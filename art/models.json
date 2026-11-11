@@ -23,14 +23,14 @@
       "group": "hero",
       "name": "Санни",
       "faces": 60000,
-      "prompt": "A cheerful young fisherman with curly brown hair, wearing a navy baseball cap with a yellow brim and yellow goggles strapped on top, a yellow hooded jacket with dark zip-up fishing vest panels, a navy backpack with yellow straps, black fingerless gloves with yellow knuckle pads, a leather belt, dark grey cargo trousers with thigh pockets and knee pads, yellow work boots with black soles",
+      "prompt": "A cheerful young fisherman with curly brown hair, wearing a navy baseball cap with a yellow brim and yellow goggles strapped on top, a yellow hooded jacket with a dark navy zip-up fishing vest over it, a navy backpack with yellow straps, plain black gloves, a brown leather belt, dark grey cargo trousers with thigh pockets and knee pads, yellow work boots with black soles",
       "fp": {
-        "sleeve": "#f2c22e",
-        "sleeve2": "#2c313c",
-        "glove": "#23262d",
+        "sleeve": "#f0d24a",
+        "sleeve2": "#2c3554",
+        "glove": "#2b2e35",
         "skin": "#f1b88c"
       },
-      "hands": "open"
+      "pose": "standing perfectly straight and symmetrical in a strict T-pose, facing the camera, both arms stretched straight out to the sides at shoulder height, both hands are tightly clenched fists like a boxer (all fingers curled into the palm, no open palms, no pointing fingers, no thumbs up), legs slightly apart, feet pointing forward, nothing in the hands"
     },
     {
       "id": "hero-finn",
@@ -404,6 +404,148 @@
       "name": "Сундучок",
       "prompt": "a small treasure chest: dark wooden planks with gold metal bands, lock and corner fittings, lid slightly open with gold coins and pearls glowing inside, a few barnacles and seaweed on it",
       "yaw": 180
+    },
+    {
+      "id": "env-pine",
+      "group": "env",
+      "name": "Сосна",
+      "prompt": "a stylized pine tree: straight brown trunk and four tiers of thick dark green conical branches that get smaller toward the pointed top",
+      "lead": "A single tree, 3D video game environment asset concept, straight side view at eye level, the whole tree visible from the base of the trunk to the top.",
+      "tris": 2600
+    },
+    {
+      "id": "env-oak",
+      "group": "env",
+      "name": "Дуб",
+      "prompt": "a stylized broadleaf tree: thick short brown trunk with two big branches and a large round fluffy bright green crown made of several rounded leaf clumps",
+      "lead": "A single tree, 3D video game environment asset concept, straight side view at eye level, the whole tree visible from the base of the trunk to the top.",
+      "tris": 3000
+    },
+    {
+      "id": "env-birch",
+      "group": "env",
+      "name": "Берёза",
+      "prompt": "a stylized birch tree: slender white trunk with black marks, a light yellow-green oval crown made of rounded leaf clumps",
+      "lead": "A single tree, 3D video game environment asset concept, straight side view at eye level, the whole tree visible from the base of the trunk to the top.",
+      "tris": 2600
+    },
+    {
+      "id": "env-palm",
+      "group": "env",
+      "name": "Пальма",
+      "prompt": "a stylized coconut palm tree: tall gently curved ringed brown trunk, a crown of eight big thick green fronds, a few coconuts under the fronds",
+      "lead": "A single tree, 3D video game environment asset concept, straight side view at eye level, the whole tree visible from the base of the trunk to the top.",
+      "tris": 3000
+    },
+    {
+      "id": "env-bush",
+      "group": "env",
+      "name": "Куст",
+      "prompt": "a stylized round leafy green bush made of rounded leaf clumps with a few small pink flowers",
+      "tris": 1200
+    },
+    {
+      "id": "env-rock1",
+      "group": "env",
+      "name": "Валун",
+      "prompt": "a big rounded granite boulder: grey stone with darker cracks and chiselled flat facets, a patch of green moss on top",
+      "tris": 1400
+    },
+    {
+      "id": "env-rock2",
+      "group": "env",
+      "name": "Плита",
+      "prompt": "a wide flat layered rock slab: grey stone with horizontal strata lines and chipped edges, a little green moss on top",
+      "tris": 1400
+    },
+    {
+      "id": "env-rock3",
+      "group": "env",
+      "name": "Скала",
+      "prompt": "a tall sharp sea stack rock spire: grey layered stone with cracks, wider at the base, barnacles and dark wet band at the bottom",
+      "tris": 1800
+    },
+    {
+      "id": "env-lighthouse",
+      "group": "env",
+      "name": "Маяк",
+      "prompt": "a tall classic lighthouse: round tapered tower painted in wide white and red horizontal stripes, a red lantern room with glass windows and a gallery with a railing on top, a red conical roof, a small arched wooden door, a round stone base",
+      "tris": 9000
+    },
+    {
+      "id": "env-wreck",
+      "group": "env",
+      "name": "Затонувший корабль",
+      "prompt": "an old wooden shipwreck: the broken hull of a small sailing ship lying tilted on its side, a broken mast with torn rigging, holes between dark weathered planks, green seaweed and barnacles on it",
+      "tris": 10000
+    },
+    {
+      "id": "env-hut",
+      "group": "env",
+      "name": "Хижина",
+      "prompt": "a small tropical beach hut on short stilts: bamboo walls, a thick thatched palm-leaf roof, an open window with a wooden shutter, a small porch with two steps, a surfboard leaning on the wall",
+      "tris": 8000
+    },
+    {
+      "id": "env-rental",
+      "group": "env",
+      "name": "Прокат лодок",
+      "prompt": "a small wooden boat rental kiosk booth: open front counter, a blue and white striped awning, a red life ring and two wooden oars hanging on the wall, a blank wooden signboard on the roof",
+      "tris": 8000
+    },
+    {
+      "id": "env-motorboat",
+      "group": "env",
+      "name": "Моторная лодка",
+      "prompt": "a small open fishing motorboat: white hull with a wide teal stripe and a wooden gunwale, a pointed bow, a flat stern with a black outboard motor, two wooden bench seats, wooden floorboards, seen from the side and slightly from above so the inside of the boat is visible",
+      "tris": 9000,
+      "textureQuality": "detailed",
+      "tex": [
+        2048,
+        1024
+      ]
+    },
+    {
+      "id": "env-lamppost",
+      "group": "env",
+      "name": "Фонарный столб",
+      "prompt": "a wooden dock lamp post: a thick wooden post with an iron bracket arm at the top and a hanging lantern with glass panes, rope wrapped around the base",
+      "tris": 2500
+    },
+    {
+      "id": "env-bench",
+      "group": "env",
+      "name": "Скамейка",
+      "prompt": "a rustic wooden bench with a backrest made of thick weathered planks, with iron bolts",
+      "tris": 2200
+    },
+    {
+      "id": "env-fender",
+      "group": "env",
+      "name": "Кранец",
+      "prompt": "an old black car tyre used as a boat dock fender, hanging on two thick ropes tied at the top",
+      "tris": 1600
+    },
+    {
+      "id": "env-signpost",
+      "group": "env",
+      "name": "Указатель",
+      "prompt": "a wooden signpost: a thick wooden pole with three blank wooden arrow boards pointing in different directions, a little rope wrapped around it",
+      "tris": 2000
+    },
+    {
+      "id": "env-seagull",
+      "group": "env",
+      "name": "Чайка",
+      "prompt": "a seagull standing on its two legs with wings folded: white body, grey wings with black tips, yellow beak and yellow legs",
+      "tris": 1600
+    },
+    {
+      "id": "env-campfire",
+      "group": "env",
+      "name": "Костёр",
+      "prompt": "a campfire: a ring of round stones with stacked logs and bright orange stylized flames, a black cooking pot hanging over it on a wooden tripod",
+      "tris": 3500
     }
   ],
   "leads": {
@@ -418,6 +560,11 @@
       "lead": "A single object, 3D video game prop concept, three-quarter front view at eye level, the whole object visible.",
       "style": "Fortnite-like art style, chunky readable shapes, slightly exaggerated proportions, hand-painted textures, soft matte materials, a little wear",
       "concept": "Plain light grey background, even studio lighting, no cast shadows, no ground, no text, no letters"
+    },
+    "env": {
+      "lead": "A single object, 3D video game environment asset concept, three-quarter front view at eye level, the whole object visible from bottom to top.",
+      "style": "Fortnite-like art style, chunky readable shapes, slightly exaggerated proportions, hand-painted textures, soft matte materials",
+      "concept": "Plain light grey background, even studio lighting, no cast shadows, no ground plane, no text, no letters"
     }
   },
   "groupDefaults": {
@@ -435,6 +582,11 @@
       "textureQuality": "standard",
       "geometry": "standard",
       "faces": 16000
+    },
+    "env": {
+      "textureQuality": "standard",
+      "geometry": "standard",
+      "faces": 20000
     }
   }
 }

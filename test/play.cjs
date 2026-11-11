@@ -261,6 +261,35 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     assert.ok(land[2] > 1, 'на берегу стоим на земле');
     const wet = await walk([14, 18], 0, () => RYBAK.player.wade > 0.5, 'с берега в воду по колено');
     assert.ok(wet[3] <= 0.63, `глубже, чем по колено, не заходим: ${wet[3]}`);
+    // бег: с зажатым Shift по пирсу проходим заметно больше, чем шагом, и поле зрения шире; пятясь, не бежим
+    const dash = async (keys, yaw = 0) => {
+      // шагаем кадрами сами, чтобы время было точным и не зависело от скорости машины
+      return G(walker, ([keys, yaw]) => {
+        const g = RYBAK;
+        g.input.locked = true; g.input.enabled = true;
+        g.player.place(0, 2, yaw);
+        g.player.speed = 0; g.player.run = 0;
+        for (const k of keys) g.input.keys.add(k);
+        const raf = window.requestAnimationFrame;
+        window.requestAnimationFrame = () => 0;
+        let now = performance.now() + 5000;
+        g.last = now;
+        for (let i = 0; i < 120; i++) { now += 1000 / 60 / g.timeScale; g.frame(now); }
+        const out = { dz: 2 - g.player.z, fov: g.camera.fov, base: JSON.parse(localStorage.getItem('rybak.settings.v1') || '{}').fov || 0, run: g.player.run };
+        for (const k of keys) g.input.keys.delete(k);
+        window.requestAnimationFrame = raf;
+        raf((t) => g.frame(t));
+        return out;
+      }, [keys, yaw]);
+    };
+    const stepW = await dash(['KeyW']);
+    const runW = await dash(['KeyW', 'ShiftLeft']);
+    const backS = await dash(['KeyS', 'ShiftLeft']);
+    assert.ok(stepW.dz > 6.5 && stepW.dz < 8.3, `шагом за две секунды около 7,8 м: ${stepW.dz.toFixed(2)}`);
+    assert.ok(runW.dz > 12.5 && runW.dz < 14.8, `бегом за две секунды около 14 м: ${runW.dz.toFixed(2)}`);
+    assert.ok(runW.fov > stepW.fov + 4, `на бегу поле зрения шире: ${stepW.fov.toFixed(1)} → ${runW.fov.toFixed(1)}`);
+    assert.ok(backS.dz < -6 && backS.dz > -8.3 && backS.run < 0.05, `пятимся шагом: ${backS.dz.toFixed(2)}`);
+    console.log(`  бег: шагом ${stepW.dz.toFixed(1)} м за 2 с, бегом ${runW.dz.toFixed(1)} м`);
     assert.ok(!walker.__err, 'ошибки на странице (ходьба)');
     await walker.close();
     console.log('  ходьба: пирс до края, мостки, берег и вода по колено');

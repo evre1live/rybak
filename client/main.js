@@ -797,7 +797,7 @@ class Game {
     const k = (a) => ui.key(a);
     const sep = '<i class="sep"></i>';
     switch (f.state) {
-      case 'idle': return `<span>${k('primary')} УДЕРЖИВАЙ — ЗАБРОС</span>${sep}<span>${k('tackle')} СНАСТИ</span>`;
+      case 'idle': return `<span>${k('primary')} УДЕРЖИВАЙ — ЗАБРОС</span>${sep}<span>${k('tackle')} СНАСТИ</span>${sep}<span>${k('run')} БЕГ</span>`;
       case 'charge': return `<span>ОТПУСТИ — ЗАБРОС</span>${sep}<span>ДО БЕЛОЙ РИСКИ — ТОЧНО В МЕТКУ</span>`;
       case 'cast': return '<span>ЛЕТИТ…</span>';
       case 'wait': return f.lure ? `<span>${k('primary')} ДЕРЖИ — ВЕДИ ПРИМАНКУ</span>${sep}<span>${k('back')} СМОТАТЬ</span>` : `<span>ЖДЁМ ПОКЛЁВКУ</span>${sep}<span>${k('back')} СМОТАТЬ</span>`;
@@ -832,6 +832,8 @@ class Game {
           t.mx = dx;
           t.mz = -dy;
           knob.style.transform = `translate(${dx * 2.6}em,${dy * 2.6}em)`;
+          t.run = l > 0.92; // стик до упора — бежим
+          stick.classList.toggle('run', t.run);
         } else if (c.identifier === lid) {
           this.input.lookDX += (c.clientX - lx) * 2.4;
           this.input.lookDY += (c.clientY - ly) * 2.4;
@@ -845,6 +847,8 @@ class Game {
         if (c.identifier === sid) {
           sid = null;
           t.mx = t.mz = 0;
+          t.run = false;
+          stick.classList.remove('run');
           knob.style.transform = '';
         } else if (c.identifier === lid) lid = null;
       }
@@ -853,6 +857,8 @@ class Game {
       sid = lid = null;
       t.mx = t.mz = 0;
       t.primary = false;
+      t.run = false;
+      stick.classList.remove('run');
       knob.style.transform = '';
     };
     stick.addEventListener('touchstart', (e) => {

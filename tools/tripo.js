@@ -137,11 +137,11 @@ async function concept(id) {
   const from = flag('from', null);
   let body;
   if (from) body = { type: 'image_to_image', file: await upload(path.resolve(from)), prompt: `${m.prompt}. ${spec.pose}. ${spec.concept}`.slice(0, 1024), ...(spec.imageModel ? { model_version: spec.imageModel } : {}) };
-  else if (m.group === 'hero') body = { type: 'text_to_image', prompt: `${spec.conceptLead} ${spec.pose}. ${m.prompt}. ${spec.style}. ${spec.concept}`.slice(0, 1024) };
+  else if (m.group === 'hero') body = { type: 'text_to_image', prompt: `${spec.conceptLead} ${m.pose || spec.pose}. ${m.prompt}. ${spec.style}. ${spec.concept}`.slice(0, 1024) };
   else {
     // рыба — строго сбоку головой влево (плоская — сверху), предметы — в три четверти: так модель выходит в известном положении
-    const L = spec.leads[m.group === 'fish' ? 'fish' : 'prop'];
-    const lead = m.view === 'top' ? L.top : L.lead;
+    const L = spec.leads[m.group === 'fish' ? 'fish' : m.group === 'env' ? 'env' : 'prop'];
+    const lead = m.lead || (m.view === 'top' ? L.top : L.lead);
     body = { type: 'text_to_image', prompt: `${lead} ${m.prompt[0].toUpperCase()}${m.prompt.slice(1)}. ${m.style || L.style}. ${L.concept}`.slice(0, 1024), ...(L.negative && args.includes('--neg') ? { negative_prompt: L.negative } : {}) };
   }
   const d = await run(`${id} образец`, body, 5);

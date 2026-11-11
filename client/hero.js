@@ -307,16 +307,16 @@ export class HeroBody {
     const { canon, hipK, scale } = this.tpl;
     const sp = st.speed || 0;
     // 1) анимации модели
-    const run = this.act.run ? sstep(3.6, 4.9, sp) : 0;
+    const run = this.act.run ? sstep(4.6, 6.2, sp) : 0;
     const walk = this.act.walk ? sstep(0.2, 1.1, sp) * (1 - run) : 0;
     if (this.act.idle) this.act.idle.setEffectiveWeight(Math.max(0, 1 - walk - run));
     if (this.act.walk) {
       this.act.walk.setEffectiveWeight(walk);
-      this.act.walk.timeScale = clamp(sp / 2.6, 0.7, 1.7);
+      this.act.walk.timeScale = clamp(sp / 2.9, 0.7, 1.7);
     }
     if (this.act.run) {
       this.act.run.setEffectiveWeight(run);
-      this.act.run.timeScale = clamp(sp / 5.2, 0.8, 1.3);
+      this.act.run.timeScale = clamp(sp / 6.4, 0.8, 1.25);
     }
     this.mixer.update(st.snap ? 0 : dt);
     const clips = !!this.act.idle;

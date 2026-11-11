@@ -347,6 +347,7 @@ input.code{text-transform:uppercase;letter-spacing:.3em;text-align:center;font-f
 #touch>*{position:absolute}
 #stick{left:4%;bottom:8%;width:9.6em;height:9.6em;border-radius:50%;background:rgba(14,33,64,.42);border:.16em solid rgba(255,255,255,.4)}
 #stick i{position:absolute;left:50%;top:50%;width:4em;height:4em;margin:-2em;border-radius:50%;background:rgba(255,255,255,.75)}
+#stick.run{border-color:var(--cy);box-shadow:0 0 0 .3em rgba(34,211,238,.25)}
 #stick.steer{border-color:var(--ye)}
 #stick.steer::before,#stick.steer::after{content:"◀";position:absolute;top:50%;left:.5em;transform:translateY(-50%);color:var(--ye);font-size:1.3em}
 #stick.steer::after{content:"▶";left:auto;right:.5em}

@@ -10,16 +10,32 @@
         {
           "task": "be8c202b-5d04-4ee2-850d-484ff32c1777",
           "file": "art/tripo/raw/hero-yellow-concept2.jpg"
+        },
+        {
+          "task": "375951f8-dd04-4403-bb16-292269124d6c",
+          "file": "art/tripo/raw/hero-yellow-concept3.jpg"
+        },
+        {
+          "task": "f5843530-4309-48bc-9322-5ccf9494d80c",
+          "file": "art/tripo/raw/hero-yellow-concept4.jpg"
+        },
+        {
+          "task": "8f5a63c3-f72b-42db-bcd2-b78b4828f02e",
+          "file": "art/tripo/raw/hero-yellow-concept5.jpg"
+        },
+        {
+          "task": "81957421-86a8-4b16-8732-652e4aeebc96",
+          "file": "art/tripo/raw/hero-yellow-concept6.jpg"
         }
       ],
-      "concept": "be8c202b-5d04-4ee2-850d-484ff32c1777",
-      "model": "eb5d8ee1-7f31-4e09-b9a8-a87a5a5f1869",
+      "concept": "81957421-86a8-4b16-8732-652e4aeebc96",
+      "model": "eead0ea1-a28a-4581-8c5a-1a09495a511d",
       "rig_v25": "17ad855a-1ef9-4d6a-b8a7-3f70a473f744",
-      "rig": "ffec2844-e9db-44c3-bbb6-5cf0d720ceb2",
+      "rig": "2d52fa18-81c2-45ea-a306-652597ee7358",
       "anims": {
-        "idle": "4bf8be61-90f2-4638-aca4-95a90b9483e4",
-        "walk": "1fab2000-69b8-4d6e-8100-d46397f75bd9",
-        "run": "c17f615d-8bc3-45cb-b681-c23e6bb1d24f"
+        "idle": "a9c819f8-029e-4c4b-a334-1d0148b54647",
+        "walk": "8dc5330d-58e3-4f96-8003-a43164d7fecf",
+        "run": "194af2f9-3986-4604-b945-d8fb15dfe884"
       }
     },
     "hero-finn": {
@@ -559,6 +575,177 @@
       ],
       "concept": "b937b087-10e6-4bdf-a490-fc887e2c3417",
       "model": "c7bf5d9d-804a-4016-b522-0fb9a5984d48"
+    },
+    "env-birch": {
+      "concepts": [
+        {
+          "task": "c41e844c-c7b3-480d-99dd-b63e1b43ee9e",
+          "file": "art/tripo/raw/env-birch-concept1.jpg"
+        }
+      ],
+      "concept": "c41e844c-c7b3-480d-99dd-b63e1b43ee9e"
+    },
+    "env-pine": {
+      "concepts": [
+        {
+          "task": "116e49ba-84f4-490d-ace9-7f46f773f424",
+          "file": "art/tripo/raw/env-pine-concept1.jpg"
+        }
+      ],
+      "concept": "116e49ba-84f4-490d-ace9-7f46f773f424"
+    },
+    "env-bush": {
+      "concepts": [
+        {
+          "task": "ebe9607e-524e-4703-9ec6-71c1604f6620",
+          "file": "art/tripo/raw/env-bush-concept1.jpg"
+        }
+      ],
+      "concept": "ebe9607e-524e-4703-9ec6-71c1604f6620"
+    },
+    "env-oak": {
+      "concepts": [
+        {
+          "task": "d84bfec9-1b4c-48b0-8c3d-35abb25335ed",
+          "file": "art/tripo/raw/env-oak-concept1.jpg"
+        }
+      ],
+      "concept": "d84bfec9-1b4c-48b0-8c3d-35abb25335ed"
+    },
+    "env-rock1": {
+      "concepts": [
+        {
+          "task": "28858e99-26ae-41f0-aaf5-23f3f2635440",
+          "file": "art/tripo/raw/env-rock1-concept1.jpg"
+        }
+      ],
+      "concept": "28858e99-26ae-41f0-aaf5-23f3f2635440"
+    },
+    "env-rock2": {
+      "concepts": [
+        {
+          "task": "bec6e3dc-c1aa-43c3-a580-b9f6e273d511",
+          "file": "art/tripo/raw/env-rock2-concept1.jpg"
+        }
+      ],
+      "concept": "bec6e3dc-c1aa-43c3-a580-b9f6e273d511"
+    },
+    "env-palm": {
+      "concepts": [
+        {
+          "task": "bebf369e-7349-4be9-9503-20c6b8ee03ca",
+          "file": "art/tripo/raw/env-palm-concept1.jpg"
+        }
+      ],
+      "concept": "bebf369e-7349-4be9-9503-20c6b8ee03ca"
+    },
+    "env-rock3": {
+      "concepts": [
+        {
+          "task": "3ac887b9-dd47-4ed7-acf1-12d8d5550884",
+          "file": "art/tripo/raw/env-rock3-concept1.jpg"
+        }
+      ],
+      "concept": "3ac887b9-dd47-4ed7-acf1-12d8d5550884"
+    },
+    "env-lighthouse": {
+      "concepts": [
+        {
+          "task": "53be67d1-206a-4aa2-be58-2bba419f2071",
+          "file": "art/tripo/raw/env-lighthouse-concept1.jpg"
+        }
+      ],
+      "concept": "53be67d1-206a-4aa2-be58-2bba419f2071"
+    },
+    "env-wreck": {
+      "concepts": [
+        {
+          "task": "54071f7c-f5d7-4c80-9a61-8d5385d65b8f",
+          "file": "art/tripo/raw/env-wreck-concept1.jpg"
+        }
+      ],
+      "concept": "54071f7c-f5d7-4c80-9a61-8d5385d65b8f"
+    },
+    "env-hut": {
+      "concepts": [
+        {
+          "task": "b671a043-b6e7-4df2-81da-ad9a9fa26d8a",
+          "file": "art/tripo/raw/env-hut-concept1.jpg"
+        }
+      ],
+      "concept": "b671a043-b6e7-4df2-81da-ad9a9fa26d8a"
+    },
+    "env-rental": {
+      "concepts": [
+        {
+          "task": "8a5dbc7e-828c-456a-abb7-26033cf6998e",
+          "file": "art/tripo/raw/env-rental-concept1.jpg"
+        }
+      ],
+      "concept": "8a5dbc7e-828c-456a-abb7-26033cf6998e"
+    },
+    "env-motorboat": {
+      "concepts": [
+        {
+          "task": "072603fe-6248-4251-8a6b-e4916ce6e045",
+          "file": "art/tripo/raw/env-motorboat-concept1.jpg"
+        }
+      ],
+      "concept": "072603fe-6248-4251-8a6b-e4916ce6e045"
+    },
+    "env-lamppost": {
+      "concepts": [
+        {
+          "task": "1eb1f792-274e-4ceb-b917-8fd7fe675e91",
+          "file": "art/tripo/raw/env-lamppost-concept1.jpg"
+        }
+      ],
+      "concept": "1eb1f792-274e-4ceb-b917-8fd7fe675e91"
+    },
+    "env-bench": {
+      "concepts": [
+        {
+          "task": "bb48cbb0-1ef6-4703-93e8-d82d4f43b346",
+          "file": "art/tripo/raw/env-bench-concept1.jpg"
+        }
+      ],
+      "concept": "bb48cbb0-1ef6-4703-93e8-d82d4f43b346"
+    },
+    "env-fender": {
+      "concepts": [
+        {
+          "task": "7e89c0cb-9662-4d33-8695-fe8941dc204d",
+          "file": "art/tripo/raw/env-fender-concept1.jpg"
+        }
+      ],
+      "concept": "7e89c0cb-9662-4d33-8695-fe8941dc204d"
+    },
+    "env-signpost": {
+      "concepts": [
+        {
+          "task": "0b4fb648-5d40-437d-b896-b2c280c60e50",
+          "file": "art/tripo/raw/env-signpost-concept1.jpg"
+        }
+      ],
+      "concept": "0b4fb648-5d40-437d-b896-b2c280c60e50"
+    },
+    "env-seagull": {
+      "concepts": [
+        {
+          "task": "858c3a51-fa48-4ca3-ae54-8e3324869386",
+          "file": "art/tripo/raw/env-seagull-concept1.jpg"
+        }
+      ],
+      "concept": "858c3a51-fa48-4ca3-ae54-8e3324869386"
+    },
+    "env-campfire": {
+      "concepts": [
+        {
+          "task": "8eaeb6c8-a4b9-460f-b386-d5c665bbcf03",
+          "file": "art/tripo/raw/env-campfire-concept1.jpg"
+        }
+      ],
+      "concept": "8eaeb6c8-a4b9-460f-b386-d5c665bbcf03"
     }
   },
   "ledger": [
@@ -1506,6 +1693,209 @@
       "type": "image_to_model",
       "task": "c7bf5d9d-804a-4016-b522-0fb9a5984d48",
       "credits": 30
+    },
+    {
+      "at": "2026-11-11T20:38:50.223Z",
+      "label": "hero-yellow образец",
+      "type": "text_to_image",
+      "task": "375951f8-dd04-4403-bb16-292269124d6c",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T20:39:00.316Z",
+      "label": "hero-yellow образец",
+      "type": "text_to_image",
+      "task": "f5843530-4309-48bc-9322-5ccf9494d80c",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T20:41:22.681Z",
+      "label": "hero-yellow образец",
+      "type": "text_to_image",
+      "task": "8f5a63c3-f72b-42db-bcd2-b78b4828f02e",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T20:42:05.987Z",
+      "label": "hero-yellow образец",
+      "type": "text_to_image",
+      "task": "81957421-86a8-4b16-8732-652e4aeebc96",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T20:45:16.819Z",
+      "label": "hero-yellow модель",
+      "type": "image_to_model",
+      "task": "eead0ea1-a28a-4581-8c5a-1a09495a511d",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-11T20:45:24.218Z",
+      "label": "hero-yellow проверка скелета",
+      "type": "animate_prerigcheck",
+      "task": "ff99bb7d-87a3-49b2-bad4-d107b85cc42a",
+      "credits": 0
+    },
+    {
+      "at": "2026-11-11T20:45:37.518Z",
+      "label": "hero-yellow скелет",
+      "type": "animate_rig",
+      "task": "2d52fa18-81c2-45ea-a306-652597ee7358",
+      "credits": 25
+    },
+    {
+      "at": "2026-11-11T20:46:56.234Z",
+      "label": "env-birch образец",
+      "type": "text_to_image",
+      "task": "c41e844c-c7b3-480d-99dd-b63e1b43ee9e",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T20:46:56.438Z",
+      "label": "env-pine образец",
+      "type": "text_to_image",
+      "task": "116e49ba-84f4-490d-ace9-7f46f773f424",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T20:47:00.834Z",
+      "label": "env-bush образец",
+      "type": "text_to_image",
+      "task": "ebe9607e-524e-4703-9ec6-71c1604f6620",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T20:47:00.838Z",
+      "label": "env-oak образец",
+      "type": "text_to_image",
+      "task": "d84bfec9-1b4c-48b0-8c3d-35abb25335ed",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T20:47:05.050Z",
+      "label": "env-rock1 образец",
+      "type": "text_to_image",
+      "task": "28858e99-26ae-41f0-aaf5-23f3f2635440",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T20:47:06.357Z",
+      "label": "env-rock2 образец",
+      "type": "text_to_image",
+      "task": "bec6e3dc-c1aa-43c3-a580-b9f6e273d511",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T20:47:09.256Z",
+      "label": "env-palm образец",
+      "type": "text_to_image",
+      "task": "bebf369e-7349-4be9-9503-20c6b8ee03ca",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T20:47:10.589Z",
+      "label": "env-rock3 образец",
+      "type": "text_to_image",
+      "task": "3ac887b9-dd47-4ed7-acf1-12d8d5550884",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T20:47:10.993Z",
+      "label": "env-lighthouse образец",
+      "type": "text_to_image",
+      "task": "53be67d1-206a-4aa2-be58-2bba419f2071",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T20:47:11.114Z",
+      "label": "env-wreck образец",
+      "type": "text_to_image",
+      "task": "54071f7c-f5d7-4c80-9a61-8d5385d65b8f",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T20:47:14.905Z",
+      "label": "env-hut образец",
+      "type": "text_to_image",
+      "task": "b671a043-b6e7-4df2-81da-ad9a9fa26d8a",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T20:47:16.255Z",
+      "label": "env-rental образец",
+      "type": "text_to_image",
+      "task": "8a5dbc7e-828c-456a-abb7-26033cf6998e",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T20:47:19.181Z",
+      "label": "env-motorboat образец",
+      "type": "text_to_image",
+      "task": "072603fe-6248-4251-8a6b-e4916ce6e045",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T20:47:20.499Z",
+      "label": "env-lamppost образец",
+      "type": "text_to_image",
+      "task": "1eb1f792-274e-4ceb-b917-8fd7fe675e91",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T20:47:24.952Z",
+      "label": "env-bench образец",
+      "type": "text_to_image",
+      "task": "bb48cbb0-1ef6-4703-93e8-d82d4f43b346",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T20:47:25.447Z",
+      "label": "env-fender образец",
+      "type": "text_to_image",
+      "task": "7e89c0cb-9662-4d33-8695-fe8941dc204d",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T20:47:32.920Z",
+      "label": "env-signpost образец",
+      "type": "text_to_image",
+      "task": "0b4fb648-5d40-437d-b896-b2c280c60e50",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T20:47:34.362Z",
+      "label": "env-seagull образец",
+      "type": "text_to_image",
+      "task": "858c3a51-fa48-4ca3-ae54-8e3324869386",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T20:47:45.582Z",
+      "label": "env-campfire образец",
+      "type": "text_to_image",
+      "task": "8eaeb6c8-a4b9-460f-b386-d5c665bbcf03",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T20:47:49.262Z",
+      "label": "hero-yellow idle",
+      "type": "animate_retarget",
+      "task": "a9c819f8-029e-4c4b-a334-1d0148b54647",
+      "credits": 10
+    },
+    {
+      "at": "2026-11-11T20:48:03.929Z",
+      "label": "hero-yellow walk",
+      "type": "animate_retarget",
+      "task": "8dc5330d-58e3-4f96-8003-a43164d7fecf",
+      "credits": 10
+    },
+    {
+      "at": "2026-11-11T20:48:14.210Z",
+      "label": "hero-yellow run",
+      "type": "animate_retarget",
+      "task": "194af2f9-3986-4604-b945-d8fb15dfe884",
+      "credits": 10
     }
   ]
 }

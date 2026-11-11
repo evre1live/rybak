@@ -22,8 +22,8 @@ export class Input {
     this.mouse = { x: 0.5, y: 0.5, in: false };
     this.onFree = () => {};
     this.enabled = false; // игра принимает управление (не открыто меню)
-    this.touch = { on: false, mx: 0, mz: 0, primary: false };
-    this.pad = { on: false, last: {} };
+    this.touch = { on: false, mx: 0, mz: 0, primary: false, run: false }; // run: стик отведён до упора
+    this.pad = { on: false, last: {}, run: false }; // run: бег включён нажатием на левый стик, пока идём
     this.device = 'kb';
     this.onLockChange = () => {};
     this.typing = () => false;
@@ -143,7 +143,7 @@ export class Input {
       this.lookDX += dz(gp.axes[2] || 0) * 14;
       this.lookDY += dz(gp.axes[3] || 0) * 10;
       const b = (i) => !!(gp.buttons[i] && gp.buttons[i].pressed);
-      const map = { 7: 'Primary', 0: 'KeyE', 1: 'Secondary', 2: 'Tab', 3: 'KeyJ', 9: 'Escape', 10: 'ShiftLeft', 4: 'KeyC', 5: 'KeyM' };
+      const map = { 7: 'Primary', 0: 'KeyE', 1: 'Secondary', 2: 'Tab', 3: 'KeyJ', 9: 'Escape', 10: 'PadRun', 4: 'KeyC', 5: 'KeyM' };
       for (const i in map) {
         const on = b(+i);
         if (on && !this.pad.last[i]) {
@@ -154,12 +154,15 @@ export class Input {
       }
       if (b(7)) primary = true;
       if (Math.abs(ax) + Math.abs(ay) > 0.3) this.device = 'pad';
+      // бег на геймпаде: нажать на левый стик — бежим, пока не остановимся
+      if (this.pressed.has('PadRun')) this.pad.run = !this.pad.run;
+      if (Math.abs(ax) + Math.abs(ay) < 0.2) this.pad.run = false;
     }
     this.moveX = clamp(mx, -1, 1);
     this.moveZ = clamp(mz, -1, 1);
     this.steer = Math.abs(steer) > 0.35 ? Math.sign(steer) : 0;
     this.hold = this.enabled && primary;
-    this.sprint = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight');
+    this.sprint = this.enabled && (this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || (this.touch.on && this.touch.run) || (this.pad.on && this.pad.run));
   }
   endFrame() {
     this.pressed.clear();
@@ -167,6 +170,9 @@ export class Input {
     this.lookDY = 0;
   }
 }
+
+export const WALK = 3.9; // шаг, м/с
+export const RUN = 7.2; // бег, м/с
 
 export class Player {
   constructor(camera) {
@@ -187,6 +193,7 @@ export class Player {
     this.eyeNow = 1.62;
     this.onStep = () => {};
     this.shake = 0;
+    this.run = 0; // 0 — шаг, 1 — бег (плавно)
   }
   place(x, z, yaw = 0) {
     this.x = x;
@@ -211,7 +218,10 @@ export class Player {
     if (this.sit && len > 0.1 && canMove) this.sit = false;
     // по колено в воде идём медленнее
     this.wade = this.onDeck ? 0 : Math.max(0, -groundH(this.x, this.z));
-    const max = (this.sit ? 0 : input.sprint ? 5.4 : 3.5) * (1 - Math.min(0.55, this.wade * 0.9));
+    // бежим только вперёд и вбок; пятясь — шагом
+    const running = input.sprint && !this.sit && mz > 0.3 && len > 0.5;
+    const max = (this.sit ? 0 : running ? RUN : WALK) * (1 - Math.min(0.55, this.wade * 0.9));
+    this.run = damp(this.run, running && canMove ? 1 : 0, 7, dt);
     const sin = Math.sin(this.yaw);
     const cos = Math.cos(this.yaw);
     const vx = (mx * cos - mz * sin) * max;
@@ -268,11 +278,17 @@ export class Player {
       if (Math.floor(this.walk / Math.PI) !== before) this.onStep(false);
     }
     this.eyeNow = damp(this.eyeNow, this.sit ? (this.dangle ? 0.86 : 0.8) : this.eye, 9, dt);
-    const bob = this.speed > 0.4 ? Math.abs(Math.cos(this.walk)) * 0.035 * Math.min(1, this.speed / 3) : 0;
+    const bob = this.speed > 0.4 ? Math.abs(Math.cos(this.walk)) * (0.035 + 0.03 * this.run) * Math.min(1, this.speed / 3) : 0;
     this.shake = Math.max(0, this.shake - dt * 3);
     const sh = this.shake * 0.012;
     this.camera.position.set(this.x + (Math.random() - 0.5) * sh, this.y + this.eyeNow + this.jump - bob + (Math.random() - 0.5) * sh, this.z);
     this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
+    // на бегу поле зрения чуть шире — скорость чувствуется
+    const fov = settings.fov + 7 * this.run * Math.min(1, this.speed / RUN);
+    if (Math.abs(this.camera.fov - fov) > 0.02) {
+      this.camera.fov = fov;
+      this.camera.updateProjectionMatrix();
+    }
   }
   toggleSit() {
     this.sit = !this.sit;

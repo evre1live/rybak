@@ -6,19 +6,18 @@
       "file": "models/hero-yellow.glb",
       "lite": "models/hero-yellow.lite.glb",
       "tris": 30000,
-      "kb": 880,
+      "kb": 905,
       "clips": [
         "idle",
         "run",
         "walk"
       ],
       "fp": {
-        "sleeve": "#f2c22e",
-        "sleeve2": "#2c313c",
-        "glove": "#23262d",
+        "sleeve": "#f0d24a",
+        "sleeve2": "#2c3554",
+        "glove": "#2b2e35",
         "skin": "#f1b88c"
-      },
-      "hands": "open"
+      }
     },
     {
       "id": "hero-finn",

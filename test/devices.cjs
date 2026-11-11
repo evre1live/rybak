@@ -73,6 +73,15 @@ const atHead = (page) => G(page, () => { RYBAK.player.place(0.6, -20, 0.1); RYBA
     await page.waitForFunction((z) => RYBAK.player.z > z + 0.5, z0, { timeout: 30000 });
     await touch('touchEnd', []);
     assert.equal(await G(page, () => RYBAK.input.touch.mz), 0, 'джойстик отпущен');
+    // джойстик до упора вперёд — бег; чуть отвели — шаг
+    await touch('touchStart', [[sx, sy]]);
+    await touch('touchMove', [[sx, sy - 20]]);
+    await page.waitForFunction(() => RYBAK.input.touch.mz > 0.2);
+    assert.equal(await G(page, () => RYBAK.input.touch.run), false, 'джойстик отведён слегка — шаг');
+    await touch('touchMove', [[sx, sy - 90]]);
+    await page.waitForFunction(() => RYBAK.input.touch.run && RYBAK.input.sprint && document.querySelector('#stick').classList.contains('run'), null, { timeout: 10000 });
+    await touch('touchEnd', []);
+    await page.waitForFunction(() => !RYBAK.input.touch.run && !RYBAK.input.sprint && !document.querySelector('#stick').classList.contains('run'), null, { timeout: 10000 }); // отпустили — бег выключился
     // палец по экрану — поворот
     await atHead(page);
     const yaw0 = await G(page, () => RYBAK.player.yaw);
