@@ -1,0 +1,32 @@
+{
+  "name": "rybak",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Рыбак — рыбалка с друзьями от первого лица: голосовой чат, рынок, снасти, свой персонаж",
+  "main": "server/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server/index.js",
+    "build": "node tools/build.js",
+    "dev": "node tools/build.js --watch",
+    "test": "node --test test/logic.test.js test/net.test.js",
+    "test:play": "node test/play.cjs",
+    "test:coop": "node test/coop.cjs",
+    "balance": "node tools/balance.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "ws": "^8.22.2"
+  },
+  "devDependencies": {
+    "@fontsource/fira-sans-extra-condensed": "^5.3.0",
+    "@fontsource/onest": "^5.3.1",
+    "@fontsource/oswald": "^5.3.0",
+    "@fontsource/rubik": "^5.3.0",
+    "@fontsource/sofia-sans-extra-condensed": "^5.3.0",
+    "esbuild": "^0.28.2",
+    "three": "^0.187.0"
+  }
+}

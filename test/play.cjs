@@ -1,0 +1,207 @@
+// Проверка игры в настоящем браузере: одиночная рыбалка от заброса до покупки, все экраны, снимки.
+// Запуск: PORT=3111 node test/play.cjs [папка для снимков]
+const { chromium } = require(process.env.PLAYWRIGHT || '/opt/npm-tools/node_modules/playwright');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const out = process.argv[2] || '/tmp/rybak-shots';
+fs.mkdirSync(out, { recursive: true });
+const BASE = `http://127.0.0.1:${process.env.PORT || 3111}`;
+const W = +(process.env.W || 1280), H = +(process.env.H || 720);
+
+async function open(browser, query, name) {
+  const page = await browser.newPage({ viewport: { width: W, height: H } });
+  page.on('console', (m) => { if (m.type() === 'error') console.log(`[${name}] console.error`, m.text().slice(0, 300)); });
+  page.on('pageerror', (e) => { console.log(`[${name}] PAGEERROR`, e.message.slice(0, 500)); page.__err = (page.__err || 0) + 1; });
+  await page.goto(`${BASE}/?${query}`);
+  await page.waitForFunction(() => window.RYBAK && window.__frames > 3, null, { timeout: 60000 });
+  return page;
+}
+async function shot(page, file, wait = 0) {
+  if (wait) await page.waitForTimeout(wait);
+  const before = await page.evaluate(() => { window.__render = true; return window.__rendered || 0; });
+  await page.waitForFunction((b) => (window.__rendered || 0) > b, before, { timeout: 120000 });
+  await page.screenshot({ path: `${out}/${file}.png` });
+  console.log('  снимок', file);
+}
+const G = (page, fn, arg) => page.evaluate(fn, arg);
+
+(async () => {
+  const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
+  const page = await open(browser, 'q=low&norender&ts=3&h=13', 'solo');
+  await shot(page, '01-title');
+
+  // меню: без имени нельзя
+  await page.click('[data-a="solo"]');
+  assert.match(await page.textContent('#terr'), /представьтесь/);
+  await page.fill('#nm', 'Жамшид');
+  await page.click('[data-a="solo"]');
+  await page.waitForFunction(() => RYBAK.state === 'lobby');
+  await shot(page, '02-lobby', 300);
+
+  // лобби → снасти, журнал, редактор
+  await page.click('.nav [data-p="tackle"]');
+  await page.waitForSelector('.panel .grid .tile');
+  await shot(page, '03-tackle');
+  for (const cat of ['tackle', 'lure', 'reel', 'line', 'hook', 'float', 'bag', 'extra']) {
+    await page.click(`.tabs2 [data-id="${cat}"]`);
+    assert.ok((await page.locator('.grid .tile').count()) >= 2, cat);
+    assert.ok((await page.textContent('.detail h2')).length > 2);
+  }
+  await page.keyboard.press('Escape');
+  await page.click('.nav [data-p="journal"]');
+  await page.waitForSelector('.jstats');
+  await shot(page, '04-journal');
+  await page.keyboard.press('Escape');
+  await page.click('.nav [data-p="editor"]');
+  await page.waitForSelector('.editor .opts');
+  await shot(page, '05-editor', 400);
+  for (const cat of ['presets', 'face', 'hair', 'head', 'top', 'bottom', 'shoes', 'hands', 'back']) {
+    await page.click(`.cats [data-id="${cat}"]`);
+    await page.locator('.opts button').nth(1).click();
+  }
+  await page.click('.cats [data-id="hair"]');
+  await page.click('.opts [data-k="hair"][data-id="7"]');
+  await shot(page, '06-editor-hair', 300);
+  await page.click('[data-a="edsave"]');
+  assert.equal(await G(page, () => RYBAK.profile.look.hair), 7);
+
+  // на рыбалку
+  await page.click('[data-a="start"]');
+  await page.waitForFunction(() => RYBAK.state === 'world');
+  assert.ok(await page.isVisible('.center h1'), 'первая справка');
+  await shot(page, '07-help');
+  await page.click('.center [data-a="close"]');
+  await G(page, () => { const g = RYBAK; g.input.locked = true; g.input.enabled = true; g.player.place(0, -24.5, 0); g.player.pitch = -0.22; });
+  await shot(page, '08-hud-idle', 300);
+  assert.ok(await G(page, () => RYBAK.fishing.aim.ok), 'прицел на воде');
+
+  // заброс: зажать, подождать, отпустить
+  await G(page, () => { const i = RYBAK.input; i.primary = true; i.pressed.add('Primary'); });
+  await page.waitForFunction(() => RYBAK.fishing.state === 'charge' && RYBAK.fishing.power > 0.6);
+  await shot(page, '09-charge');
+  await G(page, () => { RYBAK.input.primary = false; });
+  await page.waitForFunction(() => RYBAK.fishing.state === 'wait', null, { timeout: 20000 });
+  assert.equal(await G(page, () => RYBAK.profile.stats.casts), 1);
+  await shot(page, '10-wait');
+  // во время ожидания ходить нельзя
+  const z0 = await G(page, () => RYBAK.player.z);
+  await page.keyboard.down('KeyS');
+  await page.waitForTimeout(400);
+  await page.keyboard.up('KeyS');
+  assert.equal(await G(page, () => RYBAK.player.z), z0);
+
+  // ловим до первой рыбы в садке (с ботом на вываживании)
+  await G(page, () => {
+    const g = RYBAK;
+    window.__log = [];
+    const emit = g.fishing.emit;
+    g.fishing.emit = (t, d) => { window.__log.push(t); emit(t, d); };
+    window.__bot = setInterval(() => {
+      const f = g.fishing, i = g.input;
+      if (f.state === 'idle') { i.primary = true; i.pressed.add('Primary'); }
+      else if (f.state === 'charge') { if (f.power > 0.9) i.primary = false; }
+      else if (f.state === 'bite') { i.pressed.add('Primary'); }
+      else if (f.state === 'fight') {
+        const s = f.fight; const run = s.phase === 'run';
+        i.primary = s.T < (run ? 0.5 : s.warned ? 0.42 : 0.64);
+        i.keys.delete('KeyA'); i.keys.delete('KeyD');
+        if (run && s.dir) i.keys.add(s.dir > 0 ? 'KeyA' : 'KeyD');
+      } else if (f.state === 'landed') { i.primary = false; if (f.landT > 1.2 && !window.__keep) i.pressed.add('Primary'); }
+      else i.primary = false;
+    }, 30);
+  });
+  await page.waitForFunction(() => RYBAK.fishing.state === 'bite', null, { timeout: 90000 });
+  await shot(page, '11-bite');
+  await page.waitForFunction(() => RYBAK.fishing.state === 'fight', null, { timeout: 30000 });
+  await page.waitForFunction(() => RYBAK.fishing.state !== 'fight' || RYBAK.fishing.fight.p > 0.35, null, { timeout: 60000 });
+  await shot(page, '12-fight');
+  await G(page, () => { window.__keep = true; });
+  await page.waitForFunction(() => window.__log.includes('caught'), null, { timeout: 240000 });
+  await shot(page, '13-catch', 400);
+  await G(page, () => { window.__keep = false; });
+  await page.waitForFunction(() => RYBAK.profile.cooler.length >= 3, null, { timeout: 400000 });
+  await G(page, () => { clearInterval(window.__bot); const i = RYBAK.input; i.primary = false; i.keys.clear(); window.__bot = setInterval(() => { if (RYBAK.fishing.state === 'landed') RYBAK.input.pressed.add('Primary'); else if (RYBAK.fishing.state !== 'idle' && RYBAK.fishing.state !== 'fight') RYBAK.input.pressed.add('KeyR'); }, 50); });
+  await page.waitForFunction(() => RYBAK.fishing.state === 'idle', null, { timeout: 120000 });
+  await G(page, () => clearInterval(window.__bot));
+  const st = await G(page, () => ({ cooler: RYBAK.profile.cooler.length, xp: RYBAK.profile.xp, journal: Object.keys(RYBAK.profile.journal).length, log: [...new Set(window.__log)] }));
+  console.log('  улов:', JSON.stringify(st));
+  assert.ok(st.cooler >= 3 && st.xp > 0);
+
+  // рынок: подойти, продать, купить
+  await G(page, () => { RYBAK.player.place(-5.4, 12.8, 1.4); });
+  await G(page, () => { RYBAK.input.locked = true; });
+  await page.waitForFunction(() => /РЫНОК/.test(document.querySelector('#prompt').textContent));
+  await shot(page, '14-market-prompt', 200);
+  await G(page, () => RYBAK.input.pressed.add('KeyE'));
+  await page.waitForSelector('.sellside');
+  await shot(page, '15-sell');
+  const coins0 = await G(page, () => RYBAK.profile.coins);
+  await page.locator('.grid .tile').first().click();
+  await page.click('[data-a="sellall"]');
+  const coins1 = await G(page, () => RYBAK.profile.coins);
+  assert.ok(coins1 > coins0, 'монеты за улов');
+  assert.equal(await G(page, () => RYBAK.profile.cooler.length), 0);
+  await page.click('[data-p="shop"]');
+  await page.waitForSelector('.panel .grid .tile');
+  await G(page, () => { RYBAK.profile.coins += 2000; RYBAK.ui.rerender(); });
+  await page.click('.tabs2 [data-id="rod"]');
+  await page.click('.grid [data-id="rod2"]');
+  await shot(page, '16-shop');
+  await page.click('.detail [data-a="buy"]');
+  assert.equal(await G(page, () => RYBAK.profile.equip.rod), 'rod2');
+  await page.click('.tabs2 [data-id="tackle"]');
+  await page.click('.grid [data-id="shrimp"]');
+  await page.click('.detail [data-a="buy"]');
+  assert.equal(await G(page, () => RYBAK.profile.tackle.shrimp), 10);
+  await page.click('.tabs2 [data-id="lure"]');
+  await page.click('.grid [data-id="spoon"]');
+  await page.click('.detail [data-a="buy"]');
+  assert.equal(await G(page, () => RYBAK.profile.equip.tackle), 'spoon');
+  await page.keyboard.press('Escape');
+  assert.equal(await G(page, () => RYBAK.ui.panel), null);
+  assert.equal(await G(page, () => RYBAK.fishing.kit.cast), 24);
+
+  // блесна: вести подмоткой
+  await page.waitForTimeout(900);
+  assert.equal(await G(page, () => RYBAK.ui.panel), null, 'после Esc не должна всплывать пауза');
+  await G(page, () => { const g = RYBAK; g.input.locked = true; g.input.enabled = true; g.player.place(0, -24.5, 0); g.player.pitch = -0.12; const i = g.input; i.primary = true; i.pressed.add('Primary'); });
+  await page.waitForFunction(() => RYBAK.fishing.state === 'charge' && RYBAK.fishing.power > 0.95);
+  await G(page, () => { RYBAK.input.primary = false; });
+  await page.waitForFunction(() => RYBAK.fishing.state === 'wait', null, { timeout: 20000 });
+  const d0 = await G(page, () => Math.hypot(RYBAK.fishing.bx - RYBAK.player.x, RYBAK.fishing.bz - RYBAK.player.z));
+  assert.ok(d0 > 18, 'дальний заброс новой удочкой: ' + d0);
+  await G(page, () => { RYBAK.input.primary = true; });
+  await page.waitForTimeout(1200);
+  const d1 = await G(page, () => Math.hypot(RYBAK.fishing.bx - RYBAK.player.x, RYBAK.fishing.bz - RYBAK.player.z));
+  assert.ok(d1 < d0 - 1 || (await G(page, () => RYBAK.fishing.state)) !== 'wait', 'приманка идёт к берегу');
+  await shot(page, '17-lure');
+  await G(page, () => { RYBAK.input.primary = false; RYBAK.input.pressed.add('KeyR'); });
+  await page.waitForFunction(() => ['idle', 'bite', 'fight'].includes(RYBAK.fishing.state));
+
+  // пауза, настройки, ночь
+  await G(page, () => { RYBAK.fishing.reelIn(true); RYBAK.ui.openPanel('pause'); });
+  await shot(page, '18-pause');
+  await page.click('[data-p="settings"]');
+  await page.waitForSelector('.set');
+  await shot(page, '19-settings');
+  await page.click('.tog[data-id="near"]');
+  assert.equal(await G(page, () => JSON.parse(localStorage.getItem('rybak.settings.v1')).near), true);
+  await page.click('.center [data-a="close"]');
+  await G(page, () => { RYBAK.fixedHour = 22.5; RYBAK.input.locked = true; RYBAK.player.place(0, -10, 0.5); });
+  await shot(page, '20-night', 400);
+  await G(page, () => { RYBAK.fixedHour = 19.2; RYBAK.player.place(-31, 8, 1.2); RYBAK.player.pitch = -0.1; });
+  await shot(page, '21-dusk-backwater', 400);
+
+  // сохранение переживает перезагрузку
+  await page.waitForTimeout(500);
+  const saved = await G(page, () => JSON.parse(localStorage.getItem('rybak.profile.v1')));
+  assert.equal(saved.equip.rod, 'rod2');
+  assert.equal(saved.name, 'Жамшид');
+  await page.reload();
+  await page.waitForFunction(() => window.RYBAK && window.__frames > 3);
+  assert.equal(await page.inputValue('#nm'), 'Жамшид');
+  assert.equal(await G(page, () => RYBAK.profile.equip.rod), 'rod2');
+  assert.ok(!page.__err, 'ошибки на странице');
+  await browser.close();
+  console.log('ОДИНОЧНАЯ ИГРА: всё в порядке');
+})().catch((e) => { console.error('ПРОВАЛ:', e.message.split('\n').slice(0, 6).join('\n'), '\n', (e.stack || '').split('\n').filter((l) => l.includes('play.cjs')).slice(0, 2).join('\n')); process.exit(1); });

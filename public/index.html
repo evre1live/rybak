@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0e2140">
+<title>Рыбак — рыбалка с друзьями</title>
+<meta name="description" content="Рыбалка с друзьями от первого лица: голосовой чат, рынок, снасти и свой персонаж.">
+<meta property="og:title" content="Рыбак — рыбалка с друзьями">
+<meta property="og:description" content="Заходи в бухту: поболтаем и порыбачим.">
+<link rel="icon" href="favicon.svg">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="ui">
+  <div id="hud" class="hidden">
+    <div class="hud-tl">
+      <div class="chip loc"><span class="ic" data-ic="pin"></span><b id="locName">СОЛНЕЧНАЯ БУХТА</b><i class="sep"></i><span class="ic" data-ic="sun" id="clockIc"></span><b id="clock">08:00</b></div>
+      <div id="crew"></div>
+      <div id="feed"></div>
+    </div>
+    <div class="hud-tc"><canvas id="compass" width="760" height="64"></canvas><div id="banner" class="hidden"></div></div>
+    <div class="hud-tr">
+      <div class="mapbox"><canvas id="minimap" width="256" height="256"></canvas><span class="north">С<i></i></span></div>
+      <div class="chip online"><span class="ic" data-ic="users"></span><b id="onlineN">1 РЫБАК</b></div>
+      <div class="chip coins"><span class="ic" data-ic="coin"></span><b id="coins">0</b><i class="sep"></i><span class="lv">УР.</span><b id="lvl">1</b></div>
+      <div class="chip voice hidden" id="voiceChip"><span class="ic" data-ic="mic"></span><b id="voiceTxt">ГОЛОС</b></div>
+    </div>
+    <div class="hud-bl">
+      <div class="chip bag"><span class="ic" data-ic="bag"></span><b>САДОК</b><b id="bagN" class="y">0 / 8</b></div>
+      <div class="chip rodchip"><img id="rodIcon" alt=""><b id="rodName">СТАРТОВАЯ</b></div>
+    </div>
+    <div class="hud-bc">
+      <div id="fight" class="hidden">
+        <div id="steer"><span class="st l"><kbd>A</kbd>◀</span><b id="fstate">РОВНО</b><span class="st r">▶<kbd>D</kbd></span></div>
+        <div class="fpanel">
+          <div class="ftitle"><i></i>НАТЯЖЕНИЕ ЛЕСКИ<i></i></div>
+          <div class="tbar"><span class="lo">СЛАБО</span><span class="ok">НОРМА</span><span class="dg"><span class="ic" data-ic="warn"></span>ОПАСНО</span><div id="tptr"></div></div>
+          <div class="prow"><span>ВЫВАЖИВАНИЕ</span><div class="pbar"><i id="pfill"></i></div><b id="ppct">0%</b></div>
+        </div>
+      </div>
+      <div id="power" class="hidden"><span>СИЛА ЗАБРОСА</span><div class="pw"><i id="pwfill"></i><em id="pwneed"></em></div></div>
+      <div id="hints" class="chip"></div>
+    </div>
+    <div class="hud-br" id="hotbar"></div>
+    <div id="cross"><i></i></div>
+    <div id="castMark" class="hidden"><div class="ring"></div><div class="lbl">ЗАБРОС СЮДА</div><div class="sub"></div></div>
+    <div id="prompt" class="hidden"></div>
+    <div id="alert" class="hidden"></div>
+    <div id="tags"></div>
+    <div id="catch" class="hidden"></div>
+    <form id="chat" class="hidden" autocomplete="off"><input id="chatIn" maxlength="200" placeholder="Сообщение друзьям — Enter"></form>
+  </div>
+  <div id="plates"></div>
+  <div id="screen"></div>
+  <div id="toasts"></div>
+  <div id="touch" class="hidden">
+    <div id="stick"><i></i></div>
+    <button id="tAct" type="button">ЗАБРОС</button>
+    <button id="tE" type="button">E</button>
+    <button id="tR" type="button">⟲</button>
+    <button id="tL" type="button">◀</button>
+    <button id="tRt" type="button">▶</button>
+    <button id="tMenu" type="button">☰</button>
+    <button id="tBag" type="button">СНАСТИ</button>
+  </div>
+  <div id="loading"><div class="logo">РЫБАК</div><p>Наполняем бухту водой…</p></div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
