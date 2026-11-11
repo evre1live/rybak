@@ -4,6 +4,7 @@
       "id": "hero-yellow",
       "name": "Санни",
       "file": "models/hero-yellow.glb",
+      "lite": "models/hero-yellow.lite.glb",
       "tris": 30000,
       "kb": 880,
       "clips": [
@@ -22,6 +23,7 @@
       "id": "hero-finn",
       "name": "Финн",
       "file": "models/hero-finn.glb",
+      "lite": "models/hero-finn.lite.glb",
       "tris": 30000,
       "kb": 970,
       "clips": [
@@ -38,6 +40,7 @@
       "id": "hero-nori",
       "name": "Нори",
       "file": "models/hero-nori.glb",
+      "lite": "models/hero-nori.lite.glb",
       "tris": 30000,
       "kb": 851,
       "clips": [
@@ -55,6 +58,7 @@
       "id": "hero-pip",
       "name": "Пип",
       "file": "models/hero-pip.glb",
+      "lite": "models/hero-pip.lite.glb",
       "tris": 29999,
       "kb": 884,
       "clips": [
@@ -71,6 +75,7 @@
       "id": "npc-vendor",
       "name": "Скупщик",
       "file": "models/npc-vendor.glb",
+      "lite": "models/npc-vendor.lite.glb",
       "tris": 29996,
       "kb": 821,
       "clips": [

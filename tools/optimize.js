@@ -103,13 +103,26 @@ for (const m of spec.models) {
   await io.write(out, doc);
   const tris = triCount(doc);
   const kb = Math.round(fs.statSync(out).size / 1024);
+  // облегчённая копия для телефонов: вдвое меньше треугольников и текстуры 1K — в четыре раза меньше видеопамяти
+  let lite = null;
   if (m.group === 'hero') {
-    const entry = { id: m.id, name: m.name, file: `models/${m.id}.glb`, tris, kb, clips: Object.keys(clips), ...(m.fp ? { fp: m.fp } : {}), ...(m.tint ? { tint: m.tint } : {}), ...(m.npc ? { npc: true } : {}) };
+    await doc.transform(
+      simplify({ simplifier: MeshoptSimplifier, ratio: 0.5, error: 0.003, lockBorder: false }),
+      prune(),
+      textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [1024, 1024], quality: 82 }),
+      meshopt({ encoder: MeshoptEncoder, level: 'medium' })
+    );
+    const lo = path.join(OUT, `${m.id}.lite.glb`);
+    await io.write(lo, doc);
+    lite = { file: `models/${m.id}.lite.glb`, tris: triCount(doc), kb: Math.round(fs.statSync(lo).size / 1024) };
+  }
+  if (m.group === 'hero') {
+    const entry = { id: m.id, name: m.name, file: `models/${m.id}.glb`, lite: lite.file, tris, kb, clips: Object.keys(clips), ...(m.fp ? { fp: m.fp } : {}), ...(m.tint ? { tint: m.tint } : {}), ...(m.npc ? { npc: true } : {}) };
     const i = manifest.heroes.findIndex((h) => h.id === m.id);
     if (i >= 0) manifest.heroes[i] = entry;
     else manifest.heroes.push(entry);
   } else manifest.props[m.id] = { file: `models/${m.id}.glb`, group: m.group, tris, kb };
-  console.log(`${m.id}: ${before} → ${tris} треуг., ${kb} КБ${Object.keys(clips).length ? ', анимации: ' + Object.entries(clips).map(([k, v]) => `${k} ${v.dur} с (${v.tracks} дорожек)`).join(', ') : ''}`);
+  console.log(`${m.id}: ${before} → ${tris} треуг., ${kb} КБ${lite ? ` (для телефонов: ${lite.tris} треуг., ${lite.kb} КБ)` : ''}${Object.keys(clips).length ? ', анимации: ' + Object.entries(clips).map(([k, v]) => `${k} ${v.dur} с (${v.tracks} дорожек)`).join(', ') : ''}`);
 }
 fs.writeFileSync(manPath, JSON.stringify(manifest, null, 2));
 console.log('manifest:', manifest.heroes.length, 'героев,', Object.keys(manifest.props).length, 'предметов');

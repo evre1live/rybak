@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
-import { clamp, sstep } from './util.js';
+import { clamp, sstep, isTouch } from './util.js';
 
 const HEIGHT = 1.76; // рост героя в метрах при росте 1 в настройках
 const PUPPET_HIP = 0.84; // высота таза куклы
@@ -52,7 +52,7 @@ export function loadHero(id) {
         new Promise((res, rej) => {
           loader ||= new GLTFLoader().setMeshoptDecoder(lib.MeshoptDecoder);
           loader.load(
-            info.file,
+            isTouch() && info.lite ? info.lite : info.file, // телефону — облегчённая копия
             (g) => {
               try {
                 const t = prepare(g, info);
