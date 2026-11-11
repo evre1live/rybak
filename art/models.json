@@ -29,7 +29,8 @@
         "sleeve2": "#2c313c",
         "glove": "#23262d",
         "skin": "#f1b88c"
-      }
+      },
+      "hands": "open"
     },
     {
       "id": "hero-finn",

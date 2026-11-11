@@ -18,6 +18,8 @@ const NAMES = {
 };
 const NEED = ['hips', 'spine', 'head', 'aL', 'eL', 'hL', 'aR', 'eR', 'hR', 'lL', 'kL', 'fL', 'lR', 'kR', 'fR'];
 const DOWN = new THREE.Vector3(0, -1, 0);
+/** Под ярким солнцем краски героев уходили в оранжевый — чуть приглушаем насыщенность, сильнее всего у тёплых тонов (кожа). */
+export const HERO_TONE = 'float heroL = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114)); float heroWarm = clamp((diffuseColor.r - diffuseColor.b) * 2.2, 0.0, 1.0); diffuseColor.rgb = mix(vec3(heroL), diffuseColor.rgb, 1.0 - 0.2 * heroWarm) * (1.0 + 0.05 * heroWarm);';
 
 export const heroes = { list: [], byId: new Map(), props: {}, ready: false, onLoad: () => {} };
 const templates = new Map();
@@ -123,6 +125,38 @@ function prepare(gltf, info) {
     canon[a] = s.clone().multiply(rest[a]);
     if (hand) canon[hand] = s.clone().multiply(rest[hand]);
   }
+  // у героя с раскрытыми ладонями пальцы один раз сгибаем в кулак: иначе удочка лежит на открытой ладони
+  if (info.hands === 'open') curlHands(mesh, node, rest, canon, at, fix, scale, lift);
+  // середина кулака в осях кисти куклы (метры от запястья): туда ложится рукоять удилища
+  const fist = {};
+  {
+    const P = mesh.geometry.attributes.position;
+    const SI = mesh.geometry.attributes.skinIndex;
+    const SW = mesh.geometry.attributes.skinWeight;
+    const all = mesh.skeleton.bones;
+    const v = new THREE.Vector3();
+    for (const s of ['L', 'R']) {
+      const hand = node('h' + s);
+      const own = new Set();
+      all.forEach((b, i) => {
+        for (let n = b; n && n.isBone; n = n.parent) if (n === hand) own.add(i);
+      });
+      const sum = new THREE.Vector3();
+      let n = 0;
+      for (let i = 0; i < P.count; i++) {
+        let w = 0;
+        for (let k = 0; k < 4; k++) if (own.has(SI.getComponent(i, k))) w += SW.getComponent(i, k);
+        if (w < 0.85) continue;
+        // вершины хранятся сжатыми, настоящий размер им возвращают кости — поэтому считаем через них
+        sum.add(mesh.applyBoneTransform(i, v.fromBufferAttribute(P, i)).applyMatrix4(mesh.matrixWorld));
+        n++;
+      }
+      sum.multiplyScalar(1 / Math.max(1, n)).applyQuaternion(fix).multiplyScalar(scale);
+      sum.y += lift;
+      const frame = rest['h' + s].clone().multiply(canon['h' + s].clone().invert()); // оси кисти куклы в исходной позе героя
+      fist[s] = n ? sum.sub(at['h' + s]).applyQuaternion(frame.invert()) : new THREE.Vector3(0, -0.085, 0.012);
+    }
+  }
   mesh.frustumCulled = false; // кости уводят сетку далеко от исходных границ
   scene.traverse((o) => {
     if (!o.isMesh) return;
@@ -136,14 +170,85 @@ function prepare(gltf, info) {
       sh.fragmentShader = sh.fragmentShader.replace(
         '#include <roughnessmap_fragment>',
         'float roughnessFactor = roughness;\n#ifdef USE_ROUGHNESSMAP\n  roughnessFactor *= mix(0.55, 1.0, texture2D(roughnessMap, vRoughnessMapUv).g);\n#endif'
-      );
+      ).replace('#include <color_fragment>', '#include <color_fragment>\n' + HERO_TONE);
     };
-    m.customProgramCacheKey = () => 'hero-matte';
+    m.customProgramCacheKey = () => 'hero-matte2';
     m.needsUpdate = true;
   });
   const clips = {};
   for (const c of gltf.animations || []) clips[c.name] = c;
-  return { info, scene, names, fix, scale, lift, canon, at, clips, hipK: at.hips.y / PUPPET_HIP, forearm: at.eR.distanceTo(at.hR) };
+  return { info, scene, names, fix, scale, lift, canon, at, clips, fist, hipK: at.hips.y / PUPPET_HIP, forearm: at.eR.distanceTo(at.hR) };
+}
+
+/**
+ * Сгибает пальцы раскрытой кисти в кулак — прямо в сетке, один раз при загрузке.
+ * В осях кисти куклы: −Y — к кончикам пальцев, ладонь смотрит внутрь (у правой +X, у левой −X), +Z — к большому пальцу.
+ * Всё, что дальше линии костяшек, наматывается на воображаемый валик со стороны ладони.
+ */
+function curlHands(mesh, node, rest, canon, at, fix, scale, lift) {
+  const P = mesh.geometry.attributes.position;
+  const N = mesh.geometry.attributes.normal;
+  const SI = mesh.geometry.attributes.skinIndex;
+  const SW = mesh.geometry.attributes.skinWeight;
+  const all = mesh.skeleton.bones;
+  const v = new THREE.Vector3();
+  const n = new THREE.Vector3();
+  for (const s of ['L', 'R']) {
+    const hand = node('h' + s);
+    const hi = all.indexOf(hand);
+    // из хранимых координат вершины — в оси кисти куклы (метры) и обратно
+    const A = new THREE.Matrix4().copy(mesh.bindMatrixInverse).multiply(hand.matrixWorld).multiply(mesh.skeleton.boneInverses[hi]).multiply(mesh.bindMatrix).premultiply(mesh.matrixWorld);
+    const C = new THREE.Matrix4().compose(new THREE.Vector3(0, lift, 0), fix, new THREE.Vector3(scale, scale, scale));
+    const frame = rest['h' + s].clone().multiply(canon['h' + s].clone().invert());
+    const F = new THREE.Matrix4().compose(at['h' + s], frame, new THREE.Vector3(1, 1, 1));
+    const toHand = new THREE.Matrix4().copy(F).invert().multiply(C).multiply(A);
+    const fromHand = toHand.clone().invert();
+    const toN = new THREE.Matrix3().setFromMatrix4(toHand);
+    const fromN = new THREE.Matrix3().setFromMatrix4(fromHand);
+    const ids = [];
+    let len = 0;
+    for (let i = 0; i < P.count; i++) {
+      let w = 0;
+      for (let k = 0; k < 4; k++) if (SI.getComponent(i, k) === hi) w += SW.getComponent(i, k);
+      if (w < 0.9) continue;
+      ids.push(i);
+      len = Math.max(len, -v.fromBufferAttribute(P, i).applyMatrix4(toHand).y);
+    }
+    const hinge = len * 0.5; // линия костяшек
+    const r = (len - hinge) / 2.9; // валик: пальцы обходят его почти на пол-оборота
+    const ps = s === 'R' ? 1 : -1;
+    // середина толщины пальцев: гнём вокруг неё, чтобы тыльная сторона не растягивалась вдвое
+    let mid = 0;
+    let cnt = 0;
+    for (const i of ids) {
+      v.fromBufferAttribute(P, i).applyMatrix4(toHand);
+      if (-v.y - hinge > 0) {
+        mid += ps * v.x;
+        cnt++;
+      }
+    }
+    mid /= Math.max(1, cnt);
+    for (const i of ids) {
+      v.fromBufferAttribute(P, i).applyMatrix4(toHand);
+      const u = -v.y - hinge;
+      if (u <= 0) continue;
+      const phi = Math.min(u / r, 3.3);
+      const rho = r - (ps * v.x - mid);
+      const over = u - phi * r; // что не поместилось в дугу — дальше по касательной
+      const c = Math.cos(phi);
+      const sn = Math.sin(phi);
+      v.set(ps * (mid + r - rho * c + over * sn), -hinge - rho * sn - over * c, v.z).applyMatrix4(fromHand);
+      P.setXYZ(i, v.x, v.y, v.z);
+      if (N) {
+        n.fromBufferAttribute(N, i).applyMatrix3(toN).normalize();
+        const nx = ps * n.x;
+        n.set(ps * (nx * c - n.y * sn), nx * sn + n.y * c, n.z).applyMatrix3(fromN).normalize();
+        N.setXYZ(i, n.x, n.y, n.z);
+      }
+    }
+    P.needsUpdate = true;
+    if (N) N.needsUpdate = true;
+  }
 }
 
 export class HeroBody {
@@ -185,7 +290,7 @@ export class HeroBody {
     const inv = tpl.canon.hR.clone().invert();
     grip.quaternion.copy(inv);
     grip.scale.setScalar(1 / tpl.scale);
-    grip.position.copy(_v.set(0, -Math.min(0.09, tpl.forearm * 0.36), 0.018).applyQuaternion(inv)).divideScalar(tpl.scale);
+    grip.position.copy(_v.copy(tpl.fist.R).applyQuaternion(inv)).divideScalar(tpl.scale); // удочка проходит через середину кулака
     bones.hR.add(grip);
     this.pq = {};
     for (const k of ['hips', 'torso', 'head', 'aR', 'eR', 'aL', 'eL', 'lR', 'kR', 'lL', 'kL']) this.pq[k] = new THREE.Quaternion();

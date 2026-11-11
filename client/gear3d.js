@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { ITEMS, RODS, FLOATS, LINES, REELS } from '../shared/data.js';
 import { Batch, M, G, BATCH_MAT, BATCH_MAT_2S } from './batch.js';
+import { METAL_MAT, GLOSS_MAT, RING_MAT } from './env.js';
 import { loft, tube } from './shapes.js';
 import { shade, mat } from './util.js';
 
@@ -21,33 +22,58 @@ export function buildRod(rodId, reelId = 'reel1', lineId = 'line1', handleSide =
   const reelCol = reel.id === 'reel1' ? cReel : reel.col;
   const group = new THREE.Group();
   const B = new Batch();
-  // рукоять
-  B.add(G.cyl(12), cAccent, M(0, -0.285, 0, 0.044, 0.04, 0.044));
-  B.add(loft([[-0.27, 0.019, 0.019], [-0.2, 0.0175, 0.0175], [-0.06, 0.0165, 0.0165]], 12), cGrip, M(0, 0, 0));
-  B.add(G.cyl(12), cAccent, M(0, -0.055, 0, 0.04, 0.022, 0.04));
-  B.add(G.cyl(12), shade(cBlank, -0.25), M(0, 0.03, 0, 0.03, 0.15, 0.03));
-  B.add(G.cyl(12), cAccent, M(0, 0.112, 0, 0.04, 0.022, 0.04));
-  B.add(loft([[0.12, 0.0165, 0.0165], [0.2, 0.016, 0.016], [0.245, 0.0125, 0.0125]], 12), cGrip, M(0, 0, 0));
-  B.add(G.cyl(12), cAccent, M(0, 0.252, 0, 0.03, 0.016, 0.03));
-  // катушка: ножка, корпус, шпуля с леской, ротор
-  B.add(G.box(), METAL, M(0, 0.03, 0.036, 0.012, 0.03, 0.06));
-  B.add(G.sph(14, 10), reelCol, M(0, 0.03, 0.082, 0.062, 0.07, 0.056));
-  B.add(G.cyl(14), shade(reelCol, -0.3), M(0, 0.085, 0.082, 0.05, 0.03, 0.05));
-  B.add(G.cyl(14), line.col, M(0, 0.115, 0.082, 0.054, 0.034, 0.054));
-  B.add(G.cyl(14), cAccent, M(0, 0.136, 0.082, 0.064, 0.008, 0.064));
-  B.add(G.cyl(14), shade(reelCol, -0.15), M(0, 0.097, 0.082, 0.068, 0.008, 0.068));
-  B.add(G.torus(0.06, 12, Math.PI * 1.1), '#cbd5e1', M(0, 0.118, 0.082, 0.09, 0.09, 0.09, Math.PI / 2, 0, 0.6));
-  B.add(G.cyl(8), METAL, M(handleSide * 0.022, 0.03, 0.082, 0.014, 0.05, 0.014, 0, 0, Math.PI / 2));
-  const base = B.build(BATCH_MAT, false);
-  group.add(base);
-  // ручка катушки — отдельно, она крутится
+  const hs = handleSide;
+  const Bg = new Batch(); // глянец: корпус и шпуля
+  const Bm = new Batch(); // хром
+  const CHROME = '#dfe5ee';
+  // ── рукоять: торец, задняя ручка с цветными кольцами, катушкодержатель с гайками, передняя ручка ──
+  B.add(G.cyl(14), cAccent, M(0, -0.285, 0, 0.046, 0.04, 0.046));
+  Bm.add(G.cyl(14), CHROME, M(0, -0.262, 0, 0.042, 0.008, 0.042));
+  B.add(loft([[-0.27, 0.0195, 0.0195], [-0.2, 0.018, 0.018], [-0.06, 0.017, 0.017]], 14), cGrip, M(0, 0, 0), { mat: 5 });
+  for (const y of [-0.215, -0.105]) B.add(G.cyl(14), cAccent, M(0, y, 0, 0.0385, 0.012, 0.0385));
+  B.add(G.cyl(14), cAccent, M(0, -0.055, 0, 0.041, 0.022, 0.041));
+  Bg.add(G.cyl(14), shade(cBlank, -0.25), M(0, 0.03, 0, 0.031, 0.15, 0.031));
+  for (const y of [-0.036, 0.096]) Bm.add(G.cyl(14), CHROME, M(0, y, 0, 0.037, 0.014, 0.037));
+  B.add(G.cyl(14), cAccent, M(0, 0.112, 0, 0.041, 0.022, 0.041));
+  B.add(loft([[0.12, 0.017, 0.017], [0.2, 0.0165, 0.0165], [0.245, 0.0128, 0.0128]], 14), cGrip, M(0, 0, 0), { mat: 5 });
+  B.add(G.cyl(14), cAccent, M(0, 0.252, 0, 0.031, 0.016, 0.031));
+  // ── катушка: крупная, как на макете. Ось шпули параллельна удилищу и висит под ним (со стороны +Z) ──
+  const RZ = 0.108;
+  // лапка под гайками катушкодержателя и ножка
+  Bm.add(G.box(), CHROME, M(0, 0.03, 0.019, 0.017, 0.112, 0.007));
+  Bg.add(loft([[0.02, 0.011, 0.0065], [0.045, 0.012, 0.0075], [0.078, 0.019, 0.013]], 10), reelCol, M(0, 0.036, 0, 1, 1, 1, Math.PI / 2, 0, 0));
+  // корпус редуктора и крышка со стороны ручки
+  Bg.add(G.sph(18, 12), reelCol, M(0, 0.036, RZ, 0.056, 0.082, 0.078));
+  Bg.add(G.cyl(18), shade(reelCol, -0.18), M(-hs * 0.027, 0.036, RZ, 0.062, 0.008, 0.062, 0, 0, Math.PI / 2));
+  Bm.add(G.cyl(12), CHROME, M(-hs * 0.032, 0.036, RZ, 0.02, 0.006, 0.02, 0, 0, Math.PI / 2));
+  // ротор с двумя стойками
+  Bg.add(G.cyl(20), shade(reelCol, -0.28), M(0, 0.094, RZ, 0.088, 0.034, 0.088));
+  Bg.add(G.cyl(20), shade(reelCol, -0.12), M(0, 0.076, RZ, 0.092, 0.008, 0.092));
+  for (const sx of [-1, 1]) Bg.add(G.box(), shade(reelCol, -0.2), M(sx * 0.046, 0.128, RZ, 0.009, 0.062, 0.02));
+  // шпуля: юбка, леска, бортик, фрикцион
+  Bg.add(G.cyl(20), cAccent, M(0, 0.116, RZ, 0.077, 0.018, 0.077));
+  B.add(G.cyl(20), line.col, M(0, 0.143, RZ, 0.064, 0.038, 0.064), { mat: 5 });
+  Bm.add(G.cyl(20), CHROME, M(0, 0.164, RZ, 0.082, 0.006, 0.082));
+  Bg.add(G.cyl(16), cAccent, M(0, 0.176, RZ, 0.044, 0.018, 0.044));
+  Bm.add(G.cyl(12), CHROME, M(0, 0.187, RZ, 0.022, 0.006, 0.022));
+  // дужка лесоукладывателя и ролик
+  Bm.add(G.torus(0.045, 18, Math.PI * 1.08), CHROME, M(0, 0.15, RZ, 0.104, 0.104, 0.104, Math.PI / 2 - 0.42, 0, -0.1));
+  Bm.add(G.cyl(8), '#f2c94c', M(0.046, 0.157, RZ + 0.004, 0.014, 0.014, 0.014, Math.PI / 2, 0, 0));
+  // вал ручки
+  Bm.add(G.cyl(10), CHROME, M(hs * 0.034, 0.036, RZ, 0.016, 0.028, 0.016, 0, 0, Math.PI / 2));
+  group.add(B.build(BATCH_MAT, false), Bg.build(GLOSS_MAT, false), Bm.build(METAL_MAT, false));
+  // ручка катушки — отдельно, она крутится: рычаг и крупная ручка-«грибок»
   const handle = new THREE.Group();
-  handle.position.set(handleSide * 0.046, 0.03, 0.082);
+  handle.position.set(hs * 0.05, 0.036, RZ);
+  const KNOB = new THREE.Vector3(hs * 0.04, 0.072, 0);
   const hb = new Batch();
-  hb.add(G.box(), '#cbd5e1', M(0, 0.022, 0, 0.007, 0.05, 0.012));
-  hb.add(G.cyl(8), '#cbd5e1', M(handleSide * 0.012, 0.045, 0, 0.008, 0.026, 0.008, 0, 0, Math.PI / 2));
-  hb.add(G.sph(10, 8), shade(cGrip, -0.1), M(handleSide * 0.03, 0.045, 0, 0.032, 0.026, 0.026));
-  handle.add(hb.build(BATCH_MAT, false));
+  const hm = new Batch();
+  hm.add(G.cyl(12), CHROME, M(0, 0, 0, 0.026, 0.012, 0.026, 0, 0, Math.PI / 2));
+  hm.add(G.box(), CHROME, M(0, KNOB.y / 2, 0, 0.007, KNOB.y + 0.016, 0.015));
+  hm.add(G.cyl(8), CHROME, M(hs * 0.012, KNOB.y, 0, 0.009, 0.024, 0.009, 0, 0, Math.PI / 2));
+  hb.add(G.sph(14, 10), shade(cGrip, -0.1), M(KNOB.x, KNOB.y, 0, 0.05, 0.034, 0.034), { mat: 5 });
+  hb.add(G.cyl(10), cAccent, M(hs * 0.019, KNOB.y, 0, 0.022, 0.006, 0.022, 0, 0, Math.PI / 2));
+  handle.add(hb.build(BATCH_MAT, false), hm.build(METAL_MAT, false));
   group.add(handle);
   // бланк из сегментов: каждый следующий чуть наклоняется — так удочка гнётся
   const segs = [];
@@ -56,7 +82,7 @@ export function buildRod(rodId, reelId = 'reel1', lineId = 'line1', handleSide =
   let parent = group;
   const blankMat = mat(cBlank, 0.45, 0.1);
   const accentMat = mat(cAccent, 0.5, 0.1);
-  const metalMat = mat(METAL, 0.4, 0.5);
+  const metalMat = RING_MAT;
   for (let i = 0; i < SEGS; i++) {
     const s = new THREE.Group();
     s.position.y = i ? sl : 0.26;
@@ -90,6 +116,9 @@ export function buildRod(rodId, reelId = 'reel1', lineId = 'line1', handleSide =
   });
   return {
     group, tip, handle, id: rodId,
+    /** середина ручки катушки в осях handle — туда ложится левая кисть */
+    knob: KNOB,
+    handleSide: hs,
     /** b: 0 — прямая, 1 — в дугу; side — увод кончика вбок */
     setBend(b, side = 0) {
       for (let i = 0; i < SEGS; i++) {

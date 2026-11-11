@@ -212,7 +212,7 @@ for (const m of spec.models) {
     lite = { file: `models/${m.id}.lite.glb`, tris: triCount(doc), kb: Math.round(fs.statSync(lo).size / 1024) };
   }
   if (m.group === 'hero') {
-    const entry = { id: m.id, name: m.name, file: `models/${m.id}.glb`, lite: lite.file, tris, kb, clips: Object.keys(clips), ...(m.fp ? { fp: m.fp } : {}), ...(m.tint ? { tint: m.tint } : {}), ...(m.npc ? { npc: true } : {}) };
+    const entry = { id: m.id, name: m.name, file: `models/${m.id}.glb`, lite: lite.file, tris, kb, clips: Object.keys(clips), ...(m.fp ? { fp: m.fp } : {}), ...(m.tint ? { tint: m.tint } : {}), ...(m.npc ? { npc: true } : {}), ...(m.hands ? { hands: m.hands } : {}) };
     const i = manifest.heroes.findIndex((h) => h.id === m.id);
     if (i >= 0) manifest.heroes[i] = entry;
     else manifest.heroes.push(entry);

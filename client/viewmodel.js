@@ -4,11 +4,17 @@ import { buildRod } from './gear3d.js';
 import { Batch, M, G, BATCH_MAT } from './batch.js';
 import { loft } from './shapes.js';
 import { shade, damp, clamp } from './util.js';
+import { heroTemplate } from './hero.js';
+import { FpArms } from './fparms.js';
 
 const GRIP = new THREE.Vector3(0.2, -0.275, -0.5);
+const GRIP_HERO = new THREE.Vector3(0.17, -0.105, -0.55); // с руками героя кисть лежит на катушкодержателе — поднимаем всё повыше, чтобы катушка была в кадре
 const ELBOW_R = new THREE.Vector3(0.44, -0.7, -0.08);
 const ELBOW_L = new THREE.Vector3(-0.16, -0.72, -0.1);
 const WRIST_R = new THREE.Vector3(-0.058, 0.135, 0.012);
+const GRIP_Y = -0.1; // где на рукояти лежит правый кулак: на задней рукояти, сразу под катушкой
+const ROLL = 0.8; // удилище довёрнуто вокруг своей оси: катушка видна слева от кисти, как на макете
+const qr = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), ROLL);
 const DEG = Math.PI / 180;
 const qy = new THREE.Quaternion();
 const qx = new THREE.Quaternion();
@@ -18,6 +24,9 @@ const AY = new THREE.Vector3(0, 1, 0);
 const AZ = new THREE.Vector3(0, 0, 1);
 const v1 = new THREE.Vector3();
 const v2 = new THREE.Vector3();
+const v3 = new THREE.Vector3();
+// левая рука героя: локоть (x, y, z), куда смотрит тыл кисти (x, y, z), на сколько пальцы дальше середины кулака
+const LEFT = [-0.42, -0.62, -0.12, 0.1, 0.35, 1, 0.05];
 
 export class ViewModel {
   constructor(camera) {
@@ -31,10 +40,11 @@ export class ViewModel {
     this.root.add(this.fishSlot);
     this.rod = null;
     this.hands = [];
+    this.arms = null; // руки готового героя (fparms.js)
     this.p = { th: 54, be: 0.24, ox: 0, oy: 0, oz: 0, bend: 0.03, side: 0 };
     this.t = 0;
     this.walk = 0;
-    this.crank = 0;
+    this.crank = 2.4; // в покое ручка катушки внизу — кисть не закрывает шпулю
     this.swayX = 0;
     this.swayY = 0;
   }
@@ -95,6 +105,17 @@ export class ViewModel {
     L.add(G.sph(8, 6), cTip, M(0.028, 0.02, -0.02, 0.03, 0.03, 0.06, 0, 0.3, 0));
     this.handL = add(this.root, L);
     this.look = look;
+    // у готового героя — его собственные руки; процедурные остаются запасными (свой персонаж из частей, модель ещё грузится)
+    if (this.arms) {
+      this.root.remove(this.arms.space);
+      this.arms = null;
+    }
+    const tpl = look.hero ? heroTemplate(look.hero) : null;
+    if (tpl) {
+      this.arms = new FpArms(tpl);
+      this.root.add(this.arms.space);
+      for (const h of this.hands) h.visible = false;
+    }
   }
 
   setRod(rodId, reelId, lineId) {
@@ -152,6 +173,11 @@ export class ViewModel {
         P.oy = 0.03 + T * 0.02;
         P.bend = 0.28 + 0.72 * T;
         P.side = -(st.steer || 0) * 0.6 - (st.pull || 0) * 0.5;
+        if (this.arms) {
+          // руки героя крупнее процедурных: при вываживании опускаем их, чтобы середина экрана оставалась свободной
+          P.ox += 0.05;
+          P.oy -= 0.075;
+        }
         break;
       }
       case 'landed':
@@ -173,10 +199,12 @@ export class ViewModel {
     const p = this.p;
     const k = fast ? 40 : 14;
     for (const key in P) p[key] = damp(p[key], P[key], key === 'bend' || key === 'side' ? 18 : k, dt);
-    this.pivot.position.set(GRIP.x + p.ox - this.swayX * 0.3, GRIP.y + p.oy + this.swayY * 0.3, GRIP.z + p.oz);
+    const GP = this.arms ? GRIP_HERO : GRIP;
+    this.pivot.position.set(GP.x + p.ox - this.swayX * 0.3, GP.y + p.oy + this.swayY * 0.3, GP.z + p.oz);
     qy.setFromAxisAngle(AY, p.be + this.swayX);
     qx.setFromAxisAngle(AX, -p.th * DEG + this.swayY);
     this.pivot.quaternion.copy(qy).multiply(qx).multiply(qf);
+    if (this.arms) this.pivot.quaternion.multiply(qr);
     this.rod.setBend(p.bend, p.side);
     if (st.reel) this.crank += dt * (st.mode === 'fight' ? 13 : 9);
     this.rod.handle.rotation.x = this.crank;
@@ -186,7 +214,7 @@ export class ViewModel {
     this.foreR.lookAt(v2.copy(ELBOW_R).applyMatrix4(this.root.matrixWorld));
     this.foreR.scale.set(1, 1, v1.distanceTo(ELBOW_R));
     // левая рука — на ручке катушки
-    v1.set(0.03, 0.045, 0).applyAxisAngle(AX, this.crank).add(this.rod.handle.position);
+    v1.copy(this.rod.knob).applyAxisAngle(AX, this.crank).add(this.rod.handle.position);
     v1.applyQuaternion(this.pivot.quaternion).add(this.pivot.position);
     v1.x -= 0.03;
     v1.y -= 0.012;
@@ -196,6 +224,16 @@ export class ViewModel {
     this.foreL.position.copy(v2);
     this.foreL.lookAt(v1.copy(ELBOW_L).applyMatrix4(this.root.matrixWorld));
     this.foreL.scale.set(1, 1, v2.distanceTo(ELBOW_L));
+    if (this.arms) {
+      // правый кулак — на рукояти над катушкой, большой палец к кончику удилища
+      v1.set(0, GRIP_Y, 0).applyQuaternion(this.pivot.quaternion).add(this.pivot.position);
+      v2.copy(AY).applyQuaternion(this.pivot.quaternion);
+      this.arms.arm('R', v1, v2, ELBOW_R);
+      // левый — на ручке катушки, ходит по кругу вместе с ней
+      v1.copy(this.rod.knob).applyAxisAngle(AX, this.crank).add(this.rod.handle.position).applyQuaternion(this.pivot.quaternion).add(this.pivot.position);
+      const lh = LEFT;
+      this.arms.arm('L', v1, v2.set(lh[3], lh[4], lh[5]), v3.set(lh[0], lh[1], lh[2]), lh[6]); // ручку держим пальцами снизу, тыл кисти — к нам
+    }
   }
 
   tipWorld(out) {
