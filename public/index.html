@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#0e2140">
 <title>Рыбак — рыбалка с друзьями</title>
 <meta name="description" content="Рыбалка с друзьями от первого лица: голосовой чат, рынок, снасти и свой персонаж.">
@@ -25,7 +25,7 @@
       <div class="mapbox"><canvas id="minimap" width="256" height="256"></canvas><span class="north">С<i></i></span></div>
       <div class="chip online"><span class="ic" data-ic="users"></span><b id="onlineN">1 РЫБАК</b></div>
       <div class="chip coins"><span class="ic" data-ic="coin"></span><b id="coins">0</b><i class="sep"></i><span class="lv">УР.</span><b id="lvl">1</b></div>
-      <div class="chip voice hidden" id="voiceChip"><span class="ic" data-ic="mic"></span><b id="voiceTxt">ГОЛОС</b></div>
+      <div class="chip voice click hidden" id="voiceChip"><span class="ic" data-ic="mic"></span><b id="voiceTxt">ГОЛОС</b></div>
     </div>
     <div class="hud-bl">
       <div class="chip bag"><span class="ic" data-ic="bag"></span><b>САДОК</b><b id="bagN" class="y">0 / 8</b></div>
@@ -58,13 +58,13 @@
   <div id="touch" class="hidden">
     <div id="stick"><i></i></div>
     <button id="tAct" type="button">ЗАБРОС</button>
-    <button id="tE" type="button">E</button>
-    <button id="tR" type="button">⟲</button>
-    <button id="tL" type="button">◀</button>
-    <button id="tRt" type="button">▶</button>
-    <button id="tMenu" type="button">☰</button>
-    <button id="tBag" type="button">СНАСТИ</button>
+    <button id="tR" type="button" class="pill hidden">СМОТАТЬ</button>
+    <button id="tE" type="button" class="pill ye hidden">РЫНОК</button>
+    <button id="tSit" type="button" class="pill">СЕСТЬ</button>
+    <button id="tChat" type="button" class="hidden" aria-label="Чат"><svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4v-4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg></button>
+    <button id="tMenu" type="button" aria-label="Меню">☰</button>
   </div>
+  <div id="rotate"><svg viewBox="0 0 64 64" width="64" height="64"><rect x="20" y="6" width="24" height="44" rx="5" fill="none" stroke="currentColor" stroke-width="4"/><path d="M8 40a26 26 0 0 0 22 18m-4-7 5 7-8 3" fill="none" stroke="#ffd60a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg><b>ПОВЕРНИТЕ ТЕЛЕФОН</b><p>Рыбачить удобнее, когда экран лежит на боку.</p><button type="button" class="btn ghost"><span>ИГРАТЬ ТАК</span></button></div>
   <div id="loading"><div class="logo">РЫБАК</div><p>Наполняем бухту водой…</p></div>
 </div>
 <script src="app.js"></script>

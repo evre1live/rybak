@@ -14,8 +14,15 @@ export class Input {
     this.pressed = new Set(); // события «нажато в этом кадре»
     this.locked = false;
     this.lockedAt = 0;
+    // запасной режим: браузер не даёт захватить мышь (игра встроена в чужую страницу) — смотрим движением мыши, у краёв экрана камера доворачивается
+    this.free = false;
+    this.everLocked = false;
+    this.lockFails = 0;
+    this.failAt = 0;
+    this.mouse = { x: 0.5, y: 0.5, in: false };
+    this.onFree = () => {};
     this.enabled = false; // игра принимает управление (не открыто меню)
-    this.touch = { on: false, mx: 0, mz: 0, primary: false, steer: 0 };
+    this.touch = { on: false, mx: 0, mz: 0, primary: false };
     this.pad = { on: false, last: {} };
     this.device = 'kb';
     this.onLockChange = () => {};
@@ -38,7 +45,7 @@ export class Input {
     });
     canvas.addEventListener('mousedown', (e) => {
       if (!this.enabled) return;
-      if (!this.locked && !this.touch.on) return this.lock();
+      if (!this.locked && !this.free && !this.touch.on) return this.lock();
       if (e.button === 0) {
         this.primary = true;
         this.pressed.add('Primary');
@@ -49,28 +56,51 @@ export class Input {
     });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     addEventListener('mousemove', (e) => {
-      if (!this.locked) return;
+      if (this.free) {
+        this.mouse.x = e.clientX / innerWidth;
+        this.mouse.y = e.clientY / innerHeight;
+        this.mouse.in = true;
+        if (!this.enabled) return;
+      } else if (!this.locked) return;
       this.lookDX += e.movementX;
       this.lookDY += e.movementY;
     });
+    document.addEventListener('mouseleave', () => (this.mouse.in = false));
+    document.addEventListener('pointerlockerror', () => this.lockFailed());
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === canvas;
-      if (this.locked) this.lockedAt = performance.now();
-      else this.primary = false;
+      if (this.locked) {
+        this.lockedAt = performance.now();
+        this.everLocked = true;
+      } else this.primary = false;
       // мышь захватилась, когда уже открыто меню, — сразу отпускаем
       if (this.locked && !this.enabled) return document.exitPointerLock();
       this.onLockChange(this.locked);
     });
   }
   lock() {
-    if (this.touch.on || this.locked || !this.enabled) return;
+    if (this.touch.on || this.locked || this.free || !this.enabled) return;
     this.lockedAt = performance.now();
     try {
       const p = this.canvas.requestPointerLock();
-      if (p && p.catch) p.catch(() => {});
+      if (p && p.catch) p.catch(() => this.lockFailed());
     } catch {
-      /* браузер не дал захватить мышь */
+      this.lockFailed();
     }
+  }
+  /** Мышь захватить не дали. Если так было с самого начала и дважды — играем без захвата. */
+  lockFailed() {
+    const now = performance.now();
+    if (this.everLocked || this.free || now - this.failAt < 300) return;
+    this.failAt = now;
+    if (++this.lockFails < 2) return;
+    this.free = true;
+    this.canvas.style.cursor = 'crosshair';
+    this.onFree();
+  }
+  /** Управление у игрока: мышь захвачена или работает запасной режим. */
+  get grab() {
+    return this.locked || this.free;
   }
   unlock() {
     if (document.pointerLockElement === this.canvas) document.exitPointerLock();
@@ -93,10 +123,15 @@ export class Input {
       steer = mx;
     }
     let primary = this.primary || this.touch.primary;
+    if (this.free && this.enabled && this.mouse.in) {
+      // курсор у края — камера продолжает поворачиваться
+      this.lookDX += (this.mouse.x < 0.07 ? -1 : this.mouse.x > 0.93 ? 1 : 0) * 11;
+      this.lookDY += (this.mouse.y < 0.06 ? -1 : this.mouse.y > 0.94 ? 1 : 0) * 6;
+    }
     if (this.touch.on) {
       mx += this.touch.mx;
       mz += this.touch.mz;
-      steer += this.touch.steer;
+      steer += this.touch.mx;
     }
     if (gp && this.enabled) {
       const dz = (v) => (Math.abs(v) < 0.18 ? 0 : v);

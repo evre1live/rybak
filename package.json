@@ -12,7 +12,8 @@
     "test": "node --test test/logic.test.js test/net.test.js",
     "test:play": "node test/play.cjs",
     "test:coop": "node test/coop.cjs",
-    "balance": "node tools/balance.js"
+    "balance": "node tools/balance.js",
+    "test:devices": "node test/devices.cjs"
   },
   "engines": {
     "node": ">=20"

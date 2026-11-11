@@ -24,6 +24,14 @@ const SPAWNS = [[-2, 9], [0.6, 9.4], [-4, 8.2], [2.6, 8.6], [-1, 11], [1.6, 11.4
 const LINE_Z = 7;
 const lineX = (slot) => -5.0 + slot * 1.32;
 const v3 = new THREE.Vector3();
+/** Адрес комнаты в строке браузера; во встроенной рамке это может быть запрещено — тогда просто молчим. */
+function setUrl(u) {
+  try {
+    history.replaceState(null, '', u);
+  } catch {
+    /* адрес не меняем */
+  }
+}
 const VENDOR = ['Свежая рыба — хорошая цена. Показывай улов!', 'Клюёт сегодня? У меня глаз намётан: вижу — клюёт.', 'Старика под аркой видел кто? Сорок лет ловят — не поймали.', 'Бери плетёнку, не пожалеешь. Карп стартовую леску рвёт как нитку.', 'На рассвете в заводи, говорят, золотой кои ходит.', 'Ночью угорь под сваями берёт на червя. Проверено.'];
 
 class Game {
@@ -31,6 +39,8 @@ class Game {
     const q = new URLSearchParams(location.search);
     this.params = q;
     this.urlCode = (q.get('room') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+    // пробная версия без сервера (например, страница-витрина): только одиночная рыбалка
+    this.offline = !!window.RYBAK_OFFLINE;
     this.profile = loadProfile();
     this.canvas = $('#view');
     const touch = isTouch();
@@ -61,6 +71,7 @@ class Game {
     this.sendT = 0;
     this.emote = null;
     this.emoteT = 0;
+    this.editing = false;
     this.frameMs = 16;
     this.slowT = 0;
     this.fixedHour = q.has('h') ? Number(q.get('h')) : null;
@@ -87,6 +98,7 @@ class Game {
       onChange: (k) => this.voiceChanged(k), onError: (m) => this.ui.toast(m, 'bad', 5000), getVolume: (vid) => this.voiceVolume(vid)
     });
     this.input.typing = () => this.ui.chatOpen || (document.activeElement && /INPUT|SELECT/.test(document.activeElement.tagName));
+    this.input.onFree = () => this.ui.toast('Мышь захватить не удалось — смотрите движением мыши: у краёв экрана камера доворачивается', '', 6500);
     this.input.onLockChange = (locked) => {
       // Esc в игре — пауза. Но если захват мыши сорвался сразу после закрытия меню, паузу не навязываем
       if (!locked && this.state === 'world' && !this.ui.panel && !this.ui.chatOpen && !this.input.touch.on && performance.now() - this.input.lockedAt > 700) this.ui.openPanel('pause');
@@ -139,7 +151,19 @@ class Game {
     this.profile.name = name.slice(0, 16);
     saveProfile(this.profile);
   }
+  /** На телефоне с Android раскрываем игру на весь экран и кладём его на бок. Вызывать из обработчика нажатия. */
+  goFullscreen() {
+    if (!this.input.touch.on || document.fullscreenElement || !/Android/i.test(navigator.userAgent)) return;
+    try {
+      const el = document.documentElement;
+      const p = el.requestFullscreen && el.requestFullscreen({ navigationUI: 'hide' });
+      if (p && p.then) p.then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {})).catch(() => {});
+    } catch {
+      /* не дали — играем в окне */
+    }
+  }
   startSolo() {
+    this.goFullscreen();
     this.audio.start();
     this.solo = true;
     this.code = '';
@@ -150,12 +174,14 @@ class Game {
     this.toLobbyState();
   }
   createRoom() {
+    this.goFullscreen();
     this.audio.start();
     this.solo = false;
     this.net.create();
     this.ui.toast('Создаю комнату…');
   }
   joinRoom(code) {
+    this.goFullscreen();
     this.audio.start();
     this.solo = false;
     const s = session.get();
@@ -173,7 +199,7 @@ class Game {
         for (const p of this.players.values()) p.remote.dispose();
         this.players.clear();
         for (const p of m.players) this.addPlayer(p);
-        history.replaceState(null, '', '?room=' + m.code);
+        setUrl('?room=' + m.code);
         this.urlCode = m.code;
         if (back) {
           this.ui.toast('Связь вернулась', 'good');
@@ -283,7 +309,8 @@ class Game {
     const chip = $('#voiceChip');
     chip.classList.toggle('hidden', this.solo);
     chip.classList.toggle('off', !v.joined || v.muted);
-    $('#voiceTxt').textContent = v.joining ? 'ПОДКЛЮЧАЮ…' : !v.joined ? 'ВКЛЮЧИТЬ ГОЛОС' : v.muted ? 'МИКРОФОН ВЫКЛ · M' : 'ГОЛОС ВКЛЮЧЁН · M';
+    const mk = this.input.touch.on ? '' : ' · M';
+    $('#voiceTxt').textContent = v.joining ? 'ПОДКЛЮЧАЮ…' : !v.joined ? 'ВКЛЮЧИТЬ ГОЛОС' : v.muted ? `МИКРОФОН ВЫКЛ${mk}` : `ГОЛОС ВКЛЮЧЁН${mk}`;
     $('#voiceChip .ic').innerHTML = (v.joined && !v.muted ? '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>' : '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M3 3l18 18" stroke="#f04438" stroke-width="2.6" stroke-linecap="round"/></svg>');
     this.rosterChanged();
   }
@@ -377,7 +404,7 @@ class Game {
     for (const p of this.players.values()) p.remote.dispose();
     this.players.clear();
     this.solo = false;
-    history.replaceState(null, '', location.pathname);
+    setUrl(location.pathname);
     this.urlCode = '';
     this.backToTitle('');
   }
@@ -451,6 +478,7 @@ class Game {
       drag = e.clientX;
     });
     addEventListener('pointerup', () => (drag = null));
+    addEventListener('pointercancel', () => (drag = null));
   }
 
   // ───── покупки ─────
@@ -711,8 +739,8 @@ class Game {
     }
     // рынок
     const near = Math.hypot(this.player.x - MARKET.x, this.player.z - MARKET.z) < MARKET.r && !f.lineOut;
-    const noMouse = !i.locked && !i.touch.on && i.device !== 'pad';
-    ui.prompt(noMouse ? 'КЛИКНИТЕ ПО ИГРЕ — ВЗЯТЬ УПРАВЛЕНИЕ' : near ? `${ui.key('use')} РЫНОК — ПРОДАТЬ УЛОВ, КУПИТЬ СНАСТИ` : '');
+    const noMouse = !i.grab && !i.touch.on && i.device !== 'pad';
+    ui.prompt(noMouse ? 'КЛИКНИТЕ ПО ИГРЕ — ВЗЯТЬ УПРАВЛЕНИЕ' : near ? (i.touch.on ? 'РЫНОК — ПРОДАТЬ УЛОВ, КУПИТЬ СНАСТИ' : `${ui.key('use')} РЫНОК — ПРОДАТЬ УЛОВ, КУПИТЬ СНАСТИ`) : '');
     this.nearMarket = near;
     if (near && i.hit('KeyE')) ui.openPanel('sell');
   }
@@ -735,9 +763,10 @@ class Game {
 
   bindTouch() {
     const t = this.input.touch;
-    $('#touch').classList.remove('hidden');
     const stick = $('#stick');
     const knob = stick.firstElementChild;
+    // садок — наверх, к названию места: внизу слева живёт джойстик
+    $('.hud-tl').insertBefore($('.chip.bag'), $('#crew'));
     let sid = null;
     let lid = null;
     let lx = 0;
@@ -764,6 +793,21 @@ class Game {
         }
       }
     };
+    const drop = (e) => {
+      for (const c of e.changedTouches) {
+        if (c.identifier === sid) {
+          sid = null;
+          t.mx = t.mz = 0;
+          knob.style.transform = '';
+        } else if (c.identifier === lid) lid = null;
+      }
+    };
+    this.touchReset = () => {
+      sid = lid = null;
+      t.mx = t.mz = 0;
+      t.primary = false;
+      knob.style.transform = '';
+    };
     stick.addEventListener('touchstart', (e) => {
       sid = e.changedTouches[0].identifier;
       move(e);
@@ -776,15 +820,8 @@ class Game {
       ly = c.clientY;
     }, { passive: true });
     addEventListener('touchmove', move, { passive: true });
-    addEventListener('touchend', (e) => {
-      for (const c of e.changedTouches) {
-        if (c.identifier === sid) {
-          sid = null;
-          t.mx = t.mz = 0;
-          knob.style.transform = '';
-        } else if (c.identifier === lid) lid = null;
-      }
-    });
+    addEventListener('touchend', drop);
+    addEventListener('touchcancel', drop);
     const hold = (id, down, up) => {
       const b = $(id);
       b.addEventListener('touchstart', (e) => {
@@ -792,10 +829,12 @@ class Game {
         this.audio.start();
         down();
       }, { passive: false });
-      b.addEventListener('touchend', (e) => {
+      const end = (e) => {
         e.preventDefault();
         up && up();
-      }, { passive: false });
+      };
+      b.addEventListener('touchend', end, { passive: false });
+      b.addEventListener('touchcancel', end, { passive: false });
     };
     hold('#tAct', () => {
       t.primary = true;
@@ -803,10 +842,39 @@ class Game {
     }, () => (t.primary = false));
     hold('#tE', () => this.input.pressed.add('KeyE'));
     hold('#tR', () => this.input.pressed.add('KeyR'));
-    hold('#tL', () => (t.steer = -1), () => (t.steer = 0));
-    hold('#tRt', () => (t.steer = 1), () => (t.steer = 0));
     hold('#tMenu', () => this.input.pressed.add('Escape'));
-    hold('#tBag', () => this.input.pressed.add('Tab'));
+    hold('#tSit', () => this.input.pressed.add('KeyX'));
+    hold('#tChat', () => this.input.pressed.add('Enter'));
+    // панель снастей: касание наживки листает её, остальное открывает снасти
+    $('#hotbar').addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      const slot = e.target.closest('.slot');
+      this.input.pressed.add(slot && slot.dataset.k === 'bait' ? 'KeyQ' : 'Tab');
+    }, { passive: false });
+    $('#rotate button').addEventListener('click', () => document.body.classList.add('anyway'));
+  }
+  /** Сенсорные кнопки: только в бухте и только те, что сейчас нужны. */
+  touchUi() {
+    const f = this.fishing;
+    const ui = this.ui;
+    const show = this.state === 'world' && !ui.panel && !ui.chatOpen;
+    const st = show ? f.state : 'off';
+    const key = `${st}|${f.lure ? 1 : 0}|${this.nearMarket ? 1 : 0}|${this.solo ? 1 : 0}|${this.player.sit ? 1 : 0}`;
+    if (key === this.touchKey) return;
+    this.touchKey = key;
+    $('#touch').classList.toggle('hidden', !show);
+    if (!show) return this.touchReset();
+    $('#tAct').textContent = { idle: 'ЗАБРОС', charge: 'ОТПУСТИ', cast: '…', wait: f.lure ? 'ВЕДИ' : 'ЖДЁМ', bite: 'ПОДСЕКАЙ', fight: 'МОТАЙ', landed: 'В САДОК' }[st] || 'ЗАБРОС';
+    $('#tAct').classList.toggle('dim', st === 'cast' || (st === 'wait' && !f.lure));
+    $('#tAct').classList.toggle('go', st === 'bite');
+    $('#tR').textContent = st === 'landed' ? 'ОТПУСТИТЬ' : 'СМОТАТЬ';
+    $('#tR').classList.toggle('hidden', st !== 'landed' && st !== 'wait');
+    $('#tE').classList.toggle('hidden', !(this.nearMarket && st === 'idle'));
+    $('#tSit').classList.toggle('hidden', st !== 'idle' || this.nearMarket);
+    $('#tSit').textContent = this.player.sit ? 'ВСТАТЬ' : 'СЕСТЬ';
+    $('#tChat').classList.toggle('hidden', this.solo || st === 'fight' || st === 'landed');
+    $('#hotbar').classList.toggle('hidden', st === 'fight' || st === 'charge');
+    $('#stick').classList.toggle('steer', st === 'fight');
   }
 
   // ───── главный цикл ─────
@@ -853,12 +921,12 @@ class Game {
       const kit = f.kit;
       ui.minimap(this.player, [...this.players.values()].filter((p) => p.mode === 'world' && p.st).map((p) => ({ x: p.st[S.X], z: p.st[S.Z], slot: p.slot })), kit.sonar ? this.world.scenery.schools.centers : null);
       const aim = f.aim;
-      if (!ui.panel && ((f.state === 'idle' && i.enabled && (i.locked || i.touch.on)) || f.state === 'charge')) {
+      if (!ui.panel && ((f.state === 'idle' && i.enabled && (i.grab || i.touch.on)) || f.state === 'charge')) {
         v3.set(aim.x, 0.05, aim.z).project(cam);
         ui.castMark({ x: (v3.x * 0.5 + 0.5) * this.gfx.w, y: (-v3.y * 0.5 + 0.5) * this.gfx.h, ok: aim.ok, hot: aim.spot && aim.spot.hot, clamped: aim.clamped, dist: aim.dist, zone: aim.spot ? ZONES[aim.spot.zone].name : '', depth: aim.spot ? aim.spot.depth : 0, act: aim.act });
       } else ui.castMark(null);
       ui.power(f.state === 'charge' ? f.power : null, aim.dist / kit.cast);
-      $('#cross').className = !i.locked && !i.touch.on ? 'off' : f.state === 'idle' && !aim.ok ? 'bad' : '';
+      $('#cross').className = !i.grab && !i.touch.on ? 'off' : f.state === 'idle' && !aim.ok ? 'bad' : '';
       ui.fight(f.state === 'fight' ? f.fight : null, i.steer);
       if (f.state === 'fight') {
         this.audio.strain(f.fight.T);
@@ -915,8 +983,9 @@ class Game {
       }
     }
     if (this.state === 'world') ui.setTags(tags);
+    if (i.touch.on) this.touchUi();
     // свой персонаж: в лобби и в редакторе
-    const showMe = this.state === 'lobby' || this.editing;
+    const showMe = this.state === 'lobby' || !!this.editing;
     this.meChar.group.visible = showMe;
     if (showMe) {
       if (this.state === 'lobby') this.meChar.group.position.set(lineX(this.me.slot), DECK_Y, LINE_Z);

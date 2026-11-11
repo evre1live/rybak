@@ -1,0 +1,199 @@
+// Проверка в настоящем браузере: телефон (сенсорное управление), страница без захвата мыши, пробная версия без сервера.
+// Запуск: PORT=3111 node test/devices.cjs [папка для снимков]
+const { chromium } = require(process.env.PLAYWRIGHT || '/opt/npm-tools/node_modules/playwright');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const out = process.argv[2] || '/tmp/rybak-shots';
+fs.mkdirSync(out, { recursive: true });
+const BASE = `http://127.0.0.1:${process.env.PORT || 3111}`;
+const G = (page, fn, arg) => page.evaluate(fn, arg);
+
+async function open(ctx, query, name) {
+  const page = await ctx.newPage();
+  page.on('console', (m) => { if (m.type() === 'error') console.log(`[${name}] console.error`, m.text().slice(0, 300)); });
+  page.on('pageerror', (e) => { console.log(`[${name}] PAGEERROR`, e.message.slice(0, 500)); page.__err = (page.__err || 0) + 1; });
+  await page.goto(`${BASE}/?${query}`);
+  await page.waitForFunction(() => window.RYBAK && window.__frames > 3, null, { timeout: 60000 });
+  return page;
+}
+async function shot(page, file, wait = 0) {
+  if (wait) await page.waitForTimeout(wait);
+  const before = await page.evaluate(() => { window.__render = true; return window.__rendered || 0; });
+  await page.waitForFunction((b) => (window.__rendered || 0) > b, before, { timeout: 120000 });
+  await page.screenshot({ path: `${out}/${file}.png` });
+  console.log('  снимок', file);
+}
+/** В бухту в одиночку, минуя подсказку первого запуска. */
+async function toWorld(page, tap) {
+  await page.fill('#nm', 'Жамшид');
+  await G(page, () => { RYBAK.profile.seenIntro = true; });
+  await (tap ? page.tap('[data-a="solo"]') : page.click('[data-a="solo"]'));
+  await page.waitForFunction(() => RYBAK.state === 'lobby');
+  await (tap ? page.tap('[data-a="start"]') : page.click('[data-a="start"]'));
+  await page.waitForFunction(() => RYBAK.state === 'world');
+}
+const atHead = (page) => G(page, () => { RYBAK.player.place(0.6, -20, 0.1); RYBAK.player.pitch = -0.15; });
+
+(async () => {
+  const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+
+  // ───── телефон, экран на боку ─────
+  {
+    const ctx = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+    const page = await open(ctx, 'q=low&norender&ts=3&h=13', 'phone');
+    const cdp = await ctx.newCDPSession(page);
+    const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map(([x, y, id]) => ({ x, y, id: id || 1 })) });
+    const mid = async (sel) => { const b = await page.locator(sel).boundingBox(); return [b.x + b.width / 2, b.y + b.height / 2]; };
+    const vis = (sel) => G(page, (s) => { const e = document.querySelector(s); return !!e && !e.closest('.hidden') && e.getClientRects().length > 0; }, sel);
+    assert.ok(await G(page, () => RYBAK.input.touch.on), 'сенсорный режим включён');
+    assert.equal(await vis('#touch'), false, 'в меню кнопок управления нет');
+    // меню умещается на экране телефона
+    const card = await page.locator('.tcard').boundingBox();
+    assert.ok(card.y >= 0 && card.y + card.height <= 390, `меню умещается по высоте: ${Math.round(card.y)}…${Math.round(card.y + card.height)}`);
+    await shot(page, 'd01-phone-title');
+    await toWorld(page, true);
+    await page.waitForFunction(() => !document.querySelector('#touch').classList.contains('hidden'));
+    await atHead(page);
+    assert.equal(await page.textContent('#tAct'), 'ЗАБРОС');
+    assert.equal(await vis('#tR'), false);
+    assert.equal(await vis('#hints'), false, 'подсказок с клавишами на телефоне нет');
+    // кнопки не наезжают друг на друга и на панель снастей
+    const boxes = {};
+    for (const s of ['#stick', '#tAct', '#tSit', '#tMenu', '#hotbar', '.mapbox']) boxes[s] = await page.locator(s).boundingBox();
+    const hit = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+    const names = Object.keys(boxes);
+    for (let i = 0; i < names.length; i++) for (let j = i + 1; j < names.length; j++) assert.ok(!hit(boxes[names[i]], boxes[names[j]]), `${names[i]} и ${names[j]} не пересекаются`);
+    await shot(page, 'd02-phone-world', 300);
+
+    // джойстик: идём назад по пирсу
+    const z0 = await G(page, () => RYBAK.player.z);
+    const [sx, sy] = await mid('#stick');
+    await touch('touchStart', [[sx, sy]]);
+    await touch('touchMove', [[sx, sy + 40]]);
+    await page.waitForFunction((z) => RYBAK.player.z > z + 0.5, z0, { timeout: 30000 });
+    await touch('touchEnd', []);
+    assert.equal(await G(page, () => RYBAK.input.touch.mz), 0, 'джойстик отпущен');
+    // палец по экрану — поворот
+    await atHead(page);
+    const yaw0 = await G(page, () => RYBAK.player.yaw);
+    await touch('touchStart', [[420, 120]]);
+    await touch('touchMove', [[470, 120]]);
+    await touch('touchMove', [[520, 120]]);
+    await touch('touchEnd', []);
+    await page.waitForFunction((y) => Math.abs(RYBAK.player.yaw - y) > 0.05, yaw0, { timeout: 30000 });
+
+    // заброс: держим жёлтую кнопку и отпускаем
+    await atHead(page);
+    const [ax, ay] = await mid('#tAct');
+    await touch('touchStart', [[ax, ay]]);
+    await page.waitForFunction(() => RYBAK.fishing.state === 'charge', null, { timeout: 30000 });
+    assert.equal(await page.textContent('#tAct'), 'ОТПУСТИ');
+    assert.equal(await vis('#hotbar'), false, 'во время замаха панель снастей убрана');
+    await page.waitForFunction(() => RYBAK.fishing.power > 0.5, null, { timeout: 30000 });
+    await touch('touchEnd', []);
+    await page.waitForFunction(() => RYBAK.fishing.state === 'wait', null, { timeout: 60000 });
+    await page.waitForFunction(() => document.querySelector('#tAct').textContent === 'ЖДЁМ');
+    assert.equal(await vis('#tR'), true);
+    assert.equal(await page.textContent('#tR'), 'СМОТАТЬ');
+    await shot(page, 'd03-phone-wait');
+    // поклёвка → подсечка → вываживание: джойстик работает как руль
+    await G(page, () => { RYBAK.fishing.kit.hookWin = 9; }); // время в проверке ускорено втрое — даём пальцу успеть
+    await page.waitForFunction(() => RYBAK.fishing.state === 'bite' && document.querySelector('#tAct').textContent === 'ПОДСЕКАЙ', null, { timeout: 240000 });
+    await touch('touchStart', [[ax, ay]]); // кнопка мигает — жмём «пальцем» напрямую, не дожидаясь, пока она замрёт
+    await touch('touchEnd', []);
+    await page.waitForFunction(() => RYBAK.fishing.state === 'fight', null, { timeout: 30000 });
+    await page.waitForFunction(() => document.querySelector('#tAct').textContent === 'МОТАЙ');
+    assert.ok(await G(page, () => document.querySelector('#stick').classList.contains('steer')));
+    await touch('touchStart', [[sx, sy]]);
+    await touch('touchMove', [[sx + 40, sy]]);
+    await page.waitForFunction(() => RYBAK.input.touch.mx > 0.5);
+    await page.waitForTimeout(150);
+    await page.waitForFunction(() => RYBAK.input.steer === 1, null, { timeout: 30000 }); // джойстик вправо — руль вправо
+    await touch('touchEnd', []);
+    await shot(page, 'd04-phone-fight');
+    // меню поверх игры: кнопки управления прячутся, а вернувшись — снова на месте
+    await G(page, () => RYBAK.fishing.reelIn(true));
+    await page.waitForFunction(() => RYBAK.fishing.state === 'idle');
+    await page.tap('#tMenu');
+    await page.waitForFunction(() => RYBAK.ui.panel === 'pause');
+    assert.equal(await vis('#touch'), false);
+    await shot(page, 'd05-phone-pause');
+    await G(page, () => RYBAK.ui.closePanel());
+    await page.waitForFunction(() => !document.querySelector('#touch').classList.contains('hidden'));
+    // панель снастей нажимается: удочка открывает снасти
+    await page.tap('#hotbar .slot[data-k="rod"]');
+    await page.waitForFunction(() => RYBAK.ui.panel === 'tackle');
+    await shot(page, 'd06-phone-tackle');
+    assert.ok(!page.__err, 'ошибки на странице (телефон)');
+    await ctx.close();
+    console.log('  телефон: управление пальцами работает');
+  }
+
+  // ───── телефон стоймя: просим повернуть, но играть можно ─────
+  {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    const page = await open(ctx, 'q=low&norender&h=13', 'portrait');
+    assert.equal(await G(page, () => getComputedStyle(document.querySelector('#rotate')).display), 'flex');
+    await page.tap('#rotate button');
+    assert.equal(await G(page, () => getComputedStyle(document.querySelector('#rotate')).display), 'none');
+    await toWorld(page, true);
+    await shot(page, 'd07-portrait', 300);
+    assert.ok(!page.__err, 'ошибки на странице (стоймя)');
+    await ctx.close();
+    console.log('  телефон стоймя: подсказка повернуть, игра идёт');
+  }
+
+  // ───── браузер не даёт захватить мышь (игра встроена в чужую страницу) ─────
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+    await ctx.addInitScript(() => { HTMLCanvasElement.prototype.requestPointerLock = () => Promise.reject(new Error('sandboxed')); });
+    const page = await open(ctx, 'q=low&norender&ts=3&h=13', 'nolock');
+    await toWorld(page, false);
+    await page.waitForFunction(() => RYBAK.input.lockFails === 1, null, { timeout: 30000 });
+    assert.equal(await G(page, () => RYBAK.input.free), false, 'после первой неудачи ещё просим кликнуть');
+    await page.waitForTimeout(400);
+    await page.mouse.click(640, 300);
+    await page.waitForFunction(() => RYBAK.input.free === true, null, { timeout: 30000 });
+    await atHead(page);
+    // движение мыши поворачивает камеру, у края экрана она доворачивается сама
+    const yaw0 = await G(page, () => RYBAK.player.yaw);
+    await page.mouse.move(640, 360);
+    await page.mouse.move(700, 360, { steps: 4 });
+    await page.waitForFunction((y) => Math.abs(RYBAK.player.yaw - y) > 0.02, yaw0, { timeout: 30000 });
+    await page.mouse.move(1275, 360, { steps: 3 });
+    const yaw1 = await G(page, () => RYBAK.player.yaw);
+    await page.waitForFunction((y) => Math.abs(RYBAK.player.yaw - y) > 0.15, yaw1, { timeout: 30000 });
+    // заброс мышью без захвата
+    await page.mouse.move(640, 360);
+    await atHead(page);
+    await page.mouse.down();
+    await page.waitForFunction(() => RYBAK.fishing.state === 'charge' && RYBAK.fishing.power > 0.5, null, { timeout: 30000 });
+    await page.mouse.up();
+    await page.waitForFunction(() => RYBAK.fishing.state === 'wait', null, { timeout: 60000 });
+    // Esc открывает паузу
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => RYBAK.ui.panel === 'pause');
+    assert.ok(!page.__err, 'ошибки на странице (без захвата мыши)');
+    await ctx.close();
+    console.log('  без захвата мыши: камера, заброс и пауза работают');
+  }
+
+  // ───── пробная версия без сервера ─────
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+    await ctx.addInitScript(() => { window.RYBAK_OFFLINE = true; });
+    const page = await open(ctx, 'q=low&norender&h=13', 'offline');
+    assert.equal(await page.locator('[data-a="create"]').count(), 0);
+    assert.equal(await page.locator('#code').count(), 0);
+    assert.match(await page.textContent('.tcard .note'), /Пробная версия/);
+    await toWorld(page, false);
+    assert.equal(await G(page, () => RYBAK.solo), true);
+    assert.equal(await G(page, () => !!(RYBAK.net.ws)), false, 'к серверу не подключаемся');
+    assert.ok(!page.__err, 'ошибки на странице (пробная версия)');
+    await ctx.close();
+    console.log('  пробная версия: только одиночная рыбалка, без сети');
+  }
+
+  await browser.close();
+  console.log('УСТРОЙСТВА: всё в порядке');
+})().catch((e) => { console.error('ПРОВАЛ:', e.message.split('\n').slice(0, 6).join('\n'), '\n', (e.stack || '').split('\n').filter((l) => l.includes('devices.cjs')).slice(0, 2).join('\n')); process.exit(1); });

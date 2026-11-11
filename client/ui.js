@@ -81,9 +81,9 @@ export class UI {
     $('#rodIcon').src = itemIcon(rod.id);
     const tk = p.equip.tackle;
     const n = tackleCount(p, tk);
-    $('#hotbar').innerHTML = `<div class="slot sel"><img src="${itemIcon(rod.id)}" alt=""></div>
-      <div class="slot"><img src="${itemIcon(tk)}" alt=""><b>${n === Infinity ? '∞' : n}</b><kbd class="x">Q</kbd></div>
-      <div class="slot"><img src="${itemIcon(isLure(tk) ? tk : p.equip.float)}" alt=""></div>`;
+    $('#hotbar').innerHTML = `<div class="slot sel" data-k="rod"><img src="${itemIcon(rod.id)}" alt=""></div>
+      <div class="slot" data-k="bait"><img src="${itemIcon(tk)}" alt=""><b>${n === Infinity ? '∞' : n}</b><kbd class="x">Q</kbd></div>
+      <div class="slot" data-k="float"><img src="${itemIcon(isLure(tk) ? tk : p.equip.float)}" alt=""></div>`;
   }
   setCrew(list) {
     const key = JSON.stringify(list.map((p) => [p.id, p.name, p.slot, p.look, p.voice, p.muted, p.mode]));
@@ -411,12 +411,13 @@ export class UI {
         <label for="nm">Как вас зовут</label>
         <input class="in" id="nm" maxlength="16" placeholder="Имя" value="${esc(p.name || '')}" autocomplete="off">
         <div class="err" id="terr">${esc(err)}</div>
-        ${code ? `<button class="btn pri" data-a="join"><span>ВОЙТИ В КОМНАТУ ${esc(code)}</span></button>` : '<button class="btn pri" data-a="create"><span>СОЗДАТЬ КОМНАТУ ДЛЯ ДРУЗЕЙ</span></button>'}
+        ${this.g.offline ? `<button class="btn pri" data-a="solo"><span>НАЧАТЬ РЫБАЛКУ</span></button>
+        <div class="note">Пробная версия для одного. Комнаты для друзей и голосовой чат работают в полной игре на сервере.</div>` : `${code ? `<button class="btn pri" data-a="join"><span>ВОЙТИ В КОМНАТУ ${esc(code)}</span></button>` : '<button class="btn pri" data-a="create"><span>СОЗДАТЬ КОМНАТУ ДЛЯ ДРУЗЕЙ</span></button>'}
         <div class="row"><input class="in code" id="code" maxlength="4" placeholder="КОД" value="${esc(code)}" autocomplete="off"><button class="btn cy" data-a="joincode"><span>ВОЙТИ ПО КОДУ</span></button></div>
         <div class="or">или</div>
-        <button class="btn ghost" data-a="solo"><span>РЫБАЧИТЬ В ОДИНОЧКУ</span></button>
+        <button class="btn ghost" data-a="solo"><span>РЫБАЧИТЬ В ОДИНОЧКУ</span></button>`}
       </div>
-      <div class="tfoot">Голосовой чат включается в комнате · прогресс хранится в этом браузере<br><a data-a="help">Как играть</a> · <a data-a="settings">Настройки</a></div>
+      <div class="tfoot">${this.g.offline ? 'Прогресс хранится в этом браузере' : 'Голосовой чат включается в комнате · прогресс хранится в этом браузере'}<br><a data-a="help">Как играть</a> · <a data-a="settings">Настройки</a></div>
     </div>`;
     setTimeout(() => {
       const n = $('#nm');
@@ -638,7 +639,7 @@ export class UI {
     this.screen.innerHTML = `<div class="editor">
       <div class="ptitle"><h1>ПЕРСОНАЖ</h1><span class="sp"></span><button class="btn sm cy" data-a="rnd"><span>СЛУЧАЙНО</span></button></div>
       <div class="cats">${cats.map(([k, n]) => `<button class="btn ${E.cat === k ? 'on' : ''}" data-a="ecat" data-id="${k}"><span>${n}</span></button>`).join('')}</div>
-      <div class="edhint">Зажмите мышь и ведите — персонаж повернётся</div>
+      <div class="edhint">${this.g.input.touch.on ? 'Ведите пальцем — персонаж повернётся' : 'Зажмите мышь и ведите — персонаж повернётся'}</div>
       <div class="opts">${body}</div>
       <div class="edfoot"><button class="btn ghost" data-a="edcancel"><kbd class="b">ESC</kbd><span>ОТМЕНА</span></button><span class="sp"></span><button class="btn pri big" data-a="edsave" style="height:2.2em"><span>ГОТОВО</span></button></div></div>`;
   }
@@ -680,6 +681,23 @@ export class UI {
   }
   renderHelp() {
     const k = (s, c = '') => `<kbd class="${c}">${s}</kbd>`;
+    if (this.g.input.touch.on) {
+      this.screen.innerHTML = `<div class="dim"></div><div class="center" style="width:min(44em,94vw)">
+      <h1>КАК ИГРАТЬ</h1>
+      <div class="help">
+        <span>${k('ДЖОЙСТИК', 'g')}</span><span>Слева — ходить. Палец по экрану — смотреть по сторонам.</span>
+        <span>${k('ЗАБРОС')}</span><span>Наведите прицел на воду, зажмите жёлтую кнопку — шкала силы растёт — и отпустите. Белая риска показывает, сколько силы нужно до метки.</span>
+        <span>${k('ПОДСЕКАЙ')}</span><span>Поплавок нырнул и кнопка замигала — жмите сразу.</span>
+        <span>${k('МОТАЙ')}</span><span><b>Вываживание:</b> держите кнопку — мотаете, отпускаете — леска слабеет. Стрелка натяжения должна быть в голубой зоне. Рыба рванула вбок — ведите джойстик в другую сторону.</span>
+        <span>${k('СМОТАТЬ', 'g')}</span><span>Вернуть снасть. После улова рядом появится «ОТПУСТИТЬ» — за это дают больше опыта.</span>
+        <span>${k('РЫНОК')}</span><span>Кнопка появляется у лавки на берегу: продать улов, купить удочки, леску, наживку.</span>
+        <span>${k('СНАСТИ', 'x')}</span><span>Панель внизу экрана: нажмите на наживку — сменить её, на удочку — открыть все снасти.</span>
+        <span>${k('☰', 'g')}</span><span>Меню: журнал рыб, персонаж, настройки. Плашка «ГОЛОС» справа сверху включает и выключает микрофон.</span>
+      </div>
+      <p>Чем лучше удочка — тем дальше заброс: до рифа, водопада и арки стартовой не достать. Тёмные тени под водой — косяки, там клюёт чаще и крупнее.</p>
+      <button class="btn pri" data-a="${this.popts && this.popts.first ? 'close' : 'back'}"><span>ПОНЯТНО</span></button></div>`;
+      return;
+    }
     this.screen.innerHTML = `<div class="dim"></div><div class="center" style="width:min(44em,94vw)">
       <h1>КАК ИГРАТЬ</h1>
       <div class="help">
@@ -709,7 +727,7 @@ export class UI {
     switch (a) {
       case 'create': case 'join': case 'joincode': case 'solo': {
         const name = ($('#nm').value || '').trim();
-        const code = ($('#code').value || '').trim().toUpperCase();
+        const code = (($('#code') || {}).value || '').trim().toUpperCase();
         if (!name) {
           $('#terr').textContent = 'Сначала представьтесь — друзья увидят это имя';
           $('#nm').focus();
