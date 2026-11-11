@@ -2,8 +2,8 @@
 import * as THREE from 'three';
 import { clamp, lerp, sstep, fbm2, canvasTex, rng, TAU, isTouch } from './util.js';
 import { groundH, shoreZ, BOUNDS, capeDist, CAPE, ISLAND, islandR, MAP_VIEW, DECKS, LIGHTHOUSE, ARCH } from './terrain.js';
-import { createWater } from './water.js';
-import { buildScenery } from './scenery.js';
+import { createWater, createFoamRings } from './water.js';
+import { buildScenery, FOAM_SPOTS } from './scenery.js';
 import { patchSurface, surfaceU, detailTexture } from './surface.js';
 
 // ключевые часы суток: цвета неба, солнца, воды
@@ -226,6 +226,7 @@ export class World {
     scene.add(sun, sun.target);
 
     this.scenery = buildScenery(scene);
+    if (FOAM_SPOTS.length) scene.add(createFoamRings(FOAM_SPOTS, this.water.uniforms));
     this.sunDir = new THREE.Vector3(0, 1, 0);
     this.night = 0;
     this.hours = 12;

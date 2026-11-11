@@ -248,3 +248,77 @@ export function createWater() {
   m.renderOrder = 2;
   return { mesh: m, uniforms };
 }
+
+const RING_VERT = /* glsl */ `
+uniform float uTime;
+uniform sampler2D uDepth;
+uniform vec4 uBounds;
+attribute float aSeed;
+varying vec2 vUv;
+varying float vSeed;
+varying float vDist;
+void main() {
+  vec4 wp = vec4(position, 1.0);
+  vec2 p = wp.xz; float h = 0.0; vec2 g = vec2(0.0);
+  ${waveGLSL}
+  float dv = texture2D(uDepth, (p - uBounds.xy) * uBounds.zw).r;
+  float t = clamp((dv * dv * 16.0 - 0.4) / 5.6, 0.0, 1.0);
+  wp.y += h * (0.12 + 0.88 * t * t * (3.0 - 2.0 * t)) + 0.012;
+  vUv = uv; vSeed = aSeed;
+  vDist = length(cameraPosition - wp.xyz);
+  gl_Position = projectionMatrix * viewMatrix * wp;
+}`;
+const RING_FRAG = /* glsl */ `
+precision highp float;
+uniform float uTime, uGlitter;
+uniform sampler2D uNormal;
+uniform vec3 uSkyHor;
+varying vec2 vUv;
+varying float vSeed;
+varying float vDist;
+void main() {
+  float d = length(vUv); // 1.0 — край сваи
+  float n = texture2D(uNormal, vUv * 0.09 + vSeed * 7.0 + uTime * 0.015).x;
+  // рваная кромка пены у самой сваи
+  float foam = smoothstep(1.7 + n * 0.9, 1.08, d) * smoothstep(0.92, 1.04, d);
+  // два расходящихся круга
+  float ring = 0.0;
+  for (int i = 0; i < 2; i++) {
+    float ph = fract(uTime * 0.19 + vSeed + float(i) * 0.5);
+    ring += smoothstep(0.2, 0.0, abs(d - (1.25 + ph * 2.7) - n * 0.25)) * (1.0 - ph) * (1.0 - ph);
+  }
+  float a = clamp(foam * 0.85 + ring * 0.42, 0.0, 1.0) * smoothstep(4.1, 3.3, d) * smoothstep(60.0, 25.0, vDist);
+  if (a < 0.01) discard;
+  vec3 c = mix(vec3(1.0), uSkyHor, 0.25) * (0.35 + 0.65 * clamp(uGlitter + 0.25, 0.0, 1.0));
+  gl_FragColor = vec4(c, a);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}`;
+/** Пена и расходящиеся круги вокруг свай: плоские кольца, которые качаются вместе с водой. spots: [[x, z, радиус], …] */
+export function createFoamRings(spots, wU) {
+  const n = spots.length;
+  const pos = new Float32Array(n * 12);
+  const uv = new Float32Array(n * 8);
+  const seed = new Float32Array(n * 4);
+  const idx = [];
+  const Q = [[-1, -1], [-1, 1], [1, 1], [1, -1]];
+  spots.forEach(([x, z, r], i) => {
+    const K = 4.2;
+    Q.forEach(([a, b], k) => {
+      pos.set([x + a * r * K, 0, z + b * r * K], (i * 4 + k) * 3);
+      uv.set([a * K, b * K], (i * 4 + k) * 2);
+      seed[i * 4 + k] = (i * 0.6180339887) % 1;
+    });
+    idx.push(i * 4, i * 4 + 1, i * 4 + 2, i * 4, i * 4 + 2, i * 4 + 3);
+  });
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  geo.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
+  geo.setIndex(idx);
+  const uniforms = { uTime: wU.uTime, uDepth: wU.uDepth, uBounds: wU.uBounds, uNormal: wU.uNormal, uGlitter: wU.uGlitter, uSkyHor: wU.uSkyHor };
+  const m = new THREE.Mesh(geo, new THREE.ShaderMaterial({ uniforms, vertexShader: RING_VERT, fragmentShader: RING_FRAG, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
+  m.frustumCulled = false;
+  m.renderOrder = 3;
+  return m;
+}

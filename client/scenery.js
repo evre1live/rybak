@@ -10,6 +10,8 @@ const DARK_WOOD = '#7a5230';
 const ROPE = '#ead9a7';
 export const LAMP_POSTS = [[1.92, -9, -1], [-6.18, -22.3, 1], [6.18, 4.3, -1], [-29.25, 12.7, -1], [-6.5, 9.7, 1]];
 
+/** Сваи, стоящие в воде: вокруг них пена и круги (water.js). */
+export const FOAM_SPOTS = [];
 function buildDocks(B, r) {
   for (const d of DECKS) {
     const across = d.along === 'z';
@@ -76,6 +78,7 @@ function buildDocks(B, r) {
       const tall = r() < 0.62;
       const top = DECK_Y + (tall ? 0.62 + r() * 0.3 : 0.1);
       const bot = Math.min(gh - 0.6, -1.2);
+      if (gh < -0.25) FOAM_SPOTS.push([px, pz, 0.17]);
       B.add(G.cyl(9), shade('#8a5f3a', (r() - 0.5) * 0.14), M(px, (top + bot) / 2, pz, 0.34, top - bot, 0.34, 0, r() * 3, (r() - 0.5) * 0.03), { grad: [0.5, 1.05] });
       B.add(G.cyl(9), '#c79d6c', M(px, top + 0.012, pz, 0.3, 0.03, 0.3), { mat: 4 });
       if (tall && r() < 0.5) for (let k = 0; k < 3; k++) B.add(G.torus(0.2, 12), ROPE, M(px, DECK_Y + 0.3 + k * 0.066, pz, 0.46, 0.46, 0.46, Math.PI / 2, r() * 3, 0));
