@@ -103,12 +103,18 @@ function deckDist(x, z) {
   return best;
 }
 export const standY = (x, z) => (deckAt(x, z, -0.05) ? DECK_Y : groundH(x, z));
+const EDGE = 0.1; // настолько не доходим до края настила
+export const WADE = 0.62; // на такую глубину можно зайти в воду с берега
+/** Точка на настилах: все четыре угла «подошвы» лежат хоть на каком-то из них — на стыках настилов щелей нет. */
+function onDecks(x, z) {
+  return !!(deckAt(x - EDGE, z - EDGE) && deckAt(x + EDGE, z - EDGE) && deckAt(x - EDGE, z + EDGE) && deckAt(x + EDGE, z + EDGE));
+}
 export function canStand(x, z) {
   for (const b of BOXES) if (x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1) return false;
   for (const c of CIRCLES) if ((x - c.x) ** 2 + (z - c.z) ** 2 < c.r * c.r) return false;
-  if (deckAt(x, z, 0.14)) return true;
-  if (x < -54 || x > 47 || z < -12) return false;
-  if (groundH(x, z) < -0.32) return false;
+  if (onDecks(x, z)) return true;
+  if (x < -54 || x > 47 || z < -12.6) return false;
+  if (groundH(x, z) < -WADE) return false;
   return z - shoreZ(x) < 13.5;
 }
 

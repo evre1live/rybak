@@ -1,5 +1,5 @@
 // Игрок от первого лица: ввод (клавиатура, мышь, геймпад, сенсор), ходьба по причалу и берегу, камера.
-import { canStand, standY, deckAt, SPAWN } from './terrain.js';
+import { canStand, standY, deckAt, groundH, SPAWN } from './terrain.js';
 import { clamp, damp } from './util.js';
 import { settings } from './profile.js';
 
@@ -180,6 +180,7 @@ export class Player {
     this.jump = 0;
     this.vy = 0;
     this.sit = false;
+    this.wade = 0; // глубина воды под ногами, м
     this.dangle = false;
     this.walk = 0;
     this.eye = 1.62;
@@ -208,7 +209,9 @@ export class Player {
       mz /= len;
     }
     if (this.sit && len > 0.1 && canMove) this.sit = false;
-    const max = this.sit ? 0 : input.sprint ? 5.4 : 3.5;
+    // по колено в воде идём медленнее
+    this.wade = this.onDeck ? 0 : Math.max(0, -groundH(this.x, this.z));
+    const max = (this.sit ? 0 : input.sprint ? 5.4 : 3.5) * (1 - Math.min(0.55, this.wade * 0.9));
     const sin = Math.sin(this.yaw);
     const cos = Math.cos(this.yaw);
     const vx = (mx * cos - mz * sin) * max;

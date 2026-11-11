@@ -60,6 +60,14 @@ class Game {
     this.vm.setVisible(false);
     this.fx = new Fx(this.scene);
     this.audio = new Audio2();
+    // шаги: доски причала, земля, вода по колено
+    this.player.onStep = (land) => {
+      const p = this.player;
+      if (p.wade > 0.05) {
+        this.audio.splash(0.3 + p.wade * 0.5, land ? 0.45 : 0.2);
+        this.fx.ripple(p.x, p.z, 0.6 + p.wade, 0.9);
+      } else this.audio.step(p.onDeck, land);
+    };
     this.state = 'title';
     this.solo = false;
     this.code = '';

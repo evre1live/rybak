@@ -192,6 +192,35 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
   await G(page, () => { RYBAK.fixedHour = 19.2; RYBAK.player.place(-31, 8, 1.2); RYBAK.player.pitch = -0.1; });
   await shot(page, '21-dusk-backwater', 400);
 
+  // ходим ногами, а не переносимся: от берега до края пирса, по мосткам на западный причал, с настила на берег и в воду
+  {
+    const walker = await open(browser, 'q=low&norender&h=13', 'walk');
+    await walker.fill('#nm', 'Ходок');
+    await G(walker, () => { RYBAK.profile.seenIntro = true; });
+    await walker.click('[data-a="solo"]');
+    await walker.waitForFunction(() => RYBAK.state === 'lobby');
+    await walker.click('[data-a="start"]');
+    await walker.waitForFunction(() => RYBAK.state === 'world');
+    const walk = async (from, yaw, done, what) => {
+      await G(walker, ([x, z, yaw]) => { const g = RYBAK; g.input.locked = true; g.input.enabled = true; g.player.place(x, z, yaw); g.input.keys.add('KeyW'); }, [...from, yaw]);
+      const ok = await walker.waitForFunction(done, null, { timeout: 40000 }).then(() => true, () => false);
+      const at = await G(walker, () => { RYBAK.input.keys.delete('KeyW'); const p = RYBAK.player; return [+p.x.toFixed(2), +p.z.toFixed(2), +p.y.toFixed(2), +p.wade.toFixed(2)]; });
+      assert.ok(ok, `${what}: застряли в точке ${at}`);
+      return at;
+    };
+    const head = await walk([0, 9], 0, () => RYBAK.player.z < -26.8, 'с настила по пирсу до его края');
+    assert.ok(Math.abs(head[2] - 1.1) < 0.05, 'на краю пирса стоим на досках');
+    await walk([-10, 9], Math.PI / 2, () => RYBAK.player.x < -34.8, 'по мосткам на западный причал');
+    await walk([-5.5, -24.5], Math.PI / 2, () => RYBAK.player.x < -5.85, 'до бокового края площадки на конце пирса');
+    const land = await walk([0, 14], Math.PI, () => RYBAK.player.z > 22, 'с настила на берег');
+    assert.ok(land[2] > 1, 'на берегу стоим на земле');
+    const wet = await walk([14, 18], 0, () => RYBAK.player.wade > 0.5, 'с берега в воду по колено');
+    assert.ok(wet[3] <= 0.63, `глубже, чем по колено, не заходим: ${wet[3]}`);
+    assert.ok(!walker.__err, 'ошибки на странице (ходьба)');
+    await walker.close();
+    console.log('  ходьба: пирс до края, мостки, берег и вода по колено');
+  }
+
   // сохранение переживает перезагрузку
   await page.waitForTimeout(500);
   const saved = await G(page, () => JSON.parse(localStorage.getItem('rybak.profile.v1')));
