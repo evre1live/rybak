@@ -13,7 +13,8 @@
     "test:play": "node test/play.cjs",
     "test:coop": "node test/coop.cjs",
     "balance": "node tools/balance.js",
-    "test:devices": "node test/devices.cjs"
+    "test:devices": "node test/devices.cjs",
+    "solo": "node tools/artifact.js"
   },
   "engines": {
     "node": ">=20"

@@ -178,20 +178,59 @@ const atHead = (page) => G(page, () => { RYBAK.player.place(0.6, -20, 0.1); RYBA
     console.log('  без захвата мыши: камера, заброс и пауза работают');
   }
 
-  // ───── пробная версия без сервера ─────
+  // ───── пробная версия одним файлом под строгой политикой загрузки (так страницу держит рамка без сети) ─────
   {
+    const { execFileSync } = require('node:child_process');
+    const http = require('node:http');
+    const path = require('node:path');
+    const os = require('node:os');
+    const file = path.join(os.tmpdir(), `rybak-solo-${process.pid}.html`);
+    execFileSync(process.execPath, [path.join(__dirname, '..', 'tools', 'artifact.js'), file]);
+    const CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:; worker-src blob:; connect-src 'none'";
+    const srv = http.createServer((req, res) => {
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': CSP });
+      res.end(fs.readFileSync(file));
+    });
+    await new Promise((r) => srv.listen(0, '127.0.0.1', r));
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
-    await ctx.addInitScript(() => { window.RYBAK_OFFLINE = true; });
-    const page = await open(ctx, 'q=low&norender&h=13', 'offline');
+    await ctx.addInitScript(() => {
+      window.__csp = [];
+      document.addEventListener('securitypolicyviolation', (e) => window.__csp.push(`${e.violatedDirective} ${e.blockedURI}`.slice(0, 120)));
+    });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => { console.log('[solo-file] PAGEERROR', e.message.slice(0, 500)); page.__err = (page.__err || 0) + 1; });
+    await page.goto(`http://127.0.0.1:${srv.address().port}/?q=low&norender&ts=3&h=13`);
+    await page.waitForFunction(() => window.RYBAK && window.__frames > 3, null, { timeout: 60000 });
+    await G(page, () => document.fonts.ready);
+    assert.ok(await G(page, () => document.fonts.check('italic 900 20px "Sofia X"', 'РЫБАК') && document.fonts.check('400 16px "Onest"', 'Имя')), 'шрифты загрузились из самой страницы');
     assert.equal(await page.locator('[data-a="create"]').count(), 0);
     assert.equal(await page.locator('#code').count(), 0);
     assert.match(await page.textContent('.tcard .note'), /Пробная версия/);
+    await shot(page, 'd08-solo-file-title');
     await toWorld(page, false);
     assert.equal(await G(page, () => RYBAK.solo), true);
-    assert.equal(await G(page, () => !!(RYBAK.net.ws)), false, 'к серверу не подключаемся');
+    assert.equal(await G(page, () => !!RYBAK.net.ws), false, 'к серверу не подключаемся');
+    // значки снастей нарисованы и показываются
+    await G(page, () => RYBAK.ui.openPanel('tackle'));
+    await page.waitForSelector('.panel .grid .tile img');
+    assert.ok(await G(page, () => [...document.querySelectorAll('.panel .grid .tile img')].every((i) => i.complete && i.naturalWidth > 0)), 'значки снастей видны');
+    await G(page, () => RYBAK.ui.closePanel());
+    // заброс
+    await G(page, () => { RYBAK.input.locked = true; RYBAK.input.enabled = true; });
+    await atHead(page);
+    await G(page, () => { RYBAK.input.primary = true; RYBAK.input.pressed.add('Primary'); });
+    await page.waitForFunction(() => RYBAK.fishing.state === 'charge' && RYBAK.fishing.power > 0.5, null, { timeout: 30000 });
+    await G(page, () => { RYBAK.input.primary = false; });
+    await page.waitForFunction(() => RYBAK.fishing.state === 'wait', null, { timeout: 60000 });
+    // сохранение в браузере работает и здесь
+    await page.waitForTimeout(600);
+    assert.equal(await G(page, () => JSON.parse(localStorage.getItem('rybak.profile.v1')).name), 'Жамшид');
+    assert.deepEqual(await G(page, () => window.__csp), [], 'страница ничего не тянет извне');
     assert.ok(!page.__err, 'ошибки на странице (пробная версия)');
     await ctx.close();
-    console.log('  пробная версия: только одиночная рыбалка, без сети');
+    srv.close();
+    fs.rmSync(file, { force: true });
+    console.log('  пробная версия одним файлом: без сети, шрифты и значки на месте, рыбалка идёт');
   }
 
   await browser.close();
