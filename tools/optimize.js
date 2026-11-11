@@ -187,7 +187,7 @@ for (const m of spec.models) {
     dedup(),
     prune(),
     weld(),
-    ...(ratio < 0.98 ? [simplify({ simplifier: MeshoptSimplifier, ratio, error: m.group === 'hero' ? 0.0015 : m.group === 'fish' ? 0.003 : 0.006, lockBorder: false })] : []),
+    ...(ratio < 0.98 ? [simplify({ simplifier: MeshoptSimplifier, ratio, error: m.err || (m.group === 'hero' ? 0.0015 : m.group === 'fish' ? 0.003 : 0.008), lockBorder: false })] : []),
     resample(),
     prune(),
     textureCompress({ encoder: sharp, targetFormat: 'webp', slots: /^baseColorTexture$/, resize: [budget.tex[0], budget.tex[0]], quality: 86 }),

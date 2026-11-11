@@ -162,7 +162,7 @@ function buildShack(B, P, scene, r) {
       const h = 0.14 + r() * 0.14;
       P.add(r() < 0.5 ? G.cyl(8) : G.box(), c, M(x1 - 1.28, by + sy + 0.03 + h / 2, cz - 1.3 + i * 0.43 + r() * 0.08, 0.15, h, 0.15));
     }
-    for (let i = 0; i < 3; i++) place('prop-shelfgoods', x1 - 1.28, by + sy + 0.025, cz - 0.98 + i * 0.98, 0.84, Math.PI / 2, true);
+    for (let i = 0; i < 3; i++) place('prop-shelfgoods', x1 - 1.28, by + sy + 0.025, cz - 0.98 + i * 0.98, 0.84, Math.PI / 2, true, { ns: 1 });
   }
   // прилавок с уловом на льду
   B.add(G.box(), '#d9a066', M(x1 + 0.2, by + 1.04, cz, 0.78, 0.09, z1 - z0 - 1.5));
@@ -171,7 +171,7 @@ function buildShack(B, P, scene, r) {
     P.add(G.box(), '#a86f3a', M(x1 + 0.22, by + 1.15, cz + dz, 0.55, 0.14, 0.7));
     P.add(G.box(), '#e8f6ff', M(x1 + 0.22, by + 1.21, cz + dz, 0.47, 0.06, 0.62));
     for (let i = 0; i < 4; i++) P.add(G.sph(8, 6), ['#b9c7d1', '#e8643a', '#9fb04a', '#cfd9de'][i], M(x1 + 0.14 + (i % 2) * 0.16, by + 1.27, cz + dz - 0.2 + i * 0.13, 0.13, 0.07, 0.36, 0, 0.3 * (i - 1.5), 0));
-    place('prop-fishtray', x1 + 0.22, by + 1.085, cz + dz, 0.74, Math.PI / 2, true);
+    place('prop-fishtray', x1 + 0.22, by + 1.085, cz + dz, 0.74, Math.PI / 2, true, { ns: 1 });
   }
   place('prop-lantern', x1 + 0.26, by + 1.085, cz - 1.82, 0.4, 0.4);
   B.add(G.box(), '#59636e', M(x1 + 0.25, by + 1.14, cz + 1.25, 0.3, 0.1, 0.3));
@@ -358,6 +358,7 @@ function upgradeProps(scene, fallback, floaters) {
         const bt = base && got.get(base.id);
         o.position.set(p.x, bt && bt.info.size ? base.y + bt.info.size[1] * base.s : p.y, p.z);
         o.rotation.set(p.rx || 0, p.ry, p.rz || 0, 'YXZ');
+        if (p.ns) o.traverse((c) => (c.castShadow = false)); // под крышей лавки тень всё равно не видна
         scene.add(o);
         propsDone.placed++;
       }

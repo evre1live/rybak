@@ -113,8 +113,8 @@
     "prop-crate": {
       "file": "models/prop-crate.glb",
       "group": "prop",
-      "tris": 6988,
-      "kb": 192,
+      "tris": 4999,
+      "kb": 172,
       "size": [
         1,
         0.665,
@@ -402,8 +402,8 @@
     "prop-barrel": {
       "file": "models/prop-barrel.glb",
       "group": "prop",
-      "tris": 6997,
-      "kb": 185,
+      "tris": 4500,
+      "kb": 159,
       "size": [
         0.755,
         1,
@@ -414,8 +414,8 @@
     "prop-bucket": {
       "file": "models/prop-bucket.glb",
       "group": "prop",
-      "tris": 6987,
-      "kb": 143,
+      "tris": 3483,
+      "kb": 110,
       "size": [
         0.718,
         1,
@@ -426,8 +426,8 @@
     "prop-ropecoil": {
       "file": "models/prop-ropecoil.glb",
       "group": "prop",
-      "tris": 7000,
-      "kb": 184,
+      "tris": 4778,
+      "kb": 161,
       "size": [
         1,
         0.383,
@@ -438,8 +438,8 @@
     "prop-cooler": {
       "file": "models/prop-cooler.glb",
       "group": "prop",
-      "tris": 7000,
-      "kb": 172,
+      "tris": 4000,
+      "kb": 142,
       "size": [
         1,
         0.749,
@@ -450,8 +450,8 @@
     "prop-trap": {
       "file": "models/prop-trap.glb",
       "group": "prop",
-      "tris": 6998,
-      "kb": 222,
+      "tris": 6000,
+      "kb": 210,
       "size": [
         1,
         0.642,
@@ -474,8 +474,8 @@
     "prop-buoy": {
       "file": "models/prop-buoy.glb",
       "group": "prop",
-      "tris": 6981,
-      "kb": 207,
+      "tris": 4497,
+      "kb": 182,
       "size": [
         0.852,
         1,
@@ -486,8 +486,8 @@
     "prop-lifering": {
       "file": "models/prop-lifering.glb",
       "group": "prop",
-      "tris": 6982,
-      "kb": 186,
+      "tris": 3500,
+      "kb": 153,
       "size": [
         1,
         0.939,
@@ -498,8 +498,8 @@
     "prop-tacklebox": {
       "file": "models/prop-tacklebox.glb",
       "group": "prop",
-      "tris": 6978,
-      "kb": 189,
+      "tris": 3992,
+      "kb": 155,
       "size": [
         1,
         0.723,
@@ -510,8 +510,8 @@
     "prop-fishtray": {
       "file": "models/prop-fishtray.glb",
       "group": "prop",
-      "tris": 7000,
-      "kb": 187,
+      "tris": 4490,
+      "kb": 161,
       "size": [
         1,
         0.465,
@@ -522,8 +522,8 @@
     "prop-shelfgoods": {
       "file": "models/prop-shelfgoods.glb",
       "group": "prop",
-      "tris": 6993,
-      "kb": 201,
+      "tris": 2999,
+      "kb": 160,
       "size": [
         1,
         0.318,
@@ -534,8 +534,8 @@
     "prop-anchor": {
       "file": "models/prop-anchor.glb",
       "group": "prop",
-      "tris": 6993,
-      "kb": 197,
+      "tris": 3993,
+      "kb": 167,
       "size": [
         0.681,
         1,
@@ -546,8 +546,8 @@
     "prop-netpile": {
       "file": "models/prop-netpile.glb",
       "group": "prop",
-      "tris": 15789,
-      "kb": 424,
+      "tris": 8987,
+      "kb": 350,
       "size": [
         1,
         0.826,
@@ -558,8 +558,8 @@
     "prop-lantern": {
       "file": "models/prop-lantern.glb",
       "group": "prop",
-      "tris": 6984,
-      "kb": 163,
+      "tris": 3498,
+      "kb": 127,
       "size": [
         0.382,
         1,

@@ -272,95 +272,111 @@
       "id": "prop-crate",
       "group": "prop",
       "name": "Ящик",
-      "prompt": "a sturdy wooden fishing crate made of thick planks, rope handles on two sides, metal corner brackets, slightly weathered"
+      "prompt": "a sturdy wooden fishing crate made of thick planks, rope handles on two sides, metal corner brackets, slightly weathered",
+      "tris": 5000
     },
     {
       "id": "prop-barrel",
       "group": "prop",
       "name": "Бочка",
-      "prompt": "an old oak barrel with dark iron hoops and a cork bung, slightly weathered"
+      "prompt": "an old oak barrel with dark iron hoops and a cork bung, slightly weathered",
+      "tris": 4500
     },
     {
       "id": "prop-cooler",
       "group": "prop",
       "name": "Холодильник",
-      "prompt": "a chunky portable cooler box: bright blue body, white lid, grey carry handle and latches"
+      "prompt": "a chunky portable cooler box: bright blue body, white lid, grey carry handle and latches",
+      "tris": 4000
     },
     {
       "id": "prop-bucket",
       "group": "prop",
       "name": "Ведро",
-      "prompt": "a galvanized metal bucket with a wire handle and a wooden grip, slightly dented, filled with water"
+      "prompt": "a galvanized metal bucket with a wire handle and a wooden grip, slightly dented, filled with water",
+      "tris": 3500
     },
     {
       "id": "prop-ropecoil",
       "group": "prop",
       "name": "Бухта каната",
-      "prompt": "a neat coil of thick beige mooring rope stacked in several loops, one frayed end"
+      "prompt": "a neat coil of thick beige mooring rope stacked in several loops, one frayed end",
+      "tris": 4000
     },
     {
       "id": "prop-trap",
       "group": "prop",
       "name": "Ловушка",
-      "prompt": "a wooden lobster trap: half-cylinder frame of wooden slats with green rope netting and a funnel entrance, a small orange float tied to it"
+      "prompt": "a wooden lobster trap: half-cylinder frame of wooden slats with green rope netting and a funnel entrance, a small orange float tied to it",
+      "tris": 6000
     },
     {
       "id": "prop-boat",
       "group": "prop",
       "name": "Лодка",
       "prompt": "a small wooden rowboat: plank-built hull painted white with a teal stripe and red trim, two wooden bench seats, two oars lying inside, seen from the side and slightly from above so the inside is visible",
-      "elong": true
+      "elong": true,
+      "tris": 7000
     },
     {
       "id": "prop-buoy",
       "group": "prop",
       "name": "Буй",
-      "prompt": "a navigation buoy: fat red and white striped conical float with a small lantern cage on top and a ring of rope around the base"
+      "prompt": "a navigation buoy: fat red and white striped conical float with a small lantern cage on top and a ring of rope around the base",
+      "tris": 4500
     },
     {
       "id": "prop-lifering",
       "group": "prop",
       "name": "Спасательный круг",
       "prompt": "a classic life ring: orange-red and white segments with a rope looped around it, seen straight from the front",
-      "flatFront": true
+      "flatFront": true,
+      "tris": 3500
     },
     {
       "id": "prop-tacklebox",
       "group": "prop",
       "name": "Ящик со снастями",
-      "prompt": "an open fishing tackle box: green plastic box with fold-out trays full of colourful lures, floats and hooks, and a small reel"
+      "prompt": "an open fishing tackle box: green plastic box with fold-out trays full of colourful lures, floats and hooks, and a small reel",
+      "tris": 4000
     },
     {
       "id": "prop-fishtray",
       "group": "prop",
       "name": "Лоток с рыбой",
       "prompt": "a shallow rectangular wooden market tray filled with crushed ice with six fresh fish laid in a row on the ice: two silver, one red, one striped green, and two lemon wedges",
-      "elong": true
+      "elong": true,
+      "tris": 4500
     },
     {
       "id": "prop-shelfgoods",
       "group": "prop",
       "name": "Товар на полке",
       "prompt": "fishing shop goods standing side by side in one straight row: two glass jars of bait with red lids, a stack of three colourful tin cans, a spool of fishing line, a small cardboard box of hooks, a red and white float, seen straight from the front",
-      "elong": true
+      "elong": true,
+      "tris": 3000
     },
     {
       "id": "prop-anchor",
       "group": "prop",
       "name": "Якорь",
-      "prompt": "an old rusty iron ship anchor with a wooden stock and a short length of heavy chain, standing upright"
+      "prompt": "an old rusty iron ship anchor with a wooden stock and a short length of heavy chain, standing upright",
+      "tris": 4000
     },
     {
       "id": "prop-netpile",
       "group": "prop",
       "name": "Сети",
-      "prompt": "a heap of teal fishing net with orange and white cork floats and a coiled rope on top"
+      "prompt": "a heap of teal fishing net with orange and white cork floats and a coiled rope on top",
+      "tris": 9000,
+      "err": 0.02
     },
     {
       "id": "prop-lantern",
       "group": "prop",
       "name": "Фонарь",
-      "prompt": "a storm lantern (hurricane lamp): dark teal metal body, glass chimney with a warm glowing flame inside, wire guard, carrying loop on top"
+      "prompt": "a storm lantern (hurricane lamp): dark teal metal body, glass chimney with a warm glowing flame inside, wire guard, carrying loop on top",
+      "tris": 3500
     },
     {
       "id": "junk-boot",
