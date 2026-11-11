@@ -3,6 +3,7 @@ import { heroTemplate, loadHero } from './hero.js';
 import * as THREE from 'three';
 import { itemModel } from './gear3d.js';
 import { buildFish } from './fish3d.js';
+import { modelInfo } from './models.js';
 import { Character } from './character.js';
 
 const SIZE = 256;
@@ -61,6 +62,8 @@ function free(obj) {
 }
 
 export function itemIcon(id) {
+  const baked = modelInfo('junk-' + id);
+  if (baked && baked.icon) return baked.icon;
   const key = 'i:' + id;
   if (cache.has(key)) return cache.get(key);
   setup();
@@ -79,6 +82,8 @@ export function itemIcon(id) {
   return url;
 }
 export function fishIcon(sp) {
+  const baked = modelInfo('fish-' + sp);
+  if (baked && baked.icon) return baked.icon; // значок, запечённый из готовой модели
   const key = 'f:' + sp;
   if (cache.has(key)) return cache.get(key);
   setup();
@@ -107,4 +112,19 @@ export function faceIcon(look) {
   if (cache.size > 400) cache.clear();
   if (heroReady) cache.set(key, url);
   return url;
+}
+
+/**
+ * Снимок готовой модели (рыба, предмет) — для запекания значков при сборке и для проверки моделей.
+ * view: 'side' — строго сбоку, 'three' — три четверти сверху, 'top' — сверху.
+ */
+export function modelShot(tpl, view = 'side') {
+  setup();
+  const o = tpl.scene.clone(true);
+  const g = new THREE.Group();
+  g.add(o);
+  if (view === 'three') g.rotation.set(0.42, -0.6, 0);
+  else if (view === 'top') g.rotation.set(Math.PI / 2, 0, 0);
+  else if (view === 'fish') g.rotation.set(0.1, 0.36, 0);
+  return shoot(g, frame(g, 1.06));
 }

@@ -30,7 +30,22 @@ if (!KEY) {
 }
 const spec = JSON.parse(fs.readFileSync(path.join(ROOT, 'art/models.json'), 'utf8'));
 const state = fs.existsSync(STATE) ? JSON.parse(fs.readFileSync(STATE, 'utf8')) : { models: {}, ledger: [] };
-const save = () => fs.writeFileSync(STATE, JSON.stringify(state, null, 2));
+// перед записью подмешиваем то, что успел записать соседний запуск (образы и модели можно гонять одновременно)
+const save = () => {
+  let disk = null;
+  try {
+    disk = JSON.parse(fs.readFileSync(STATE, 'utf8'));
+  } catch {}
+  if (disk) {
+    const key = (x) => x.task || x.label + x.at;
+    const seen = new Set(state.ledger.map(key));
+    for (const x of disk.ledger || []) if (!seen.has(key(x))) state.ledger.push(x);
+    state.ledger.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+    for (const [k, v] of Object.entries(disk.models || {})) if (!touched.has(k)) state.models[k] = v;
+  }
+  fs.writeFileSync(STATE, JSON.stringify(state, null, 2));
+};
+const touched = new Set(); // модели, которые менял этот запуск
 const args = process.argv.slice(2);
 const flag = (name, def) => {
   const i = args.indexOf('--' + name);
@@ -47,24 +62,48 @@ async function api(method, p, body) {
   return j.data;
 }
 /** Запускает задачу, ждёт её и записывает расход. cost — сколько она должна стоить (для проверки потолка). */
+let reserved = 0; // кредиты под задачи, которые сейчас идут (при работе пачкой)
+const QUIET = args.includes('--quiet');
 async function run(label, body, cost = 0) {
-  if (spent() + cost > CAP) throw new Error(`${label}: потолок ${CAP} кредитов (потрачено ${spent()}, задача стоит около ${cost}). Поднимите его: --cap N`);
-  const id = (await api('POST', '/task', body)).task_id;
-  console.log(`${label}: задача ${id}`);
-  let last = '';
-  for (;;) {
-    const d = await api('GET', `/task/${id}`);
-    const line = `${label}: ${d.status} ${d.progress ?? ''}%`;
-    if (line !== last) console.log((last = line));
-    if (d.status === 'success') {
-      const credits = d.consumed_credit ?? d.credits_consumed ?? 0;
-      state.ledger.push({ at: new Date().toISOString(), label, type: body.type, task: id, credits });
-      save();
-      console.log(`${label}: готово, ${credits} кредитов (всего ${spent()})`);
-      return { id, ...d };
+  if (spent() + reserved + cost > CAP) throw new Error(`${label}: потолок ${CAP} кредитов (потрачено ${spent()}, в работе ${reserved}, задача стоит около ${cost}). Поднимите его: --cap N`);
+  reserved += cost;
+  try {
+    let id;
+    for (let tries = 0; ; tries++) {
+      try {
+        id = (await api('POST', '/task', body)).task_id;
+        break;
+      } catch (e) {
+        // слишком много задач сразу — подождём и повторим
+        if (tries < 8 && /\b(429|2000|2010)\b|too many|rate|concurren/i.test(e.message)) await sleep(15000);
+        else throw e;
+      }
     }
-    if (['failed', 'cancelled', 'unknown', 'banned', 'expired'].includes(d.status)) throw new Error(`${label}: задача ${id} — ${d.status}`);
-    await sleep(4000);
+    console.log(`${label}: задача ${id}`);
+    let last = '';
+    for (;;) {
+      let d;
+      try {
+        d = await api('GET', `/task/${id}`);
+      } catch (e) {
+        await sleep(6000); // сеть моргнула — задача никуда не делась
+        continue;
+      }
+      const line = `${label}: ${d.status} ${d.progress ?? ''}%`;
+      if (line !== last && !QUIET) console.log(line);
+      last = line;
+      if (d.status === 'success') {
+        const credits = d.consumed_credit ?? d.credits_consumed ?? 0;
+        state.ledger.push({ at: new Date().toISOString(), label, type: body.type, task: id, credits });
+        save();
+        console.log(`${label}: готово, ${credits} кредитов (всего ${spent()})`);
+        return { id, ...d };
+      }
+      if (['failed', 'cancelled', 'unknown', 'banned', 'expired'].includes(d.status)) throw new Error(`${label}: задача ${id} — ${d.status}`);
+      await sleep(4000);
+    }
+  } finally {
+    reserved -= cost;
   }
 }
 async function download(url, file) {
@@ -90,7 +129,7 @@ const find = (id) => {
   if (!m) throw new Error(`в art/models.json нет модели ${id}`);
   return m;
 };
-const st = (id) => (state.models[id] ||= {});
+const st = (id) => (touched.add(id), (state.models[id] ||= {}));
 const imgExt = (url) => (/\.png(\?|$)/i.test(url) ? 'png' : /\.webp(\?|$)/i.test(url) ? 'webp' : 'jpg');
 
 async function concept(id) {
@@ -98,8 +137,14 @@ async function concept(id) {
   const from = flag('from', null);
   let body;
   if (from) body = { type: 'image_to_image', file: await upload(path.resolve(from)), prompt: `${m.prompt}. ${spec.pose}. ${spec.concept}`.slice(0, 1024), ...(spec.imageModel ? { model_version: spec.imageModel } : {}) };
-  else body = { type: 'text_to_image', prompt: `${spec.conceptLead} ${spec.pose}. ${m.prompt}. ${spec.style}. ${spec.concept}`.slice(0, 1024) };
-  const d = await run(`${id} образец`, body, 10);
+  else if (m.group === 'hero') body = { type: 'text_to_image', prompt: `${spec.conceptLead} ${spec.pose}. ${m.prompt}. ${spec.style}. ${spec.concept}`.slice(0, 1024) };
+  else {
+    // рыба — строго сбоку головой влево (плоская — сверху), предметы — в три четверти: так модель выходит в известном положении
+    const L = spec.leads[m.group === 'fish' ? 'fish' : 'prop'];
+    const lead = m.view === 'top' ? L.top : L.lead;
+    body = { type: 'text_to_image', prompt: `${lead} ${m.prompt[0].toUpperCase()}${m.prompt.slice(1)}. ${m.style || L.style}. ${L.concept}`.slice(0, 1024), ...(L.negative && args.includes('--neg') ? { negative_prompt: L.negative } : {}) };
+  }
+  const d = await run(`${id} образец`, body, 5);
   const url = urlOf(d.output.generated_image);
   const n = (st(id).concepts ||= []).length + 1;
   const file = await download(url, path.join(RAW, `${id}-concept${n}.${imgExt(url)}`));
@@ -107,15 +152,22 @@ async function concept(id) {
   st(id).concept = d.id;
   save();
 }
-const quality = (m) => ({
-  model_version: spec.version,
-  texture: true,
-  pbr: true,
-  texture_quality: m.textureQuality || 'detailed',
-  ...(m.geometry === 'standard' ? {} : { geometry_quality: 'detailed' }),
-  ...(m.faces ? { face_limit: m.faces } : {}),
-  auto_size: false
-});
+const quality = (m0) => {
+  const m = { ...((spec.groupDefaults || {})[m0.group] || {}), ...m0 };
+  return {
+    model_version: spec.version,
+    texture: true,
+    pbr: true,
+    texture_quality: m.textureQuality || 'detailed',
+    ...(m.geometry === 'standard' ? {} : { geometry_quality: 'detailed' }),
+    ...(m.faces ? { face_limit: m.faces } : {}),
+    auto_size: false
+  };
+};
+const modelCost = (m0) => {
+  const q = quality(m0);
+  return 30 + (q.texture_quality === 'detailed' ? 10 : 0) + (q.geometry_quality === 'detailed' ? 20 : 0);
+};
 async function model(id) {
   const m = find(id);
   const s = st(id);
@@ -123,7 +175,7 @@ async function model(id) {
   if (!file && !(s.concepts && s.concepts.length)) throw new Error(`${id}: сначала concept`);
   // модель строится по картинке-образцу: свой файл или последняя (либо выбранная через pick) картинка из concept
   const body = { type: 'image_to_model', ...quality(m), file: file ? await upload(path.resolve(file)) : await conceptFile(s) };
-  const d = await run(`${id} модель`, body, 60);
+  const d = await run(`${id} модель`, body, modelCost(m));
   s.model = d.id;
   save();
   await download(pickModel(d.output), path.join(RAW, `${id}.glb`));
@@ -180,7 +232,40 @@ try {
     const d = await run('задача', JSON.parse(rest[0]), Number(flag('cost', 10)));
     console.log(JSON.stringify(d.output, null, 1).slice(0, 1500));
   } else if (cmd === 'upload') console.log(await upload(path.resolve(rest[0])));
-  else if ({ concept, model, text, rig, anim }[cmd]) for (const id of ids) await { concept, model, text, rig, anim }[cmd](id);
+  else if (cmd === 'batch') {
+    // batch concept|model [ids…] [--group fish,prop] [--jobs 5] [--redo]: несколько задач сразу, готовое пропускается
+    const what = ids[0];
+    const fn = { concept, model }[what];
+    if (!fn) throw new Error('batch concept|model …');
+    const groups = flag('group', '').split(',').filter(Boolean);
+    const redo = args.includes('--redo');
+    let list = ids.slice(1);
+    if (!list.length) list = spec.models.filter((m) => groups.includes(m.group)).map((m) => m.id);
+    list = list.filter((id) => {
+      if (redo) return true;
+      const cur = state.models[id];
+      if (what === 'concept') return !(cur && cur.concepts && cur.concepts.length);
+      return !fs.existsSync(path.join(RAW, `${id}.glb`));
+    });
+    const jobs = Number(flag('jobs', 5));
+    const failed = [];
+    let next = 0;
+    console.log(`пачка ${what}: ${list.length} шт., по ${jobs} сразу`);
+    await Promise.all(
+      Array.from({ length: Math.min(jobs, list.length) }, async () => {
+        while (next < list.length) {
+          const id = list[next++];
+          try {
+            await fn(id);
+          } catch (e) {
+            failed.push(id);
+            console.error(`${id}: ${e.message}`);
+          }
+        }
+      })
+    );
+    console.log(`пачка ${what} закончена: готово ${list.length - failed.length}, не вышло ${failed.length}${failed.length ? ' (' + failed.join(', ') + ')' : ''}; всего потрачено ${spent()}`);
+  } else if ({ concept, model, text, rig, anim }[cmd]) for (const id of ids) await { concept, model, text, rig, anim }[cmd](id);
   else console.log('команды: balance | concept <id> [--from файл] | model <id> [--image файл] | text <id> | rig <id> | anim <id> [--only a,b] | task <json> | spent');
 } catch (e) {
   console.error(e.message);

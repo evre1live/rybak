@@ -2,6 +2,9 @@
 import * as THREE from 'three';
 import { Gfx } from './gfx.js';
 import { loadManifest, heroes, fpLook } from './hero.js';
+import { loadModel, modelInfo } from './models.js';
+import { adopt } from './fish3d.js';
+import { modelShot } from './icons.js';
 import { World, drawMinimap } from './world.js';
 import { Character, PRESETS, fixLook } from './character.js';
 import { buildRod, itemModel } from './gear3d.js';
@@ -91,7 +94,13 @@ class Game {
     this.timeScale = Number(q.get('ts')) || 1;
     this.noRender = q.has('norender');
     this.fishing = new Fishing({ scene: this.scene, camera: this.camera, vm: this.vm, fx: this.fx, schools: this.world.scenery.schools, profile: this.profile, hour: () => this.hours, emit: (t, d) => this.onFish(t, d) });
-    this.fishing.makeJunk = (id) => itemModel(id);
+    this.fishing.makeJunk = (id) => {
+      // готовая модель стоит на «полу» (y = 0) — опускаем на половину высоты, чтобы в руках она была по центру, как процедурная
+      const g = new THREE.Group();
+      g.add(itemModel(id));
+      const info = modelInfo('junk-' + id);
+      return info ? adopt(g, 'junk-' + id, false, -(info.size ? info.size[1] : 1) / 2) : g;
+    };
     this.ui = new UI(this);
     this.ui.mapBase = drawMinimap(256);
     this.meChar = new Character(this.profile.look);
@@ -101,6 +110,8 @@ class Game {
     // торговец за прилавком
     this.vendor = new Character(fixLook({ ...PRESETS[4].look, hat: 5, top: 4, topC: '#ef4444', topC2: '#f1efe6', beard: 5, hairC: '#f4ead0', body: 3 }));
     // герои из готовых моделей: список приходит отдельным файлом; кому герой ещё не показывался — ставим его
+    /** Снимок модели в картинку — им пользуются tools/bake-icons.cjs и проверочные листы. */
+    this.modelShot = (id, view) => loadModel(id).then((t) => modelShot(t, view));
     heroes.onLoad = () => {
       this.vm.setLook(fpLook(this.profile.look));
       this.ui.rerender();

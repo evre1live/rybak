@@ -19,7 +19,7 @@ const NAMES = {
 const NEED = ['hips', 'spine', 'head', 'aL', 'eL', 'hL', 'aR', 'eR', 'hR', 'lL', 'kL', 'fL', 'lR', 'kR', 'fR'];
 const DOWN = new THREE.Vector3(0, -1, 0);
 
-export const heroes = { list: [], byId: new Map(), ready: false, onLoad: () => {} };
+export const heroes = { list: [], byId: new Map(), props: {}, ready: false, onLoad: () => {} };
 const templates = new Map();
 const pending = new Map();
 let manifestP = null;
@@ -34,11 +34,16 @@ export function loadManifest() {
       const all = Array.isArray(m.heroes) ? m.heroes : [];
       for (const h of all) heroes.byId.set(h.id, h);
       heroes.list = all.filter((h) => !h.npc); // скупщик и прочие жители бухты игроку не предлагаются
+      heroes.props = m.props || {}; // рыба и предметы (models.js)
       heroes.ready = true;
       return heroes;
     }));
 }
 export const heroTemplate = (id) => templates.get(id) || null;
+/** Загрузчик GLB. Распаковщик сжатой геометрии (WebAssembly) подключается при первом обращении. */
+export function gltfLoader() {
+  return import('three/addons/libs/meshopt_decoder.module.js').then((lib) => (loader ||= new GLTFLoader().setMeshoptDecoder(lib.MeshoptDecoder)));
+}
 export function loadHero(id) {
   if (templates.has(id)) return Promise.resolve(templates.get(id));
   if (pending.has(id)) return pending.get(id);
@@ -47,10 +52,9 @@ export function loadHero(id) {
   const p = loadManifest().then(() => {
     const info = heroes.byId.get(id);
     if (!info) throw new Error('нет героя ' + id);
-    return import('three/addons/libs/meshopt_decoder.module.js').then(
-      (lib) =>
+    return gltfLoader().then(
+      (loader) =>
         new Promise((res, rej) => {
-          loader ||= new GLTFLoader().setMeshoptDecoder(lib.MeshoptDecoder);
           loader.load(
             isTouch() && info.lite ? info.lite : info.file, // телефону — облегчённая копия
             (g) => {

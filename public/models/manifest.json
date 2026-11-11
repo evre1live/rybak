@@ -84,5 +84,536 @@
       "npc": true
     }
   ],
-  "props": {}
+  "props": {
+    "fish-okun": {
+      "file": "models/fish-okun.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 228,
+      "size": [
+        1,
+        0.503,
+        0.438
+      ],
+      "icon": "models/icons/fish-okun.webp"
+    },
+    "fish-kambala": {
+      "file": "models/fish-kambala.glb",
+      "group": "fish",
+      "tris": 7973,
+      "kb": 213,
+      "size": [
+        1,
+        0.636,
+        0.43
+      ],
+      "view": "top",
+      "icon": "models/icons/fish-kambala.webp"
+    },
+    "prop-crate": {
+      "file": "models/prop-crate.glb",
+      "group": "prop",
+      "tris": 6988,
+      "kb": 192,
+      "size": [
+        1,
+        0.665,
+        0.865
+      ],
+      "icon": "models/icons/prop-crate.webp"
+    },
+    "fish-bychok": {
+      "file": "models/fish-bychok.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 195,
+      "size": [
+        1,
+        0.505,
+        0.457
+      ],
+      "icon": "models/icons/fish-bychok.webp"
+    },
+    "fish-plotva": {
+      "file": "models/fish-plotva.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 191,
+      "size": [
+        1,
+        0.459,
+        0.325
+      ],
+      "icon": "models/icons/fish-plotva.webp"
+    },
+    "fish-karas": {
+      "file": "models/fish-karas.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 220,
+      "size": [
+        1,
+        0.529,
+        0.406
+      ],
+      "icon": "models/icons/fish-karas.webp"
+    },
+    "fish-stavrida": {
+      "file": "models/fish-stavrida.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 205,
+      "size": [
+        1,
+        0.305,
+        0.258
+      ],
+      "icon": "models/icons/fish-stavrida.webp"
+    },
+    "fish-kefal": {
+      "file": "models/fish-kefal.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 191,
+      "size": [
+        1,
+        0.369,
+        0.292
+      ],
+      "icon": "models/icons/fish-kefal.webp"
+    },
+    "fish-skumbria": {
+      "file": "models/fish-skumbria.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 192,
+      "size": [
+        1,
+        0.3,
+        0.293
+      ],
+      "icon": "models/icons/fish-skumbria.webp"
+    },
+    "fish-lesh": {
+      "file": "models/fish-lesh.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 207,
+      "size": [
+        1,
+        0.456,
+        0.344
+      ],
+      "icon": "models/icons/fish-lesh.webp"
+    },
+    "fish-morokun": {
+      "file": "models/fish-morokun.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 181,
+      "size": [
+        1,
+        0.503,
+        0.481
+      ],
+      "icon": "models/icons/fish-morokun.webp"
+    },
+    "fish-sargan": {
+      "file": "models/fish-sargan.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 231,
+      "size": [
+        1,
+        0.258,
+        0.268
+      ],
+      "icon": "models/icons/fish-sargan.webp"
+    },
+    "fish-karp": {
+      "file": "models/fish-karp.glb",
+      "group": "fish",
+      "tris": 7999,
+      "kb": 156,
+      "size": [
+        1,
+        0.45,
+        0.401
+      ],
+      "icon": "models/icons/fish-karp.webp"
+    },
+    "fish-shuka": {
+      "file": "models/fish-shuka.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 208,
+      "size": [
+        1,
+        0.257,
+        0.381
+      ],
+      "icon": "models/icons/fish-shuka.webp"
+    },
+    "fish-sudak": {
+      "file": "models/fish-sudak.glb",
+      "group": "fish",
+      "tris": 7998,
+      "kb": 188,
+      "size": [
+        1,
+        0.405,
+        0.308
+      ],
+      "icon": "models/icons/fish-sudak.webp"
+    },
+    "fish-forel": {
+      "file": "models/fish-forel.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 209,
+      "size": [
+        1,
+        0.342,
+        0.322
+      ],
+      "icon": "models/icons/fish-forel.webp"
+    },
+    "fish-dorado": {
+      "file": "models/fish-dorado.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 181,
+      "size": [
+        1,
+        0.43,
+        0.404
+      ],
+      "icon": "models/icons/fish-dorado.webp"
+    },
+    "fish-sibas": {
+      "file": "models/fish-sibas.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 212,
+      "size": [
+        1,
+        0.371,
+        0.334
+      ],
+      "icon": "models/icons/fish-sibas.webp"
+    },
+    "fish-ugor": {
+      "file": "models/fish-ugor.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 161,
+      "size": [
+        1,
+        0.181,
+        0.658
+      ],
+      "icon": "models/icons/fish-ugor.webp"
+    },
+    "fish-som": {
+      "file": "models/fish-som.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 219,
+      "size": [
+        1,
+        0.3,
+        0.326
+      ],
+      "icon": "models/icons/fish-som.webp"
+    },
+    "fish-tunec": {
+      "file": "models/fish-tunec.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 175,
+      "size": [
+        1,
+        0.399,
+        0.359
+      ],
+      "icon": "models/icons/fish-tunec.webp"
+    },
+    "fish-losos": {
+      "file": "models/fish-losos.glb",
+      "group": "fish",
+      "tris": 7995,
+      "kb": 186,
+      "size": [
+        1,
+        0.335,
+        0.271
+      ],
+      "icon": "models/icons/fish-losos.webp"
+    },
+    "fish-skat": {
+      "file": "models/fish-skat.glb",
+      "group": "fish",
+      "tris": 7992,
+      "kb": 151,
+      "size": [
+        1,
+        0.395,
+        0.547
+      ],
+      "view": "top",
+      "icon": "models/icons/fish-skat.webp"
+    },
+    "fish-mech": {
+      "file": "models/fish-mech.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 205,
+      "size": [
+        1,
+        0.45,
+        0.339
+      ],
+      "icon": "models/icons/fish-mech.webp"
+    },
+    "fish-koi": {
+      "file": "models/fish-koi.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 256,
+      "size": [
+        1,
+        0.426,
+        0.388
+      ],
+      "icon": "models/icons/fish-koi.webp"
+    },
+    "fish-starik": {
+      "file": "models/fish-starik.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 204,
+      "size": [
+        1,
+        0.434,
+        0.436
+      ],
+      "icon": "models/icons/fish-starik.webp"
+    },
+    "prop-barrel": {
+      "file": "models/prop-barrel.glb",
+      "group": "prop",
+      "tris": 6997,
+      "kb": 185,
+      "size": [
+        0.755,
+        1,
+        0.752
+      ],
+      "icon": "models/icons/prop-barrel.webp"
+    },
+    "prop-bucket": {
+      "file": "models/prop-bucket.glb",
+      "group": "prop",
+      "tris": 6987,
+      "kb": 143,
+      "size": [
+        0.718,
+        1,
+        0.715
+      ],
+      "icon": "models/icons/prop-bucket.webp"
+    },
+    "prop-ropecoil": {
+      "file": "models/prop-ropecoil.glb",
+      "group": "prop",
+      "tris": 7000,
+      "kb": 184,
+      "size": [
+        1,
+        0.383,
+        0.863
+      ],
+      "icon": "models/icons/prop-ropecoil.webp"
+    },
+    "prop-cooler": {
+      "file": "models/prop-cooler.glb",
+      "group": "prop",
+      "tris": 7000,
+      "kb": 172,
+      "size": [
+        1,
+        0.749,
+        0.73
+      ],
+      "icon": "models/icons/prop-cooler.webp"
+    },
+    "prop-trap": {
+      "file": "models/prop-trap.glb",
+      "group": "prop",
+      "tris": 6998,
+      "kb": 222,
+      "size": [
+        1,
+        0.642,
+        0.667
+      ],
+      "icon": "models/icons/prop-trap.webp"
+    },
+    "prop-boat": {
+      "file": "models/prop-boat.glb",
+      "group": "prop",
+      "tris": 7000,
+      "kb": 175,
+      "size": [
+        1,
+        0.392,
+        0.515
+      ],
+      "icon": "models/icons/prop-boat.webp"
+    },
+    "prop-buoy": {
+      "file": "models/prop-buoy.glb",
+      "group": "prop",
+      "tris": 6981,
+      "kb": 207,
+      "size": [
+        0.852,
+        1,
+        0.848
+      ],
+      "icon": "models/icons/prop-buoy.webp"
+    },
+    "prop-lifering": {
+      "file": "models/prop-lifering.glb",
+      "group": "prop",
+      "tris": 6982,
+      "kb": 186,
+      "size": [
+        1,
+        0.939,
+        0.577
+      ],
+      "icon": "models/icons/prop-lifering.webp"
+    },
+    "prop-tacklebox": {
+      "file": "models/prop-tacklebox.glb",
+      "group": "prop",
+      "tris": 6978,
+      "kb": 189,
+      "size": [
+        1,
+        0.723,
+        0.931
+      ],
+      "icon": "models/icons/prop-tacklebox.webp"
+    },
+    "prop-fishtray": {
+      "file": "models/prop-fishtray.glb",
+      "group": "prop",
+      "tris": 7000,
+      "kb": 187,
+      "size": [
+        1,
+        0.465,
+        0.797
+      ],
+      "icon": "models/icons/prop-fishtray.webp"
+    },
+    "prop-shelfgoods": {
+      "file": "models/prop-shelfgoods.glb",
+      "group": "prop",
+      "tris": 6993,
+      "kb": 201,
+      "size": [
+        1,
+        0.318,
+        0.195
+      ],
+      "icon": "models/icons/prop-shelfgoods.webp"
+    },
+    "prop-anchor": {
+      "file": "models/prop-anchor.glb",
+      "group": "prop",
+      "tris": 6993,
+      "kb": 197,
+      "size": [
+        0.681,
+        1,
+        0.434
+      ],
+      "icon": "models/icons/prop-anchor.webp"
+    },
+    "prop-netpile": {
+      "file": "models/prop-netpile.glb",
+      "group": "prop",
+      "tris": 15789,
+      "kb": 424,
+      "size": [
+        1,
+        0.826,
+        0.988
+      ],
+      "icon": "models/icons/prop-netpile.webp"
+    },
+    "prop-lantern": {
+      "file": "models/prop-lantern.glb",
+      "group": "prop",
+      "tris": 6984,
+      "kb": 163,
+      "size": [
+        0.382,
+        1,
+        0.382
+      ],
+      "icon": "models/icons/prop-lantern.webp"
+    },
+    "junk-boot": {
+      "file": "models/junk-boot.glb",
+      "group": "junk",
+      "tris": 3998,
+      "kb": 87,
+      "size": [
+        1,
+        0.88,
+        0.434
+      ],
+      "icon": "models/icons/junk-boot.webp"
+    },
+    "junk-can": {
+      "file": "models/junk-can.glb",
+      "group": "junk",
+      "tris": 3994,
+      "kb": 94,
+      "size": [
+        0.654,
+        1,
+        0.653
+      ],
+      "icon": "models/icons/junk-can.webp"
+    },
+    "junk-bottle": {
+      "file": "models/junk-bottle.glb",
+      "group": "junk",
+      "tris": 4000,
+      "kb": 109,
+      "size": [
+        1,
+        0.338,
+        0.338
+      ],
+      "icon": "models/icons/junk-bottle.webp"
+    },
+    "junk-chest": {
+      "file": "models/junk-chest.glb",
+      "group": "junk",
+      "tris": 4564,
+      "kb": 121,
+      "size": [
+        1,
+        0.775,
+        0.69
+      ],
+      "icon": "models/icons/junk-chest.webp"
+    }
+  }
 }

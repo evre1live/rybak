@@ -83,6 +83,482 @@
       "anims": {
         "idle": "894b8da7-c142-46eb-9a5d-fcd137cffc86"
       }
+    },
+    "fish-okun": {
+      "concepts": [
+        {
+          "task": "9d1a3246-9fbe-490b-915f-1a625e5d3502",
+          "file": "art/tripo/raw/fish-okun-concept1.jpg"
+        }
+      ],
+      "concept": "9d1a3246-9fbe-490b-915f-1a625e5d3502",
+      "model": "deb97ae1-8003-42e5-8595-8ee797453232"
+    },
+    "fish-kambala": {
+      "concepts": [
+        {
+          "task": "e54dcb10-b3cc-4884-8c96-901f068f6bab",
+          "file": "art/tripo/raw/fish-kambala-concept1.jpg"
+        }
+      ],
+      "concept": "e54dcb10-b3cc-4884-8c96-901f068f6bab",
+      "model": "a3fc7d52-4ff2-47d8-a28e-53b7f7d2ae36"
+    },
+    "prop-crate": {
+      "concepts": [
+        {
+          "task": "d9973464-6d8a-4461-8938-e77d722edb81",
+          "file": "art/tripo/raw/prop-crate-concept1.jpg"
+        }
+      ],
+      "concept": "d9973464-6d8a-4461-8938-e77d722edb81",
+      "model": "e216e737-7ad1-46e9-b03a-cb34d023381b"
+    },
+    "fish-skumbria": {
+      "concepts": [
+        {
+          "task": "4ad478a4-a374-4429-9c9d-d7e462ced6c2",
+          "file": "art/tripo/raw/fish-skumbria-concept1.jpg"
+        },
+        {
+          "task": "5ea25b0b-196b-4c87-9bbe-fa8b2ba1d9e9",
+          "file": "art/tripo/raw/fish-skumbria-concept2.jpg"
+        },
+        {
+          "task": "d1f65f40-167e-4536-b88c-821c8a220b7d",
+          "file": "art/tripo/raw/fish-skumbria-concept3.jpg"
+        }
+      ],
+      "concept": "d1f65f40-167e-4536-b88c-821c8a220b7d",
+      "model": "74abf465-1898-49b2-bc03-5bfb3c8da580"
+    },
+    "fish-bychok": {
+      "concepts": [
+        {
+          "task": "85c2453a-e481-457f-bbca-9132da7b4f1f",
+          "file": "art/tripo/raw/fish-bychok-concept1.jpg"
+        }
+      ],
+      "concept": "85c2453a-e481-457f-bbca-9132da7b4f1f",
+      "model": "c7fa9887-a371-487b-ba49-542991a4a242"
+    },
+    "fish-kefal": {
+      "concepts": [
+        {
+          "task": "7ed16f93-15f1-4e82-9e0a-403697849d86",
+          "file": "art/tripo/raw/fish-kefal-concept1.jpg"
+        }
+      ],
+      "concept": "7ed16f93-15f1-4e82-9e0a-403697849d86",
+      "model": "7e25ff1a-0b32-4428-9d1f-0bfaa5234935"
+    },
+    "fish-karas": {
+      "concepts": [
+        {
+          "task": "7c980b29-1dea-4961-9d79-40deed3d46bb",
+          "file": "art/tripo/raw/fish-karas-concept1.jpg"
+        }
+      ],
+      "concept": "7c980b29-1dea-4961-9d79-40deed3d46bb",
+      "model": "ea16ac23-afa4-498c-a9bb-aa39e5b7ee46"
+    },
+    "fish-plotva": {
+      "concepts": [
+        {
+          "task": "eef9b9b4-7c3d-465d-b76d-9fa30fee2518",
+          "file": "art/tripo/raw/fish-plotva-concept1.jpg"
+        }
+      ],
+      "concept": "eef9b9b4-7c3d-465d-b76d-9fa30fee2518",
+      "model": "f4ce7ea7-e93a-4a59-b2f4-fd5cf5d85e63"
+    },
+    "fish-stavrida": {
+      "concepts": [
+        {
+          "task": "286e0299-b06c-43ad-a417-5e47a7d5f048",
+          "file": "art/tripo/raw/fish-stavrida-concept1.jpg"
+        }
+      ],
+      "concept": "286e0299-b06c-43ad-a417-5e47a7d5f048",
+      "model": "499e48c8-dd7c-4af4-941c-c99415f33d8f"
+    },
+    "fish-lesh": {
+      "concepts": [
+        {
+          "task": "2a556b2d-a5b1-4d75-9bcc-9d0350e12d6d",
+          "file": "art/tripo/raw/fish-lesh-concept1.jpg"
+        },
+        {
+          "task": "10dd15b7-16a8-43fb-93dc-8310aca460e9",
+          "file": "art/tripo/raw/fish-lesh-concept2.jpg"
+        }
+      ],
+      "concept": "10dd15b7-16a8-43fb-93dc-8310aca460e9",
+      "model": "9049218c-c33e-459b-81fe-6174cc99316a"
+    },
+    "fish-morokun": {
+      "concepts": [
+        {
+          "task": "400edf58-6d36-469e-8fe8-1f45467768b1",
+          "file": "art/tripo/raw/fish-morokun-concept1.jpg"
+        }
+      ],
+      "concept": "400edf58-6d36-469e-8fe8-1f45467768b1",
+      "model": "5c3d9689-1c89-4768-be5a-d72f556b4e0e"
+    },
+    "fish-karp": {
+      "concepts": [
+        {
+          "task": "d082b9e8-03ea-4610-b20a-4711b0e52df1",
+          "file": "art/tripo/raw/fish-karp-concept1.jpg"
+        }
+      ],
+      "concept": "d082b9e8-03ea-4610-b20a-4711b0e52df1",
+      "model": "b622c3e6-655e-4417-8615-a5b77a696cfc"
+    },
+    "fish-sargan": {
+      "concepts": [
+        {
+          "task": "70353ffb-8180-452d-b1b2-107699c4e2dd",
+          "file": "art/tripo/raw/fish-sargan-concept1.jpg"
+        }
+      ],
+      "concept": "70353ffb-8180-452d-b1b2-107699c4e2dd",
+      "model": "1348d458-f5a4-49f8-b8fb-285e91c94c90"
+    },
+    "fish-shuka": {
+      "concepts": [
+        {
+          "task": "ba6b91aa-f85b-44e4-8eaa-a62c43d9d487",
+          "file": "art/tripo/raw/fish-shuka-concept1.jpg"
+        }
+      ],
+      "concept": "ba6b91aa-f85b-44e4-8eaa-a62c43d9d487",
+      "model": "621d4fd0-4ac1-49af-a0cb-acb16885bdc2"
+    },
+    "fish-sudak": {
+      "concepts": [
+        {
+          "task": "12fb3373-346d-42c7-9131-4533f077a5d5",
+          "file": "art/tripo/raw/fish-sudak-concept1.jpg"
+        }
+      ],
+      "concept": "12fb3373-346d-42c7-9131-4533f077a5d5",
+      "model": "947e4382-8390-411b-927b-a1f3a103e917"
+    },
+    "fish-forel": {
+      "concepts": [
+        {
+          "task": "87b79eef-5ca7-4b7c-9d4f-860187e976d0",
+          "file": "art/tripo/raw/fish-forel-concept1.jpg"
+        }
+      ],
+      "concept": "87b79eef-5ca7-4b7c-9d4f-860187e976d0",
+      "model": "20fb4a4f-ece6-4fad-886e-d06b4de25cc5"
+    },
+    "fish-dorado": {
+      "concepts": [
+        {
+          "task": "3683f0f8-8cf9-482e-bce5-15c0a14b7b1b",
+          "file": "art/tripo/raw/fish-dorado-concept1.jpg"
+        }
+      ],
+      "concept": "3683f0f8-8cf9-482e-bce5-15c0a14b7b1b",
+      "model": "fca0647a-35cd-42dd-ad5d-4bd58919f47e"
+    },
+    "fish-ugor": {
+      "concepts": [
+        {
+          "task": "8923650a-82bd-40a2-8b85-da24e7ea66be",
+          "file": "art/tripo/raw/fish-ugor-concept1.jpg"
+        }
+      ],
+      "concept": "8923650a-82bd-40a2-8b85-da24e7ea66be",
+      "model": "935712f9-7db5-4a7b-aa89-d89b2b529665"
+    },
+    "fish-som": {
+      "concepts": [
+        {
+          "task": "f430d769-08ec-4078-8fd5-146c326c925c",
+          "file": "art/tripo/raw/fish-som-concept1.jpg"
+        }
+      ],
+      "concept": "f430d769-08ec-4078-8fd5-146c326c925c",
+      "model": "f7f39ac4-d1df-4b0f-8dc2-7306f8116b39"
+    },
+    "fish-sibas": {
+      "concepts": [
+        {
+          "task": "fbcc540a-5d82-4479-ad35-cedda1e3d499",
+          "file": "art/tripo/raw/fish-sibas-concept1.jpg"
+        }
+      ],
+      "concept": "fbcc540a-5d82-4479-ad35-cedda1e3d499",
+      "model": "9ae4d227-9f3f-403c-8e49-76adc7436583"
+    },
+    "fish-tunec": {
+      "concepts": [
+        {
+          "task": "b77a6af9-7b38-448e-a42c-390022226a5a",
+          "file": "art/tripo/raw/fish-tunec-concept1.jpg"
+        },
+        {
+          "task": "f2eb96aa-70a4-4afd-acfa-cf46a7930c39",
+          "file": "art/tripo/raw/fish-tunec-concept2.jpg"
+        },
+        {
+          "task": "d645247c-7699-4e22-aacb-777593857e5d",
+          "file": "art/tripo/raw/fish-tunec-concept3.jpg"
+        }
+      ],
+      "concept": "d645247c-7699-4e22-aacb-777593857e5d",
+      "model": "aa7e2248-7cd3-45ca-b0a5-dbac31c65488"
+    },
+    "fish-losos": {
+      "concepts": [
+        {
+          "task": "1c82ae4d-c0bb-4cab-a493-ef7b6ca578b8",
+          "file": "art/tripo/raw/fish-losos-concept1.jpg"
+        },
+        {
+          "task": "25c31a98-095b-40f2-a282-baabd234de96",
+          "file": "art/tripo/raw/fish-losos-concept2.jpg"
+        },
+        {
+          "task": "552bd6fb-e3b0-4fc0-a21c-b88cf66a0620",
+          "file": "art/tripo/raw/fish-losos-concept3.jpg"
+        }
+      ],
+      "concept": "552bd6fb-e3b0-4fc0-a21c-b88cf66a0620",
+      "model": "bd461d72-4810-4a3e-9c3f-372cc544ddf3"
+    },
+    "fish-skat": {
+      "concepts": [
+        {
+          "task": "757a53a0-fca2-4e42-8dcb-544965d94f22",
+          "file": "art/tripo/raw/fish-skat-concept1.jpg"
+        },
+        {
+          "task": "43328764-1611-4a96-860b-ef569faaa09b",
+          "file": "art/tripo/raw/fish-skat-concept2.jpg"
+        }
+      ],
+      "concept": "43328764-1611-4a96-860b-ef569faaa09b",
+      "model": "ebd99a11-387c-4829-ad4f-8cf70a4b4323"
+    },
+    "fish-mech": {
+      "concepts": [
+        {
+          "task": "0e7b3066-3206-478d-8f5a-7b1f37c87851",
+          "file": "art/tripo/raw/fish-mech-concept1.jpg"
+        },
+        {
+          "task": "0bbd860b-a175-420f-8d4a-3ac3bcc2dd23",
+          "file": "art/tripo/raw/fish-mech-concept2.jpg"
+        }
+      ],
+      "concept": "0bbd860b-a175-420f-8d4a-3ac3bcc2dd23",
+      "model": "c82f6c9d-14e9-45ce-a842-49fcf5f78990"
+    },
+    "fish-starik": {
+      "concepts": [
+        {
+          "task": "f215a804-9a7a-469b-86a1-dc108d32fab2",
+          "file": "art/tripo/raw/fish-starik-concept1.jpg"
+        }
+      ],
+      "concept": "f215a804-9a7a-469b-86a1-dc108d32fab2",
+      "model": "d53db0b5-5b9f-47e2-a580-f28922fbe34b"
+    },
+    "fish-koi": {
+      "concepts": [
+        {
+          "task": "8bca5ef6-bc62-4afa-8058-f17f44697fb9",
+          "file": "art/tripo/raw/fish-koi-concept1.jpg"
+        }
+      ],
+      "concept": "8bca5ef6-bc62-4afa-8058-f17f44697fb9",
+      "model": "8c5d614a-03b8-4f29-b101-73490f9176ae"
+    },
+    "prop-barrel": {
+      "concepts": [
+        {
+          "task": "a6364202-de8b-4d0e-bae3-a6dd715936c4",
+          "file": "art/tripo/raw/prop-barrel-concept1.jpg"
+        }
+      ],
+      "concept": "a6364202-de8b-4d0e-bae3-a6dd715936c4",
+      "model": "f04d8d5c-a99b-4029-a12a-2c8f13a6c6f7"
+    },
+    "prop-cooler": {
+      "concepts": [
+        {
+          "task": "2ef7e09a-5745-443a-aab8-f2a1480171c3",
+          "file": "art/tripo/raw/prop-cooler-concept1.jpg"
+        }
+      ],
+      "concept": "2ef7e09a-5745-443a-aab8-f2a1480171c3",
+      "model": "83f8e3fd-f03b-4994-97b0-8e8f74a349d6"
+    },
+    "prop-bucket": {
+      "concepts": [
+        {
+          "task": "a2de6bc6-9b32-41ed-8392-72c1b36b48bd",
+          "file": "art/tripo/raw/prop-bucket-concept1.jpg"
+        }
+      ],
+      "concept": "a2de6bc6-9b32-41ed-8392-72c1b36b48bd",
+      "model": "a467bc70-3b97-4451-8384-25f7212e8f1f"
+    },
+    "prop-ropecoil": {
+      "concepts": [
+        {
+          "task": "eec522fb-fdd9-47d8-81df-946d13524e05",
+          "file": "art/tripo/raw/prop-ropecoil-concept1.jpg"
+        }
+      ],
+      "concept": "eec522fb-fdd9-47d8-81df-946d13524e05",
+      "model": "dea6e9ce-753e-4606-b8c9-446d5588501d"
+    },
+    "prop-trap": {
+      "concepts": [
+        {
+          "task": "3590485d-68f2-492f-990f-131d08aa1e99",
+          "file": "art/tripo/raw/prop-trap-concept1.jpg"
+        }
+      ],
+      "concept": "3590485d-68f2-492f-990f-131d08aa1e99",
+      "model": "5ad49d82-4373-4c51-8628-cf5debb4f146"
+    },
+    "prop-boat": {
+      "concepts": [
+        {
+          "task": "8b6bd344-4294-404d-8265-13eb345d777f",
+          "file": "art/tripo/raw/prop-boat-concept1.jpg"
+        }
+      ],
+      "concept": "8b6bd344-4294-404d-8265-13eb345d777f",
+      "model": "66f0c48f-d4d9-461e-99f4-58a777f98c4c"
+    },
+    "prop-buoy": {
+      "concepts": [
+        {
+          "task": "8f250426-74c9-4081-88ae-73caeb5cedaa",
+          "file": "art/tripo/raw/prop-buoy-concept1.jpg"
+        }
+      ],
+      "concept": "8f250426-74c9-4081-88ae-73caeb5cedaa",
+      "model": "d0b0eb9f-4762-4e90-a58d-2c53205c0bef"
+    },
+    "prop-lifering": {
+      "concepts": [
+        {
+          "task": "b67b230c-1395-408d-ad76-16405991a24c",
+          "file": "art/tripo/raw/prop-lifering-concept1.jpg"
+        }
+      ],
+      "concept": "b67b230c-1395-408d-ad76-16405991a24c",
+      "model": "7d42b2ec-cf34-4d10-9f7b-ccbb34754016"
+    },
+    "prop-tacklebox": {
+      "concepts": [
+        {
+          "task": "01e947ab-09d3-466e-871c-594c769e40f9",
+          "file": "art/tripo/raw/prop-tacklebox-concept1.jpg"
+        }
+      ],
+      "concept": "01e947ab-09d3-466e-871c-594c769e40f9",
+      "model": "95c20008-c1c7-445e-8a30-744eedd75230"
+    },
+    "prop-shelfgoods": {
+      "concepts": [
+        {
+          "task": "2571f6ef-bed9-4b49-a47a-793e4539f56d",
+          "file": "art/tripo/raw/prop-shelfgoods-concept1.jpg"
+        }
+      ],
+      "concept": "2571f6ef-bed9-4b49-a47a-793e4539f56d",
+      "model": "ede9dc75-092b-45f3-8702-ec6ae69ae878"
+    },
+    "prop-fishtray": {
+      "concepts": [
+        {
+          "task": "6db2c181-ade7-41c9-a6fe-0ca405facdb9",
+          "file": "art/tripo/raw/prop-fishtray-concept1.jpg"
+        }
+      ],
+      "concept": "6db2c181-ade7-41c9-a6fe-0ca405facdb9",
+      "model": "97d90f6c-4060-4b5f-839a-1a8c1630f9e7"
+    },
+    "prop-anchor": {
+      "concepts": [
+        {
+          "task": "a9d401bf-38b5-4616-9dfa-3bc10a9fc385",
+          "file": "art/tripo/raw/prop-anchor-concept1.jpg"
+        }
+      ],
+      "concept": "a9d401bf-38b5-4616-9dfa-3bc10a9fc385",
+      "model": "e7c336cf-bf57-44c3-8c75-8f074c41d688"
+    },
+    "prop-netpile": {
+      "concepts": [
+        {
+          "task": "2d8d11f2-42d1-4911-a700-3d5a873864b0",
+          "file": "art/tripo/raw/prop-netpile-concept1.jpg"
+        }
+      ],
+      "concept": "2d8d11f2-42d1-4911-a700-3d5a873864b0",
+      "model": "95c79bca-107b-4e08-8607-2f8d15f0101d"
+    },
+    "junk-boot": {
+      "concepts": [
+        {
+          "task": "97904f76-1881-42e4-a05f-42c74603f5a1",
+          "file": "art/tripo/raw/junk-boot-concept1.jpg"
+        }
+      ],
+      "concept": "97904f76-1881-42e4-a05f-42c74603f5a1",
+      "model": "ec8d5189-ccc0-45e5-9f8e-bf541cbc6af1"
+    },
+    "prop-lantern": {
+      "concepts": [
+        {
+          "task": "02eb72dc-3264-4d86-badf-b0fea31c4714",
+          "file": "art/tripo/raw/prop-lantern-concept1.jpg"
+        }
+      ],
+      "concept": "02eb72dc-3264-4d86-badf-b0fea31c4714",
+      "model": "7a11a575-7214-416d-8f0f-c3768616c6bf"
+    },
+    "junk-bottle": {
+      "concepts": [
+        {
+          "task": "4b6576ae-5b60-4f29-80ed-0b258d561ae8",
+          "file": "art/tripo/raw/junk-bottle-concept1.jpg"
+        }
+      ],
+      "concept": "4b6576ae-5b60-4f29-80ed-0b258d561ae8",
+      "model": "416c7db7-0db1-44c5-b6e6-19f066495245"
+    },
+    "junk-can": {
+      "concepts": [
+        {
+          "task": "ae108edf-a986-48a8-8953-7290cc4c0efc",
+          "file": "art/tripo/raw/junk-can-concept1.jpg"
+        }
+      ],
+      "concept": "ae108edf-a986-48a8-8953-7290cc4c0efc",
+      "model": "7f191b89-64e6-4f8f-a2b9-6ae29c831ed0"
+    },
+    "junk-chest": {
+      "concepts": [
+        {
+          "task": "b937b087-10e6-4bdf-a490-fc887e2c3417",
+          "file": "art/tripo/raw/junk-chest-concept1.jpg"
+        }
+      ],
+      "concept": "b937b087-10e6-4bdf-a490-fc887e2c3417",
+      "model": "c7bf5d9d-804a-4016-b522-0fb9a5984d48"
     }
   },
   "ledger": [
@@ -337,6 +813,699 @@
       "type": "animate_retarget",
       "task": "894b8da7-c142-46eb-9a5d-fcd137cffc86",
       "credits": 10
+    },
+    {
+      "at": "2026-11-11T19:17:12.949Z",
+      "label": "prop-crate образец",
+      "type": "text_to_image",
+      "task": "d9973464-6d8a-4461-8938-e77d722edb81",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:17:13.187Z",
+      "label": "fish-okun образец",
+      "type": "text_to_image",
+      "task": "9d1a3246-9fbe-490b-915f-1a625e5d3502",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:17:17.611Z",
+      "label": "fish-kambala образец",
+      "type": "text_to_image",
+      "task": "e54dcb10-b3cc-4884-8c96-901f068f6bab",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:17:52.977Z",
+      "label": "fish-skumbria образец",
+      "type": "text_to_image",
+      "task": "4ad478a4-a374-4429-9c9d-d7e462ced6c2",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:17:53.088Z",
+      "label": "fish-bychok образец",
+      "type": "text_to_image",
+      "task": "85c2453a-e481-457f-bbca-9132da7b4f1f",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:17:57.116Z",
+      "label": "fish-kefal образец",
+      "type": "text_to_image",
+      "task": "7ed16f93-15f1-4e82-9e0a-403697849d86",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:18:01.180Z",
+      "label": "fish-karas образец",
+      "type": "text_to_image",
+      "task": "7c980b29-1dea-4961-9d79-40deed3d46bb",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:18:01.227Z",
+      "label": "fish-plotva образец",
+      "type": "text_to_image",
+      "task": "eef9b9b4-7c3d-465d-b76d-9fa30fee2518",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:18:05.464Z",
+      "label": "fish-stavrida образец",
+      "type": "text_to_image",
+      "task": "286e0299-b06c-43ad-a417-5e47a7d5f048",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:18:11.277Z",
+      "label": "fish-lesh образец",
+      "type": "text_to_image",
+      "task": "2a556b2d-a5b1-4d75-9bcc-9d0350e12d6d",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:18:11.470Z",
+      "label": "fish-morokun образец",
+      "type": "text_to_image",
+      "task": "400edf58-6d36-469e-8fe8-1f45467768b1",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:18:15.228Z",
+      "label": "fish-karp образец",
+      "type": "text_to_image",
+      "task": "d082b9e8-03ea-4610-b20a-4711b0e52df1",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:18:15.346Z",
+      "label": "fish-sargan образец",
+      "type": "text_to_image",
+      "task": "70353ffb-8180-452d-b1b2-107699c4e2dd",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:18:19.742Z",
+      "label": "fish-shuka образец",
+      "type": "text_to_image",
+      "task": "ba6b91aa-f85b-44e4-8eaa-a62c43d9d487",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:18:28.217Z",
+      "label": "fish-sudak образец",
+      "type": "text_to_image",
+      "task": "12fb3373-346d-42c7-9131-4533f077a5d5",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:18:29.486Z",
+      "label": "fish-forel образец",
+      "type": "text_to_image",
+      "task": "87b79eef-5ca7-4b7c-9d4f-860187e976d0",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:18:29.750Z",
+      "label": "fish-dorado образец",
+      "type": "text_to_image",
+      "task": "3683f0f8-8cf9-482e-bce5-15c0a14b7b1b",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:18:33.772Z",
+      "label": "fish-ugor образец",
+      "type": "text_to_image",
+      "task": "8923650a-82bd-40a2-8b85-da24e7ea66be",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:18:37.873Z",
+      "label": "fish-som образец",
+      "type": "text_to_image",
+      "task": "f430d769-08ec-4078-8fd5-146c326c925c",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:18:41.623Z",
+      "label": "fish-sibas образец",
+      "type": "text_to_image",
+      "task": "fbcc540a-5d82-4479-ad35-cedda1e3d499",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:18:42.417Z",
+      "label": "fish-tunec образец",
+      "type": "text_to_image",
+      "task": "b77a6af9-7b38-448e-a42c-390022226a5a",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:18:43.617Z",
+      "label": "fish-losos образец",
+      "type": "text_to_image",
+      "task": "1c82ae4d-c0bb-4cab-a493-ef7b6ca578b8",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:18:47.763Z",
+      "label": "fish-skat образец",
+      "type": "text_to_image",
+      "task": "757a53a0-fca2-4e42-8dcb-544965d94f22",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:18:47.959Z",
+      "label": "fish-mech образец",
+      "type": "text_to_image",
+      "task": "0e7b3066-3206-478d-8f5a-7b1f37c87851",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:18:51.628Z",
+      "label": "fish-starik образец",
+      "type": "text_to_image",
+      "task": "f215a804-9a7a-469b-86a1-dc108d32fab2",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:18:55.877Z",
+      "label": "fish-koi образец",
+      "type": "text_to_image",
+      "task": "8bca5ef6-bc62-4afa-8058-f17f44697fb9",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:18:56.416Z",
+      "label": "prop-barrel образец",
+      "type": "text_to_image",
+      "task": "a6364202-de8b-4d0e-bae3-a6dd715936c4",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:19:01.697Z",
+      "label": "prop-cooler образец",
+      "type": "text_to_image",
+      "task": "2ef7e09a-5745-443a-aab8-f2a1480171c3",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:19:01.856Z",
+      "label": "prop-bucket образец",
+      "type": "text_to_image",
+      "task": "a2de6bc6-9b32-41ed-8392-72c1b36b48bd",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:19:02.044Z",
+      "label": "prop-ropecoil образец",
+      "type": "text_to_image",
+      "task": "eec522fb-fdd9-47d8-81df-946d13524e05",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:19:05.571Z",
+      "label": "prop-trap образец",
+      "type": "text_to_image",
+      "task": "3590485d-68f2-492f-990f-131d08aa1e99",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:19:05.800Z",
+      "label": "prop-boat образец",
+      "type": "text_to_image",
+      "task": "8b6bd344-4294-404d-8265-13eb345d777f",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:19:06.342Z",
+      "label": "prop-buoy образец",
+      "type": "text_to_image",
+      "task": "8f250426-74c9-4081-88ae-73caeb5cedaa",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:19:11.657Z",
+      "label": "prop-lifering образец",
+      "type": "text_to_image",
+      "task": "b67b230c-1395-408d-ad76-16405991a24c",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:19:11.984Z",
+      "label": "prop-tacklebox образец",
+      "type": "text_to_image",
+      "task": "01e947ab-09d3-466e-871c-594c769e40f9",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:19:15.087Z",
+      "label": "fish-okun модель",
+      "type": "image_to_model",
+      "task": "deb97ae1-8003-42e5-8595-8ee797453232",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:19:15.491Z",
+      "label": "prop-shelfgoods образец",
+      "type": "text_to_image",
+      "task": "2571f6ef-bed9-4b49-a47a-793e4539f56d",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:19:16.416Z",
+      "label": "prop-fishtray образец",
+      "type": "text_to_image",
+      "task": "6db2c181-ade7-41c9-a6fe-0ca405facdb9",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:19:19.713Z",
+      "label": "prop-anchor образец",
+      "type": "text_to_image",
+      "task": "a9d401bf-38b5-4616-9dfa-3bc10a9fc385",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:19:20.370Z",
+      "label": "prop-netpile образец",
+      "type": "text_to_image",
+      "task": "2d8d11f2-42d1-4911-a700-3d5a873864b0",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:19:22.286Z",
+      "label": "junk-boot образец",
+      "type": "text_to_image",
+      "task": "97904f76-1881-42e4-a05f-42c74603f5a1",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:19:25.650Z",
+      "label": "prop-lantern образец",
+      "type": "text_to_image",
+      "task": "02eb72dc-3264-4d86-badf-b0fea31c4714",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:19:27.183Z",
+      "label": "fish-kambala модель",
+      "type": "image_to_model",
+      "task": "a3fc7d52-4ff2-47d8-a28e-53b7f7d2ae36",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:19:30.368Z",
+      "label": "junk-bottle образец",
+      "type": "text_to_image",
+      "task": "4b6576ae-5b60-4f29-80ed-0b258d561ae8",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:19:33.664Z",
+      "label": "junk-can образец",
+      "type": "text_to_image",
+      "task": "ae108edf-a986-48a8-8953-7290cc4c0efc",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:19:42.336Z",
+      "label": "junk-chest образец",
+      "type": "text_to_image",
+      "task": "b937b087-10e6-4bdf-a490-fc887e2c3417",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:20:34.556Z",
+      "label": "prop-crate модель",
+      "type": "image_to_model",
+      "task": "e216e737-7ad1-46e9-b03a-cb34d023381b",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:21:44.426Z",
+      "label": "fish-skumbria образец",
+      "type": "text_to_image",
+      "task": "5ea25b0b-196b-4c87-9bbe-fa8b2ba1d9e9",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:21:44.439Z",
+      "label": "fish-lesh образец",
+      "type": "text_to_image",
+      "task": "10dd15b7-16a8-43fb-93dc-8310aca460e9",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:21:44.444Z",
+      "label": "fish-tunec образец",
+      "type": "text_to_image",
+      "task": "f2eb96aa-70a4-4afd-acfa-cf46a7930c39",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:21:48.732Z",
+      "label": "fish-mech образец",
+      "type": "text_to_image",
+      "task": "0bbd860b-a175-420f-8d4a-3ac3bcc2dd23",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:21:52.952Z",
+      "label": "fish-skat образец",
+      "type": "text_to_image",
+      "task": "43328764-1611-4a96-860b-ef569faaa09b",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:22:00.898Z",
+      "label": "fish-losos образец",
+      "type": "text_to_image",
+      "task": "25c31a98-095b-40f2-a282-baabd234de96",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:22:45.683Z",
+      "label": "fish-kefal модель",
+      "type": "image_to_model",
+      "task": "7e25ff1a-0b32-4428-9d1f-0bfaa5234935",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:22:46.046Z",
+      "label": "fish-tunec образец",
+      "type": "text_to_image",
+      "task": "d645247c-7699-4e22-aacb-777593857e5d",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:22:46.187Z",
+      "label": "fish-losos образец",
+      "type": "text_to_image",
+      "task": "552bd6fb-e3b0-4fc0-a21c-b88cf66a0620",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:22:50.397Z",
+      "label": "fish-skumbria образец",
+      "type": "text_to_image",
+      "task": "d1f65f40-167e-4536-b88c-821c8a220b7d",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:22:50.528Z",
+      "label": "fish-stavrida модель",
+      "type": "image_to_model",
+      "task": "499e48c8-dd7c-4af4-941c-c99415f33d8f",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:22:54.150Z",
+      "label": "fish-bychok модель",
+      "type": "image_to_model",
+      "task": "c7fa9887-a371-487b-ba49-542991a4a242",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:23:01.978Z",
+      "label": "fish-plotva модель",
+      "type": "image_to_model",
+      "task": "f4ce7ea7-e93a-4a59-b2f4-fd5cf5d85e63",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:23:02.090Z",
+      "label": "fish-morokun модель",
+      "type": "image_to_model",
+      "task": "5c3d9689-1c89-4768-be5a-d72f556b4e0e",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:23:06.262Z",
+      "label": "fish-karas модель",
+      "type": "image_to_model",
+      "task": "ea16ac23-afa4-498c-a9bb-aa39e5b7ee46",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:24:04.240Z",
+      "label": "fish-sargan модель",
+      "type": "image_to_model",
+      "task": "1348d458-f5a4-49f8-b8fb-285e91c94c90",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:24:08.885Z",
+      "label": "fish-karp модель",
+      "type": "image_to_model",
+      "task": "b622c3e6-655e-4417-8615-a5b77a696cfc",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:24:13.548Z",
+      "label": "fish-shuka модель",
+      "type": "image_to_model",
+      "task": "621d4fd0-4ac1-49af-a0cb-acb16885bdc2",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:24:14.848Z",
+      "label": "fish-skumbria модель",
+      "type": "image_to_model",
+      "task": "74abf465-1898-49b2-bc03-5bfb3c8da580",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:24:16.942Z",
+      "label": "fish-dorado модель",
+      "type": "image_to_model",
+      "task": "fca0647a-35cd-42dd-ad5d-4bd58919f47e",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:24:18.744Z",
+      "label": "fish-losos модель",
+      "type": "image_to_model",
+      "task": "bd461d72-4810-4a3e-9c3f-372cc544ddf3",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:24:23.175Z",
+      "label": "fish-tunec модель",
+      "type": "image_to_model",
+      "task": "aa7e2248-7cd3-45ca-b0a5-dbac31c65488",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:24:23.952Z",
+      "label": "fish-forel модель",
+      "type": "image_to_model",
+      "task": "20fb4a4f-ece6-4fad-886e-d06b4de25cc5",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:24:28.142Z",
+      "label": "fish-sudak модель",
+      "type": "image_to_model",
+      "task": "947e4382-8390-411b-927b-a1f3a103e917",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:25:23.491Z",
+      "label": "fish-sibas модель",
+      "type": "image_to_model",
+      "task": "9ae4d227-9f3f-403c-8e49-76adc7436583",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:25:26.192Z",
+      "label": "fish-ugor модель",
+      "type": "image_to_model",
+      "task": "935712f9-7db5-4a7b-aa89-d89b2b529665",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:25:31.997Z",
+      "label": "fish-som модель",
+      "type": "image_to_model",
+      "task": "f7f39ac4-d1df-4b0f-8dc2-7306f8116b39",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:25:36.125Z",
+      "label": "fish-mech модель",
+      "type": "image_to_model",
+      "task": "c82f6c9d-14e9-45ce-a842-49fcf5f78990",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:25:39.558Z",
+      "label": "fish-koi модель",
+      "type": "image_to_model",
+      "task": "8c5d614a-03b8-4f29-b101-73490f9176ae",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:25:40.739Z",
+      "label": "fish-skat модель",
+      "type": "image_to_model",
+      "task": "ebd99a11-387c-4829-ad4f-8cf70a4b4323",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:25:44.124Z",
+      "label": "fish-lesh модель",
+      "type": "image_to_model",
+      "task": "9049218c-c33e-459b-81fe-6174cc99316a",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:26:35.020Z",
+      "label": "prop-barrel модель",
+      "type": "image_to_model",
+      "task": "f04d8d5c-a99b-4029-a12a-2c8f13a6c6f7",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:26:39.562Z",
+      "label": "fish-starik модель",
+      "type": "image_to_model",
+      "task": "d53db0b5-5b9f-47e2-a580-f28922fbe34b",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:27:33.409Z",
+      "label": "prop-bucket модель",
+      "type": "image_to_model",
+      "task": "a467bc70-3b97-4451-8384-25f7212e8f1f",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:27:39.560Z",
+      "label": "prop-ropecoil модель",
+      "type": "image_to_model",
+      "task": "dea6e9ce-753e-4606-b8c9-446d5588501d",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:27:50.837Z",
+      "label": "prop-trap модель",
+      "type": "image_to_model",
+      "task": "5ad49d82-4373-4c51-8628-cf5debb4f146",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:28:22.416Z",
+      "label": "prop-boat модель",
+      "type": "image_to_model",
+      "task": "66f0c48f-d4d9-461e-99f4-58a777f98c4c",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:28:25.768Z",
+      "label": "prop-cooler модель",
+      "type": "image_to_model",
+      "task": "83f8e3fd-f03b-4994-97b0-8e8f74a349d6",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:28:38.361Z",
+      "label": "prop-buoy модель",
+      "type": "image_to_model",
+      "task": "d0b0eb9f-4762-4e90-a58d-2c53205c0bef",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:28:59.759Z",
+      "label": "fish-dorado образец",
+      "type": "text_to_image",
+      "task": "dba0c8cf-c92a-4b16-8254-889d2c5220bf",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T19:29:45.330Z",
+      "label": "prop-lifering модель",
+      "type": "image_to_model",
+      "task": "7d42b2ec-cf34-4d10-9f7b-ccbb34754016",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:29:55.913Z",
+      "label": "prop-anchor модель",
+      "type": "image_to_model",
+      "task": "e7c336cf-bf57-44c3-8c75-8f074c41d688",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:29:56.251Z",
+      "label": "prop-tacklebox модель",
+      "type": "image_to_model",
+      "task": "95c20008-c1c7-445e-8a30-744eedd75230",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:30:00.797Z",
+      "label": "prop-shelfgoods модель",
+      "type": "image_to_model",
+      "task": "ede9dc75-092b-45f3-8702-ec6ae69ae878",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:30:06.510Z",
+      "label": "prop-fishtray модель",
+      "type": "image_to_model",
+      "task": "97d90f6c-4060-4b5f-839a-1a8c1630f9e7",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:30:26.917Z",
+      "label": "fish-dorado модель",
+      "type": "image_to_model",
+      "task": "eeeb045f-c9d9-475c-ba9b-24cf0ab7e19c",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:31:15.432Z",
+      "label": "prop-netpile модель",
+      "type": "image_to_model",
+      "task": "95c79bca-107b-4e08-8607-2f8d15f0101d",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:31:20.847Z",
+      "label": "prop-lantern модель",
+      "type": "image_to_model",
+      "task": "7a11a575-7214-416d-8f0f-c3768616c6bf",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:33:08.086Z",
+      "label": "junk-bottle модель",
+      "type": "image_to_model",
+      "task": "416c7db7-0db1-44c5-b6e6-19f066495245",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:33:33.063Z",
+      "label": "junk-boot модель",
+      "type": "image_to_model",
+      "task": "ec8d5189-ccc0-45e5-9f8e-bf541cbc6af1",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:33:45.899Z",
+      "label": "junk-can модель",
+      "type": "image_to_model",
+      "task": "7f191b89-64e6-4f8f-a2b9-6ae29c831ed0",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-11T19:34:06.612Z",
+      "label": "junk-chest модель",
+      "type": "image_to_model",
+      "task": "c7bf5d9d-804a-4016-b522-0fb9a5984d48",
+      "credits": 30
     }
   ]
 }

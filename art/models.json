@@ -86,6 +86,338 @@
       "name": "Скупщик",
       "faces": 60000,
       "prompt": "A jolly old fishmonger with a big bushy white beard and rosy cheeks, wearing a navy captain's cap, a red and white striped sailor shirt with rolled-up sleeves, a long brown leather apron over a round belly, dark trousers and tall dark green rubber boots"
+    },
+    {
+      "id": "fish-bychok",
+      "group": "fish",
+      "sp": "bychok",
+      "name": "Бычок",
+      "prompt": "a round goby: big wide head, thick lips, bulging eyes set high, stubby body mottled in brown and sand colours, fan-shaped pectoral fins, rounded tail"
+    },
+    {
+      "id": "fish-plotva",
+      "group": "fish",
+      "sp": "plotva",
+      "name": "Плотва",
+      "prompt": "a common roach: silver body with a blue-green back, bright red-orange pelvic and anal fins, red eye, forked tail"
+    },
+    {
+      "id": "fish-karas",
+      "group": "fish",
+      "sp": "karas",
+      "name": "Карась",
+      "prompt": "a crucian carp: deep rounded golden-bronze body with large scales, long dorsal fin, small head without barbels"
+    },
+    {
+      "id": "fish-stavrida",
+      "group": "fish",
+      "sp": "stavrida",
+      "name": "Ставрида",
+      "prompt": "a horse mackerel (scad): slender silver body with a blue-green back, a row of bony scutes along the side, big eye, deeply forked tail, small dark spot on the gill cover"
+    },
+    {
+      "id": "fish-okun",
+      "group": "fish",
+      "sp": "okun",
+      "name": "Окунь",
+      "prompt": "a European perch: greenish body with six dark vertical stripes, humped back, tall spiny first dorsal fin, bright orange-red lower fins and tail"
+    },
+    {
+      "id": "fish-kefal",
+      "group": "fish",
+      "sp": "kefal",
+      "name": "Кефаль",
+      "prompt": "a grey mullet: torpedo-shaped silver-grey body with faint dark horizontal stripes, blunt head, two short dorsal fins, forked tail"
+    },
+    {
+      "id": "fish-kambala",
+      "group": "fish",
+      "sp": "kambala",
+      "name": "Камбала",
+      "prompt": "a European flounder: flat oval sandy-brown body with orange spots, both eyes on the upper side, a continuous fringe of fins around the body, small rounded tail",
+      "view": "top"
+    },
+    {
+      "id": "fish-skumbria",
+      "group": "fish",
+      "sp": "skumbria",
+      "name": "Скумбрия",
+      "prompt": "an Atlantic mackerel: sleek slim body, blue-green back with wavy black tiger stripes, silver-white belly, small finlets before the forked tail",
+      "style": "Hand-painted stylized 3D model for a video game, chunky readable shapes, big expressive eye, crisp scale pattern, matte colours, the fish itself does not glow and has no aura around it"
+    },
+    {
+      "id": "fish-lesh",
+      "group": "fish",
+      "sp": "lesh",
+      "name": "Лещ",
+      "prompt": "a common bream: an extremely tall, deep, flat-sided body shaped like a rounded diamond (the body is half as tall as it is long), small head with a small mouth, large bronze-silver scales, long dark anal fin, dark grey fins, deeply forked tail"
+    },
+    {
+      "id": "fish-morokun",
+      "group": "fish",
+      "sp": "morokun",
+      "name": "Морской окунь",
+      "prompt": "a red rockfish (redfish): bright orange-red spiny body, large head with big eyes and a large mouth, tall spiny dorsal fin"
+    },
+    {
+      "id": "fish-sargan",
+      "group": "fish",
+      "sp": "sargan",
+      "name": "Сарган",
+      "prompt": "a garfish (needlefish): extremely long thin silvery-green body, very long needle-like beak, dorsal and anal fins set far back near the forked tail"
+    },
+    {
+      "id": "fish-karp",
+      "group": "fish",
+      "sp": "karp",
+      "name": "Карп",
+      "prompt": "a common carp: heavy thick golden-olive body with large scales, two pairs of barbels at the thick-lipped mouth, long dorsal fin, reddish lower fins"
+    },
+    {
+      "id": "fish-shuka",
+      "group": "fish",
+      "sp": "shuka",
+      "name": "Щука",
+      "prompt": "a northern pike: long olive-green body with pale yellowish oval spots, flat duck-bill snout with sharp teeth, dorsal fin set far back near the tail, reddish fins"
+    },
+    {
+      "id": "fish-sudak",
+      "group": "fish",
+      "sp": "sudak",
+      "name": "Судак",
+      "prompt": "a zander (pikeperch): elongated grey-green body with dark vertical bars, two dorsal fins, the first one spiny with dark spots, large glassy eye, fang teeth"
+    },
+    {
+      "id": "fish-forel",
+      "group": "fish",
+      "sp": "forel",
+      "name": "Форель",
+      "prompt": "a rainbow trout: silvery body with an olive back, a pink-red band along the side, many small black spots on the body and tail, small adipose fin"
+    },
+    {
+      "id": "fish-dorado",
+      "group": "fish",
+      "sp": "dorado",
+      "name": "Дорада",
+      "prompt": "a gilthead sea bream: oval body covered with pale blue-grey scales, darker slate-blue back, a bright golden band between the eyes and a golden patch on the cheek, a dark blotch behind the gill cover, steep forehead, pale yellow fins, forked tail",
+      "style": "Hand-painted stylized 3D model for a video game, chunky readable shapes, big expressive eye, crisp scale pattern, matte painted colours, not metallic, not chrome"
+    },
+    {
+      "id": "fish-sibas",
+      "group": "fish",
+      "sp": "sibas",
+      "name": "Сибас",
+      "prompt": "a European sea bass: streamlined silver body with a dark grey back, two separate dorsal fins, the first one spiny, large mouth, slightly forked tail"
+    },
+    {
+      "id": "fish-ugor",
+      "group": "fish",
+      "sp": "ugor",
+      "name": "Угорь",
+      "prompt": "a European eel: very long snake-like dark olive-brown body with a yellowish belly, small head, one continuous fin running along the back, around the tail and along the belly, the body nearly straight with a very gentle wave"
+    },
+    {
+      "id": "fish-som",
+      "group": "fish",
+      "sp": "som",
+      "name": "Сом",
+      "prompt": "a wels catfish: huge long scaleless body with dark olive-brown and cream marbling, very wide flat head, wide mouth, two very long whiskers on the upper jaw and four short ones on the chin, tiny dorsal fin, very long anal fin reaching the small rounded tail"
+    },
+    {
+      "id": "fish-tunec",
+      "group": "fish",
+      "sp": "tunec",
+      "name": "Тунец",
+      "prompt": "a bluefin tuna: massive torpedo-shaped body, dark navy blue back, silver-white belly and sides, crescent-shaped dark tail, short sickle-shaped dark fins",
+      "style": "Hand-painted stylized 3D model for a video game, chunky readable shapes, big expressive eye, crisp scale pattern, matte colours, the fish itself does not glow and has no aura around it"
+    },
+    {
+      "id": "fish-losos",
+      "group": "fish",
+      "sp": "losos",
+      "name": "Лосось",
+      "prompt": "an Atlantic salmon: powerful streamlined silver body with a blue-grey back, small black spots above the lateral line, slightly hooked lower jaw, small adipose fin, broad tail",
+      "style": "Hand-painted stylized 3D model for a video game, chunky readable shapes, big expressive eye, crisp scale pattern, matte colours, the fish itself does not glow and has no aura around it"
+    },
+    {
+      "id": "fish-skat",
+      "group": "fish",
+      "sp": "skat",
+      "name": "Скат",
+      "prompt": "one single stingray: a flat kite-shaped body with two wide triangular wings, sandy brown-grey with small pale spots, two small eyes close together on top of the head, one long thin whip tail pointing right",
+      "view": "top"
+    },
+    {
+      "id": "fish-mech",
+      "group": "fish",
+      "sp": "mech",
+      "name": "Рыба-меч",
+      "prompt": "a swordfish: huge powerful body, dark steel-blue back and silver-white belly, a very long flat pointed sword bill, tall curved dorsal fin, large crescent tail, big dark eye"
+    },
+    {
+      "id": "fish-koi",
+      "group": "fish",
+      "sp": "koi",
+      "name": "Золотой кои",
+      "prompt": "a golden koi carp: elegant body covered in shining metallic gold-orange scales with a few white patches, long flowing fins and tail, two small barbels"
+    },
+    {
+      "id": "fish-starik",
+      "group": "fish",
+      "sp": "starik",
+      "name": "Мероу «Старик»",
+      "prompt": "a giant old dusky grouper: enormous heavy body, dark brown-olive with pale mottled blotches, huge mouth with a thick lower lip, small wise eye, old scars and a few barnacles on the head, rounded tail"
+    },
+    {
+      "id": "prop-crate",
+      "group": "prop",
+      "name": "Ящик",
+      "prompt": "a sturdy wooden fishing crate made of thick planks, rope handles on two sides, metal corner brackets, slightly weathered"
+    },
+    {
+      "id": "prop-barrel",
+      "group": "prop",
+      "name": "Бочка",
+      "prompt": "an old oak barrel with dark iron hoops and a cork bung, slightly weathered"
+    },
+    {
+      "id": "prop-cooler",
+      "group": "prop",
+      "name": "Холодильник",
+      "prompt": "a chunky portable cooler box: bright blue body, white lid, grey carry handle and latches"
+    },
+    {
+      "id": "prop-bucket",
+      "group": "prop",
+      "name": "Ведро",
+      "prompt": "a galvanized metal bucket with a wire handle and a wooden grip, slightly dented, filled with water"
+    },
+    {
+      "id": "prop-ropecoil",
+      "group": "prop",
+      "name": "Бухта каната",
+      "prompt": "a neat coil of thick beige mooring rope stacked in several loops, one frayed end"
+    },
+    {
+      "id": "prop-trap",
+      "group": "prop",
+      "name": "Ловушка",
+      "prompt": "a wooden lobster trap: half-cylinder frame of wooden slats with green rope netting and a funnel entrance, a small orange float tied to it"
+    },
+    {
+      "id": "prop-boat",
+      "group": "prop",
+      "name": "Лодка",
+      "prompt": "a small wooden rowboat: plank-built hull painted white with a teal stripe and red trim, two wooden bench seats, two oars lying inside, seen from the side and slightly from above so the inside is visible",
+      "elong": true
+    },
+    {
+      "id": "prop-buoy",
+      "group": "prop",
+      "name": "Буй",
+      "prompt": "a navigation buoy: fat red and white striped conical float with a small lantern cage on top and a ring of rope around the base"
+    },
+    {
+      "id": "prop-lifering",
+      "group": "prop",
+      "name": "Спасательный круг",
+      "prompt": "a classic life ring: orange-red and white segments with a rope looped around it, seen straight from the front",
+      "flatFront": true
+    },
+    {
+      "id": "prop-tacklebox",
+      "group": "prop",
+      "name": "Ящик со снастями",
+      "prompt": "an open fishing tackle box: green plastic box with fold-out trays full of colourful lures, floats and hooks, and a small reel"
+    },
+    {
+      "id": "prop-fishtray",
+      "group": "prop",
+      "name": "Лоток с рыбой",
+      "prompt": "a shallow rectangular wooden market tray filled with crushed ice with six fresh fish laid in a row on the ice: two silver, one red, one striped green, and two lemon wedges",
+      "elong": true
+    },
+    {
+      "id": "prop-shelfgoods",
+      "group": "prop",
+      "name": "Товар на полке",
+      "prompt": "fishing shop goods standing side by side in one straight row: two glass jars of bait with red lids, a stack of three colourful tin cans, a spool of fishing line, a small cardboard box of hooks, a red and white float, seen straight from the front",
+      "elong": true
+    },
+    {
+      "id": "prop-anchor",
+      "group": "prop",
+      "name": "Якорь",
+      "prompt": "an old rusty iron ship anchor with a wooden stock and a short length of heavy chain, standing upright"
+    },
+    {
+      "id": "prop-netpile",
+      "group": "prop",
+      "name": "Сети",
+      "prompt": "a heap of teal fishing net with orange and white cork floats and a coiled rope on top"
+    },
+    {
+      "id": "prop-lantern",
+      "group": "prop",
+      "name": "Фонарь",
+      "prompt": "a storm lantern (hurricane lamp): dark teal metal body, glass chimney with a warm glowing flame inside, wire guard, carrying loop on top"
+    },
+    {
+      "id": "junk-boot",
+      "group": "junk",
+      "name": "Старый ботинок",
+      "prompt": "an old worn brown leather boot, soaked, untied laces, a hole at the toe, a strand of green seaweed hanging from it"
+    },
+    {
+      "id": "junk-can",
+      "group": "junk",
+      "name": "Консервная банка",
+      "prompt": "an opened rusty tin can with the lid peeled back, dented, a few barnacles on it"
+    },
+    {
+      "id": "junk-bottle",
+      "group": "junk",
+      "name": "Бутылка с запиской",
+      "prompt": "a green glass bottle sealed with a cork, a rolled paper note inside, a little rope tied around the neck, lying on its side",
+      "elong": true
+    },
+    {
+      "id": "junk-chest",
+      "group": "junk",
+      "name": "Сундучок",
+      "prompt": "a small treasure chest: dark wooden planks with gold metal bands, lock and corner fittings, lid slightly open with gold coins and pearls glowing inside, a few barnacles and seaweed on it",
+      "yaw": 180
     }
-  ]
+  ],
+  "leads": {
+    "fish": {
+      "lead": "A single fish, 3D video game asset concept, exact side view, the fish faces left, body straight and horizontal, all fins visible and slightly spread, mouth closed.",
+      "top": "A single fish, 3D video game asset concept, seen from directly above (top-down view), head pointing left, body flat and horizontal.",
+      "style": "Stylized trophy fish in a Fortnite-like art style: chunky readable shapes, slightly exaggerated proportions, big expressive eye, hand-painted texture with a crisp scale pattern, wet skin",
+      "concept": "Plain light grey background, even studio lighting, no cast shadows, no glow, no halo, no outline, no water, no hook, no fishing line, no text",
+      "negative": "glow, halo, aura, backlight, light rays, rim light, outline, yellow background"
+    },
+    "prop": {
+      "lead": "A single object, 3D video game prop concept, three-quarter front view at eye level, the whole object visible.",
+      "style": "Fortnite-like art style, chunky readable shapes, slightly exaggerated proportions, hand-painted textures, soft matte materials, a little wear",
+      "concept": "Plain light grey background, even studio lighting, no cast shadows, no ground, no text, no letters"
+    }
+  },
+  "groupDefaults": {
+    "fish": {
+      "textureQuality": "standard",
+      "geometry": "standard",
+      "faces": 20000
+    },
+    "prop": {
+      "textureQuality": "standard",
+      "geometry": "standard",
+      "faces": 20000
+    },
+    "junk": {
+      "textureQuality": "standard",
+      "geometry": "standard",
+      "faces": 16000
+    }
+  }
 }

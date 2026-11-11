@@ -1,6 +1,6 @@
 // Рыбалка игрока: прицел и заброс, поплавок, поклёвка, подсечка, вываживание, улов.
 import * as THREE from 'three';
-import { ITEMS, FISH_BY_ID, isLure } from '../shared/data.js';
+import { ITEMS, FISH_BY_ID, JUNK_BY_ID, isLure } from '../shared/data.js';
 import { kitStats, biteDelay, rollFish, fightInit, fightStep, spendTackle, addCatch, recordCatch, activity, T_DANGER, T_LOW } from '../shared/logic.js';
 import { spotAt } from './terrain.js';
 import { waveH } from './water.js';
@@ -405,6 +405,21 @@ export class Fishing {
       this.pendingGear = false;
       this.refreshGear();
     }
+  }
+  /** Для проверок и снимков: сразу показать улов в руках, минуя заброс и вываживание. u — размер от 0 до 1. */
+  showCatch(sp, u = 0.5) {
+    const f = FISH_BY_ID[sp];
+    const j = f || JUNK_BY_ID[sp];
+    if (!j) return;
+    if (this.fish) (this.fish.parent || this.scene).remove(this.fish);
+    const w = Math.round((j.w[0] + (j.w[1] - j.w[0]) * u) * 1000) / 1000;
+    const c = (this.catch = { sp, w, len: f ? Math.round(f.look.lenK * Math.cbrt(w)) : 0, trophy: u > 0.8, junk: !f });
+    this.fishLen = c.junk ? 0.3 : clamp(c.len / 100, 0.16, 2.6);
+    this.fish = c.junk ? new THREE.Group() : buildFish(sp);
+    this.scene.add(this.fish);
+    this.bx = this.camera.position.x;
+    this.bz = this.camera.position.z - 3;
+    this.land();
   }
   junkModel(id) {
     return this.makeJunk ? this.makeJunk(id) : new THREE.Group();

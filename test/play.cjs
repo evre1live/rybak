@@ -210,6 +210,31 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
 
   // ходим ногами, а не переносимся: от берега до края пирса, по мосткам на западный причал, с настила на берег и в воду
   {
+    // готовые модели: предметы на причале, рыба в руках, значки
+    const models = await G(page, () => fetch('models/manifest.json').then((r) => r.json()).then((m) => Object.keys(m.props || {}).length, () => 0));
+    if (models) {
+      const mp = await open(browser, 'q=low&norender&h=13', 'models');
+      await mp.fill('#nm', 'Модели');
+      await G(mp, () => { RYBAK.profile.seenIntro = true; });
+      await mp.click('[data-a="solo"]');
+      await mp.waitForFunction(() => RYBAK.state === 'lobby');
+      await mp.click('[data-a="start"]');
+      await mp.waitForFunction(() => RYBAK.state === 'world');
+      await mp.waitForFunction(() => { const st = RYBAK.world.scenery.propsState(); return !st.fallback && st.placed >= 20 && st.floaters >= 5; }, null, { timeout: 120000 });
+      for (const sp of ['okun', 'skat', 'chest']) {
+        await G(mp, (sp) => { RYBAK.ui.closePanel(); RYBAK.fishing.showCatch(sp, 0.5); }, sp);
+        await mp.waitForFunction((id) => RYBAK.fishing.fish && (RYBAK.fishing.fish.userData.model === id || (RYBAK.fishing.fish.children[0] && RYBAK.fishing.fish.children[0].userData.model === id) || RYBAK.fishing.fish.userData.model === id), (sp === 'chest' ? 'junk-' : 'fish-') + sp, { timeout: 60000 });
+        if (sp === 'okun') await shot(mp, '22-model-fish', 400);
+        await G(mp, () => RYBAK.fishing.finish(false));
+      }
+      // значки из готовых моделей — обычные картинки, которые действительно загружаются
+      await G(mp, () => RYBAK.ui.openPanel('journal'));
+      await mp.waitForFunction(() => { const im = [...document.querySelectorAll('.tile img')]; return im.length >= 25 && im.every((i) => /models\/icons\/fish-.*\.webp$/.test(i.getAttribute('src')) && i.complete && i.naturalWidth > 0); }, null, { timeout: 60000 });
+      await shot(mp, '23-model-journal', 300);
+      assert.equal(mp.__err || 0, 0, 'ошибок на странице с моделями нет');
+      await mp.close();
+      console.log('  модели: предметы расставлены, рыба и сундук в руках, значки в журнале');
+    }
     const walker = await open(browser, 'q=low&norender&h=13', 'walk');
     await walker.fill('#nm', 'Ходок');
     await G(walker, () => { RYBAK.profile.seenIntro = true; });

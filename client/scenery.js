@@ -1,6 +1,8 @@
 // Всё, что стоит в бухте: причалы, лавка-рынок, маяк, водопады, арка, камни, деревья, лодка, буйки, чайки.
 import * as THREE from 'three';
 import { Batch, M, G, BATCH_MAT, BATCH_MAT_2S } from './batch.js';
+import { loadManifest } from './hero.js';
+import { modelInfo, loadModels, spawn } from './models.js';
 import { rng, rockGeo, blobGeo, canvasTex, shade, sstep, TAU, fbm2 } from './util.js';
 import { DECKS, DECK_Y, groundH, shoreZ, islandR, ISLAND, ARCH, REEF, CAPE, capeDist, FALLS, LIGHTHOUSE, BACKWATER, deckAt, SCHOOL_HOMES } from './terrain.js';
 import { waveH } from './water.js';
@@ -86,6 +88,13 @@ function buildDocks(B, r) {
   }
 }
 
+// ── Готовые модели предметов (Tripo) ──
+// Процедурные ящики, бочки, товар в лавке остаются запасным вариантом: они собраны в отдельный меш,
+// который прячется, когда все заменяющие его модели загрузились. Новые предметы (лодка, ловушки, якорь) просто добавляются.
+const PLACES = [];
+/** s — наибольший размер предмета в метрах; rep: заменяет процедурный предмет; e — прочее (rx, rz; on — номер места, на котором предмет стоит). Возвращает номер места. */
+const place = (id, x, y, z, s, ry = 0, rep = false, e = null) => PLACES.push({ id, x, y, z, s, ry, rep, ...e }) - 1;
+
 function crate(B, x, y, z, s, ry, color = '#c9975c') {
   B.add(G.box(), color, M(x, y + s / 2, z, s, s, s, 0, ry, 0), { grad: [0.82, 1.05] });
   for (const dy of [0.12, 0.88]) B.add(G.box(), shade(color, -0.22), M(x, y + s * dy, z, s * 1.04, s * 0.1, s * 1.04, 0, ry, 0));
@@ -104,7 +113,7 @@ function ropeCoil(B, x, y, z) {
   for (let k = 0; k < 3; k++) B.add(G.torus(0.22, 14), ROPE, M(x, y + 0.05 + k * 0.075, z, 0.6 - k * 0.04, 0.6 - k * 0.04, 0.5, Math.PI / 2, k, 0));
 }
 
-function buildShack(B, scene, r) {
+function buildShack(B, P, scene, r) {
   const x0 = -13;
   const x1 = -7.2;
   const z0 = 10.4;
@@ -151,17 +160,20 @@ function buildShack(B, scene, r) {
     for (let i = 0; i < 7; i++) {
       const c = ['#ef4444', '#fbbf24', '#22d3ee', '#a3e635', '#f97316', '#e2e8f0'][Math.floor(r() * 6)];
       const h = 0.14 + r() * 0.14;
-      B.add(r() < 0.5 ? G.cyl(8) : G.box(), c, M(x1 - 1.28, by + sy + 0.03 + h / 2, cz - 1.3 + i * 0.43 + r() * 0.08, 0.15, h, 0.15));
+      P.add(r() < 0.5 ? G.cyl(8) : G.box(), c, M(x1 - 1.28, by + sy + 0.03 + h / 2, cz - 1.3 + i * 0.43 + r() * 0.08, 0.15, h, 0.15));
     }
+    for (let i = 0; i < 3; i++) place('prop-shelfgoods', x1 - 1.28, by + sy + 0.025, cz - 0.98 + i * 0.98, 0.84, Math.PI / 2, true);
   }
   // прилавок с уловом на льду
   B.add(G.box(), '#d9a066', M(x1 + 0.2, by + 1.04, cz, 0.78, 0.09, z1 - z0 - 1.5));
   B.add(G.box(), '#b97c42', M(x1 + 0.5, by + 0.5, cz, 0.08, 1.0, z1 - z0 - 1.7), { grad: [0.8, 1.05] });
   for (const dz of [-0.95, 0.45]) {
-    B.add(G.box(), '#a86f3a', M(x1 + 0.22, by + 1.15, cz + dz, 0.55, 0.14, 0.7));
-    B.add(G.box(), '#e8f6ff', M(x1 + 0.22, by + 1.21, cz + dz, 0.47, 0.06, 0.62));
-    for (let i = 0; i < 4; i++) B.add(G.sph(8, 6), ['#b9c7d1', '#e8643a', '#9fb04a', '#cfd9de'][i], M(x1 + 0.14 + (i % 2) * 0.16, by + 1.27, cz + dz - 0.2 + i * 0.13, 0.13, 0.07, 0.36, 0, 0.3 * (i - 1.5), 0));
+    P.add(G.box(), '#a86f3a', M(x1 + 0.22, by + 1.15, cz + dz, 0.55, 0.14, 0.7));
+    P.add(G.box(), '#e8f6ff', M(x1 + 0.22, by + 1.21, cz + dz, 0.47, 0.06, 0.62));
+    for (let i = 0; i < 4; i++) P.add(G.sph(8, 6), ['#b9c7d1', '#e8643a', '#9fb04a', '#cfd9de'][i], M(x1 + 0.14 + (i % 2) * 0.16, by + 1.27, cz + dz - 0.2 + i * 0.13, 0.13, 0.07, 0.36, 0, 0.3 * (i - 1.5), 0));
+    place('prop-fishtray', x1 + 0.22, by + 1.085, cz + dz, 0.74, Math.PI / 2, true);
   }
+  place('prop-lantern', x1 + 0.26, by + 1.085, cz - 1.82, 0.4, 0.4);
   B.add(G.box(), '#59636e', M(x1 + 0.25, by + 1.14, cz + 1.25, 0.3, 0.1, 0.3));
   B.add(G.cyl(12), '#cbd5e1', M(x1 + 0.25, by + 1.25, cz + 1.25, 0.36, 0.03, 0.36));
   // крыша
@@ -176,7 +188,8 @@ function buildShack(B, scene, r) {
   B.add(G.box(), '#8f3d2c', M(cx, by + H + rise + 0.06, cz, 0.22, 0.14, z1 - z0 + 1));
   for (const pz of [z0, z1]) B.add(G.prism(), TEAL, M(cx, by + H, pz, x1 - x0, rise, 0.12), { grad: [0.9, 1.02] });
   // спасательный круг на северной стене
-  for (let i = 0; i < 8; i++) B.add(G.torus(0.3, 5, Math.PI / 4 + 0.02), i % 2 ? '#e2452f' : '#f8fafc', M(x0 + 1.4, by + 1.65, z0 - 0.1, 0.74, 0.74, 0.74, 0, 0, (i * Math.PI) / 4));
+  for (let i = 0; i < 8; i++) P.add(G.torus(0.3, 5, Math.PI / 4 + 0.02), i % 2 ? '#e2452f' : '#f8fafc', M(x0 + 1.4, by + 1.65, z0 - 0.1, 0.74, 0.74, 0.74, 0, 0, (i * Math.PI) / 4));
+  place('prop-lifering', x0 + 1.4, by, z0 - 0.29, 0.8, Math.PI, true); // круг стоит на настиле, прислонённый к стене
   // окно на север с ящиком цветов
   B.add(G.box(), '#f1efe6', M(cx + 0.9, by + 1.6, z0 - 0.04, 1.2, 0.95, 0.1));
   B.add(G.box(), '#24405c', M(cx + 0.9, by + 1.6, z0 - 0.08, 1.02, 0.78, 0.06));
@@ -269,21 +282,50 @@ function buildShack(B, scene, r) {
   return { setBoard, glow };
 }
 
-function buildProps(B, r) {
+function buildProps(B, P, r) {
   const y = DECK_Y;
-  crate(B, -12.6, y, 5.5, 0.82, 0.2);
-  crate(B, -12.45, y + 0.82, 5.55, 0.62, 0.6, '#d3a56a');
-  crate(B, -11.9, y, 6.2, 0.55, 1.1, '#b9854e');
-  barrel(B, -11.15, y, 5.15);
-  cooler(B, 4.5, y, 14.9, 0.2);
-  cooler(B, 4.75, y + 0.5, 14.85, -0.15, '#3b82f6');
-  cooler(B, 4.9, y, 14.1, 1.3, '#1e4fa8');
-  barrel(B, 4.95, y, 5.15, 0.9);
-  ropeCoil(B, 4.3, y, 6.1);
-  crate(B, 5.25, y, -26.3, 0.5, 0.4);
-  B.add(G.cyl(10, 1, 0.8), '#64748b', M(4.55, y + 0.17, -26.1, 0.34, 0.34, 0.34), { grad: [0.8, 1.05] });
-  ropeCoil(B, -34.2, y, 11.6);
-  crate(B, -34.3, y, 5.7, 0.6, 0.3);
+  // ящики, бочки, холодильники, канаты, вёдра: процедурные — в запасной меш, на их места — готовые модели
+  const crateAt = (x, yy, z, sz, ry, color, on) => {
+    crate(P, x, yy, z, sz, ry, color);
+    return place('prop-crate', x, yy, z, sz * 1.12, ry, true, on === undefined ? null : { on });
+  };
+  const barrelAt = (x, z, sz = 1) => {
+    barrel(P, x, y, z, sz);
+    place('prop-barrel', x, y, z, sz * 0.98, r() * 6, true);
+  };
+  const coolerAt = (x, yy, z, ry, color, on) => {
+    cooler(P, x, yy, z, ry, color);
+    return place('prop-cooler', x, yy, z, 0.84, ry, true, on === undefined ? null : { on });
+  };
+  const coilAt = (x, z) => {
+    ropeCoil(P, x, y, z);
+    place('prop-ropecoil', x, y, z, 0.7, r() * 6, true);
+  };
+  const bucketAt = (x, z, color) => {
+    P.add(G.cyl(10, 1, 0.8), color, M(x, y + 0.17, z, 0.34, 0.34, 0.34), { grad: [0.8, 1.05] });
+    place('prop-bucket', x, y, z, 0.46, r() * 6, true);
+  };
+  const c0 = crateAt(-12.6, y, 5.5, 0.82, 0.2);
+  crateAt(-12.45, y + 0.82, 5.55, 0.62, 0.6, '#d3a56a', c0);
+  crateAt(-11.9, y, 6.2, 0.55, 1.1, '#b9854e');
+  barrelAt(-11.15, 5.15);
+  const k0 = coolerAt(4.5, y, 14.9, 0.2);
+  coolerAt(4.75, y + 0.5, 14.85, -0.15, '#3b82f6', k0);
+  coolerAt(4.9, y, 14.1, 1.3, '#1e4fa8');
+  barrelAt(4.95, 5.15, 0.9);
+  coilAt(4.3, 6.1);
+  crateAt(5.25, y, -26.3, 0.5, 0.4);
+  bucketAt(4.55, -26.1, '#64748b');
+  coilAt(-34.2, 11.6);
+  crateAt(-34.3, y, 5.7, 0.6, 0.3);
+  bucketAt(-2.6, 5.0, '#e2452f');
+  // новое: ловушки, сети, якорь на песке, ящик со снастями на скамейке, фонари
+  place('prop-trap', -5.0, y, -22.9, 0.95, 0.5);
+  place('prop-trap', -29.8, y, 5.8, 0.9, 2.2);
+  place('prop-netpile', 4.9, y, 7.5, 1.05, 0.8);
+  place('prop-anchor', 7.7, groundH(7.7, 12.6) - 0.06, 12.6, 1.45, -0.7, false, { rz: 0.16 });
+  place('prop-tacklebox', 1.95, y + 0.5, 15.33, 0.44, -0.35);
+  place('prop-lantern', 5.65, y, -25.4, 0.46, 0.6);
   // скамейка у берега
   const bx = 1.4;
   const bz = 15.35;
@@ -295,8 +337,47 @@ function buildProps(B, r) {
     B.add(G.cyl(8), '#3b424c', M(cx2, y + 0.08, cz2, 0.12, 0.16, 0.12));
     B.add(G.box(), '#3b424c', M(cx2, y + 0.17, cz2, 0.34, 0.06, 0.09, 0, r() * 3, 0));
   }
-  // рыбацкие сети на свае, ведро
-  B.add(G.cyl(10, 1, 0.82), '#e2452f', M(-2.6, y + 0.16, 5.0, 0.32, 0.32, 0.32), { grad: [0.8, 1.05] });
+}
+
+/** Когда модели загрузились: расставляет их, прячет процедурные двойники, меняет лодку и буйки. */
+const propsDone = { placed: 0, floaters: 0 };
+function upgradeProps(scene, fallback, floaters) {
+  loadManifest().then(() => {
+    const ids = [...new Set([...PLACES.map((p) => p.id), 'prop-boat', 'prop-buoy'])].filter((id) => modelInfo(id));
+    if (!ids.length) return;
+    loadModels(ids).then((got) => {
+      const all = PLACES.filter((p) => p.rep).every((p) => got.has(p.id));
+      if (all) fallback.visible = false;
+      for (const p of PLACES) {
+        const tpl = got.get(p.id);
+        if (!tpl || (p.rep && !all)) continue;
+        const o = spawn(tpl);
+        o.scale.setScalar(p.s);
+        // стоит на другом предмете — высоту берём у настоящей модели, а не у процедурного двойника
+        const base = p.on === undefined ? null : PLACES[p.on];
+        const bt = base && got.get(base.id);
+        o.position.set(p.x, bt && bt.info.size ? base.y + bt.info.size[1] * base.s : p.y, p.z);
+        o.rotation.set(p.rx || 0, p.ry, p.rz || 0, 'YXZ');
+        scene.add(o);
+        propsDone.placed++;
+      }
+      for (const f of floaters) {
+        const tpl = got.get(f.kind === 'boat' ? 'prop-boat' : 'prop-buoy');
+        if (!tpl) continue;
+        const o = spawn(tpl);
+        if (f.kind === 'boat') {
+          o.scale.setScalar(4.1);
+          f.y = -0.26;
+        } else {
+          o.scale.setScalar(1.85);
+          f.y = -0.42;
+        }
+        f.o.clear();
+        f.o.add(o);
+        propsDone.floaters++;
+      }
+    });
+  });
 }
 
 function buildLamps(B, scene) {
@@ -742,7 +823,13 @@ function buildFloaters(scene) {
   boat.position.set(-32, 0, 3.3);
   boat.rotation.y = 0.25;
   scene.add(boat);
-  list.push({ o: boat, y: 0.08, roll: 0.06 });
+  list.push({ o: boat, y: 0.08, roll: 0.06, kind: 'boat' });
+  // вторая лодка — у главного пирса (появляется только готовой моделью)
+  const boat2 = new THREE.Group();
+  boat2.position.set(3.25, 0, -11.5);
+  boat2.rotation.y = Math.PI / 2 + 0.08;
+  scene.add(boat2);
+  list.push({ o: boat2, y: 0, roll: 0.05, kind: 'boat' });
   // буйки
   const red = new THREE.MeshStandardMaterial({ color: '#e2452f', roughness: 0.6 });
   const white = new THREE.MeshStandardMaterial({ color: '#f8fafc', roughness: 0.6 });
@@ -762,7 +849,7 @@ function buildFloaters(scene) {
     b.position.set(x, 0, z);
     b.traverse((o) => (o.castShadow = true));
     scene.add(b);
-    list.push({ o: b, y: 0.05, roll: 0.12 });
+    list.push({ o: b, y: 0.05, roll: 0.12, kind: 'buoy' });
   }
   return list;
 }
@@ -869,11 +956,15 @@ export function buildScenery(scene) {
   const r = rng(20261111);
   const B = new Batch();
   B.auto = true;
+  const P = new Batch(); // процедурные двойники предметов, у которых есть готовые модели
+  P.auto = true;
   buildDocks(B, r);
-  const shack = buildShack(B, scene, r);
-  buildProps(B, r);
+  const shack = buildShack(B, P, scene, r);
+  buildProps(B, P, r);
   const lamps = buildLamps(B, scene);
   scene.add(B.build());
+  const fallback = P.build();
+  scene.add(fallback);
   buildVegetation(scene, r);
   buildRocks(scene, r);
   const lh = buildLighthouse(scene, r);
@@ -881,9 +972,12 @@ export function buildScenery(scene) {
   const floaters = buildFloaters(scene);
   const gulls = buildGulls(scene);
   const schools = buildSchools(scene);
+  upgradeProps(scene, fallback, floaters);
   return {
     setBoard: shack.setBoard,
     schools,
+    /** Для проверок: спрятан ли запасной меш и сколько готовых моделей расставлено. */
+    propsState: () => ({ fallback: fallback.visible, ...propsDone }),
     /** night: 0 днём … 1 ночью; light — общая яркость дня */
     setNight(night, light) {
       for (const l of lamps.lamps) l.intensity = night * 9;

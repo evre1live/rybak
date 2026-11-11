@@ -1,5 +1,6 @@
 // Рыба в 3D: тело-лофт по профилю вида, плавники, раскраска на canvas. Голова смотрит влево (−X), длина тела — 1.
 import * as THREE from 'three';
+import { modelInfo, modelReady, loadModel, spawn } from './models.js';
 import { FISH_BY_ID } from '../shared/data.js';
 import { loft, flat, tube } from './shapes.js';
 import { canvasTex, rng, mat, shade } from './util.js';
@@ -223,7 +224,7 @@ function finShape(P, range, h, up) {
 }
 
 /** Собрать рыбу вида sp. Возвращает группу длиной 1 (масштабируйте сами) и хвост для анимации. */
-export function buildFish(sp) {
+function proceduralFish(sp) {
   const pr = parts(sp);
   const { look, shape, fins, P } = pr;
   const g = new THREE.Group();
@@ -341,10 +342,59 @@ function raySkin(look) {
     }
   });
 }
+/** Рыба вида sp длиной 1: голова к −X, спина к +Y. Если есть готовая модель — она встаёт на место процедурной, как только загрузится. */
+export function buildFish(sp) {
+  return adopt(proceduralFish(sp), 'fish-' + sp, true);
+}
+const WIG_KEY = () => 'fishwig';
+/**
+ * Подменяет содержимое wrap готовой моделью id (сразу или когда та загрузится). Нет модели — wrap остаётся как был.
+ * fish: модель гнётся в шейдере (волна от головы к хвосту), у каждой копии своя фаза; y — сдвиг модели по высоте.
+ */
+export function adopt(wrap, id, fish = false, y = 0) {
+  if (!modelInfo(id)) return wrap;
+  const put = (tpl) => {
+    const o = spawn(tpl, fish);
+    o.position.y = y;
+    for (const c of [...wrap.children]) wrap.remove(c);
+    wrap.add(o);
+    wrap.userData.model = id;
+    if (!fish) return;
+    wrap.userData.tail = null;
+    const wig = (wrap.userData.wig = []);
+    o.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(o.matrixWorld).invert();
+    o.traverse((c) => {
+      if (!c.isMesh) return;
+      // вершины хранятся сжатыми: переводим в «рыбьи» координаты (x от −0,5 у головы до +0,5 у хвоста) и обратно
+      const e = new THREE.Matrix4().multiplyMatrices(inv, c.matrixWorld).elements;
+      const u = { value: new THREE.Vector2(0, 0) };
+      const k = { value: new THREE.Vector3(e[0], e[12], 1 / (e[10] || 1)) };
+      wig.push(u);
+      c.material.onBeforeCompile = (sh) => {
+        sh.uniforms.uWig = u;
+        sh.uniforms.uWigK = k;
+        sh.vertexShader = sh.vertexShader
+          .replace('#include <common>', '#include <common>\nuniform vec2 uWig; uniform vec3 uWigK;')
+          .replace('#include <begin_vertex>', '#include <begin_vertex>\nfloat fx = position.x * uWigK.x + uWigK.y; transformed.z += sin(fx * 5.2 - uWig.x) * 0.075 * uWig.y * smoothstep(-0.32, 0.5, fx) * uWigK.z;');
+      };
+      c.material.customProgramCacheKey = WIG_KEY;
+    });
+  };
+  const tpl = modelReady(id);
+  if (tpl) put(tpl);
+  else loadModel(id).then(put, () => {});
+  return wrap;
+}
 /** Шевеление хвостом и телом: вызывать каждый кадр. */
 export function wiggleFish(fish, t, amp = 1) {
   const u = fish.userData;
   if (!u || !u.shape || !fish.children[0]) return; // хлам на крючке не шевелится
+  if (u.wig) {
+    for (const w of u.wig) w.value.set(t * 9, amp);
+    fish.children[0].rotation.y = Math.sin(t * 9 + 1) * 0.08 * amp;
+    return;
+  }
   if (u.tail && u.shape !== 'ray') u.tail.rotation.y = Math.sin(t * 9) * 0.5 * amp;
   fish.children[0].rotation.y = Math.sin(t * 9 + 1) * 0.12 * amp;
 }
