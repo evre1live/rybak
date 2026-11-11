@@ -1,7 +1,7 @@
 // Всё, что стоит в бухте: причалы, лавка-рынок, маяк, водопады, арка, камни, деревья, лодка, буйки, чайки.
 import * as THREE from 'three';
 import { Batch, M, G, BATCH_MAT, BATCH_MAT_2S } from './batch.js';
-import { rng, rockGeo, canvasTex, shade, sstep, TAU, fbm2 } from './util.js';
+import { rng, rockGeo, blobGeo, canvasTex, shade, sstep, TAU, fbm2 } from './util.js';
 import { DECKS, DECK_Y, groundH, shoreZ, islandR, ISLAND, ARCH, REEF, CAPE, capeDist, FALLS, LIGHTHOUSE, BACKWATER, deckAt, SCHOOL_HOMES } from './terrain.js';
 import { waveH } from './water.js';
 
@@ -77,7 +77,7 @@ function buildDocks(B, r) {
       const top = DECK_Y + (tall ? 0.62 + r() * 0.3 : 0.1);
       const bot = Math.min(gh - 0.6, -1.2);
       B.add(G.cyl(9), shade('#8a5f3a', (r() - 0.5) * 0.14), M(px, (top + bot) / 2, pz, 0.34, top - bot, 0.34, 0, r() * 3, (r() - 0.5) * 0.03), { grad: [0.5, 1.05] });
-      B.add(G.cyl(9), '#c79d6c', M(px, top + 0.012, pz, 0.3, 0.03, 0.3));
+      B.add(G.cyl(9), '#c79d6c', M(px, top + 0.012, pz, 0.3, 0.03, 0.3), { mat: 4 });
       if (tall && r() < 0.5) for (let k = 0; k < 3; k++) B.add(G.torus(0.2, 12), ROPE, M(px, DECK_Y + 0.3 + k * 0.066, pz, 0.46, 0.46, 0.46, Math.PI / 2, r() * 3, 0));
     }
   }
@@ -89,7 +89,7 @@ function crate(B, x, y, z, s, ry, color = '#c9975c') {
 }
 function barrel(B, x, y, z, s = 1) {
   B.add(G.cyl(12), '#9b6b3e', M(x, y + 0.45 * s, z, 0.64 * s, 0.9 * s, 0.64 * s), { grad: [0.78, 1.06] });
-  B.add(G.cyl(12), '#7d5330', M(x, y + 0.9 * s, z, 0.56 * s, 0.03, 0.56 * s));
+  B.add(G.cyl(12), '#7d5330', M(x, y + 0.9 * s, z, 0.56 * s, 0.03, 0.56 * s), { mat: 4 });
   for (const h of [0.2, 0.7]) B.add(G.torus(0.1, 14), '#4a4f57', M(x, y + h * s, z, 0.67 * s, 0.67 * s, 0.67 * s, Math.PI / 2, 0, 0));
 }
 function cooler(B, x, y, z, ry, color = '#2f6fd6') {
@@ -132,9 +132,17 @@ function buildShack(B, scene, r) {
   B.add(G.box(), '#f1efe6', M(x1 + 0.02, by + H / 2, z0 + 0.9, 0.16, H, 0.14));
   B.add(G.box(), '#f1efe6', M(x1 + 0.02, by + H / 2, z1 - 0.9, 0.16, H, 0.14));
   for (const [px, pz] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) B.add(G.box(), '#f1efe6', M(px, by + H / 2, pz, 0.2, H + 0.04, 0.2));
-  // нутро лавки: тёмная глубина, полки с товаром
-  B.add(G.box(), '#1b2430', M(x1 - 1.5, by + 1.6, cz, 0.1, 1.3, z1 - z0 - 1.9));
-  B.add(G.box(), '#232e3c', M(x1 - 0.75, by + 0.95, cz, 1.5, 0.08, z1 - z0 - 1.9));
+  // нутро лавки: дощатая задняя стенка, полки с товаром, тёплая лампа под потолком
+  for (let i = 0; i < 9; i++) B.add(G.box(), shade('#7b5433', (r() - 0.5) * 0.16), M(x1 - 1.5, by + 1.62, cz - 1.38 + i * 0.345, 0.1, 1.36, 0.33));
+  B.add(G.box(), '#4a3320', M(x1 - 0.75, by + 0.95, cz, 1.5, 0.08, z1 - z0 - 1.9));
+  B.add(G.cyl(8), '#2b2f36', M(x1 - 0.55, by + 2.42, cz, 0.02, 0.36, 0.02), { mat: 0 });
+  B.add(G.cone(10), '#2f6f6a', M(x1 - 0.55, by + 2.22, cz, 0.34, 0.14, 0.34), { mat: 0 });
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), new THREE.MeshBasicMaterial({ color: '#fff1c4' }));
+  bulb.position.set(x1 - 0.55, by + 2.14, cz);
+  scene.add(bulb);
+  const glow = new THREE.PointLight('#ffd9a3', 7, 7.5, 1.7);
+  glow.position.set(x1 - 0.5, by + 2.05, cz);
+  scene.add(glow);
   for (const sy of [1.45, 1.85]) {
     B.add(G.box(), '#8a5f3a', M(x1 - 1.3, by + sy, cz, 0.34, 0.05, 3));
     for (let i = 0; i < 7; i++) {
@@ -255,7 +263,7 @@ function buildShack(B, scene, r) {
     btex.needsUpdate = true;
   };
   setBoard(['…', '…', '…']);
-  return { setBoard };
+  return { setBoard, glow };
 }
 
 function buildProps(B, r) {
@@ -343,36 +351,40 @@ function buildLamps(B, scene) {
   return { lamps, glassMat };
 }
 
+const BLOBS = [blobGeo(3, 2), blobGeo(8, 2), blobGeo(15, 2), blobGeo(22, 2)];
+const BLOBS_FAR = [blobGeo(3, 1, 0.16), blobGeo(15, 1, 0.16)]; // вдали хватит и грубой кроны
+const blobOf = (B, r) => (B.far ? BLOBS_FAR[Math.floor(r() * BLOBS_FAR.length)] : BLOBS[Math.floor(r() * BLOBS.length)]);
 function pine(B, x, y, z, s, r) {
-  B.add(G.cyl(6, 0.6, 1), '#7a5230', M(x, y + 0.7 * s, z, 0.34 * s, 1.5 * s, 0.34 * s), { grad: [0.7, 1] });
+  B.add(G.cyl(6, 0.6, 1), '#7a5230', M(x, y + 0.7 * s, z, 0.34 * s, 1.5 * s, 0.34 * s), { grad: [0.7, 1], mat: 1 });
   const tiers = 3 + (r() < 0.5 ? 1 : 0);
   const base = ['#2f8f4e', '#2a8246', '#37a058'][Math.floor(r() * 3)];
   for (let i = 0; i < tiers; i++) {
     const k = i / tiers;
     const rad = (1.5 - k * 0.95) * s;
-    B.add(G.cone(8), shade(base, i * 0.07), M(x, y + (1.25 + i * 1.02) * s, z, rad * 2, 1.75 * s, rad * 2, 0, r() * 3, 0), { grad: [0.62, 1.12] });
+    B.add(G.cone(8), shade(base, i * 0.07), M(x, y + (1.25 + i * 1.02) * s, z, rad * 2, 1.75 * s, rad * 2, 0, r() * 3, 0), { grad: [0.62, 1.12], mat: 3 });
   }
 }
 function roundTree(B, x, y, z, s, r) {
-  B.add(G.cyl(6, 0.7, 1), '#8a5f3a', M(x, y + 0.9 * s, z, 0.36 * s, 1.9 * s, 0.36 * s, 0, 0, (r() - 0.5) * 0.12), { grad: [0.7, 1] });
+  B.add(G.cyl(6, 0.7, 1), '#8a5f3a', M(x, y + 0.9 * s, z, 0.36 * s, 1.9 * s, 0.36 * s, 0, 0, (r() - 0.5) * 0.12), { grad: [0.7, 1], mat: 1 });
   const base = ['#62b84e', '#74c75a', '#57a947', '#86cf63'][Math.floor(r() * 4)];
   const n = 3 + Math.floor(r() * 2);
   for (let i = 0; i < n; i++) {
     const a = r() * TAU;
     const d = i ? (0.55 + r() * 0.4) * s : 0;
     const rad = (i ? 1.0 + r() * 0.5 : 1.55) * s;
-    B.add(G.ico(1), shade(base, (r() - 0.5) * 0.12), M(x + Math.cos(a) * d, y + (2.25 + (i ? r() * 0.7 : 0.35)) * s, z + Math.sin(a) * d, rad * 2, rad * 1.7, rad * 2, r(), r() * 3, 0), { flat: true, grad: [0.6, 1.14] });
+    B.add(blobOf(B, r), shade(base, (r() - 0.5) * 0.12), M(x + Math.cos(a) * d, y + (2.25 + (i ? r() * 0.7 : 0.35)) * s, z + Math.sin(a) * d, rad * 1.04, rad * 0.9, rad * 1.04, r() * 0.4, r() * 3, 0), { grad: [0.55, 1.16], mat: 3 });
   }
 }
 function bush(B, x, y, z, s, r) {
   const base = ['#58b848', '#4aa63f', '#6cc956'][Math.floor(r() * 3)];
-  for (let i = 0; i < 2; i++) B.add(G.ico(1), shade(base, (r() - 0.5) * 0.1), M(x + (r() - 0.5) * s, y + 0.3 * s, z + (r() - 0.5) * s, (1 + r() * 0.5) * s, 0.8 * s, (1 + r() * 0.5) * s, 0, r() * 3, 0), { flat: true, grad: [0.6, 1.12] });
+  for (let i = 0; i < 2; i++) B.add(blobOf(B, r), shade(base, (r() - 0.5) * 0.1), M(x + (r() - 0.5) * s, y + 0.3 * s, z + (r() - 0.5) * s, (0.52 + r() * 0.26) * s, 0.42 * s, (0.52 + r() * 0.26) * s, 0, r() * 3, 0), { grad: [0.55, 1.14], mat: 3 });
 }
 
 function buildVegetation(scene, r) {
   const near = new Batch();
   const far = new Batch();
   const isl = new Batch();
+  far.far = isl.far = true;
   // остров
   let placed = 0;
   for (let i = 0; i < 400 && placed < 46; i++) {
@@ -477,12 +489,15 @@ function buildVegetation(scene, r) {
 
 function buildRocks(scene, r) {
   const B = new Batch();
+  B.mat = 2;
   const geos = [rockGeo(11), rockGeo(23), rockGeo(37), rockGeo(51), rockGeo(64, 2, 0.3)];
+  const small = [rockGeo(11, 1), rockGeo(23, 1), rockGeo(37, 1)]; // мелким камням хватит и грубой сетки
   const GREYS = ['#8d95a1', '#7f8793', '#9aa2ad', '#868f9c', '#a3a9b3'];
   const GRASS = '#6dbd50';
   const rock = (x, y, z, sx, sy, sz, grass = false, tone = 0) => {
     const c = shade(GREYS[Math.floor(r() * GREYS.length)], tone + (r() - 0.5) * 0.1);
-    B.add(geos[Math.floor(r() * geos.length)], c, M(x, y, z, sx, sy, sz, (r() - 0.5) * 0.5, r() * TAU, (r() - 0.5) * 0.5), grass ? { top: [shade(GRASS, (r() - 0.5) * 0.12), 0.72], grad: [0.72, 1.05] } : { grad: [0.72, 1.05] });
+    const set = Math.max(sx, sy, sz) < 2.4 ? small : geos;
+    B.add(set[Math.floor(r() * set.length)], c, M(x, y, z, sx, sy, sz, (r() - 0.5) * 0.5, r() * TAU, (r() - 0.5) * 0.5), grass ? { top: [shade(GRASS, (r() - 0.5) * 0.12), 0.72], grad: [0.72, 1.05] } : { grad: [0.72, 1.05] });
   };
   // риф у причала
   for (let i = 0; i < 11; i++) {
@@ -850,6 +865,7 @@ function buildSchools(scene) {
 export function buildScenery(scene) {
   const r = rng(20261111);
   const B = new Batch();
+  B.auto = true;
   buildDocks(B, r);
   const shack = buildShack(B, scene, r);
   buildProps(B, r);
@@ -868,6 +884,7 @@ export function buildScenery(scene) {
     /** night: 0 днём … 1 ночью; light — общая яркость дня */
     setNight(night, light) {
       for (const l of lamps.lamps) l.intensity = night * 9;
+      shack.glow.intensity = 6 + night * 6;
       lamps.glassMat.emissiveIntensity = 0.05 + night * 1.9;
       lh.lampMat.emissiveIntensity = 0.25 + night * 2.4;
       lh.beamMat.uniforms.opacity.value = Math.max(0, night - 0.4) * 0.9;

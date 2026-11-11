@@ -175,14 +175,18 @@ void main() {
   float ndv = max(dot(N, V), 0.0);
   float fres = 0.025 + 0.975 * pow(1.0 - ndv, 5.0);
 
-  vec3 c = mix(uShallow, uDeep, ss(0.8, 9.5, depth));
-  c = mix(uShallow * 1.12 + vec3(0.05, 0.07, 0.04), c, ss(0.0, 1.6, depth));
+  // толща воды: чем длиннее путь взгляда сквозь неё, тем плотнее цвет; на мели и при взгляде сверху вниз видно дно
+  float path = depth / max(ndv, 0.18);
+  float body = 1.0 - exp(-path * 0.16);
+  vec3 c = mix(uShallow, uDeep, ss(1.0, 14.0, depth));
+  c = mix(uShallow * 1.1 + vec3(0.04, 0.06, 0.04), c, ss(0.0, 2.2, depth));
 
   // сетка света на поверхности — как на мелководье в ясный день
-  float c1 = texture2D(uCaustic, p * 0.075 + uTime * vec2(0.011, 0.007) + n1.xy * 0.035).r;
-  float c2 = texture2D(uCaustic, p * 0.11 - uTime * vec2(0.009, 0.013) + n2.xy * 0.03).r;
+  vec2 warp = (texture2D(uNormal, p * 0.012 + uTime * 0.003).xy - 0.5) * 0.32;
+  float c1 = texture2D(uCaustic, p * 0.075 + uTime * vec2(0.011, 0.007) + n1.xy * 0.035 + warp).r;
+  float c2 = texture2D(uCaustic, p * 0.11 - uTime * vec2(0.009, 0.013) + n2.xy * 0.03 - warp * 1.3).r;
   float net = max(c1 * 0.75, c2 * 0.55) * (1.0 - 0.55 * ss(3.0, 12.0, depth));
-  c += uSunCol * net * 0.2 * uGlitter / (1.0 + dist * 0.018);
+  c += uSunCol * net * 0.27 * uGlitter * (0.35 + 0.65 * body) / (1.0 + dist * 0.016);
 
   vec3 R = reflect(-V, N);
   vec3 sky = mix(uSkyHor, uSkyZen, pow(max(R.y, 0.0), 0.55));
@@ -191,14 +195,16 @@ void main() {
   c += uSunCol * (pow(rs, 380.0) * 3.0 + pow(rs, 28.0) * 0.1) * uGlitter;
 
   // пена: кромка берега и набегающие полосы
-  float edge = 1.0 - ss(0.0, 0.5, depth + n1.x * 0.14);
-  float band = ss(0.62, 0.8, sin(depth * 8.0 - uTime * 1.5 + n2.x * 3.0) * 0.5 + 0.5) * (1.0 - ss(0.25, 1.25, depth));
-  float foam = clamp(edge + band * 0.55, 0.0, 1.0) * step(0.004, dv);
+  // пена: тонкая живая кромка у берега и редкие набегающие полосы — без молочной каши на мели
+  float lap = 0.1 + 0.07 * sin(uTime * 0.9 + p.x * 0.35 + n1.y * 2.0);
+  float edge = 1.0 - ss(0.0, lap + 0.1, depth + n1.x * 0.07);
+  float band = ss(0.8, 0.94, sin(depth * 9.0 - uTime * 1.3 + n2.x * 3.0) * 0.5 + 0.5) * (1.0 - ss(0.2, 0.95, depth)) * ss(0.35, 0.7, n1.z * 0.5 + c1);
+  float foam = clamp(edge + band * 0.4, 0.0, 1.0) * step(0.004, dv);
   vec3 foamCol = mix(vec3(1.0), uSkyHor, 0.25) * (0.35 + 0.65 * clamp(uGlitter + 0.25, 0.0, 1.0));
   c = mix(c, foamCol, foam * 0.85);
 
-  float alpha = mix(0.3, 0.965, ss(0.0, 5.0, depth));
-  alpha = max(alpha, max(fres * 0.9, foam));
+  float alpha = max(max(body, 0.1), max(fres * 0.92, foam));
+  alpha = max(alpha, ss(70.0, 170.0, dist)); // вдали вода сплошная: дна всё равно не разглядеть
   float fog = ss(uFogNear, uFogFar, dist);
   c = mix(c, uFogCol, fog);
   gl_FragColor = vec4(c, alpha);

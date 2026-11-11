@@ -1,5 +1,6 @@
 // Мелкие помощники: математика, шум, текстуры на canvas.
 import * as THREE from 'three';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export const lerp = (a, b, t) => a + (b - a) * t;
@@ -105,20 +106,61 @@ export function mesh(geo, material, x = 0, y = 0, z = 0, parent = null, shadow =
   return m;
 }
 
-/** Камень: икосаэдр, помятый шумом, с плоскими гранями. */
-export function rockGeo(seed, detail = 1, rough = 0.38) {
-  const g = new THREE.IcosahedronGeometry(1, detail);
+/**
+ * Камень: глыба, «обтёсанная» случайными плоскостями, со скруглёнными рёбрами.
+ * Берём частую сферу и прижимаем каждую вершину к ближайшей из плоскостей — получаются ровные грани,
+ * а общие (сглаженные) нормали дают мягкий перелом на рёбрах вместо жёсткой гранёной «картошки».
+ */
+export function rockGeo(seed, detail = 2, rough = 0.38) {
+  let g = new THREE.IcosahedronGeometry(1, detail + 1);
+  g.deleteAttribute('uv');
+  g.deleteAttribute('normal');
+  g = mergeVertices(g, 1e-4);
   const p = g.attributes.position;
   const r = rng(seed);
+  const planes = [];
+  const n = 9 + Math.floor(r() * 6);
+  for (let i = 0; i < n; i++) {
+    const v = new THREE.Vector3(r() * 2 - 1, (r() * 2 - 1) * 0.8, r() * 2 - 1).normalize();
+    planes.push([v, 1 - r() * rough * 0.95]);
+  }
+  // верх и низ чуть приплюснуты — камень лежит, а не катится
+  planes.push([new THREE.Vector3(0, 1, 0), 0.8 - r() * 0.12], [new THREE.Vector3(0, -1, 0), 0.72]);
   const ox = r() * 50;
   const oy = r() * 50;
   const v = new THREE.Vector3();
-  // у икосаэдра вершины не общие — мнём по координате, чтобы швы не расходились
   for (let i = 0; i < p.count; i++) {
-    v.fromBufferAttribute(p, i);
-    const n = fbm2(v.x * 1.3 + ox + v.z * 0.7, v.y * 1.3 + oy - v.z * 0.5, 3);
-    const k = 1 + (n - 0.5) * 2 * rough;
-    p.setXYZ(i, v.x * k, v.y * k * 0.85, v.z * k);
+    v.fromBufferAttribute(p, i).normalize();
+    let k = 1.18;
+    for (const [pn, h] of planes) {
+      const d = v.dot(pn);
+      if (d > 0.05) k = Math.min(k, h / d);
+    }
+    k *= 1 + (fbm2(v.x * 2.1 + ox + v.z, v.y * 2.1 + oy - v.z, 2) - 0.5) * 0.07;
+    p.setXYZ(i, v.x * k, v.y * k, v.z * k);
+  }
+  g.computeVertexNormals();
+  return g;
+}
+
+/** Крона: пышный ком из «облачков» — сфера с крупными буграми и общими (мягкими) нормалями. */
+export function blobGeo(seed, detail = 3, bump = 0.2) {
+  let g = new THREE.IcosahedronGeometry(1, detail);
+  g.deleteAttribute('uv');
+  g.deleteAttribute('normal');
+  g = mergeVertices(g, 1e-4);
+  const p = g.attributes.position;
+  const r = rng(seed);
+  // бугры: несколько случайных направлений, вокруг каждого крона выпирает
+  const lumps = [];
+  for (let i = 0; i < 9; i++) lumps.push([new THREE.Vector3(r() * 2 - 1, r() * 1.4 - 0.4, r() * 2 - 1).normalize(), 0.5 + r() * 0.5]);
+  const v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i).normalize();
+    let k = 0;
+    for (const [d, a] of lumps) k = Math.max(k, a * Math.max(0, (v.dot(d) - 0.55) / 0.45));
+    const s = 1 - bump + bump * 2 * (k * k * (3 - 2 * k));
+    p.setXYZ(i, v.x * s, v.y * s, v.z * s);
   }
   g.computeVertexNormals();
   return g;

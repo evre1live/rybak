@@ -6,6 +6,7 @@
 //   3) один проход на экран: сцена + свечение, цвет, виньетка, тональная кривая.
 // Каждый лишний проход во весь экран на таких видеокартах стоит дорого, поэтому он ровно один.
 import * as THREE from 'three';
+import { surfaceU } from './surface.js';
 import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 
 const VERT = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
@@ -68,6 +69,7 @@ export class Gfx {
     const r = this.renderer;
     r.shadowMap.enabled = q !== 'low';
     r.shadowMap.needsUpdate = true;
+    surfaceU.uDetail.value = q === 'low' ? 0 : 1; // на «низком» — без фактуры дерева и камня: экономим выборки из текстур
     this.dropPost();
     this.w = 0;
     this.resize();

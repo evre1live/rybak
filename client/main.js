@@ -1048,7 +1048,14 @@ class Game {
       this.gfx.render(this.scene, cam, this.world.exposure);
       window.__rendered = (window.__rendered || 0) + 1;
     }
-    if (!this.shot && this.state === 'title' && !this.noRender) this.takeShot();
+    if (!this.shot && (this.state === 'title' || this.state === 'lobby') && !this.noRender && (this.shotTries = (this.shotTries || 0) + 1) < 40) {
+      this.takeShot();
+      if (this.shot) {
+        // снимок делался с другой точки — возвращаем кадр на место, чтобы картинка не мигнула
+        this.world.update(0, tw, cam);
+        this.gfx.render(this.scene, cam, this.world.exposure);
+      }
+    }
     i.endFrame();
     window.__frames = (window.__frames || 0) + 1;
     // автоподбор качества: если кадры долгие — упрощаем картинку
@@ -1064,6 +1071,8 @@ class Game {
   }
   /** Картинка бухты для карточки места в лобби — снимаем один раз с готового кадра. */
   takeShot() {
+    // окно ещё не получило размер (страница открыта в фоне) — снимем на следующем кадре
+    if (this.gfx.renderer.domElement.width < 64 || this.gfx.renderer.domElement.height < 64) return;
     const c = document.createElement('canvas');
     c.width = 560;
     c.height = 350;
@@ -1082,8 +1091,9 @@ class Game {
       c.getContext('2d').drawImage(src, (c.width - src.width * k) / 2, (c.height - src.height * k) / 2, src.width * k, src.height * k);
       this.shot = c.toDataURL('image/jpeg', 0.86);
     } catch {
-      this.shot = 'data:,';
+      this.shot = null; // попробуем ещё раз на следующем кадре
     }
+    if (this.shot && this.state === 'lobby') this.ui.rerender();
     cam.position.copy(keep[0]);
     cam.rotation.copy(keep[1]);
     cam.fov = keep[2];

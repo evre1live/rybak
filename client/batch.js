@@ -1,5 +1,6 @@
 // Склейка неподвижных деталей мира в один меш с цветами по вершинам — сотни досок и камней за один вызов отрисовки.
 import * as THREE from 'three';
+import { patchSurface } from './surface.js';
 
 const _v = new THREE.Vector3();
 const _n = new THREE.Vector3();
@@ -9,6 +10,7 @@ const _q = new THREE.Quaternion();
 const _e = new THREE.Euler();
 const _c = new THREE.Color();
 const _c2 = new THREE.Color();
+const _hsl = { h: 0, s: 0, l: 0 };
 
 export function M(x, y, z, sx = 1, sy = sx, sz = sx, rx = 0, ry = 0, rz = 0) {
   _e.set(rx, ry, rz, 'YXZ');
@@ -51,11 +53,18 @@ export class Batch {
     this.pos = [];
     this.nor = [];
     this.col = [];
+    this.mid = []; // номер материала для фактуры (surface.js)
+    this.tex = []; // координаты волокон: x — вдоль длинной стороны детали, в метрах
+    this.mat = 0; // материал по умолчанию для следующих деталей
+    this.auto = false; // подбирать материал по цвету детали
+    this.hasMat = false;
+    this.parts = 0;
   }
   /**
    * opts.grad: [k внизу, k вверху] — затемнение по высоте детали (ложная тень у основания);
    * opts.top: [цвет, порог] — верхние грани красим другим цветом (трава на камнях);
-   * opts.flat: пересчитать нормали по граням.
+   * opts.flat: пересчитать нормали по граням;
+   * opts.mat: материал этой детали (иначе — this.mat).
    */
   add(geo, color, matrix, opts = null) {
     let g = plain.get(geo);
@@ -83,8 +92,36 @@ export class Batch {
       }
     }
     if (opts && opts.top) _c2.set(opts.top[0]);
+    let mat = opts && opts.mat !== undefined ? opts.mat : this.mat;
+    if (this.auto && !mat && !(opts && opts.mat === 0)) {
+      // материал по цвету: коричневое — дерево, светло-песочное — верёвка и холст; крашеное, металл и пластик — гладкие
+      _c.getHSL(_hsl);
+      const deg = _hsl.h * 360;
+      if (deg > 14 && deg < 48 && _hsl.s > 0.2 && _hsl.s < 0.8 && _hsl.l > 0.14 && _hsl.l < 0.72) mat = 1;
+      else if (deg >= 36 && deg < 60 && _hsl.l >= 0.72 && _hsl.l < 0.9 && _hsl.s > 0.3) mat = 5;
+    }
+    // оси детали по убыванию размера: волокна дерева идут вдоль самой длинной
+    let ax = 0;
+    let ay = 1;
+    let az = 2;
+    const e = matrix.elements;
+    const sc = [Math.hypot(e[0], e[1], e[2]), Math.hypot(e[4], e[5], e[6]), Math.hypot(e[8], e[9], e[10])];
+    if (mat === 1 || mat === 5) {
+      const o = [0, 1, 2].sort((a, b) => sc[b] - sc[a]);
+      ax = o[0];
+      ay = o[1];
+      az = o[2];
+    }
+    const off = mat ? ((++this.parts * 0.6180339887) % 1) * 9 : 0;
+    if (mat) this.hasMat = true;
     for (let i = 0; i < p.count; i++) {
       _v.fromBufferAttribute(p, i);
+      if (mat) {
+        const l = [_v.x * sc[0], _v.y * sc[1], _v.z * sc[2]];
+        if (mat === 4) this.tex.push(l[0], l[1], l[2]);
+        else this.tex.push(l[ax] + off, l[ay] + off * 0.37, l[az]);
+      } else this.tex.push(0, 0, 0);
+      this.mid.push(mat);
       let k = 1;
       if (opts && opts.grad) k = opts.grad[0] + ((opts.grad[1] - opts.grad[0]) * (_v.y - y0)) / Math.max(1e-6, y1 - y0);
       _v.applyMatrix4(matrix);
@@ -104,13 +141,17 @@ export class Batch {
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
     g.setAttribute('normal', new THREE.Float32BufferAttribute(this.nor, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
+    if (this.hasMat) {
+      g.setAttribute('aMat', new THREE.Float32BufferAttribute(this.mid, 1));
+      g.setAttribute('aTex', new THREE.Float32BufferAttribute(this.tex, 3));
+    }
     g.computeBoundingSphere();
     const m = new THREE.Mesh(g, material || BATCH_MAT);
     m.castShadow = shadow;
     m.receiveShadow = true;
-    this.pos = this.nor = this.col = null;
+    this.pos = this.nor = this.col = this.mid = this.tex = null;
     return m;
   }
 }
-export const BATCH_MAT = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88, metalness: 0 });
-export const BATCH_MAT_2S = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88, metalness: 0, side: THREE.DoubleSide });
+export const BATCH_MAT = patchSurface(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88, metalness: 0 }));
+export const BATCH_MAT_2S = patchSurface(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88, metalness: 0, side: THREE.DoubleSide }));

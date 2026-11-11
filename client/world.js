@@ -1,9 +1,10 @@
 // Мир «Солнечной бухты»: рельеф, небо, облака, свет по времени суток — и сборка всего остального.
 import * as THREE from 'three';
-import { clamp, lerp, sstep, fbm2, canvasTex, rng, TAU } from './util.js';
+import { clamp, lerp, sstep, fbm2, canvasTex, rng, TAU, isTouch } from './util.js';
 import { groundH, shoreZ, BOUNDS, capeDist, CAPE, ISLAND, islandR, MAP_VIEW, DECKS, LIGHTHOUSE, ARCH } from './terrain.js';
 import { createWater } from './water.js';
 import { buildScenery } from './scenery.js';
+import { patchSurface, surfaceU, detailTexture } from './surface.js';
 
 // ключевые часы суток: цвета неба, солнца, воды
 const K = (h, zen, hor, sun, sunI, hemiS, hemiG, hemiI, fog, wS, wD, cloud, stars, glit, exp) => ({
@@ -105,20 +106,7 @@ function buildTerrain() {
     colors[i * 3 + 2] = c.b;
   }
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  const grain = canvasTex(256, 256, (g, w, h) => {
-    const img = g.createImageData(w, h);
-    const rr = rng(5);
-    for (let i = 0; i < w * h; i++) {
-      const v = 222 + rr() * 33;
-      img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = v;
-      img.data[i * 4 + 3] = 255;
-    }
-    g.putImageData(img, 0, 0);
-    g.globalAlpha = 0.5;
-    g.filter = 'blur(1.2px)';
-    g.drawImage(g.canvas, 0, 0);
-  }, { repeat: true, aniso: 8 });
-  const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96, map: grain }));
+  const m = new THREE.Mesh(geo, patchSurface(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96 }), { terrain: true }));
   m.receiveShadow = true;
   return m;
 }
@@ -191,6 +179,9 @@ export class World {
     scene.add(this.terrain);
     this.water = createWater();
     scene.add(this.water.mesh);
+    // фактура поверхностей и свет на дне — общие для рельефа и всех построек
+    surfaceU.uDet.value = detailTexture(isTouch() ? 512 : 1024);
+    surfaceU.uCaust.value = this.water.uniforms.uCaustic.value;
 
     this.skyU = {
       uZen: { value: new THREE.Color() }, uHor: { value: new THREE.Color() }, uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uSunCol: { value: new THREE.Color() },
@@ -272,6 +263,10 @@ export class World {
     w.uSunCol.value.copy(k.sun);
     w.uFogCol.value.copy(k.fog);
     w.uGlitter.value = k.glit;
+    surfaceU.uSunC.value.copy(k.sun);
+    surfaceU.uWaterS.value.copy(k.wS);
+    surfaceU.uWaterD.value.copy(k.wD);
+    surfaceU.uCaustK.value = k.glit * (dayLight ? 1 : 0.35);
     w.uFogNear.value = this.scene.fog.near;
     w.uFogFar.value = this.scene.fog.far;
     for (const m of this.cloudMat) m.color.copy(k.cloud);
@@ -282,6 +277,7 @@ export class World {
 
   update(dt, t, camera) {
     this.water.uniforms.uTime.value = t;
+    surfaceU.uTimeS.value = t;
     this.skyU.uTime.value = t;
     this.sky.position.copy(camera.position);
     this.sky.scale.setScalar(2500);
