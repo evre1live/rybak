@@ -1,4 +1,5 @@
 // Персонаж: собирается из настроек внешности (телосложение, лицо, волосы, одежда…), анимируется без костей — суставы-группы.
+import { heroTemplate, loadHero, HeroBody } from './hero.js';
 import * as THREE from 'three';
 import { Batch, M, G, BATCH_MAT } from './batch.js';
 import { loft } from './shapes.js';
@@ -42,8 +43,10 @@ export const PRESETS = [
   { name: 'Дождь', look: { ...DEFAULT_LOOK, body: 0, hair: 6, hairC: '#1c1410', hat: 0, glasses: 3, top: 5, topC: '#f6c21c', topC2: '#2a2f3a', bottom: 3, botC: '#4b5563', shoes: 1, shoeC: '#22c55e', gloves: 2, gloveC: '#f97316', pack: 2, packC: '#22c55e', eyes: 2, skin: '#c07f52' } }
 ];
 export function fixLook(l) {
-  const out = { ...DEFAULT_LOOK };
+  const out = { ...DEFAULT_LOOK, hero: '' };
   if (!l || typeof l !== 'object') return out;
+  // герой из готовой модели (пусто — собранный из частей)
+  out.hero = typeof l.hero === 'string' && /^[a-z0-9-]{1,40}$/.test(l.hero) ? l.hero : '';
   for (const k of Object.keys(DEFAULT_LOOK)) {
     const v = l[k];
     if (OPTIONS[k]) out[k] = Number.isInteger(v) && v >= 0 && v < OPTIONS[k].length ? v : DEFAULT_LOOK[k];
@@ -262,6 +265,7 @@ export class Character {
   }
 
   dispose() {
+    this.gone = true;
     this.clear();
     this.faceTex.dispose();
     this.faceMat.dispose();
@@ -269,6 +273,10 @@ export class Character {
   clear() {
     const rodGroup = this.rod ? this.rod.group : null;
     if (rodGroup && rodGroup.parent) rodGroup.parent.remove(rodGroup);
+    if (this.hero) {
+      this.hero.dispose();
+      this.hero = null;
+    }
     this.group.traverse((o) => {
       if (o.isMesh && o.geometry && o.userData.own) o.geometry.dispose();
     });
@@ -487,9 +495,27 @@ export class Character {
     this.group.traverse((o) => {
       if (o.isMesh) o.castShadow = true;
     });
+    if (l.hero) this.useHero(l);
     if (this.rod) J.rod.add(this.rod.group);
     this.redrawFace(true);
     return this;
+  }
+  /** Готовая модель вместо куклы: кукла остаётся невидимым «скелетом», который задаёт позу. */
+  useHero(l) {
+    const tpl = heroTemplate(l.hero);
+    if (!tpl) {
+      // модель ещё грузится — пока показываем куклу, потом перестроимся
+      loadHero(l.hero).then(() => !this.gone && this.look === l && this.setLook(l), () => {});
+      return;
+    }
+    this.root.traverse((o) => {
+      if (o.isMesh) o.visible = false;
+    });
+    const h = (this.hero = new HeroBody(tpl));
+    this.root.add(h.wrap);
+    // удочка — в руку героя
+    h.grip.add(this.j.rod);
+    this.j.rod.position.set(0, 0, 0);
   }
 
   buildHair(B, l) {
@@ -781,9 +807,10 @@ export class Character {
     // варианты стойки в лобби
     if (st.variant && mode !== 'charge' && mode !== 'cast' && !st.emote) {
       if (st.variant === 1) {
-        P.aLx = -1.2;
-        P.aLz = 0.15;
-        P.eL = -1.4;
+        // рука поднята сбоку от лица: «привет» — лицо остаётся открытым под любым углом камеры
+        P.aLx = -0.9;
+        P.aLz = 0.6;
+        P.eL = -1.2;
       } else if (st.variant === 2) {
         P.aLx = 0.25;
         P.aLz = 0.75;
@@ -795,6 +822,7 @@ export class Character {
         P.eL = -0.7 + Math.sin(t * 6) * 0.3;
       }
     }
+    if (st.P) Object.assign(P, st.P); // подбор поз в тестах
     if (st.sit) {
       P.hy = -HIP_Y + (st.dangle ? 0.1 : 0.12);
       P.lRx = P.lLx = -1.52;
@@ -822,6 +850,7 @@ export class Character {
     J.lL.rotation.set(p.lLx, 0, p.lLz);
     J.kL.rotation.x = p.kL;
     J.rod.rotation.x = Math.PI / 2 + p.rod;
+    if (this.hero) this.hero.update(dt, st, J);
     // лицо: моргание и разговор
     this.blinkT -= dt;
     if (this.blinkT <= 0) {

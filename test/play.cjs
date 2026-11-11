@@ -55,15 +55,31 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
   await page.click('.nav [data-p="editor"]');
   await page.waitForSelector('.editor .opts');
   await shot(page, '05-editor', 400);
+  // готовые герои: новичку достаётся один из них, в редакторе можно выбрать другого или собрать своего из частей
+  const heroIds = await G(page, () => fetch('models/manifest.json').then((r) => r.json()).then((m) => m.heroes.filter((h) => !h.npc).map((h) => h.id), () => []));
+  if (heroIds.length) {
+    assert.ok(heroIds.includes(await G(page, () => RYBAK.profile.look.hero)), 'новичок получает готового героя');
+    await page.click('.cats [data-id="presets"]');
+    assert.equal(await page.locator('.hlist button').count(), heroIds.length, 'все герои в списке');
+    const pick = heroIds[heroIds.length - 1];
+    await page.click(`.hlist [data-id="${pick}"]`);
+    await page.waitForFunction((id) => RYBAK.ui.ed.look.hero === id && RYBAK.meChar.hero && RYBAK.meChar.look.hero === id, pick, { timeout: 60000 });
+    assert.ok(await G(page, () => RYBAK.meChar.hero.act.idle && RYBAK.meChar.hero.act.walk && RYBAK.meChar.hero.bones.hR && RYBAK.meChar.j.rod.parent === RYBAK.meChar.hero.grip), 'герой со скелетом, анимациями и удочкой в руке');
+    await shot(page, '05b-editor-hero', 400);
+    await page.click('.cats [data-id="top"]');
+    await page.click('[data-a="nohero"]');
+    await page.waitForFunction(() => RYBAK.ui.ed.look.hero === '' && !RYBAK.meChar.hero);
+  }
   for (const cat of ['presets', 'face', 'hair', 'head', 'top', 'bottom', 'shoes', 'hands', 'back']) {
     await page.click(`.cats [data-id="${cat}"]`);
-    await page.locator('.opts button').nth(1).click();
+    await page.locator(cat === 'presets' ? '.olist button' : '.opts button').nth(1).click();
   }
   await page.click('.cats [data-id="hair"]');
   await page.click('.opts [data-k="hair"][data-id="7"]');
   await shot(page, '06-editor-hair', 300);
   await page.click('[data-a="edsave"]');
   assert.equal(await G(page, () => RYBAK.profile.look.hair), 7);
+  assert.equal(await G(page, () => RYBAK.profile.look.hero), '', 'собранный из частей остаётся собранным');
 
   // на рыбалку
   await page.click('[data-a="start"]');

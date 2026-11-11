@@ -1,6 +1,7 @@
 // РЫБАК — сборка игры: состояния (меню → лобби → рыбалка), главный цикл, связь всех частей.
 import * as THREE from 'three';
 import { Gfx } from './gfx.js';
+import { loadManifest, heroes, fpLook } from './hero.js';
 import { World, drawMinimap } from './world.js';
 import { Character, PRESETS, fixLook } from './character.js';
 import { buildRod, itemModel } from './gear3d.js';
@@ -49,16 +50,19 @@ class Game {
     this.gfx = new Gfx(this.canvas, q.get('q') || (this.auto ? (touch ? 'medium' : 'high') : settings.quality));
     this.world = new World();
     this.scene = this.world.scene;
-    this.camera = new THREE.PerspectiveCamera(settings.fov, 1, 0.07, 3400);
+    this.camera = new THREE.PerspectiveCamera(settings.fov, this.gfx.w / Math.max(1, this.gfx.h), 0.07, 3400);
     this.camera.rotation.order = 'YXZ';
     this.scene.add(this.camera);
     this.input = new Input(this.canvas);
     this.input.touch.on = touch;
     this.player = new Player(this.camera);
     this.vm = new ViewModel(this.camera);
-    this.vm.setLook(this.profile.look);
+    this.vm.setLook(fpLook(this.profile.look));
     this.vm.setVisible(false);
     this.fx = new Fx(this.scene);
+    // мягкий свет от камеры на экране команды и в редакторе: лица не должны тонуть в тени, когда солнце сзади
+    this.fill = new THREE.DirectionalLight('#fff1dc', 0);
+    this.scene.add(this.fill, this.fill.target);
     this.audio = new Audio2();
     // шаги: доски причала, земля, вода по колено
     this.player.onStep = (land) => {
@@ -96,6 +100,23 @@ class Game {
     this.scene.add(this.meChar.group);
     // торговец за прилавком
     this.vendor = new Character(fixLook({ ...PRESETS[4].look, hat: 5, top: 4, topC: '#ef4444', topC2: '#f1efe6', beard: 5, hairC: '#f4ead0', body: 3 }));
+    // герои из готовых моделей: список приходит отдельным файлом; кому герой ещё не показывался — ставим его
+    heroes.onLoad = () => {
+      this.vm.setLook(fpLook(this.profile.look));
+      this.ui.rerender();
+    };
+    loadManifest().then(() => {
+      if (heroes.byId.has('npc-vendor')) this.vendor.setLook({ ...this.vendor.look, hero: 'npc-vendor' });
+      const p = this.profile;
+      if (!heroes.list.length || p.heroSeen) return;
+      p.heroSeen = true;
+      p.look = fixLook({ ...p.look, hero: heroes.list[Math.floor(Math.random() * heroes.list.length)].id });
+      saveProfile(p);
+      this.meChar.setLook(p.look);
+      this.vm.setLook(fpLook(p.look));
+      if (!this.solo && this.net.room) this.net.send({ t: 'card', card: this.card() });
+      this.ui.rerender();
+    });
     this.vendor.group.position.set(-8.35, DECK_Y, 12.9);
     this.vendor.group.rotation.y = Math.PI / 2;
     this.scene.add(this.vendor.group);
@@ -469,7 +490,7 @@ class Game {
   saveLook(look) {
     this.profile.look = look;
     saveProfile(this.profile);
-    this.vm.setLook(look);
+    this.vm.setLook(fpLook(look));
     this.player.eye = 1.62 * look.height;
     this.sendCard();
     this.rosterChanged();
@@ -994,6 +1015,11 @@ class Game {
     if (i.touch.on) this.touchUi();
     // свой персонаж: в лобби и в редакторе
     const showMe = this.state === 'lobby' || !!this.editing;
+    this.fill.intensity = damp(this.fill.intensity, showMe ? (this.world.night > 0.5 ? 0.55 : 1.0) : 0, 6, dt);
+    if (this.fill.intensity > 0.01) {
+      this.fill.position.copy(this.camera.position);
+      this.camera.getWorldDirection(this.fill.target.position).multiplyScalar(6).add(this.camera.position);
+    }
     this.meChar.group.visible = showMe;
     if (showMe) {
       if (this.state === 'lobby') this.meChar.group.position.set(lineX(this.me.slot), DECK_Y, LINE_Z);

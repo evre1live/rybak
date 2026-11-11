@@ -216,21 +216,38 @@ export class Player {
     const cos = Math.cos(this.yaw);
     const vx = (mx * cos - mz * sin) * max;
     const vz = (-mx * sin - mz * cos) * max;
-    const nx = this.x + vx * dt;
-    const nz = this.z + vz * dt;
     let moved = false;
     if (len > 0.01 && !this.sit) {
-      if (canStand(nx, nz)) {
-        this.x = nx;
-        this.z = nz;
-        moved = true;
-      } else if (canStand(nx, this.z)) {
-        this.x = nx;
-        moved = true;
-      } else if (canStand(this.x, nz)) {
-        this.z = nz;
-        moved = true;
+      // шаг целиком; упёрлись — доходим вплотную к краю (деление пополам), остаток шага скользим вдоль преграды.
+      // Так до самого края пирса доходишь при любой частоте кадров, а не останавливаешься за шаг до него.
+      const x0 = this.x;
+      const z0 = this.z;
+      const step = (ax, az) => {
+        if (canStand(this.x + ax, this.z + az)) {
+          this.x += ax;
+          this.z += az;
+          return 1;
+        }
+        let lo = 0;
+        let hi = 1;
+        for (let i = 0; i < 5; i++) {
+          const k = (lo + hi) * 0.5;
+          if (canStand(this.x + ax * k, this.z + az * k)) lo = k;
+          else hi = k;
+        }
+        this.x += ax * lo;
+        this.z += az * lo;
+        return lo;
+      };
+      const dx = vx * dt;
+      const dz = vz * dt;
+      const k = step(dx, dz);
+      if (k < 1) {
+        const r = 1 - k;
+        if (Math.abs(dx) > 1e-6) step(dx * r, 0);
+        if (Math.abs(dz) > 1e-6) step(0, dz * r);
       }
+      moved = Math.hypot(this.x - x0, this.z - z0) > Math.hypot(dx, dz) * 0.2;
     }
     this.speed = damp(this.speed, moved ? Math.hypot(vx, vz) : 0, 12, dt);
     const ground = standY(this.x, this.z);

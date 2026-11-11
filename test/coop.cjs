@@ -45,6 +45,12 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
   await b.waitForFunction(() => RYBAK.state === 'lobby');
   await a.waitForFunction(() => RYBAK.players.size === 1);
   assert.equal(await G(a, () => [...RYBAK.players.values()][0].card.name), 'Нори');
+  // друг с готовым героем: модель догружается и встаёт вместо куклы
+  if (await G(b, () => fetch('models/manifest.json').then((r) => r.json()).then((m) => m.heroes.some((h) => h.id === 'hero-nori'), () => false))) {
+    await G(b, () => { const g = RYBAK; g.profile.look = { ...g.profile.look, hero: 'hero-nori' }; g.meChar.setLook(g.profile.look); g.net.send({ t: 'card', card: g.card() }); });
+    await a.waitForFunction(() => { const r = [...RYBAK.players.values()][0].remote; return r.char.look.hero === 'hero-nori' && !!r.char.hero; }, null, { timeout: 60000 });
+    console.log('  герой друга загружен');
+  }
   assert.equal(await G(b, () => [...RYBAK.players.values()][0].card.name), 'Жамшид');
   assert.match(await a.textContent('.lob-tl'), /2\/8/);
   await a.waitForFunction(() => document.querySelectorAll('.plate').length === 2);

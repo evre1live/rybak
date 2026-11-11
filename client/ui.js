@@ -2,6 +2,7 @@
 import { CATS, ITEMS, FISH, FISH_BY_ID, JUNK_BY_ID, RARITY, ZONES, DAY_PARTS, RODS, MAX_PLAYERS, fmtW, fmtCoins, fmtClock, dayPart, isLure } from '../shared/data.js';
 import { kitStats, rodBars, owns, tackleCount, priceOf, fishValue, coolerValue, levelInfo, fightGrade, T_LOW, T_DANGER } from '../shared/logic.js';
 import { itemIcon, fishIcon, faceIcon } from './icons.js';
+import { heroes } from './hero.js';
 import { OPTIONS, COLOR_KEYS, PRESETS, randomLook, fixLook } from './character.js';
 import { MARKS, markSvg } from './proto.js';
 import { MAP_VIEW, MARKET } from './terrain.js';
@@ -626,8 +627,13 @@ export class UI {
     };
     let body = '';
     if (E.cat === 'presets') {
-      body = `<h3>Готовые образы</h3><div class="olist">${PRESETS.map((p, i) => `<button data-a="preset" data-id="${i}">${esc(p.name)}</button>`).join('')}</div>
+      const hs = heroes.list;
+      body = `${hs.length ? `<h3>Герои</h3><div class="hlist">${hs.map((h) => `<button class="${L.hero === h.id ? 'on' : ''}" data-a="hero" data-id="${h.id}"><img src="${faceIcon(fixLook({ hero: h.id }))}" alt=""><span>${esc(h.name)}</span></button>`).join('')}</div>` : ''}
+        <h3>${hs.length ? 'Собрать своего из частей' : 'Готовые образы'}</h3><div class="olist">${PRESETS.map((p, i) => `<button data-a="preset" data-id="${i}">${esc(p.name)}</button>`).join('')}</div>
         <h3>Или доверьтесь случаю</h3><button class="btn cy sm" data-a="rnd" style="width:100%"><span>СЛУЧАЙНЫЙ РЫБАК</span></button>`;
+    } else if (L.hero) {
+      body = `<h3>Выбран готовый герой</h3><p class="ednote">Телосложение, лицо и одежда настраиваются у персонажа, собранного из частей. Герой — цельная модель.</p>
+        <button class="btn cy sm" data-a="nohero" style="width:100%"><span>СОБРАТЬ СВОЕГО</span></button>`;
     } else {
       for (const [title, key] of GROUPS[E.cat]) {
         body += `<h3>${title}</h3>`;
@@ -781,6 +787,14 @@ export class UI {
         this.ed.look[t.dataset.k] = id;
         g.editLook(this.ed.look);
         return this.renderEditor();
+      case 'hero':
+        this.ed.look = { ...this.ed.look, hero: id };
+        g.editLook(this.ed.look);
+        return this.renderEditor();
+      case 'nohero':
+        this.ed.look = { ...this.ed.look, hero: '' };
+        g.editLook(this.ed.look);
+        return this.renderEditor();
       case 'preset':
         this.ed.look = { ...PRESETS[Number(id)].look };
         g.editLook(this.ed.look);
@@ -838,6 +852,7 @@ export class UI {
     if (this.panel === 'tackle' || this.panel === 'shop') this.renderTackle();
     else if (this.panel === 'sell') this.renderSell();
     else if (this.panel === 'journal') this.renderJournal();
+    else if (this.panel === 'editor') this.renderEditor();
     else if (this.view === 'lobby' && !this.panel) this.showLobby();
   }
 }

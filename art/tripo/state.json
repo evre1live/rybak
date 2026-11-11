@@ -1,0 +1,342 @@
+{
+  "models": {
+    "hero-yellow": {
+      "concepts": [
+        {
+          "task": "22843717-a4a1-4479-b872-2ee622e2d49b",
+          "file": "art/tripo/raw/hero-yellow-concept.jpg",
+          "note": "проба: по тексту, без кепки"
+        },
+        {
+          "task": "be8c202b-5d04-4ee2-850d-484ff32c1777",
+          "file": "art/tripo/raw/hero-yellow-concept2.jpg"
+        }
+      ],
+      "concept": "be8c202b-5d04-4ee2-850d-484ff32c1777",
+      "model": "eb5d8ee1-7f31-4e09-b9a8-a87a5a5f1869",
+      "rig_v25": "17ad855a-1ef9-4d6a-b8a7-3f70a473f744",
+      "rig": "ffec2844-e9db-44c3-bbb6-5cf0d720ceb2",
+      "anims": {
+        "idle": "4bf8be61-90f2-4638-aca4-95a90b9483e4",
+        "walk": "1fab2000-69b8-4d6e-8100-d46397f75bd9",
+        "run": "c17f615d-8bc3-45cb-b681-c23e6bb1d24f"
+      }
+    },
+    "hero-finn": {
+      "concepts": [
+        {
+          "task": "b20beef3-2cdf-440f-a128-d6da9dd7bc7a",
+          "file": "art/tripo/raw/hero-finn-concept1.jpg"
+        }
+      ],
+      "concept": "b20beef3-2cdf-440f-a128-d6da9dd7bc7a",
+      "model": "7a9af10d-48e3-4c70-8156-a3c3d08a8dbb",
+      "rig": "0a565b98-7ab7-4d9d-82db-668c9c3f6d43",
+      "anims": {
+        "idle": "2744c8bd-c7f7-4f00-9e3c-8437a314d332",
+        "walk": "c986d8cc-fbef-4f83-83a3-8b808a794722",
+        "run": "09d43966-795b-477b-a166-5513d815bb40"
+      }
+    },
+    "hero-nori": {
+      "concepts": [
+        {
+          "task": "c8ed6248-6eb9-4c5b-9c66-74cc700e8bdc",
+          "file": "art/tripo/raw/hero-nori-concept1.jpg"
+        }
+      ],
+      "concept": "c8ed6248-6eb9-4c5b-9c66-74cc700e8bdc",
+      "model": "e719c542-0df8-4533-85a3-34ce84a39a4e",
+      "rig": "89fab4e4-503a-4825-96cb-1a5763b9832a",
+      "anims": {
+        "idle": "278525d7-39f2-4aad-b794-448d94219967",
+        "walk": "e2bd55f3-ec38-4f6c-9540-a8ee3bbcedb1",
+        "run": "a906e22f-7c67-4a71-9f84-9be32510a076"
+      }
+    },
+    "hero-pip": {
+      "concepts": [
+        {
+          "task": "c55b65f1-1e01-4da4-80b7-ba66eca3c232",
+          "file": "art/tripo/raw/hero-pip-concept1.jpg"
+        }
+      ],
+      "concept": "c55b65f1-1e01-4da4-80b7-ba66eca3c232",
+      "model": "396a04ab-0c69-4275-8b2a-a0c43dc05a84",
+      "rig": "00bc87a3-101f-40c3-a63a-df6e465e19c9",
+      "anims": {
+        "idle": "9cd89e40-d040-4acf-851a-0bb1d621c665",
+        "walk": "9c3c8195-f319-43cf-bde2-f653a1b7b2b0",
+        "run": "7d0cfe67-07c0-4fec-9d69-7e85268df91a"
+      }
+    },
+    "npc-vendor": {
+      "concepts": [
+        {
+          "task": "c6b9471a-1af1-4d5c-8ddf-b74ae72bc626",
+          "file": "art/tripo/raw/npc-vendor-concept1.jpg"
+        }
+      ],
+      "concept": "c6b9471a-1af1-4d5c-8ddf-b74ae72bc626",
+      "model": "f3395f37-b3fa-4818-b07c-bdd8ad61fde5",
+      "rig": "3c2ca6b7-b590-41e0-86b1-314ea7b13893",
+      "anims": {
+        "idle": "894b8da7-c142-46eb-9a5d-fcd137cffc86"
+      }
+    }
+  },
+  "ledger": [
+    {
+      "at": "2026-11-11T17:57:00.000Z",
+      "label": "hero-yellow образец (проба)",
+      "type": "text_to_image",
+      "task": "22843717-a4a1-4479-b872-2ee622e2d49b",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T18:01:48.586Z",
+      "label": "hero-yellow образец",
+      "type": "text_to_image",
+      "task": "be8c202b-5d04-4ee2-850d-484ff32c1777",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T18:06:11.756Z",
+      "label": "hero-yellow модель",
+      "type": "image_to_model",
+      "task": "eb5d8ee1-7f31-4e09-b9a8-a87a5a5f1869",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-11T18:06:35.221Z",
+      "label": "hero-yellow проверка скелета",
+      "type": "animate_prerigcheck",
+      "task": "4e90976f-df29-4b68-b4ae-12f1f7fb645e",
+      "credits": 0
+    },
+    {
+      "at": "2026-11-11T18:07:20.989Z",
+      "label": "hero-yellow скелет",
+      "type": "animate_rig",
+      "task": "17ad855a-1ef9-4d6a-b8a7-3f70a473f744",
+      "credits": 25
+    },
+    {
+      "at": "2026-11-11T18:08:46.642Z",
+      "label": "hero-yellow проверка скелета",
+      "type": "animate_prerigcheck",
+      "task": "1c4f04e0-3b69-48dc-95f6-b28555835cd1",
+      "credits": 0
+    },
+    {
+      "at": "2026-11-11T18:08:55.748Z",
+      "label": "hero-yellow скелет",
+      "type": "animate_rig",
+      "task": "ffec2844-e9db-44c3-bbb6-5cf0d720ceb2",
+      "credits": 25
+    },
+    {
+      "at": "2026-11-11T18:09:13.435Z",
+      "label": "hero-yellow idle",
+      "type": "animate_retarget",
+      "task": "4bf8be61-90f2-4638-aca4-95a90b9483e4",
+      "credits": 10
+    },
+    {
+      "at": "2026-11-11T18:09:25.577Z",
+      "label": "hero-yellow walk",
+      "type": "animate_retarget",
+      "task": "1fab2000-69b8-4d6e-8100-d46397f75bd9",
+      "credits": 10
+    },
+    {
+      "at": "2026-11-11T18:09:44.706Z",
+      "label": "hero-yellow run",
+      "type": "animate_retarget",
+      "task": "c17f615d-8bc3-45cb-b681-c23e6bb1d24f",
+      "credits": 10
+    },
+    {
+      "at": "2026-11-11T18:19:28.112Z",
+      "label": "hero-finn образец",
+      "type": "text_to_image",
+      "task": "b20beef3-2cdf-440f-a128-d6da9dd7bc7a",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T18:21:48.220Z",
+      "label": "hero-finn модель",
+      "type": "image_to_model",
+      "task": "7a9af10d-48e3-4c70-8156-a3c3d08a8dbb",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-11T18:21:55.327Z",
+      "label": "hero-finn проверка скелета",
+      "type": "animate_prerigcheck",
+      "task": "bf727920-edb9-4e6d-a698-54df41c121d5",
+      "credits": 0
+    },
+    {
+      "at": "2026-11-11T18:22:04.736Z",
+      "label": "hero-finn скелет",
+      "type": "animate_rig",
+      "task": "0a565b98-7ab7-4d9d-82db-668c9c3f6d43",
+      "credits": 25
+    },
+    {
+      "at": "2026-11-11T18:22:15.188Z",
+      "label": "hero-finn idle",
+      "type": "animate_retarget",
+      "task": "2744c8bd-c7f7-4f00-9e3c-8437a314d332",
+      "credits": 10
+    },
+    {
+      "at": "2026-11-11T18:22:34.758Z",
+      "label": "hero-finn walk",
+      "type": "animate_retarget",
+      "task": "c986d8cc-fbef-4f83-83a3-8b808a794722",
+      "credits": 10
+    },
+    {
+      "at": "2026-11-11T18:22:49.908Z",
+      "label": "hero-finn run",
+      "type": "animate_retarget",
+      "task": "09d43966-795b-477b-a166-5513d815bb40",
+      "credits": 10
+    },
+    {
+      "at": "2026-11-11T18:22:57.312Z",
+      "label": "hero-nori образец",
+      "type": "text_to_image",
+      "task": "c8ed6248-6eb9-4c5b-9c66-74cc700e8bdc",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T18:23:03.710Z",
+      "label": "hero-pip образец",
+      "type": "text_to_image",
+      "task": "c55b65f1-1e01-4da4-80b7-ba66eca3c232",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T18:26:23.884Z",
+      "label": "hero-nori модель",
+      "type": "image_to_model",
+      "task": "e719c542-0df8-4533-85a3-34ce84a39a4e",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-11T18:26:30.430Z",
+      "label": "hero-nori проверка скелета",
+      "type": "animate_prerigcheck",
+      "task": "3c7bd5a8-2309-459e-9331-0f0074e936d0",
+      "credits": 0
+    },
+    {
+      "at": "2026-11-11T18:26:43.785Z",
+      "label": "hero-nori скелет",
+      "type": "animate_rig",
+      "task": "89fab4e4-503a-4825-96cb-1a5763b9832a",
+      "credits": 25
+    },
+    {
+      "at": "2026-11-11T18:27:11.648Z",
+      "label": "hero-nori idle",
+      "type": "animate_retarget",
+      "task": "278525d7-39f2-4aad-b794-448d94219967",
+      "credits": 10
+    },
+    {
+      "at": "2026-11-11T18:27:21.708Z",
+      "label": "hero-nori walk",
+      "type": "animate_retarget",
+      "task": "e2bd55f3-ec38-4f6c-9540-a8ee3bbcedb1",
+      "credits": 10
+    },
+    {
+      "at": "2026-11-11T18:27:31.979Z",
+      "label": "hero-nori run",
+      "type": "animate_retarget",
+      "task": "a906e22f-7c67-4a71-9f84-9be32510a076",
+      "credits": 10
+    },
+    {
+      "at": "2026-11-11T18:30:36.670Z",
+      "label": "hero-pip модель",
+      "type": "image_to_model",
+      "task": "396a04ab-0c69-4275-8b2a-a0c43dc05a84",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-11T18:30:43.435Z",
+      "label": "hero-pip проверка скелета",
+      "type": "animate_prerigcheck",
+      "task": "2bd273c6-a301-4d52-bcee-02a097d357e8",
+      "credits": 0
+    },
+    {
+      "at": "2026-11-11T18:31:00.882Z",
+      "label": "hero-pip скелет",
+      "type": "animate_rig",
+      "task": "00bc87a3-101f-40c3-a63a-df6e465e19c9",
+      "credits": 25
+    },
+    {
+      "at": "2026-11-11T18:31:11.133Z",
+      "label": "hero-pip idle",
+      "type": "animate_retarget",
+      "task": "9cd89e40-d040-4acf-851a-0bb1d621c665",
+      "credits": 10
+    },
+    {
+      "at": "2026-11-11T18:31:33.549Z",
+      "label": "hero-pip walk",
+      "type": "animate_retarget",
+      "task": "9c3c8195-f319-43cf-bde2-f653a1b7b2b0",
+      "credits": 10
+    },
+    {
+      "at": "2026-11-11T18:31:43.788Z",
+      "label": "hero-pip run",
+      "type": "animate_retarget",
+      "task": "7d0cfe67-07c0-4fec-9d69-7e85268df91a",
+      "credits": 10
+    },
+    {
+      "at": "2026-11-11T18:32:34.723Z",
+      "label": "npc-vendor образец",
+      "type": "text_to_image",
+      "task": "c6b9471a-1af1-4d5c-8ddf-b74ae72bc626",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-11T18:38:17.630Z",
+      "label": "npc-vendor модель",
+      "type": "image_to_model",
+      "task": "f3395f37-b3fa-4818-b07c-bdd8ad61fde5",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-11T18:38:24.437Z",
+      "label": "npc-vendor проверка скелета",
+      "type": "animate_prerigcheck",
+      "task": "5a0b9453-7ef1-4087-9cb8-d79261e681c7",
+      "credits": 0
+    },
+    {
+      "at": "2026-11-11T18:38:42.155Z",
+      "label": "npc-vendor скелет",
+      "type": "animate_rig",
+      "task": "3c2ca6b7-b590-41e0-86b1-314ea7b13893",
+      "credits": 25
+    },
+    {
+      "at": "2026-11-11T18:38:52.762Z",
+      "label": "npc-vendor idle",
+      "type": "animate_retarget",
+      "task": "894b8da7-c142-46eb-9a5d-fcd137cffc86",
+      "credits": 10
+    }
+  ]
+}

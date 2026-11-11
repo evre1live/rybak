@@ -1,0 +1,91 @@
+{
+  "version": "v3.1-20260211",
+  "rigSpec": "mixamo",
+  "rigVersion": "",
+  "anims": [
+    "idle",
+    "walk",
+    "run"
+  ],
+  "presets": {
+    "idle": "preset:idle",
+    "walk": "preset:walk",
+    "run": "preset:run"
+  },
+  "conceptLead": "Full body character concept for a stylized 3D video game, front view,",
+  "pose": "standing straight in a T-pose with both arms stretched out to the sides, hands closed into relaxed fists with knuckles up, legs slightly apart, feet pointing forward, nothing in the hands",
+  "style": "Fortnite-like art style, clean smooth shapes, slightly exaggerated proportions, detailed fishing gear, hand-painted textures, soft matte materials",
+  "concept": "Plain light grey background, even studio lighting, no cast shadows, no props, no text",
+  "negative": "text, letters, logo, watermark, ground plane, pedestal, blurry texture, low detail",
+  "models": [
+    {
+      "id": "hero-yellow",
+      "group": "hero",
+      "name": "Санни",
+      "faces": 60000,
+      "prompt": "A cheerful young fisherman with curly brown hair, wearing a navy baseball cap with a yellow brim and yellow goggles strapped on top, a yellow hooded jacket with dark zip-up fishing vest panels, a navy backpack with yellow straps, black fingerless gloves with yellow knuckle pads, a leather belt, dark grey cargo trousers with thigh pockets and knee pads, yellow work boots with black soles",
+      "fp": {
+        "sleeve": "#f2c22e",
+        "sleeve2": "#2c313c",
+        "glove": "#23262d",
+        "skin": "#f1b88c"
+      }
+    },
+    {
+      "id": "hero-finn",
+      "group": "hero",
+      "name": "Финн",
+      "faces": 60000,
+      "prompt": "A laughing young angler with curly brown hair, wearing a navy baseball cap with a yellow brim and teal goggles on top, a teal short-sleeved jacket over a white long-sleeved shirt, grey backpack straps, a smartwatch, tan cargo shorts with pockets, a belt with a teal pouch, white socks, grey hiking boots with teal laces",
+      "fp": {
+        "bare": true,
+        "skin": "#eeb088"
+      }
+    },
+    {
+      "id": "hero-nori",
+      "group": "hero",
+      "name": "Нори",
+      "faces": 60000,
+      "prompt": "A smiling young woman angler with long pink hair, wearing a pink baseball cap, a white long-sleeved shirt under a yellow-olive fishing vest with many pockets, black gloves with yellow pads, dark grey cargo trousers rolled at the ankle, a pink pouch on the belt, grey boots with yellow laces",
+      "fp": {
+        "bare": true,
+        "glove": "#26272c",
+        "skin": "#f3bd98"
+      }
+    },
+    {
+      "id": "hero-pip",
+      "group": "hero",
+      "name": "Пип",
+      "faces": 60000,
+      "prompt": "A stocky cheerful fisherman with a thick dark beard, wearing a blue bucket hat, a purple hoodie with white sleeves under an olive fishing vest with purple pockets, khaki cargo shorts, a purple pouch on the belt, grey boots with purple laces",
+      "fp": {
+        "bare": true,
+        "skin": "#e3a67c"
+      }
+    },
+    {
+      "id": "hero-captain",
+      "group": "hero",
+      "name": "Капитан",
+      "faces": 60000,
+      "prompt": "An old sea captain with a white beard and a weathered kind face, wearing a navy captain's cap, a navy cable-knit sweater, dark trousers with a wide belt and sturdy brown boots"
+    },
+    {
+      "id": "hero-rain",
+      "group": "hero",
+      "name": "Дождь",
+      "faces": 60000,
+      "prompt": "A young woman angler with a short dark bob haircut, wearing a turquoise windbreaker with the hood down, grey leggings, a small waist bag and yellow rain boots"
+    },
+    {
+      "id": "npc-vendor",
+      "group": "hero",
+      "npc": true,
+      "name": "Скупщик",
+      "faces": 60000,
+      "prompt": "A jolly old fishmonger with a big bushy white beard and rosy cheeks, wearing a navy captain's cap, a red and white striped sailor shirt with rolled-up sleeves, a long brown leather apron over a round belly, dark trousers and tall dark green rubber boots"
+    }
+  ]
+}

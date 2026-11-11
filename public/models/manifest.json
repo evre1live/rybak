@@ -1,0 +1,83 @@
+{
+  "heroes": [
+    {
+      "id": "hero-yellow",
+      "name": "Санни",
+      "file": "models/hero-yellow.glb",
+      "tris": 30000,
+      "kb": 880,
+      "clips": [
+        "idle",
+        "run",
+        "walk"
+      ],
+      "fp": {
+        "sleeve": "#f2c22e",
+        "sleeve2": "#2c313c",
+        "glove": "#23262d",
+        "skin": "#f1b88c"
+      }
+    },
+    {
+      "id": "hero-finn",
+      "name": "Финн",
+      "file": "models/hero-finn.glb",
+      "tris": 30000,
+      "kb": 970,
+      "clips": [
+        "idle",
+        "run",
+        "walk"
+      ],
+      "fp": {
+        "bare": true,
+        "skin": "#eeb088"
+      }
+    },
+    {
+      "id": "hero-nori",
+      "name": "Нори",
+      "file": "models/hero-nori.glb",
+      "tris": 30000,
+      "kb": 851,
+      "clips": [
+        "idle",
+        "run",
+        "walk"
+      ],
+      "fp": {
+        "bare": true,
+        "glove": "#26272c",
+        "skin": "#f3bd98"
+      }
+    },
+    {
+      "id": "hero-pip",
+      "name": "Пип",
+      "file": "models/hero-pip.glb",
+      "tris": 29999,
+      "kb": 884,
+      "clips": [
+        "idle",
+        "run",
+        "walk"
+      ],
+      "fp": {
+        "bare": true,
+        "skin": "#e3a67c"
+      }
+    },
+    {
+      "id": "npc-vendor",
+      "name": "Скупщик",
+      "file": "models/npc-vendor.glb",
+      "tris": 29996,
+      "kb": 821,
+      "clips": [
+        "idle"
+      ],
+      "npc": true
+    }
+  ],
+  "props": {}
+}

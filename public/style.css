@@ -377,3 +377,8 @@ body.touch #prompt{top:auto;bottom:26%}
 #rotate svg{color:#fff;width:6em;height:6em}
 @media (orientation:portrait) and (pointer:coarse) and (max-width:620px){body.touch:not(.anyway) #rotate{display:flex}}
 @media (max-aspect-ratio:1/1){body.touch .hud-tr{top:5.4em}body.touch .mapbox{width:9em;height:9em}#tR,#tSit{right:4%;bottom:calc(9% + 8.2em)}#tE{right:4%;bottom:calc(9% + 11.7em)}.hud-tc{display:none}.panel{grid-template-columns:1fr;grid-template-rows:auto auto 38% 1fr auto}.detail,.sellside{grid-column:1;grid-row:4}.lcard{width:19em}.editor{grid-template-columns:9em 1fr;grid-template-rows:auto 1fr 40% auto}.opts{grid-column:1/-1;grid-row:3}.edhint{display:none}}
+.hlist{display:grid;grid-template-columns:repeat(3,1fr);gap:.6em;margin-bottom:.4em}
+.hlist button{display:flex;flex-direction:column;align-items:center;gap:.25em;padding:.4em .3em .5em;border-radius:.8em;background:rgba(9,22,44,.85);border:.14em solid rgba(60,140,220,.45);color:#fff;font-family:var(--disp);font-weight:800;font-style:italic;text-transform:uppercase;font-size:1.05em}
+.hlist button img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:.55em;background:linear-gradient(180deg,#2a67c9,#123a78)}
+.hlist button.on{border-color:var(--ye);box-shadow:0 0 0 .12em var(--ye)}
+.ednote{font-size:.98em;line-height:1.45;color:#cfe3ff;margin:.2em 0 .9em}

@@ -1,4 +1,5 @@
 // Иконки предметов, рыб и портреты игроков: маленький отдельный рендерер рисует 3D-модель в картинку.
+import { heroTemplate, loadHero } from './hero.js';
 import * as THREE from 'three';
 import { itemModel } from './gear3d.js';
 import { buildFish } from './fish3d.js';
@@ -89,6 +90,9 @@ export function fishIcon(sp) {
 }
 /** Портрет игрока для списка друзей. */
 export function faceIcon(look) {
+  // портрет героя снимаем, когда его модель загрузилась; до тех пор — кукла, и в запас она не кладётся
+  const heroReady = !look.hero || !!heroTemplate(look.hero);
+  if (!heroReady) loadHero(look.hero).catch(() => {});
   const key = 'p:' + JSON.stringify(look);
   if (cache.has(key)) return cache.get(key);
   setup();
@@ -101,6 +105,6 @@ export function faceIcon(look) {
   const url = shoot(c.group, persp);
   c.dispose();
   if (cache.size > 400) cache.clear();
-  cache.set(key, url);
+  if (heroReady) cache.set(key, url);
   return url;
 }
