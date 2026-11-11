@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { Gfx } from './gfx.js';
 import { loadManifest, heroes, fpLook } from './hero.js';
 import { loadModel, modelInfo } from './models.js';
+import { setEnvLight } from './env.js';
 import { adopt } from './fish3d.js';
 import { modelShot } from './icons.js';
 import { World, drawMinimap } from './world.js';
@@ -667,6 +668,12 @@ class Game {
         a.catch(f ? f.rar : 0);
         ui.catchCard(d);
         this.rumble(300, 0.5);
+        {
+          // чем реже рыба, тем заметнее момент: встряска камеры и цветная вспышка
+          const rar = f ? f.rar : c.sp === 'chest' ? 4 : 0;
+          this.player.shake = Math.max(this.player.shake, 0.35 + rar * 0.28);
+          if (rar >= 2) ui.flash(RARITY[rar].color);
+        }
         return this.ev('catch', { sp: c.sp, w: c.w, len: c.len, trophy: c.trophy });
       }
       case 'kept': {
@@ -933,6 +940,8 @@ class Game {
     const T = this.nowSec();
     this.hours = this.fixedHour != null ? this.fixedHour : this.state === 'title' ? 10.5 + Math.sin(T * 0.01) : clockHours(T, 8);
     this.world.setClock(this.hours);
+    this.fx.setLight(1 - this.world.night); // ночью брызги и пена не светятся белым
+    setEnvLight(0.22 + 0.78 * (1 - this.world.night));
     this.audio.night = this.world.night;
     const tw = this.state === 'title' ? now / 1000 : T;
     const cam = this.camera;

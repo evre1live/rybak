@@ -848,6 +848,14 @@ export class UI {
     } else if (this.panel === 'help' || this.panel === 'settings') this.closePanel();
   }
   /** Перерисовать открытую панель после покупки, продажи и т. п. */
+  /** Короткая цветная вспышка по экрану — редкий улов. */
+  flash(color) {
+    const d = document.createElement('div');
+    d.className = 'flash';
+    d.style.background = `radial-gradient(circle at 38% 56%, ${color}88, ${color}22 45%, transparent 72%)`;
+    $('#ui').appendChild(d);
+    setTimeout(() => d.remove(), 800);
+  }
   rerender() {
     if (this.panel === 'tackle' || this.panel === 'shop') this.renderTackle();
     else if (this.panel === 'sell') this.renderSell();

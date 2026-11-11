@@ -382,3 +382,6 @@ body.touch #prompt{top:auto;bottom:26%}
 .hlist button img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:.55em;background:linear-gradient(180deg,#2a67c9,#123a78)}
 .hlist button.on{border-color:var(--ye);box-shadow:0 0 0 .12em var(--ye)}
 .ednote{font-size:.98em;line-height:1.45;color:#cfe3ff;margin:.2em 0 .9em}
+
+.flash{position:absolute;inset:0;pointer-events:none;z-index:3;animation:flash .75s ease-out forwards}
+@keyframes flash{0%{opacity:0}10%{opacity:1}100%{opacity:0}}

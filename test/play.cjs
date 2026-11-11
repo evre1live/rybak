@@ -221,9 +221,13 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
       await mp.click('[data-a="start"]');
       await mp.waitForFunction(() => RYBAK.state === 'world');
       await mp.waitForFunction(() => { const st = RYBAK.world.scenery.propsState(); return !st.fallback && st.placed >= 20 && st.floaters >= 5; }, null, { timeout: 120000 });
+      // руки от первого лица — руки героя
+      await mp.waitForFunction(() => RYBAK.vm.arms && RYBAK.vm.arms.b.hR && RYBAK.vm.hands.every((h) => !h.visible), null, { timeout: 60000 });
       for (const sp of ['okun', 'skat', 'chest']) {
         await G(mp, (sp) => { RYBAK.ui.closePanel(); RYBAK.fishing.showCatch(sp, 0.5); }, sp);
         await mp.waitForFunction((id) => RYBAK.fishing.fish && (RYBAK.fishing.fish.userData.model === id || (RYBAK.fishing.fish.children[0] && RYBAK.fishing.fish.children[0].userData.model === id) || RYBAK.fishing.fish.userData.model === id), (sp === 'chest' ? 'junk-' : 'fish-') + sp, { timeout: 60000 });
+        // рыба долетает до рук, за ней загорается сияние
+        await mp.waitForFunction(() => !RYBAK.fishing.fly && RYBAK.fishing.fish.parent === RYBAK.vm.fishSlot && RYBAK.vm.auraMesh.visible, null, { timeout: 30000 });
         if (sp === 'okun') await shot(mp, '22-model-fish', 400);
         await G(mp, () => RYBAK.fishing.finish(false));
       }

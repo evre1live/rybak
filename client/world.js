@@ -113,7 +113,7 @@ function buildTerrain() {
 
 const SKY_VERT = /* glsl */ `varying vec3 vDir; void main(){ vDir = position; vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position = p.xyww; }`;
 const SKY_FRAG = /* glsl */ `
-uniform vec3 uZen, uHor, uSunDir, uSunCol, uMoonDir; uniform float uStars, uTime; varying vec3 vDir;
+uniform vec3 uZen, uHor, uSunDir, uSunCol, uMoonDir; uniform float uStars, uTime; uniform sampler2D uDet; varying vec3 vDir;
 float hash(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
 void main(){
   vec3 d = normalize(vDir);
@@ -123,6 +123,15 @@ void main(){
   float sd = max(dot(d, uSunDir), 0.0);
   float up = smoothstep(-0.06, 0.03, uSunDir.y);
   c += uSunCol * (smoothstep(0.9994, 0.9997, sd) * 9.0 + pow(sd, 220.0) * 0.9 + pow(sd, 9.0) * 0.16) * up;
+  // перистые облака высоко в небе: тонкие вытянутые полосы, подсвеченные у солнца
+  if (d.y > 0.02) {
+    vec2 cu = d.xz / (d.y + 0.18);
+    float w1 = texture2D(uDet, cu * vec2(0.05, 0.11) + uTime * vec2(0.0011, 0.0004)).r;
+    float w2 = texture2D(uDet, cu * vec2(0.13, 0.31) - uTime * vec2(0.0007, 0.0002)).a;
+    float cir = smoothstep(0.5, 0.78, w1 * 0.62 + w2 * 0.5) * smoothstep(0.02, 0.3, d.y) * (0.5 + 0.5 * w2);
+    vec3 cc = mix(uHor, vec3(1.0), 0.75) + uSunCol * pow(sd, 6.0) * 0.5 * up;
+    c = mix(c, cc, cir * 0.42 * (1.0 - 0.75 * uStars));
+  }
   float md = max(dot(d, uMoonDir), 0.0);
   c += vec3(0.85, 0.9, 1.0) * (smoothstep(0.9990, 0.9993, md) * 1.6 + pow(md, 60.0) * 0.12) * uStars;
   vec3 gp = d * 330.0; vec3 g = floor(gp);
@@ -134,39 +143,67 @@ void main(){
   #include <colorspace_fragment>
 }`;
 
+/**
+ * Кучевое облако с объёмом: купол из шаров, свет слева-сверху, холодная тень снизу, плоское дно.
+ * Высота купола считается в массив, из неё — нормали и свет; так облако выглядит лепным, а не плоским пятном.
+ */
 function cloudTexture(seed) {
-  return canvasTex(512, 256, (g, w, h) => {
+  const W = 512;
+  const H = 256;
+  return canvasTex(W, H, (g) => {
     const r = rng(seed);
+    const base = H - 52;
     const puffs = [];
-    const n = 9 + Math.floor(r() * 5);
+    const n = 15 + Math.floor(r() * 9);
     for (let i = 0; i < n; i++) {
-      const t = i / (n - 1);
-      const x = 70 + t * (w - 140) + (r() - 0.5) * 40;
-      const rad = 34 + Math.sin(t * Math.PI) * 44 * (0.6 + r() * 0.6) + r() * 12;
-      puffs.push([x, h - 62 - rad * 0.55 - r() * 16, rad]);
+      const t = r();
+      const k = Math.sin(t * Math.PI);
+      const rad = 22 + k * (28 + r() * 36) + r() * 10;
+      puffs.push([70 + t * (W - 140), base - rad * (0.3 + r() * 0.5) - k * r() * 50, rad]);
     }
-    const layer = (dy, color, grow) => {
-      g.fillStyle = color;
-      g.beginPath();
-      for (const [x, y, rad] of puffs) {
-        g.moveTo(x + rad + grow, y + dy);
-        g.arc(x, y + dy, rad + grow, 0, TAU);
+    const hf = new Float32Array(W * H);
+    for (const [px, py, pr] of puffs) {
+      const x0 = Math.max(0, Math.floor(px - pr));
+      const x1 = Math.min(W - 1, Math.ceil(px + pr));
+      const y0 = Math.max(0, Math.floor(py - pr));
+      const y1 = Math.min(base, Math.ceil(py + pr));
+      for (let y = y0; y <= y1; y++)
+        for (let x = x0; x <= x1; x++) {
+          const q = pr * pr - (x - px) * (x - px) - (y - py) * (y - py);
+          if (q <= 0) continue;
+          const v = Math.sqrt(q) * (0.9 + 0.2 * fbm2(x * 0.045 + seed, y * 0.045, 2));
+          if (v > hf[y * W + x]) hf[y * W + x] = v;
+        }
+    }
+    const img = g.createImageData(W, H);
+    const d = img.data;
+    for (let y = 2; y < H - 2; y++)
+      for (let x = 2; x < W - 2; x++) {
+        const h = hf[y * W + x];
+        if (h <= 0) continue;
+        let nx = -(hf[y * W + x + 2] - hf[y * W + x - 2]) / 4;
+        let ny = -(hf[(y + 2) * W + x] - hf[(y - 2) * W + x]) / 4;
+        const l = Math.hypot(nx, ny, 1);
+        nx /= l;
+        ny /= l;
+        const lit = clamp(nx * -0.5 + ny * -0.66 + 0.56 / l, 0, 1);
+        const up = clamp((base - y) / 80, 0, 1);
+        const v = (0.42 + 0.58 * lit) * (0.66 + 0.34 * up);
+        const k4 = (y * W + x) * 4;
+        // свет — чуть тёплый белый, тень — голубовато-серая
+        d[k4] = 255 * (0.56 + 0.44 * v);
+        d[k4 + 1] = 255 * (0.64 + 0.36 * v);
+        d[k4 + 2] = 255 * (0.78 + 0.22 * v);
+        d[k4 + 3] = 255 * clamp(h / 9, 0, 1) * clamp((base - y) / 6, 0, 1);
       }
-      g.rect(80, h - 88 + dy, w - 160, 30);
-      g.fill();
-    };
-    g.filter = 'blur(5px)';
-    layer(10, '#b9cdea', 2);
-    g.filter = 'blur(3px)';
-    layer(0, '#ffffff', 0);
-    // плоское мягкое дно
-    const fade = g.createLinearGradient(0, h - 70, 0, h - 40);
-    fade.addColorStop(0, 'rgba(0,0,0,0)');
-    fade.addColorStop(1, 'rgba(0,0,0,1)');
-    g.globalCompositeOperation = 'destination-out';
+    g.putImageData(img, 0, 0);
+    // лёгкая дымка по краям: тот же рисунок, размытый, под низ
+    g.globalCompositeOperation = 'destination-over';
+    g.globalAlpha = 0.55;
+    g.filter = 'blur(7px)';
+    g.drawImage(g.canvas, 0, 0);
     g.filter = 'none';
-    g.fillStyle = fade;
-    g.fillRect(0, h - 70, w, 70);
+    g.globalAlpha = 1;
     g.globalCompositeOperation = 'source-over';
   });
 }
@@ -185,7 +222,7 @@ export class World {
 
     this.skyU = {
       uZen: { value: new THREE.Color() }, uHor: { value: new THREE.Color() }, uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uSunCol: { value: new THREE.Color() },
-      uMoonDir: { value: MOON.clone() }, uStars: { value: 0 }, uTime: { value: 0 }
+      uMoonDir: { value: MOON.clone() }, uStars: { value: 0 }, uTime: { value: 0 }, uDet: surfaceU.uDet
     };
     const sky = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16), new THREE.ShaderMaterial({ uniforms: this.skyU, vertexShader: SKY_VERT, fragmentShader: SKY_FRAG, side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false }));
     sky.frustumCulled = false;
@@ -193,23 +230,32 @@ export class World {
     scene.add(sky);
     this.sky = sky;
 
+    // облака в два кольца: ближние крупные и дальние у горизонта, плывут с разной скоростью
     this.clouds = new THREE.Group();
+    this.cloudsFar = new THREE.Group();
     this.cloudMat = [];
+    this.cloudList = [];
     const cr = rng(77);
-    const texs = [cloudTexture(1), cloudTexture(2), cloudTexture(3), cloudTexture(4)];
-    for (let i = 0; i < 16; i++) {
-      const mat = new THREE.MeshBasicMaterial({ map: texs[i % texs.length], transparent: true, depthWrite: false, fog: false, opacity: 0.96 });
-      const a = (i / 16) * TAU + cr() * 0.3;
-      const dist = 900 + cr() * 500;
-      const w = 420 + cr() * 420;
+    const texs = [1, 2, 3, 4, 5].map((n) => cloudTexture(n));
+    const N1 = 9;
+    const N2 = 12;
+    for (let i = 0; i < N1 + N2; i++) {
+      const far = i >= N1;
+      const map = texs[i % texs.length].clone(); // у каждого облака свой разворот рисунка: свет — со стороны солнца
+      map.needsUpdate = true;
+      const mat = new THREE.MeshBasicMaterial({ map, transparent: true, depthWrite: false, fog: false, opacity: far ? 0.9 : 0.97 });
+      const a = (i / (far ? N2 : N1)) * TAU + cr() * 0.4;
+      const dist = far ? 1500 + cr() * 300 : 820 + cr() * 420;
+      const w = far ? 300 + cr() * 260 : 400 + cr() * 380;
       const m = new THREE.Mesh(new THREE.PlaneGeometry(w, w * 0.5), mat);
-      m.position.set(Math.cos(a) * dist, 150 + cr() * 330, Math.sin(a) * dist);
+      m.position.set(Math.cos(a) * dist, far ? 100 + cr() * 110 : 200 + cr() * 330, Math.sin(a) * dist);
       m.lookAt(0, m.position.y * 0.35, 0);
-      m.renderOrder = -5;
-      this.clouds.add(m);
+      m.renderOrder = far ? -6 : -5;
+      (far ? this.cloudsFar : this.clouds).add(m);
       this.cloudMat.push(mat);
+      this.cloudList.push(m);
     }
-    scene.add(this.clouds);
+    scene.add(this.cloudsFar, this.clouds);
 
     this.hemi = new THREE.HemisphereLight('#d6ecff', '#c4a873', 1);
     scene.add(this.hemi);
@@ -271,6 +317,16 @@ export class World {
     w.uFogNear.value = this.scene.fog.near;
     w.uFogFar.value = this.scene.fog.far;
     for (const m of this.cloudMat) m.color.copy(k.cloud);
+    // рисунок облака отражаем так, чтобы светлый бок смотрел на солнце (или луну)
+    for (const c of this.cloudList) {
+      c.updateWorldMatrix(true, false);
+      const e = c.matrixWorld.elements; // первый столбец — «вправо» у облака
+      const flip = e[0] * dir.x + e[2] * dir.z > 0;
+      const map = c.material.map;
+      map.repeat.x = flip ? -1 : 1;
+      map.offset.x = flip ? 1 : 0;
+    }
+    surfaceU.uCloudK.value = dayLight ? 1 : 0.35;
     this.night = clamp(k.stars * 1.15, 0, 1);
     this.exposure = k.exp;
     this.scenery.setNight(this.night, 1 - this.night);
@@ -282,8 +338,10 @@ export class World {
     this.skyU.uTime.value = t;
     this.sky.position.copy(camera.position);
     this.sky.scale.setScalar(2500);
-    this.clouds.rotation.y = t * 0.0016;
+    this.clouds.rotation.y = t * 0.0019;
     this.clouds.position.set(camera.position.x, 0, camera.position.z);
+    this.cloudsFar.rotation.y = t * 0.0008;
+    this.cloudsFar.position.set(camera.position.x, 0, camera.position.z);
     // тени следуют за игроком, шагом в 2 метра — чтобы не «плыли»
     const tx = Math.round(camera.position.x / 2) * 2;
     const tz = Math.round((camera.position.z - 8) / 2) * 2;

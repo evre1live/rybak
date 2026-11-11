@@ -7,11 +7,11 @@ import { shade, damp, clamp } from './util.js';
 import { heroTemplate } from './hero.js';
 import { FpArms } from './fparms.js';
 
-const GRIP = new THREE.Vector3(0.2, -0.275, -0.5);
-const GRIP_HERO = new THREE.Vector3(0.17, -0.105, -0.55); // с руками героя кисть лежит на катушкодержателе — поднимаем всё повыше, чтобы катушка была в кадре
+const GRIP_HERO = new THREE.Vector3(0.17, -0.105, -0.55); // где в кадре катушкодержатель: катушка и обе кисти видны, середина экрана свободна
 const ELBOW_R = new THREE.Vector3(0.44, -0.7, -0.08);
 const ELBOW_L = new THREE.Vector3(-0.16, -0.72, -0.1);
-const WRIST_R = new THREE.Vector3(-0.058, 0.135, 0.012);
+const HAND_DY = -0.245; // процедурная кисть тоже держит заднюю рукоять, под катушкой
+const WRIST_R = new THREE.Vector3(-0.058, 0.135 + HAND_DY, 0.012);
 const GRIP_Y = -0.1; // где на рукояти лежит правый кулак: на задней рукояти, сразу под катушкой
 const ROLL = 0.8; // удилище довёрнуто вокруг своей оси: катушка видна слева от кисти, как на макете
 const qr = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), ROLL);
@@ -28,6 +28,35 @@ const v3 = new THREE.Vector3();
 // левая рука героя: локоть (x, y, z), куда смотрит тыл кисти (x, y, z), на сколько пальцы дальше середины кулака
 const LEFT = [-0.42, -0.62, -0.12, 0.1, 0.35, 1, 0.05];
 
+// Сияние за пойманной рыбой: мягкое свечение, вращающиеся лучи, искры и расходящееся кольцо. Цвет и сила — по редкости.
+const AURA_FRAG = /* glsl */ `
+uniform vec3 uCol;
+uniform float uK, uRays, uT, uPulse;
+varying vec2 vUv;
+float h21(vec2 p) { vec3 q = fract(vec3(p.xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
+void main() {
+  vec2 q = vUv * 2.0 - 1.0;
+  float r = length(q);
+  float a = atan(q.y, q.x);
+  float glow = exp(-r * 4.6) * 0.5 + exp(-r * 11.0) * 0.5;
+  // два слоя лучей, вращаются навстречу
+  float r1 = pow(abs(sin(a * 7.0 + uT * 0.5)), 6.0);
+  float r2 = pow(abs(sin(a * 11.0 - uT * 0.33 + 1.3)), 10.0);
+  float rays = (r1 * 0.7 + r2 * 0.5) * smoothstep(1.0, 0.15, r) * smoothstep(0.02, 0.3, r) * uRays;
+  // кольцо-вспышка в момент, когда рыба оказалась в руках
+  float ring = smoothstep(0.09, 0.0, abs(r - uPulse * 0.95)) * (1.0 - uPulse) * 1.6;
+  // искры: редкие мерцающие точки
+  vec2 g = q * 9.0;
+  vec2 id = floor(g);
+  float rnd = h21(id);
+  float tw = pow(max(0.0, sin(uT * (2.0 + rnd * 3.0) + rnd * 40.0)), 8.0);
+  float sp = step(0.72, rnd) * smoothstep(0.34, 0.0, length(fract(g) - 0.5 - (vec2(h21(id + 3.1), h21(id + 7.7)) - 0.5) * 0.5)) * tw * smoothstep(1.0, 0.3, r) * (0.4 + uRays);
+  float v = (glow * 0.42 + rays * 0.62 + ring + sp * 1.5) * uK;
+  gl_FragColor = vec4(mix(uCol, vec3(1.0), clamp(glow * 0.35 + sp, 0.0, 0.8)) * v, v * 0.6);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}`;
+
 export class ViewModel {
   constructor(camera) {
     this.camera = camera;
@@ -38,6 +67,24 @@ export class ViewModel {
     this.fishSlot = new THREE.Group();
     this.fishSlot.position.set(-0.2, -0.1, -0.78);
     this.root.add(this.fishSlot);
+    this.auraU = { uCol: { value: new THREE.Color('#ffffff') }, uK: { value: 0 }, uRays: { value: 0 }, uT: { value: 0 }, uPulse: { value: 1 } };
+    this.auraMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.7, 1.7),
+      new THREE.ShaderMaterial({
+        uniforms: this.auraU,
+        vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+        fragmentShader: AURA_FRAG,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        premultipliedAlpha: true
+      })
+    );
+    this.auraMesh.position.set(0, 0.02, -0.35);
+    this.auraMesh.renderOrder = 5;
+    this.auraMesh.visible = false;
+    this.fishSlot.add(this.auraMesh);
+    this.auraK = 0;
     this.rod = null;
     this.hands = [];
     this.arms = null; // руки готового героя (fparms.js)
@@ -50,6 +97,18 @@ export class ViewModel {
   }
   setVisible(v) {
     this.root.visible = v;
+  }
+  /** Сияние за уловом. color: цвет редкости, power: 0 — обычная рыба … 4 — легендарная; null — погасить. */
+  setAura(color, power = 0) {
+    if (!color) {
+      this.auraK = 0;
+      return;
+    }
+    this.auraU.uCol.value.set(color);
+    this.auraK = [0.34, 0.55, 0.78, 1.0, 1.3][power] ?? 0.34;
+    this.auraU.uRays.value = [0, 0.3, 0.6, 0.85, 1.1][power] ?? 0;
+    this.auraU.uPulse.value = 0;
+    this.auraMesh.visible = true;
   }
 
   setLook(look) {
@@ -82,7 +141,7 @@ export class ViewModel {
     R.add(G.sph(10, 8), cBack, M(-0.026, 0.2, -0.028, 0.044, 0.064, 0.04));
     R.add(G.sph(10, 8), cTip, M(-0.004, 0.232, -0.03, 0.031, 0.062, 0.03, 0.25, 0, 0));
     if (gl) R.add(G.box(), shade(look.gloveC, 0.45), M(-0.066, 0.186, -0.02, 0.01, 0.06, 0.04, 0, 0, 0.1));
-    add(this.pivot, R);
+    add(this.pivot, R).position.y = HAND_DY;
     // предплечья: от запястья к локтю за кадром
     const fore = (color, cuff) => {
       const B = new Batch();
@@ -134,6 +193,13 @@ export class ViewModel {
   update(dt, st) {
     if (!this.rod || !this.handL) return;
     this.t += dt;
+    if (this.auraMesh.visible) {
+      const u = this.auraU;
+      u.uT.value += dt;
+      u.uPulse.value = Math.min(1, u.uPulse.value + dt * 1.7);
+      u.uK.value = damp(u.uK.value, this.auraK, this.auraK ? 9 : 7, dt);
+      if (!this.auraK && u.uK.value < 0.01) this.auraMesh.visible = false;
+    }
     const t = this.t;
     const P = { th: 54, be: 0.24, ox: 0, oy: 0, oz: 0, bend: 0.04, side: 0 };
     let fast = false;
@@ -173,11 +239,9 @@ export class ViewModel {
         P.oy = 0.03 + T * 0.02;
         P.bend = 0.28 + 0.72 * T;
         P.side = -(st.steer || 0) * 0.6 - (st.pull || 0) * 0.5;
-        if (this.arms) {
-          // руки героя крупнее процедурных: при вываживании опускаем их, чтобы середина экрана оставалась свободной
-          P.ox += 0.05;
-          P.oy -= 0.075;
-        }
+        // при вываживании руки опускаем, чтобы середина экрана оставалась свободной
+        P.ox += 0.05;
+        P.oy -= 0.075;
         break;
       }
       case 'landed':
@@ -199,12 +263,11 @@ export class ViewModel {
     const p = this.p;
     const k = fast ? 40 : 14;
     for (const key in P) p[key] = damp(p[key], P[key], key === 'bend' || key === 'side' ? 18 : k, dt);
-    const GP = this.arms ? GRIP_HERO : GRIP;
+    const GP = GRIP_HERO;
     this.pivot.position.set(GP.x + p.ox - this.swayX * 0.3, GP.y + p.oy + this.swayY * 0.3, GP.z + p.oz);
     qy.setFromAxisAngle(AY, p.be + this.swayX);
     qx.setFromAxisAngle(AX, -p.th * DEG + this.swayY);
-    this.pivot.quaternion.copy(qy).multiply(qx).multiply(qf);
-    if (this.arms) this.pivot.quaternion.multiply(qr);
+    this.pivot.quaternion.copy(qy).multiply(qx).multiply(qf).multiply(qr);
     this.rod.setBend(p.bend, p.side);
     if (st.reel) this.crank += dt * (st.mode === 'fight' ? 13 : 9);
     this.rod.handle.rotation.x = this.crank;

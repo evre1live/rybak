@@ -1,6 +1,6 @@
 // Рыбалка игрока: прицел и заброс, поплавок, поклёвка, подсечка, вываживание, улов.
 import * as THREE from 'three';
-import { ITEMS, FISH_BY_ID, JUNK_BY_ID, isLure } from '../shared/data.js';
+import { ITEMS, FISH_BY_ID, JUNK_BY_ID, RARITY, isLure } from '../shared/data.js';
 import { kitStats, biteDelay, rollFish, fightInit, fightStep, spendTackle, addCatch, recordCatch, activity, T_DANGER, T_LOW } from '../shared/logic.js';
 import { spotAt } from './terrain.js';
 import { waveH } from './water.js';
@@ -119,6 +119,9 @@ export class Fishing {
       this.fish.parent && this.fish.parent.remove(this.fish);
       this.fish = null;
     }
+    this.fly = null;
+    this.drip = 0;
+    this.vm.setAura(null);
   }
   /** Смотать леску (отмена). */
   reelIn(silent) {
@@ -330,10 +333,43 @@ export class Fishing {
       this.line.set(tip, end, f.T < T_LOW ? 0.5 : 0.02, -5);
     } else if (st === 'landed') {
       this.landT += dt;
-      const u = Math.min(1, this.landT / 0.5);
-      this.fish.rotation.y += dt * 0.9;
-      this.fish.position.y = -0.4 * (1 - u) * (1 - u) + Math.sin(this.t * 2) * 0.01;
-      wiggleFish(this.fish, this.t, 0.5);
+      if (this.fly) {
+        // полёт: из воды по дуге к рукам, с вращением и шлейфом капель
+        const fl = this.fly;
+        fl.t += dt;
+        const e = Math.min(1, fl.t / 0.46);
+        const k = e * e * (3 - 2 * e);
+        this.vm.fishSlot.getWorldPosition(tip);
+        const p = this.fish.position;
+        p.lerpVectors(fl.from, tip, k);
+        p.y += Math.sin(e * Math.PI) * (0.8 + fl.from.distanceTo(tip) * 0.06);
+        this.fish.scale.setScalar(fl.s0 + (fl.s1 - fl.s0) * k);
+        this.fish.rotation.set(0, e * 9, (1 - e) * 1.2);
+        this.fx.drip(p.x, p.y, p.z, 2, 0.08);
+        wiggleFish(this.fish, this.t, 1.4);
+        if (e >= 1) {
+          this.scene.remove(this.fish);
+          this.fish.scale.setScalar(fl.s1);
+          this.fish.position.set(0, 0, 0);
+          this.fish.rotation.set(0, 0, 0);
+          this.vm.fishSlot.add(this.fish);
+          if (fl.rar >= 0) this.vm.setAura(RARITY[fl.rar].color, fl.rar);
+          this.drip = 1.6;
+          this.fly = null;
+        }
+      } else {
+        this.fish.rotation.y += dt * 0.9;
+        this.fish.position.y = Math.sin(this.t * 2) * 0.01;
+        wiggleFish(this.fish, this.t, 0.5);
+        if (this.drip > 0) {
+          // с рыбы ещё пару секунд капает
+          this.drip -= dt;
+          if (Math.random() < dt * 22 * this.drip) {
+            this.fish.getWorldPosition(tip);
+            this.fx.drip(tip.x, tip.y - 0.06, tip.z, 1, 0.1);
+          }
+        }
+      }
       if (this.landT > 0.4 && (input.hit('Primary') || input.hit('KeyE'))) return this.finish(false);
       if (this.landT > 0.4 && input.hit('KeyR')) return this.finish(true);
       if (this.landT > 9) return this.finish(false);
@@ -376,15 +412,18 @@ export class Fishing {
     this.state = 'landed';
     this.landT = 0;
     this.line.hide();
-    this.fx.splash(this.bx, this.bz, 0.7);
-    // рыба — в руки: показываем перед камерой
-    this.scene.remove(this.fish);
-    if (c.junk) this.fish = this.junkModel(c.sp);
+    // рыба вылетает из воды и по дуге летит в руки; там её показываем перед камерой
+    if (c.junk) {
+      this.scene.remove(this.fish);
+      this.fish = this.junkModel(c.sp);
+      this.scene.add(this.fish);
+    }
     const show = c.junk ? 0.3 : clamp(0.2 + this.fishLen * 0.22, 0.24, 0.62);
-    this.fish.scale.setScalar(show);
-    this.fish.position.set(0, -0.4, 0);
-    this.fish.rotation.set(0, 0, 0);
-    this.vm.fishSlot.add(this.fish);
+    const f0 = FISH_BY_ID[c.sp];
+    const rar = f0 ? f0.rar : c.sp === 'chest' ? 4 : -1;
+    this.fly = { t: 0, from: new THREE.Vector3(this.bx, -0.1, this.bz), s0: c.junk ? 0.3 : this.fishLen, s1: show, rar };
+    this.fish.position.copy(this.fly.from);
+    this.fx.splash(this.bx, this.bz, 1.2 + Math.max(0, rar) * 0.15);
     const full = this.profile.cooler.length >= this.kit.bagCap;
     this.emit('caught', { c, full });
   }

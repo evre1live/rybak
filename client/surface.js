@@ -14,6 +14,7 @@ export const surfaceU = {
   uDetail: { value: 1 },
   uTimeS: { value: 0 },
   uCaustK: { value: 1 },
+  uCloudK: { value: 1 },
   uSunC: { value: new THREE.Color('#fff4e0') },
   uWaterS: { value: new THREE.Color('#35e0d4') },
   uWaterD: { value: new THREE.Color('#1273c4') }
@@ -86,7 +87,7 @@ varying vec3 vWp;
 `;
 const PARS_F = /* glsl */ `
 uniform sampler2D uDet, uCaust;
-uniform float uDetail, uTimeS, uCaustK;
+uniform float uDetail, uTimeS, uCaustK, uCloudK;
 uniform vec3 uSunC, uWaterS, uWaterD;
 varying float vMat;
 varying vec3 vTex;
@@ -152,6 +153,8 @@ if (uDetail > 0.5) {
 `;
 // под водой: сетка солнечного света на дне, вода «съедает» красный, глубина уходит в синеву
 const UNDER_F = /* glsl */ `
+// тени облаков медленно плывут по земле и причалу
+outgoingLight *= 1.0 - uCloudK * 0.2 * smoothstep(0.5, 0.68, texture2D(uDet, vWp.xz * 0.0019 + uTimeS * vec2(0.0021, 0.0012)).r);
 if (vWp.y < 0.0) {
   float dW = -vWp.y;
   vec2 cp = vWp.xz + nGeo.xz * dW * 0.35;

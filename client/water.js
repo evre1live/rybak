@@ -1,6 +1,7 @@
 // Вода бухты: бирюзовая на мели, синяя на глубине, с бликами, сеткой света и пеной у берега.
 import * as THREE from 'three';
 import { groundH, BOUNDS } from './terrain.js';
+import { surfaceU } from './surface.js';
 
 // три волны: направление (x, z), частота, высота, скорость
 const WAVES = [
@@ -153,7 +154,8 @@ void main() {
 const FRAG = /* glsl */ `
 precision highp float;
 uniform float uTime, uGlitter, uFogNear, uFogFar;
-uniform sampler2D uDepth, uNormal, uCaustic;
+uniform sampler2D uDepth, uNormal, uCaustic, uDet;
+uniform float uCloudK;
 uniform vec4 uBounds;
 uniform vec3 uShallow, uDeep, uSkyZen, uSkyHor, uSunDir, uSunCol, uFogCol;
 varying vec3 vWorld;
@@ -205,6 +207,7 @@ void main() {
 
   float alpha = max(max(body, 0.1), max(fres * 0.92, foam));
   alpha = max(alpha, ss(70.0, 170.0, dist)); // вдали вода сплошная: дна всё равно не разглядеть
+  c *= 1.0 - uCloudK * 0.2 * ss(0.5, 0.68, texture2D(uDet, p * 0.0019 + uTime * vec2(0.0021, 0.0012)).r); // тени облаков
   float fog = ss(uFogNear, uFogFar, dist);
   c = mix(c, uFogCol, fog);
   gl_FragColor = vec4(c, alpha);
@@ -235,7 +238,7 @@ export function createWater() {
   geo.setIndex(idx);
   const uniforms = {
     uTime: { value: 0 }, uGlitter: { value: 1 }, uFogNear: { value: 150 }, uFogFar: { value: 1400 },
-    uDepth: { value: depthTexture() }, uNormal: { value: normalTexture() }, uCaustic: { value: causticTexture() },
+    uDepth: { value: depthTexture() }, uNormal: { value: normalTexture() }, uCaustic: { value: causticTexture() }, uDet: surfaceU.uDet, uCloudK: surfaceU.uCloudK,
     uBounds: { value: new THREE.Vector4(BOUNDS.x0, BOUNDS.z0, 1 / (BOUNDS.x1 - BOUNDS.x0), 1 / (BOUNDS.z1 - BOUNDS.z0)) },
     uShallow: { value: new THREE.Color('#35e0d4') }, uDeep: { value: new THREE.Color('#1273c4') },
     uSkyZen: { value: new THREE.Color('#1f7fe0') }, uSkyHor: { value: new THREE.Color('#a6dcff') },
