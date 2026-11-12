@@ -179,6 +179,7 @@ kbd.g{background:#1b3566;color:#fff;box-shadow:0 .14em 0 #0a1a33}
 .pbar{flex:1;height:.85em;border-radius:.5em;background:#0a1a33;border:1px solid rgba(120,190,255,.3);overflow:hidden;position:relative}
 /* легенда: отметки, где она соберётся с силами, и сколько «дыханий» у неё осталось */
 .pbar .pm{display:none;position:absolute;top:0;bottom:0;width:.22em;margin-left:-.11em;background:var(--red);box-shadow:0 0 .4em var(--red)}
+.pbar .pn{display:none;position:absolute;top:-.22em;bottom:-.22em;width:.26em;margin-left:-.13em;border-radius:.13em;background:var(--cy);box-shadow:0 0 .5em var(--cy)}.pbar.help .pn{display:block}
 .pbar.boss .pm{display:block}.pbar .pm.used{background:rgba(255,255,255,.35);box-shadow:none}
 #fboss{display:none;width:auto!important;gap:.25em;font-size:1em!important}
 #fboss.on{display:inline-flex}
@@ -417,7 +418,7 @@ input.code{text-transform:uppercase;letter-spacing:.3em;text-align:center;font-f
 #touch .pill{width:auto;height:2.9em;border-radius:1.5em;padding:0 1.1em;white-space:nowrap}
 #touch .pill.ye{background:rgba(255,214,10,.92);color:var(--ink);border-color:rgba(255,255,255,.75)}
 #tR{right:calc(4% + 9.4em);bottom:9%}
-#tE{right:calc(4% + 9.4em);bottom:calc(9% + 3.5em)}
+#tE,#tP{right:calc(4% + 9.4em);bottom:calc(9% + 3.5em)}
 #tSit{right:calc(4% + 9.4em);bottom:9%;opacity:.8}
 #tMenu{right:.7em;top:.7em;width:3em;height:3em}
 #tChat{right:.7em;top:4.6em;width:3em;height:3em}
@@ -434,7 +435,7 @@ body.touch #prompt{top:auto;bottom:26%}
 #rotate p{margin:0;color:#cfe3ff;max-width:18em;line-height:1.4}
 #rotate svg{color:#fff;width:6em;height:6em}
 @media (orientation:portrait) and (pointer:coarse) and (max-width:620px){body.touch:not(.anyway) #rotate{display:flex}}
-@media (max-aspect-ratio:1/1){body.touch .hud-tr{top:5.4em}body.touch .mapbox{width:9em;height:9em}#tR,#tSit{right:4%;bottom:calc(9% + 8.2em)}#tE{right:4%;bottom:calc(9% + 11.7em)}.hud-tc{display:none}.panel{grid-template-columns:1fr;grid-template-rows:auto auto 38% 1fr auto}.detail,.sellside{grid-column:1;grid-row:4}.lcard{width:19em}.editor{grid-template-columns:1fr;grid-template-rows:auto 1fr auto auto}.opts{grid-column:1;grid-row:3}.editor .hlist{grid-template-columns:repeat(5,1fr)}.edhint{display:none}.hinfo{justify-self:start;max-width:70%}.hinfo h2{font-size:2.4em}}
+@media (max-aspect-ratio:1/1){body.touch .hud-tr{top:5.4em}body.touch .mapbox{width:9em;height:9em}#tR,#tSit{right:4%;bottom:calc(9% + 8.2em)}#tE,#tP{right:4%;bottom:calc(9% + 11.7em)}.hud-tc{display:none}.panel{grid-template-columns:1fr;grid-template-rows:auto auto 38% 1fr auto}.detail,.sellside{grid-column:1;grid-row:4}.lcard{width:19em}.editor{grid-template-columns:1fr;grid-template-rows:auto 1fr auto auto}.opts{grid-column:1;grid-row:3}.editor .hlist{grid-template-columns:repeat(5,1fr)}.edhint{display:none}.hinfo{justify-self:start;max-width:70%}.hinfo h2{font-size:2.4em}}
 .hlist{display:grid;grid-template-columns:repeat(3,1fr);gap:.6em;margin-bottom:.4em}
 .hlist button{display:flex;flex-direction:column;align-items:center;gap:.25em;padding:.4em .3em .5em;border-radius:.8em;background:rgba(9,22,44,.85);border:.14em solid rgba(60,140,220,.45);color:#fff;font-family:var(--disp);font-weight:800;font-style:italic;text-transform:uppercase;font-size:1.05em}
 .hlist button img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:.55em;background:linear-gradient(180deg,#2a67c9,#123a78)}
@@ -463,3 +464,9 @@ body.touch #prompt{top:auto;bottom:26%}
 .dim.clear{background:none}
 .tnote{max-width:26em;margin:.2em auto 0;padding:.5em .8em;border-radius:.6em;background:rgba(6,16,36,.72);color:#ffe9a8;font-size:.86em;line-height:1.35;text-align:center}
 .cachenote{max-width:30em;font-size:.82em;opacity:.8;text-align:center}
+.cardview{gap:.7em}
+.cardview .cardimg{display:block;width:min(46em,86vw);max-height:62vh;object-fit:contain;border-radius:.6em;box-shadow:0 .6em 2em rgba(0,0,0,.45)}
+.savenote{max-width:30em;font-size:.82em;opacity:.8;text-align:center;margin-top:.4em}
+.center.wide .row2{flex-wrap:wrap}.center.wide .row2 .btn{min-width:11em}
+/* настройки на широком экране — в две колонки: все пункты и кнопки сохранения видны без прокрутки */
+@media (min-aspect-ratio:4/3){.center.wide{width:min(66em,94vw)}.center.wide .set{grid-template-columns:1fr 11.5em 1fr 11.5em;gap:.7em 1.4em}.center.wide .savenote,.center.wide .cachenote{max-width:none}}

@@ -353,6 +353,37 @@ function nextPhase(s, rng, K) {
   const runChance = Math.min(0.97, clamp(0.35 + 0.5 * Math.min(1, s.rho) + (s.temper - 1) * 0.3, 0.15, 0.95) * K.runs);
   return rng() < runChance * (0.55 + 0.45 * tired(s)) ? 'run' : 'calm';
 }
+// ───── помощь друга: подсачить чужую рыбу ─────
+export const ASSIST_AT = 0.7; // друг берёт рыбу в подсак раньше, чем рыбак возьмёт её сам (свой подсачек — с 85 % пути)
+export const ASSIST_REACH = 3.4; // …если стоит не дальше этого от рыбака, м
+/**
+ * Можно ли сейчас подсачить рыбу: '' — да, иначе причина. early — рыба ещё далеко; boss — у легенды впереди
+ * «второе дыхание»; stuck — залегла на дно; air — в свече.
+ */
+export function assistBlock(s) {
+  if (!s || s.result || !(s.p >= ASSIST_AT)) return 'early';
+  if (s.boss > 0) return 'boss';
+  if (s.stuck) return 'stuck';
+  if (s.jumpT > 0) return 'air';
+  return '';
+}
+/** Друг подсачил рыбу: бой окончен. Возвращает false, если брать ещё нельзя (assistBlock). */
+export function fightAssist(s) {
+  if (assistBlock(s)) return false;
+  s.p = 1;
+  s.assisted = true;
+  s.result = 'landed';
+  return true;
+}
+/** Опыт помощнику — четверть того, что рыба даёт рыбаку. */
+export const assistXp = (c) => Math.max(2, Math.round(xpFor(c) * 0.25));
+export function recordAssist(p, c) {
+  const xp = assistXp(c);
+  const before = levelInfo(p.xp).lvl;
+  p.xp += xp;
+  p.stats.assists++;
+  return { xp, levelUp: levelInfo(p.xp).lvl > before ? levelInfo(p.xp).lvl : 0 };
+}
 // насколько тяжёлой будет борьба — подсказка для карточки и ленты
 export function fightGrade(rho) {
   return rho < 0.3 ? 'лёгкая' : rho < 0.7 ? 'упорная' : rho < 1.1 ? 'тяжёлая' : 'на пределе снасти';
@@ -391,7 +422,7 @@ export function newProfile() {
     tackle: { worm: 20 },
     cooler: [],
     journal: {},
-    stats: { casts: 0, caught: 0, sold: 0, earned: 0, snaps: 0, escapes: 0, best: null, legends: 0, quests: 0, tours: 0, medals: 0, stalked: 0 },
+    stats: { casts: 0, caught: 0, sold: 0, earned: 0, snaps: 0, escapes: 0, best: null, legends: 0, quests: 0, tours: 0, medals: 0, stalked: 0, assists: 0 },
     seenIntro: false,
     boatTrips: 0,
     quests: null // задания на день: появляются при первом входе (syncQuests)
@@ -411,11 +442,37 @@ export function fixProfile(p) {
   p.coins = Math.max(0, Math.round(Number(p.coins) || 0));
   p.xp = Math.max(0, Math.round(Number(p.xp) || 0));
   p.boatTrips = Math.max(0, Math.round(Number(p.boatTrips) || 0));
-  for (const k of ['quests', 'tours', 'medals']) p.stats[k] = Math.max(0, Math.round(Number(p.stats[k]) || 0));
+  for (const k of ['quests', 'tours', 'medals', 'stalked', 'assists']) p.stats[k] = Math.max(0, Math.round(Number(p.stats[k]) || 0));
   if (!validQuests(p.quests)) p.quests = null;
   if (tackleCount(p, p.equip.tackle) <= 0) p.equip.tackle = 'bread';
   p.v = PROFILE_VERSION;
   return p;
+}
+// ───── перенос сохранения: файл, который можно унести на другое устройство или положить про запас ─────
+export const SAVE_KIND = 'rybak-save';
+/** Текст файла сохранения. at — когда сделано (мс), для подписи. */
+export function exportSave(p, at = 0) {
+  const { fresh, ...profile } = p;
+  return JSON.stringify({ kind: SAVE_KIND, v: PROFILE_VERSION, at, name: String(p.name || ''), lvl: levelInfo(p.xp).lvl, profile });
+}
+/** Разобрать файл сохранения: { ok, profile, name, lvl, at } или { ok: false, why }. Профиль проходит ту же починку, что и при загрузке. */
+export function importSave(text) {
+  let d;
+  try {
+    d = JSON.parse(String(text));
+  } catch {
+    return { ok: false, why: 'Это не файл сохранения «Рыбака»' };
+  }
+  if (!d || d.kind !== SAVE_KIND || !d.profile || typeof d.profile !== 'object' || Array.isArray(d.profile)) return { ok: false, why: 'Это не файл сохранения «Рыбака»' };
+  if (Number(d.v) > PROFILE_VERSION) return { ok: false, why: 'Файл сделан в более новой версии игры — обновите страницу и попробуйте снова' };
+  let profile;
+  try {
+    profile = fixProfile(JSON.parse(JSON.stringify(d.profile)));
+  } catch {
+    return { ok: false, why: 'Файл сохранения повреждён' };
+  }
+  profile.name = String(profile.name || '').slice(0, 16);
+  return { ok: true, profile, name: profile.name, lvl: levelInfo(profile.xp).lvl, at: Number(d.at) || 0 };
 }
 export const tackleCount = (p, id) => (id === 'bread' ? Infinity : p.tackle[id] || 0);
 export const owns = (p, id) => {

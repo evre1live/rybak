@@ -1,7 +1,7 @@
 // Рыбалка игрока: прицел и заброс, поплавок, поклёвка, подсечка, вываживание, улов.
 import * as THREE from 'three';
 import { ITEMS, FISH_BY_ID, JUNK_BY_ID, RARITY, isLure } from '../shared/data.js';
-import { kitStats, biteDelay, rollFish, fightInit, fightStep, dangerAt, spendTackle, addCatch, recordCatch, activity, T_DANGER, T_LOW } from '../shared/logic.js';
+import { kitStats, biteDelay, rollFish, fightInit, fightStep, fightAssist, dangerAt, spendTackle, addCatch, recordCatch, activity, T_DANGER, T_LOW } from '../shared/logic.js';
 import { spotAt } from './terrain.js';
 import { waveH } from './water.js';
 import { buildFloat, buildLure } from './gear3d.js';
@@ -581,6 +581,13 @@ export class Fishing {
     const full = this.profile.cooler.length >= this.kit.bagCap;
     this.emit('caught', { c, full });
   }
+  /** Друг рядом подсачил рыбу (правила — assistBlock в logic.js). name — кто помог. → взята ли рыба */
+  assist(name) {
+    if (this.state !== 'fight' || !fightAssist(this.fight)) return false;
+    this.catch.help = String(name || 'друг');
+    this.land();
+    return true;
+  }
   /** Решение по улову: в садок или отпустить. */
   finish(release) {
     if (this.state !== 'landed') return;
@@ -647,7 +654,7 @@ export class Fishing {
     out.by = this.by;
     out.bz = this.bz;
     out.t = s === 'fight' ? this.fight.T : s === 'charge' ? this.power : 0;
-    out.k = s === 'cast' ? this.castK : s === 'charge' ? this.power : 0;
+    out.k = s === 'cast' ? this.castK : s === 'charge' ? this.power : s === 'fight' ? this.fight.p : 0; // в бою — пройденный путь: друг видит, когда можно подсачить
     out.flags = (this.reeling ? FLAG.reel : 0) | (this.lure ? FLAG.lure : 0);
     return out;
   }

@@ -798,3 +798,124 @@ test('неровный ход: доля долгих кадров видна т�
   for (let i = 0; i < 40 && !up; i++) up = tuneStep(st, 17, q);
   assert.ok(up && up.scale > 0.7, 'один долгий кадр из тридцати — ход ровный, разрешение возвращается');
 });
+
+test('друг с подсаком: берёт рыбу с 70 % пути — но не в свече, не со дна и не у легенды, которая ещё не выдохлась', () => {
+  const kit = L.kitStats(L.newProfile());
+  const mk = (sp, w) => L.fightInit({ sp, w, len: 30 }, kit, rng());
+  const s = mk('okun', 0.3);
+  assert.equal(L.assistBlock(null), 'early');
+  s.p = 0.5;
+  assert.equal(L.assistBlock(s), 'early');
+  assert.equal(L.fightAssist(s), false);
+  assert.equal(s.result, null);
+  s.p = L.ASSIST_AT;
+  assert.equal(L.assistBlock(s), '');
+  s.jumpT = 0.4;
+  assert.equal(L.assistBlock(s), 'air');
+  s.jumpT = 0;
+  s.stuck = 1;
+  assert.equal(L.assistBlock(s), 'stuck');
+  s.stuck = 0;
+  assert.equal(L.fightAssist(s), true);
+  assert.equal(s.result, 'landed');
+  assert.equal(s.p, 1);
+  assert.equal(L.assistBlock(s), 'early', 'бой окончен — второй раз не подсачить');
+  // свой подсачек берёт позже, чем друг: помощь должна быть в радость
+  assert.ok(L.ASSIST_AT < 0.85);
+  // легенда: пока впереди «второе дыхание», подсак не поможет
+  const boss = mk('koi', 9);
+  assert.equal(boss.boss, 2);
+  boss.p = 0.75;
+  assert.equal(L.assistBlock(boss), 'boss');
+  boss.boss = 0;
+  assert.equal(L.assistBlock(boss), '');
+  // помощнику — четверть опыта и отметка в журнале
+  const p = L.newProfile();
+  const c = { sp: 'shuka', w: 4, len: 70 };
+  const r = L.recordAssist(p, c);
+  assert.equal(r.xp, Math.max(2, Math.round(L.xpFor(c) * 0.25)));
+  assert.equal(p.xp, r.xp);
+  assert.equal(p.stats.assists, 1);
+  assert.equal(L.assistXp({ sp: 'boot', junk: true }), 2);
+  assert.equal(L.fixProfile({ ...L.newProfile(), stats: { caught: 3 } }).stats.assists, 0, 'старое сохранение получает счётчик');
+});
+
+test('своя лодка: покупается один раз, как подсачек; у новичка её нет', () => {
+  const p = L.newProfile();
+  assert.ok(ITEMS.boat && ITEMS.boat.cat === 'extra' && ITEMS.boat.price >= 3000);
+  assert.equal(L.owns(p, 'boat'), false);
+  assert.equal(L.buy(p, 'boat').ok, false, 'на стартовые монеты лодку не купить');
+  p.coins = ITEMS.boat.price + 10;
+  assert.equal(L.buy(p, 'boat').ok, true);
+  assert.equal(p.coins, 10);
+  assert.equal(L.owns(p, 'boat'), true);
+  assert.equal(L.buy(p, 'boat').ok, false, 'второй раз не продаётся');
+  assert.equal(L.owns(L.fixProfile(JSON.parse(JSON.stringify(p))), 'boat'), true, 'лодка переживает сохранение');
+});
+
+test('файл сохранения: уходит и возвращается целиком; чужой, битый и из будущей версии — не принимается', () => {
+  const p = L.newProfile();
+  p.name = 'Жамшид';
+  p.coins = 777;
+  p.xp = 5000;
+  p.owned.net = 1;
+  p.journal.okun = { n: 3, best: 0.42 };
+  p.cooler.push({ sp: 'okun', w: 0.3, len: 22, trophy: false, junk: false });
+  p.fresh = true;
+  const text = L.exportSave(p, 1234567);
+  assert.ok(!/"fresh"/.test(text), 'служебные поля в файл не идут');
+  const r = L.importSave(text);
+  assert.equal(r.ok, true);
+  assert.equal(r.name, 'Жамшид');
+  assert.equal(r.at, 1234567);
+  assert.equal(r.lvl, L.levelInfo(5000).lvl);
+  const { fresh, ...want } = p;
+  assert.deepEqual(r.profile, L.fixProfile(JSON.parse(JSON.stringify(want))));
+  assert.equal(r.profile.coins, 777);
+  assert.equal(r.profile.journal.okun.best, 0.42);
+  // не то
+  for (const bad of ['', 'привет', '[]', '{}', '{"kind":"rybak-save"}', '{"kind":"other","profile":{}}', '{"kind":"rybak-save","profile":[]}']) assert.equal(L.importSave(bad).ok, false, bad);
+  assert.match(L.importSave(JSON.stringify({ kind: L.SAVE_KIND, v: L.PROFILE_VERSION + 1, profile: {} })).why, /более новой версии/);
+  // повреждённые поля чинятся так же, как при обычной загрузке
+  const broken = L.importSave(JSON.stringify({ kind: L.SAVE_KIND, v: 1, profile: { name: 'Очень-очень длинное имя рыбака', coins: -50, xp: 'много', cooler: 'нет', equip: { rod: 'нет такой' } } }));
+  assert.equal(broken.ok, true);
+  assert.equal(broken.profile.coins, 0);
+  assert.equal(broken.profile.xp, 0);
+  assert.deepEqual(broken.profile.cooler, []);
+  assert.equal(broken.profile.equip.rod, 'rod1');
+  assert.equal(broken.profile.name.length, 16);
+});
+
+test('открытка: подписи про улов и про вид бухты, имя файла', async () => {
+  const { cardText, cardFile, cardDate, CARD_W, CARD_H } = await import('../client/postcard.js');
+  const date = new Date(2026, 10, 13, 9, 30);
+  assert.equal(cardDate(date), '13 ноября 2026');
+  assert.equal(CARD_W / CARD_H, 16 / 9);
+  // улов: название, вес и длина, редкость своим цветом, отметки по порядку
+  const t = cardText({ c: { sp: 'shuka', w: 3.24, len: 71, trophy: true, stalked: true, help: 'Тимур' }, name: 'Жамшид', lvl: 7, title: 'Бывалый', zone: 'pier', date, record: true, site: 'rybak.onrender.com' });
+  assert.equal(t.head, FISH_BY_ID.shuka.name);
+  assert.equal(t.sub, '3,24 кг · 71 см');
+  assert.equal(t.rar.name.length > 2 && /^#/.test(t.rar.color), true);
+  assert.deepEqual(t.tags, ['ЛИЧНЫЙ РЕКОРД', 'ТРОФЕЙ', 'ВЫСЛЕЖЕНА', 'ПОДСАЧИЛ: ТИМУР']);
+  assert.equal(t.who, 'Жамшид · уровень 7, Бывалый');
+  assert.equal(t.when, `13 ноября 2026 · ${ZONES.pier.name}`);
+  assert.equal(t.site, 'rybak.onrender.com');
+  assert.equal(cardFile(t, date), `rybak-${FISH_BY_ID.shuka.name.toLowerCase()}-2026-11-13.jpg`);
+  // новый вид важнее рекорда; у хлама нет ни того, ни другого
+  assert.deepEqual(cardText({ c: { sp: 'okun', w: 0.2, len: 20 }, isNew: true, record: true, date }).tags, ['НОВЫЙ ВИД']);
+  const junk = cardText({ c: { sp: 'boot', w: 0.6, junk: true }, isNew: true, date });
+  assert.deepEqual(junk.tags, []);
+  assert.equal(junk.rar.name, 'Находка');
+  assert.equal(junk.sub, '600 г');
+  // без улова — вид бухты; без имени — «Рыбак»; неизвестная зона — «Солнечная бухта»
+  const view = cardText({ date, lvl: 1 });
+  assert.equal(view.head, 'Солнечная бухта');
+  assert.equal(view.sub, '');
+  assert.equal(view.rar, null);
+  assert.equal(view.who, 'Рыбак · уровень 1');
+  assert.equal(view.when, '13 ноября 2026 · Солнечная бухта');
+  assert.match(cardFile(view, date), /^rybak-солнечная-бухта-2026-11-13\.jpg$/);
+  // чужие данные не ломают подпись: неизвестный вид — как вид бухты, длинное имя режется
+  assert.equal(cardText({ c: { sp: 'нет такой', w: 1 }, date }).head, 'Солнечная бухта');
+  assert.equal(cardText({ name: 'Очень-очень длинное имя рыбака', date }).who.startsWith('Очень-очень длин ·'), true);
+});

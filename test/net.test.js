@@ -72,6 +72,15 @@ test('комната: вход по коду, положения, события
   const ev = await b.wait('ev');
   assert.deepEqual([ev.id, ev.k, ev.d.sp], [ja.id, 'catch', 'okun']);
   a.send({ t: 'ev', k: 'hack', d: {} });
+  // подсак друга: просьба и ответ идут обычными событиями — сервер их только пересылает, решает игра рыбака
+  b.send({ t: 'ev', k: 'assist', d: { to: ja.id } });
+  const ask = await a.wait('ev', (m) => m.k === 'assist');
+  assert.deepEqual([ask.id, ask.d.to], [jb.id, ja.id]);
+  a.send({ t: 'ev', k: 'assist', d: { to: jb.id, no: 'air' } });
+  assert.equal((await b.wait('ev', (m) => m.k === 'assist')).d.no, 'air');
+  a.send({ t: 'ev', k: 'catch', d: { sp: 'shuka', w: 3.2, by: jb.id } });
+  assert.equal((await b.wait('ev', (m) => m.k === 'catch' && m.d.sp === 'shuka')).d.by, jb.id);
+  assert.ok(!b.got.some((m) => m.t === 'ev' && m.k === 'hack'), 'незнакомое событие не пересылается');
   b.send({ t: 'chat', text: '  клюёт!  ' });
   assert.equal((await a.wait('chat')).text, 'клюёт!');
   b.send({ t: 'card', card: { name: 'Нори', look: { hat: 3 }, rod: 'rod3', lvl: 7 } });

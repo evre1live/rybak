@@ -26,7 +26,14 @@ async function shot(page, file, wait = 0) {
 const G = (page, fn, arg) => page.evaluate(fn, arg);
 
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
+  // LC_ALL: без русской (UTF-8) локали проверочный браузер заменяет русские имена скачанных файлов на «download»
+  const browser = await chromium.launch({ env: { ...process.env, LC_ALL: 'C.UTF-8', LANG: 'C.UTF-8' }, executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
+  if (process.env.ONLY === 'progress') {
+    // быстрый прогон одной части: ONLY=progress node test/play.cjs
+    await progress();
+    await browser.close();
+    return console.log('Проверена только часть «прогресс» (ONLY=progress).');
+  }
   const page = await open(browser, 'q=low&norender&ts=3&h=13', 'solo');
   await shot(page, '01-title');
 
@@ -284,17 +291,23 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     h = await hud({ T: 0.5 });
     assert.deepEqual(h.marks, ['-', '-'], 'у обычной рыбы отметок нет');
 
-    // взгляд сам держится на рыбе (она левее середины кадра), пока мышь не трогают; выключили в настройках — стоит
-    const view = () => G(page, () => { const g = RYBAK, f = g.fishing; const v = new g.camera.position.constructor(f.bx, 0, f.bz).project(g.camera); return { x: v.x, y: v.y, yaw: g.player.yaw }; });
+    // взгляд сам держится на рыбе (она левее середины кадра), пока мышь не трогают; выключили в настройках — стоит.
+    // Угол на рыбу считаем по положению игрока и рыбы, а не по камере: её матрицы обновляются только в кадре, и сразу
+    // после толчка она ещё «смотрит по-старому» — проверка по ней проходила или падала смотря успел ли пройти кадр.
+    const view = () => G(page, () => { const g = RYBAK, f = g.fishing, pl = g.player; const a = pl.yaw - Math.atan2(-(f.bx - pl.x), -(f.bz - pl.z)); return { a: Math.atan2(Math.sin(a), Math.cos(a)), yaw: pl.yaw, state: f.state }; });
+    // взгляд «на рыбе» — когда она на 0,22 рад левее середины кадра (правило из main.js)
+    const onFish = () => page.waitForFunction(() => { const g = RYBAK, f = g.fishing, pl = g.player; if (f.state !== 'fight') return true; const a = pl.yaw - Math.atan2(-(f.bx - pl.x), -(f.bz - pl.z)); return Math.abs(Math.atan2(Math.sin(a), Math.cos(a)) + 0.22) < 0.03; }, null, { timeout: 30000 });
     assert.equal(await G(page, () => RYBAK.fishing.state), 'fight', 'бой для проверки камеры идёт');
     // на время проверки камеры правила боя стоят: рыба на месте, бой не кончается — смотрим только на взгляд
-    await G(page, () => { const f = RYBAK.fishing; window.__upd = f.update; f.update = () => {}; });
-    // угол «после толчка» берём тем же вызовом, что и сам толчок: между двумя вызовами игра успевает прожить несколько кадров
-    // (в проверке кадры не рисуются и идут быстро), и взгляд уже возвращается — на загруженной машине почти целиком
+    await G(page, () => { const f = RYBAK.fishing; window.__upd = f.update; f.update = () => {}; RYBAK.followT = 0; });
+    await onFish();
+    const on = await view();
+    assert.ok(on.state === 'fight' && Math.abs(on.a + 0.22) < 0.03, 'взгляд встал на рыбу: ' + JSON.stringify(on));
+    // толкнули взгляд в сторону (как мышью) — он сам возвращается к рыбе
     const yawFar = await G(page, () => { RYBAK.player.yaw += 0.6; RYBAK.followT = 0; return RYBAK.player.yaw; });
-    await page.waitForFunction(() => { const g = RYBAK, f = g.fishing; if (f.state !== 'fight') return true; const v = new g.camera.position.constructor(f.bx, 0, f.bz).project(g.camera); return v.x > -0.5 && v.x < -0.05 && Math.abs(v.y) < 0.35; }, null, { timeout: 30000 });
+    await onFish();
     const seen = await view();
-    assert.ok(await G(page, () => RYBAK.fishing.state === 'fight') && Math.abs(seen.yaw - yawFar) > 0.2, 'взгляд пришёл к рыбе: ' + JSON.stringify({ ...seen, yawFar }));
+    assert.ok(seen.state === 'fight' && Math.abs(seen.a + 0.22) < 0.03 && Math.abs(seen.yaw - yawFar) > 0.5, 'взгляд пришёл к рыбе: ' + JSON.stringify({ ...seen, yawFar }));
     // выключили в настройках — взгляд остаётся где был
     const follow = async (on) => {
       await G(page, () => { const g = RYBAK; g.fishing.toIdle(); g.ui.catchCard(null); g.ui.openPanel('pause'); });
@@ -1322,6 +1335,95 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     await old.waitForFunction(() => { const p = JSON.parse(localStorage.getItem('rybak.profile.v1')); return p.look && p.look.hero && Object.keys(p.look).length === 1; }, null, { timeout: 5000 });
     assert.ok(!old.__err, 'ошибки на странице (старое сохранение)');
     await old.close();
+  }
+
+  // ── прогресс: своя лодка, открытка с уловом, сохранение в файл и из файла ──
+  await progress();
+  async function progress() {
+    const ctx = await browser.newContext({ viewport: { width: W, height: H }, acceptDownloads: true });
+    const pp = await ctx.newPage();
+    pp.on('pageerror', (e) => { console.log('[прогресс] PAGEERROR', e.message.slice(0, 300)); pp.__err = 1; });
+    await pp.goto(`${BASE}/?q=low&norender&ts=3&h=13`);
+    await pp.waitForFunction(() => window.RYBAK && window.__frames > 3, null, { timeout: 60000 });
+    await pp.fill('#nm', 'Жамшид');
+    await G(pp, () => { RYBAK.profile.seenIntro = true; });
+    await pp.click('[data-a="solo"]');
+    await pp.waitForFunction(() => RYBAK.state === 'lobby');
+    await G(pp, () => RYBAK.enterWorld());
+    await pp.waitForFunction(() => RYBAK.state === 'world');
+    await G(pp, () => { const g = RYBAK; g.ui.closePanel(); g.input.locked = true; g.input.enabled = true; g.player.place(0.9, -12, -Math.PI / 2); });
+
+    // своя лодка: до покупки — прокат за монеты; купили — вымпел на носу, выход без платы, сдавать не нужно
+    await pp.waitForFunction(() => /ЛОДКА НАПРОКАТ/.test(document.querySelector('#prompt').textContent), null, { timeout: 20000 });
+    const b0 = await G(pp, () => { const g = RYBAK; g.profile.coins = 5000; g.profile.boatTrips = 3; const before = g.boatPrice(); g.buy('boat'); return { before, own: g.ownBoat(), coins: g.profile.coins, rented: g.boat.rented, owner: g.boat.vis.owner, pennant: !!g.boat.vis.pennant, price: g.boatPrice() }; });
+    assert.ok(b0.before === 30 && b0.own && b0.coins === 500 && b0.rented && b0.pennant && b0.price === 0 && /^#/.test(b0.owner), `лодка куплена: ${JSON.stringify(b0)}`);
+    await pp.waitForFunction(() => /СВОЯ ЛОДКА — В ПУТЬ/.test(document.querySelector('#prompt').textContent), null, { timeout: 20000 });
+    await G(pp, () => RYBAK.input.pressed.add('KeyE'));
+    await pp.waitForFunction(() => RYBAK.boat.active);
+    assert.equal(await G(pp, () => RYBAK.profile.coins), 500, 'за выход на своей лодке не платят');
+    // вымпел: на полном ходу вытянут к корме, у причала смотрит по ветру, как флаги на берегу
+    const pen = await G(pp, () => { const v = RYBAK.boat.vis, r = () => ({ y: +v.pennant.rotation.y.toFixed(4), w: +v.pennant.userData.wind.value.toFixed(3) }); v.pose(0, -40, 0.3, 1, 1, 0, 0.016); const go = r(); v.pose(0, -40, 0.3, 1, 0, 0, 0.016); return { go, still: r() }; });
+    assert.ok(Math.abs(Math.sin(pen.go.y) + 1) < 1e-4 && pen.go.w === 1 && pen.still.w >= 0.75 && pen.still.w < 1 && Math.abs(Math.sin(pen.still.y) + 1) > 0.01, `вымпел на ходу и на стоянке: ${JSON.stringify(pen)}`);
+    // ушли в море и вернулись: лодка остаётся своей, в паузе не предлагают её «сдать»
+    await G(pp, () => { const g = RYBAK; g.boat.away = true; g.dock(0); });
+    const b1 = await G(pp, () => { const g = RYBAK; g.ui.openPanel('pause'); const home = !!document.querySelector('[data-a="home"]'); g.ui.closePanel(); g.input.locked = true; g.input.enabled = true; return { rented: g.boat.rented, away: g.boat.away, active: g.boat.active, toast: document.querySelector('#toasts').textContent, home }; });
+    assert.ok(b1.rented && !b1.away && !b1.active && /на своём месте/.test(b1.toast) && !b1.home, `своя лодка дома: ${JSON.stringify(b1)}`);
+
+    // открытка: с уловом в руках — кадр игры с подписью; скачивается файлом, улов при этом ждёт
+    await G(pp, () => { const g = RYBAK, f = g.fishing; g.player.place(0, -24.5, 0); g.player.pitch = -0.1; f.kit.net = false; f.showCatch('shuka', 0.9); });
+    await pp.waitForFunction(() => RYBAK.fishing.state === 'landed' && !RYBAK.fishing.fly, null, { timeout: 60000 });
+    await G(pp, () => RYBAK.input.pressed.add('KeyP'));
+    await pp.waitForSelector('.cardview .cardimg', { timeout: 60000 });
+    await pp.waitForFunction(() => document.querySelector('.cardimg').naturalWidth > 0, null, { timeout: 20000 });
+    const card = await G(pp, () => {
+      const k = RYBAK.card, im = document.querySelector('.cardimg');
+      // картинка не пустая: в верхней половине (небо, море, рыба) и в нижней (тёмная подложка с подписями) разные цвета
+      const g2 = k.cv.getContext('2d'), px = (x, y) => [...g2.getImageData(x, y, 1, 1).data].slice(0, 3);
+      const seen = new Set();
+      for (let x = 100; x < 1600; x += 150) for (let y = 80; y < 880; y += 100) seen.add(px(x, y).map((v) => v >> 4).join());
+      return { file: k.file, size: [k.cv.width, k.cv.height], kind: k.url.slice(0, 23), len: k.url.length, head: k.t.head, sub: k.t.sub, tags: k.t.tags, who: k.t.who, state: RYBAK.fishing.state, nat: [im.naturalWidth, im.naturalHeight], colors: seen.size, corner: px(30, 30), key: document.querySelector('#hints') ? document.querySelector('#hints').textContent : '' };
+    });
+    assert.deepEqual(card.size, [1600, 900]);
+    assert.deepEqual(card.nat, [1600, 900]);
+    assert.equal(card.kind, 'data:image/jpeg;base64,');
+    assert.ok(card.len > 40000 && card.colors > 12, `открытка не пустая: ${card.len} знаков, цветов ${card.colors}`);
+    assert.ok(card.head === 'Щука' && /кг · \d+ см/.test(card.sub) && card.tags.includes('НОВЫЙ ВИД') && card.tags.includes('ТРОФЕЙ') && /^Жамшид · уровень 1/.test(card.who), `подписи: ${JSON.stringify(card)}`);
+    assert.match(card.file, /^rybak-щука-\d{4}-\d\d-\d\d\.jpg$/);
+    const [dl] = await Promise.all([pp.waitForEvent('download'), pp.click('[data-a="cardsave"]')]);
+    assert.equal(dl.suggestedFilename(), card.file);
+    await dl.saveAs(`${out}/40-postcard.jpg`);
+    assert.ok(fs.statSync(`${out}/40-postcard.jpg`).size > 30000);
+    await pp.click('.cardview [data-a="close"]');
+    assert.deepEqual(await G(pp, () => [RYBAK.fishing.state, RYBAK.card, RYBAK.ui.panel]), ['landed', null, null], 'после открытки улов всё ещё в руках');
+    await G(pp, () => { RYBAK.fishing.finish(false); RYBAK.ui.catchCard(null); });
+    // без улова — открытка с видом бухты
+    await pp.waitForFunction(() => RYBAK.fishing.state === 'idle');
+    await G(pp, () => { const g = RYBAK; g.input.locked = true; g.input.enabled = true; g.input.pressed.add('KeyP'); });
+    await pp.waitForSelector('.cardview .cardimg', { timeout: 60000 });
+    assert.deepEqual(await G(pp, () => [RYBAK.card.t.head, RYBAK.card.t.sub, RYBAK.card.t.tags.length]), ['Солнечная бухта', '', 0]);
+    await pp.click('.cardview [data-a="close"]');
+
+    // сохранение — файлом: скачали, чужой файл не принят, свой (с другими монетами) заменяет прогресс после подтверждения
+    await G(pp, () => RYBAK.ui.openPanel('settings'));
+    const [sv] = await Promise.all([pp.waitForEvent('download'), pp.click('[data-a="savefile"]')]);
+    assert.match(sv.suggestedFilename(), /^rybak-Жамшид-\d{4}-\d\d-\d\d\.json$/);
+    const data = JSON.parse(fs.readFileSync(await sv.path(), 'utf8'));
+    assert.ok(data.kind === 'rybak-save' && data.profile.name === 'Жамшид' && data.profile.owned.boat === 1 && data.profile.journal.shuka.n === 1 && data.profile.fresh === undefined, 'в файле — весь прогресс');
+    await pp.setInputFiles('#savein', { name: 'чужой.json', mimeType: 'application/json', buffer: Buffer.from('{"привет":1}') });
+    await pp.waitForFunction(() => /не файл сохранения/.test(document.querySelector('#toasts').textContent), null, { timeout: 10000 });
+    assert.equal(await G(pp, () => RYBAK.pendingSave || null), null);
+    data.profile.coins = 4321;
+    data.profile.xp = 900;
+    await pp.setInputFiles('#savein', { name: 'rybak.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(data)) });
+    await pp.waitForFunction(() => /ЗАМЕНИТЬ ПРОГРЕСС: ЖАМШИД, УРОВЕНЬ \d+\?/.test(document.querySelector('[data-a="loadfile"]').textContent), null, { timeout: 10000 });
+    assert.equal(await G(pp, () => RYBAK.profile.coins), 500, 'до подтверждения прогресс прежний');
+    await pp.click('[data-a="loadfile"]');
+    // игра открывается заново уже с загруженным прогрессом
+    await pp.waitForFunction(() => window.RYBAK && window.__frames > 3 && RYBAK.state === 'title' && RYBAK.profile.coins === 4321, null, { timeout: 60000 });
+    assert.deepEqual(await G(pp, () => [RYBAK.profile.xp, RYBAK.profile.name, RYBAK.ownBoat(), RYBAK.profile.journal.shuka.n]), [900, 'Жамшид', true, 1]);
+    assert.ok(!pp.__err, 'ошибки на странице (прогресс)');
+    await ctx.close();
+    console.log('  прогресс: своя лодка с вымпелом, открытка с уловом и с видом бухты, сохранение в файл и обратно');
   }
 
   // сохранение переживает перезагрузку

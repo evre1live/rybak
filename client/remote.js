@@ -5,7 +5,7 @@ import { buildRod, buildFloat, buildLure } from './gear3d.js';
 import { buildFish, wiggleFish } from './fish3d.js';
 import { FishLine } from './line.js';
 import { BoatVisual, moorSpot, wake, VMAX } from './boat.js';
-import { S, FS_NAME, FLAG } from './proto.js';
+import { S, FS_NAME, FLAG, MARKS } from './proto.js';
 import { ITEMS, FISH_BY_ID, isLure } from '../shared/data.js';
 import { angDiff, lerp, clamp } from './util.js';
 
@@ -141,6 +141,7 @@ export class Remote {
     const bs = b[S.BOAT] | 0;
     if (bs > 0) {
       if (!this.boat) this.boat = new BoatVisual(this.scene);
+      this.boat.setOwner(flags & FLAG.own ? MARKS[this.slot % MARKS.length].color : null);
       if (bs === 1) {
         const y0 = a[S.BYAW] ?? b[S.BYAW] ?? 0;
         const byaw = y0 + angDiff(y0, b[S.BYAW] ?? y0) * Math.min(1, u);

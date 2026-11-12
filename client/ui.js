@@ -216,6 +216,7 @@ export class UI {
     else if (f && jn && c.w > jn.best) bd.push('<span class="bd gr">ЛИЧНЫЙ РЕКОРД!</span>');
     if (c.trophy) bd.push('<span class="bd">ТРОФЕЙ</span>');
     if (c.stalked) bd.push('<span class="bd gr">ВЫСЛЕЖЕНА</span>');
+    if (c.help) bd.push(`<span class="bd cy">ПОДСАЧИЛ: ${esc(String(c.help).toUpperCase())}</span>`);
     if (f && this.g.market().hot.includes(c.sp)) bd.push('<span class="bd">В ЦЕНЕ ×1,6</span>');
     box.style.setProperty('--rc', rar.color);
     box.innerHTML = `<div class="rar">${rar.name}</div><h2>${esc((f || j).name)}</h2>
@@ -237,7 +238,7 @@ export class UI {
     // что за бой не меняется — манера рыбы и отметки легенды — пишем один раз, в его начале
     if (this.fNow !== f) {
       this.fNow = f;
-      this.fMode = this.fBoss = null;
+      this.fMode = this.fBoss = this.fHelp = null;
       const S = FIGHT_STYLES[f.style] || FIGHT_STYLES.plain;
       $('#ftip').innerHTML = f.junk ? '' : `<b>${esc(S.name.toUpperCase())}</b>${esc(S.tip)}`;
       $('#tok').textContent = f.style === 'bulldog' ? 'ВНАТЯГ' : 'НОРМА';
@@ -256,6 +257,9 @@ export class UI {
       this.fMode = mode;
       $('#tbar').className = 'tbar ' + mode;
     }
+    // друг рядом с подсаком — на полосе пути видно, откуда он возьмёт рыбу
+    const help = !!this.g.helperNear;
+    if (this.fHelp !== help) $('#pbar').classList.toggle('help', (this.fHelp = help));
     if (f.stuck) $('#tzLiftK').style.transform = `scaleX(${clamp(f.lift / liftNeed(f), 0, 1).toFixed(3)})`;
     if (f.bossMax && this.fBoss !== f.boss) {
       this.fBoss = f.boss;
@@ -604,6 +608,7 @@ export class UI {
     else if (name === 'quests') this.renderQuests();
     else if (name === 'tour') this.renderTour();
     else if (name === 'bench') this.renderBench();
+    else if (name === 'card') this.renderCard();
     this.g.onPanel(name);
   }
   closePanel() {
@@ -735,7 +740,7 @@ export class UI {
     const s = p.stats;
     this.screen.innerHTML = `<div class="dim"></div><div class="panel">
       <div class="ptitle"><h1>ЖУРНАЛ</h1><span class="sp"></span><div class="coinbox">${coin(p.coins)}</div><button class="xbtn" data-a="close">×</button></div>
-      <div class="jstats"><div><b>${lv.lvl}</b>уровень · ${esc(lv.title)}</div><div><b>${got}/${FISH.length}</b>видов открыто</div><div><b>${s.caught}</b>поймано</div><div><b>${fmtCoins(s.earned)}</b>заработано</div><div><b>${s.best ? fmtW(s.best.w) : '—'}</b>${s.best ? esc(FISH_BY_ID[s.best.sp].name) + ' — рекорд' : 'самый тяжёлый улов'}</div><div><b>${s.snaps}</b>обрывов лески</div></div>
+      <div class="jstats"><div><b>${lv.lvl}</b>уровень · ${esc(lv.title)}</div><div><b>${got}/${FISH.length}</b>видов открыто</div><div><b>${s.caught}</b>поймано</div><div><b>${fmtCoins(s.earned)}</b>заработано</div><div><b>${s.best ? fmtW(s.best.w) : '—'}</b>${s.best ? esc(FISH_BY_ID[s.best.sp].name) + ' — рекорд' : 'самый тяжёлый улов'}</div><div><b>${s.snaps}</b>обрывов лески</div>${s.stalked ? `<div><b>${s.stalked}</b>выслежено</div>` : ''}${s.assists ? `<div><b>${s.assists}</b>подсачено друзьям</div>` : ''}</div>
       <div class="grid" style="grid-template-columns:repeat(5,1fr)">${tiles}</div>
       <div class="detail" style="grid-row:3/4">
         <img class="big ${j ? '' : 'unk'}" src="${fishIcon(f.id)}" alt="" style="${j ? '' : 'filter:brightness(0) opacity(.5)'}">
@@ -772,7 +777,7 @@ export class UI {
     const s = settings;
     const rng = (k, min, max, step) => `<input type="range" min="${min}" max="${max}" step="${step}" value="${s[k]}" data-set="${k}">`;
     const tog = (k) => `<span class="tog ${s[k] ? 'on' : ''} click" data-a="tog" data-id="${k}"></span>`;
-    this.screen.innerHTML = `<div class="dim"></div><div class="center">
+    this.screen.innerHTML = `<div class="dim"></div><div class="center wide">
       <h1>НАСТРОЙКИ</h1>
       <div class="set">
         <span>Чувствительность мыши</span>${rng('sens', 0.3, 3, 0.05)}
@@ -793,9 +798,33 @@ export class UI {
       </div>
       ${this.g.cache && this.g.cache.on ? `<div class="hint cachenote">Игра сохранена на этом устройстве${this.g.cache.total ? `: ${this.g.cache.done} из ${this.g.cache.total} файлов` : ''} — открывается сразу и не ждёт сервер.</div>` : ''}
       <button class="btn pri" data-a="close"><span>ГОТОВО</span></button>
-      ${this.g.installPrompt ? '<button class="btn sm" data-a="install"><span>УСТАНОВИТЬ КАК ПРИЛОЖЕНИЕ</span></button>' : ''}
-      <button class="btn sm" data-a="bench"><span>ПРОВЕРКА КОМПЬЮТЕРА</span></button>
-      <button class="btn ghost sm" data-a="reset"><span>НАЧАТЬ ЗАНОВО — СТЕРЕТЬ ПРОГРЕСС</span></button></div>`;
+      <div class="row2">${this.g.installPrompt ? '<button class="btn sm" data-a="install"><span>УСТАНОВИТЬ КАК ПРИЛОЖЕНИЕ</span></button>' : ''}<button class="btn sm" data-a="bench"><span>ПРОВЕРКА КОМПЬЮТЕРА</span></button></div>
+      <div class="hint savenote">Прогресс хранится в этом браузере. Файл сохранения можно перенести на другое устройство или оставить про запас.</div>
+      <div class="row2"><button class="btn sm" data-a="savefile"><span>СОХРАНИТЬ В ФАЙЛ</span></button><button class="btn sm" data-a="loadfile"><span>ЗАГРУЗИТЬ ИЗ ФАЙЛА</span></button><button class="btn ghost sm" data-a="reset"><span>НАЧАТЬ ЗАНОВО — СТЕРЕТЬ ПРОГРЕСС</span></button></div>
+      <input type="file" id="savein" accept=".json,application/json" hidden></div>`;
+    const pick = this.g.pendingSave;
+    if (pick) {
+      // файл выбран: показываем, что в нём, и спрашиваем, заменить ли нынешний прогресс
+      const b = this.screen.querySelector('[data-a="loadfile"]');
+      b.dataset.sure = '1';
+      b.classList.add('red');
+      b.innerHTML = `<span>ЗАМЕНИТЬ ПРОГРЕСС: ${esc((pick.name || 'РЫБАК').toUpperCase())}, УРОВЕНЬ ${pick.lvl}? НАЖМИТЕ ЕЩЁ РАЗ</span>`;
+    }
+    this.screen.querySelector('#savein').addEventListener('change', (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (f) this.g.loadFromFile(f);
+    });
+  }
+  /** Открытка с уловом (или с видом бухты): картинка и что с ней сделать. */
+  renderCard() {
+    const k = this.g.card;
+    if (!k) return this.closePanel();
+    const share = typeof navigator.share === 'function' && typeof navigator.canShare === 'function';
+    this.screen.innerHTML = `<div class="dim"></div><div class="center cardview">
+      <h1>ОТКРЫТКА</h1>
+      <img class="cardimg" src="${k.url}" alt="Открытка: ${esc(k.t.head)}${k.t.sub ? ', ' + esc(k.t.sub) : ''}">
+      <div class="row2"><button class="btn pri" data-a="cardsave"><span>СКАЧАТЬ</span></button>${share ? '<button class="btn cy" data-a="cardshare"><span>ПОДЕЛИТЬСЯ</span></button>' : ''}<button class="btn ghost" data-a="close"><span>НАЗАД</span></button></div>
+      <div class="hint">Отправьте друзьям — пусть завидуют.${this.g.fishing.state === 'landed' ? ' Рыба подождёт: решить, в садок её или отпустить, можно после.' : ''}</div></div>`;
   }
   /** Проверка компьютера: идёт замер — полоса, кончился — итог, который можно скопировать и прислать. */
   renderBench() {
@@ -849,7 +878,7 @@ export class UI {
       <button class="btn" data-a="open" data-p="help"><span>КАК ИГРАТЬ</span></button>
       <button class="btn" data-a="open" data-p="settings"><span>НАСТРОЙКИ</span></button>
       ${g.solo ? '' : `<button class="btn cy" data-a="copy"><span>${ic('link')} ССЫЛКА ДЛЯ ДРУЗЕЙ · ${esc(g.code)}</span></button>`}
-      ${g.ride ? '<button class="btn" data-a="home"><span>СОЙТИ И ВЕРНУТЬСЯ В БУХТУ</span></button>' : g.boat.rented ? '<button class="btn" data-a="home"><span>ВЕРНУТЬСЯ В БУХТУ · СДАТЬ ЛОДКУ</span></button>' : ''}
+      ${g.ride ? '<button class="btn" data-a="home"><span>СОЙТИ И ВЕРНУТЬСЯ В БУХТУ</span></button>' : g.ownBoat() ? (g.boat.active || g.boat.moor !== 0 ? '<button class="btn" data-a="home"><span>ВЕРНУТЬСЯ В БУХТУ ВМЕСТЕ С ЛОДКОЙ</span></button>' : '') : g.boat.rented ? '<button class="btn" data-a="home"><span>ВЕРНУТЬСЯ В БУХТУ · СДАТЬ ЛОДКУ</span></button>' : ''}
       <button class="btn ghost" data-a="tolobby"><span>${g.solo ? 'В ЛОББИ' : 'В ЛОББИ К КОМАНДЕ'}</span></button></div>`;
   }
   renderQuests() {
@@ -926,6 +955,8 @@ export class UI {
         <span>${k('ЛОДКА')}</span><span>Подойдите к лодке у пирса — её дают напрокат. Джойстик вперёд — ход, в стороны — руль. Рыбачить можно прямо с борта: в открытом море, у затонувшего корабля, в лагуне Пальмового острова. К другу в лодку можно сесть пассажиром.</span>
         <span>${k('СНАСТИ', 'x')}</span><span>Панель внизу экрана: нажмите на наживку — сменить её, на удочку — открыть все снасти.</span>
         <span>${k('☰', 'g')}</span><span>Меню: журнал рыб, задания дня, турнир, персонаж, настройки. Плашка «ГОЛОС» справа сверху включает и выключает микрофон.</span>
+        <span>${k('ОТКРЫТКА', 'g')}</span><span>Появляется с уловом в руках: кадр с подписью, который можно сохранить и отправить друзьям.</span>
+        <span>${k('ПОДСАК')}</span><span>Друг рядом вываживает рыбу — подойдите: когда она пройдёт 70 % пути, кнопка даст взять её подсаком. Рыбаку — улов, вам — четверть опыта.</span>
       </div>
       <p>Чем лучше удочка — тем дальше заброс: до рифа, водопада и арки стартовой не достать. Тёмные тени под водой — косяки, там клюёт чаще и крупнее.</p>
       <button class="btn pri" data-a="${this.popts && this.popts.first ? 'close' : 'back'}"><span>ПОНЯТНО</span></button></div>`;
@@ -940,11 +971,13 @@ export class UI {
         <span>${k('ЛКМ')}${k('A', 'g')}${k('D', 'g')}</span><span><b>Вываживание:</b> держите кнопку — мотаете, отпускаете — леска слабеет. Стрелка натяжения должна быть в голубой зоне. В красной леска рвётся, в жёлтой рыба сходит. Рванула вбок — ведите удочку в другую сторону. У каждой рыбы своя манера — подсказка под шкалой: прыгнула свечой — отпустите кнопку, залегла на дно — держите стрелку в рамке.</span>
         <span>${k('ПКМ', 'x')} / ${k('R', 'b')}</span><span>Смотать леску. После улова ${k('R', 'b')} — отпустить рыбу (за это дают больше опыта).</span>
         <span>${k('E')}</span><span>Говорить с торговцем у лавки «Рынок»: продать улов, купить удочки, леску, наживку.</span>
-        <span>${k('E')}</span><span><b>Лодка:</b> подойдите к лодке у пирса — её дают напрокат. ${k('W', 'g')}${k('S', 'g')} — ход, ${k('A', 'g')}${k('D', 'g')} — руль. Рыбачить можно прямо с борта: в открытом море, у затонувшего корабля, в лагуне Пальмового острова. Причалить можно у маяка и на острове. В лодку друга тоже можно сесть — в ней два места для пассажиров.</span>
+        <span>${k('E')}</span><span><b>Лодка:</b> подойдите к лодке у пирса — её дают напрокат (а в лавке, в «Прочем», продаётся своя). ${k('W', 'g')}${k('S', 'g')} — ход, ${k('A', 'g')}${k('D', 'g')} — руль. Рыбачить можно прямо с борта: в открытом море, у затонувшего корабля, в лагуне Пальмового острова. Причалить можно у маяка и на острове. В лодку друга тоже можно сесть — в ней два места для пассажиров.</span>
         <span>${k('TAB', 'x')} ${k('Q', 'x')}</span><span>Снасти и набор. ${k('Q', 'x')} — быстро сменить наживку.</span>
         <span>${k('J', 'g')} ${k('C', 'g')} ${k('K', 'g')} ${k('T', 'g')}</span><span>Журнал рыб, выбор героя, задания дня (за них дают монеты и опыт) и турнир — в одиночку это заплыв на медаль.</span>
         <span>${k('M', 'g')} ${k('V', 'g')} ${k('ENTER', 'g')}</span><span>Микрофон вкл/выкл, говорить по кнопке, написать в чат.</span>
         <span>${k('1', 'g')}${k('2', 'g')}${k('3', 'g')}${k('4', 'g')}</span><span>Жесты: привет, класс, ура, танец.</span>
+        <span>${k('P', 'g')}</span><span><b>Открытка:</b> кадр с подписью — с уловом в руках на ней будут вид, вес и ваше имя. Её можно скачать и отправить друзьям.</span>
+        <span>${k('E')}</span><span><b>Вдвоём:</b> друг рядом вываживает рыбу — подойдите: когда она пройдёт 70 % пути, её можно взять подсаком. Рыбаку — улов, вам — четверть опыта.</span>
       </div>
       <p>Чем лучше удочка — тем дальше заброс: до рифа, водопада и арки стартовой не достать. Тёмные тени под водой — косяки, там клюёт чаще и крупнее. В непогоду, особенно в дождь, рыба берёт охотнее.</p>
       <button class="btn pri" data-a="${this.popts && this.popts.first ? 'close' : 'back'}"><span>ПОНЯТНО</span></button></div>`;
@@ -1043,6 +1076,12 @@ export class UI {
         saveSettings();
         g.applySettings();
         return this.renderSettings();
+      case 'cardsave': return g.saveCard();
+      case 'cardshare': return g.shareCard();
+      case 'savefile': return g.saveToFile();
+      case 'loadfile':
+        if (t.dataset.sure) return g.applySave();
+        return this.screen.querySelector('#savein').click();
       case 'reset':
         if (t.dataset.sure) return g.resetProgress();
         t.dataset.sure = '1';
@@ -1072,7 +1111,8 @@ export class UI {
     else if (this.panel === 'editor') {
       g.saveLook({ hero: this.ed.look.hero });
       this.closePanel();
-    } else if (this.panel === 'help' || this.panel === 'settings' || this.panel === 'quests') this.closePanel();
+    } else if (this.panel === 'card') g.saveCard();
+    else if (this.panel === 'help' || this.panel === 'settings' || this.panel === 'quests') this.closePanel();
     else if (this.panel === 'tour') {
       if (!this.g.tour && !this.popts.result && this.g.state === 'world' && (this.g.solo || this.g.me.id === this.g.hostId)) this.g.startTour(this.tr.kind, this.tr.len);
       else this.closePanel();

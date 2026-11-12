@@ -135,6 +135,66 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
   await shot(a, 'c05-friend-catch', 200);
   await G(b, () => { clearInterval(window.__bot); RYBAK.input.primary = false; RYBAK.input.keys.clear(); });
 
+  // ── подсак друга: Нори вываживает, Жамшид рядом с пустыми руками — берёт её рыбу подсаком с 70 % пути ──
+  {
+    await G(a, () => { const g = RYBAK; g.fishing.reelIn(true); g.input.locked = true; g.input.enabled = true; g.player.place(-0.6, -13, 0); });
+    const was = await G(a, () => ({ xp: RYBAK.profile.xp, n: RYBAK.profile.stats.assists }));
+    // у Нори на крючке щука; правила боя стоят — путь выставляем сами
+    await G(b, () => {
+      const g = RYBAK, f = g.fishing;
+      if (f.state !== 'idle') f.toIdle();
+      g.ui.catchCard(null);
+      g.input.primary = false; g.input.keys.clear();
+      g.player.place(1, -14, 0);
+      f.startFight('shuka', 0.5, 9);
+      window.__upd = f.update;
+      f.update = () => {};
+      f.fight.p = 0.4;
+    });
+    // рыба ещё далеко: подсказка есть, кнопка не берёт
+    await a.waitForFunction(() => /ПОДСАК НАГОТОВЕ/.test(document.querySelector('#prompt').textContent), null, { timeout: 20000 });
+    assert.match(await a.textContent('#prompt'), /НОРИ.*40 % ИЗ 70/);
+    // рыбаку видно, что друг наготове: отметка на полосе пути и подсказка
+    await b.waitForFunction(() => document.querySelector('#pbar').classList.contains('help') && /Жамшид рядом — с 70 % пути/.test(document.querySelector('#toasts').textContent), null, { timeout: 10000 });
+    await G(a, () => RYBAK.input.pressed.add('KeyE'));
+    await a.waitForTimeout(700);
+    assert.equal(await G(b, () => RYBAK.fishing.state), 'fight', 'раньше 70 % пути подсак не берёт');
+    // дошла — но сейчас свеча: игра Нори отвечает, почему нельзя
+    await G(b, () => { const s = RYBAK.fishing.fight; s.p = 0.74; s.jumpT = 0.5; });
+    await a.waitForFunction(() => /ПОДСАЧИТЬ РЫБУ — НОРИ/.test(document.querySelector('#prompt').textContent), null, { timeout: 20000 });
+    await G(a, () => RYBAK.input.pressed.add('KeyE'));
+    await a.waitForFunction(() => /Рыба в воздухе/.test(document.querySelector('#toasts').textContent), null, { timeout: 10000 });
+    assert.equal(await G(b, () => RYBAK.fishing.state), 'fight', 'в свече рыбу не взять');
+    // свеча кончилась — берём (между попытками полторы секунды)
+    await G(b, () => { RYBAK.fishing.fight.jumpT = 0; });
+    await a.waitForTimeout(1600);
+    await G(a, () => RYBAK.input.pressed.add('KeyE'));
+    await b.waitForFunction(() => RYBAK.fishing.state === 'landed', null, { timeout: 10000 });
+    const got = await G(b, () => ({ help: RYBAK.fishing.catch.help, card: document.querySelector('#catch').textContent, toast: document.querySelector('#toasts').textContent }));
+    assert.equal(got.help, 'Жамшид');
+    assert.match(got.card, /ПОДСАЧИЛ: ЖАМШИД/);
+    assert.match(got.toast, /Жамшид подсачил вашу рыбу/);
+    // помощнику — четверть опыта, отметка в журнале и строка в ленте
+    await a.waitForFunction((n) => RYBAK.profile.stats.assists === n + 1, was.n, { timeout: 10000 });
+    const now = await G(a, () => ({ xp: RYBAK.profile.xp, feed: document.querySelector('#feed').textContent, toast: document.querySelector('#toasts').textContent }));
+    assert.ok(now.xp > was.xp, `опыт помощнику: ${was.xp} → ${now.xp}`);
+    assert.match(now.feed, /Нори — .*подсачили вы/);
+    assert.match(now.toast, /Вы подсачили рыбу для Нори/);
+    await shot(b, 'c05b-assist-catch', 300);
+    await G(b, () => { const f = RYBAK.fishing; f.update = window.__upd; f.finish(false); RYBAK.ui.catchCard(null); });
+    await a.waitForFunction(() => !/ПОДСА/.test(document.querySelector('#prompt').textContent), null, { timeout: 10000 });
+    // легенда: пока впереди «второе дыхание», подсак не поможет
+    await G(b, () => { const f = RYBAK.fishing; f.startFight('koi', 0.5, 9); window.__upd = f.update; f.update = () => {}; f.fight.p = 0.75; });
+    await a.waitForFunction(() => /ПОДСАЧИТЬ РЫБУ — НОРИ/.test(document.querySelector('#prompt').textContent), null, { timeout: 20000 });
+    await a.waitForTimeout(1600);
+    await G(a, () => RYBAK.input.pressed.add('KeyE'));
+    await a.waitForFunction(() => /Легенда ещё не выдохлась/.test(document.querySelector('#toasts').textContent), null, { timeout: 10000 });
+    assert.equal(await G(b, () => RYBAK.fishing.state), 'fight');
+    await G(b, () => { const f = RYBAK.fishing; f.update = window.__upd; f.toIdle(); RYBAK.ui.catchCard(null); });
+    assert.equal(await G(a, () => RYBAK.profile.stats.assists), was.n + 1);
+    console.log('  подсак друга: рано — не берёт, в свече и у легенды — отказ с причиной, с 70 % — улов рыбаку, опыт помощнику');
+  }
+
   // лодка: Нори берёт её у пирса и отходит; Жамшид видит лодку, подругу на банке и запись в ленте
   await G(b, () => { const g = RYBAK; g.fishing.reelIn(true); g.input.locked = true; g.input.enabled = true; g.player.place(0.9, -12, -Math.PI / 2); });
   await b.waitForFunction(() => /ЛОДКА НАПРОКАТ/.test(document.querySelector('#prompt').textContent), null, { timeout: 20000 });
@@ -256,6 +316,30 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
   await G(b, () => RYBAK.ui.closePanel());
   await G(a, () => RYBAK.ui.closePanel());
   console.log('  турнир: объявлен хозяином, улов в зачёте, итоги и приз');
+
+  // ── своя лодка: Нори покупает лодку — Жамшид видит на ней вымпел её цвета; за выход она не платит и лодку не сдаёт ──
+  {
+    await G(b, () => { const g = RYBAK; g.fishing.reelIn(true); g.ui.closePanel(); g.input.locked = true; g.input.enabled = true; if (g.boat.active || g.boat.rented) g.goHome(); });
+    await a.waitForFunction(() => { const p = [...RYBAK.players.values()][0]; return p.st && p.st[16] === 0 && !p.remote.boat; }, null, { timeout: 20000 });
+    const own = await G(b, () => { const g = RYBAK; g.profile.coins = 5000; g.profile.boatTrips = 5; g.buy('boat'); return { own: g.ownBoat(), coins: g.profile.coins, rented: g.boat.rented, owner: g.boat.vis.owner, pennant: !!g.boat.vis.pennant, price: g.boatPrice(), slot: g.me.slot }; });
+    assert.ok(own.own && own.coins === 500 && own.rented && own.pennant && own.price === 0 && /^#/.test(own.owner), `лодка куплена: ${JSON.stringify(own)}`);
+    await a.waitForFunction(() => /Нори купил: .*Своя лодка/.test(document.querySelector('#feed').textContent), null, { timeout: 10000 });
+    await G(b, () => { RYBAK.player.place(0.9, -12, -Math.PI / 2); });
+    await b.waitForFunction(() => /СВОЯ ЛОДКА — В ПУТЬ/.test(document.querySelector('#prompt').textContent), null, { timeout: 20000 });
+    await G(b, () => RYBAK.input.pressed.add('KeyE'));
+    await b.waitForFunction(() => RYBAK.boat.active);
+    assert.equal(await G(b, () => RYBAK.profile.coins), 500, 'за выход на своей лодке не платят');
+    // у Жамшида лодка Нори — с вымпелом её цвета (цвет метки на карте); его прокатная — без
+    await a.waitForFunction((c) => { const p = [...RYBAK.players.values()][0]; const r = p.remote; return p.st && p.st[16] === 1 && (p.st[11] & 16) && r.boat && r.boat.owner === c && !!r.boat.pennant; }, own.owner, { timeout: 20000 });
+    assert.equal(await G(a, () => RYBAK.boat.vis.owner), null, 'у прокатной лодки вымпела нет');
+    await G(a, () => { const g = RYBAK; g.player.place(1.2, -7.5, -0.56); g.player.pitch = -0.25; });
+    await shot(a, 'c11-friend-own-boat', 500);
+    // ушла в море и вернулась домой: лодка остаётся её
+    await G(b, () => { const g = RYBAK; g.boat.away = true; g.dock(0); });
+    const home = await G(b, () => ({ rented: RYBAK.boat.rented, away: RYBAK.boat.away, active: RYBAK.boat.active, toast: document.querySelector('#toasts').textContent }));
+    assert.ok(home.rented && !home.away && !home.active && /на своём месте/.test(home.toast), `своя лодка дома: ${JSON.stringify(home)}`);
+    console.log('  своя лодка: куплена, вымпел виден другу, выход бесплатный, дома остаётся своей');
+  }
 
   // обрыв связи у друга: он пропадает и возвращается на своё место
   const slot = await G(b, () => RYBAK.me.slot);

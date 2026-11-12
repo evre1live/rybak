@@ -10,7 +10,8 @@ import { loadModel, spawn, modelInfo } from './models.js';
 import { Batch, M, G, BATCH_MAT } from './batch.js';
 import { GLOSS_MAT, METAL_MAT } from './env.js';
 import { patchModel } from './surface.js';
-import { clamp, damp } from './util.js';
+import { clamp, damp, angDiff } from './util.js';
+import { makePennant, wind } from './flags.js';
 
 export const BOAT_PRICE = 30; // монет за выход; первый выход бесплатный
 const LEN = 4.3; // длина корпуса, м
@@ -28,9 +29,10 @@ const STERN = 1.5; // верх транца над килем
 // pass — места пассажиров (друзья садятся в чужую лодку): [вправо, к корме] от середины; оба — на передней банке,
 // по бортам, так что хозяину между ними виден нос. passZ, passW — где лежит передняя банка и её ширина.
 const HULLS = {
-  'env-motorboat': { len: 4.6, draft: 0.34, bench: 1.0, seatX: 0, seatZ: 0.25, rot: Math.PI / 2, motor: false, thwart: 1.7, pass: [[-0.56, -0.9], [0.56, -0.9]], passZ: -0.9, passW: 1.56 },
-  'prop-boat': { len: LEN, draft: DRAFT, bench: BENCH, seatX: 0, seatZ: SEAT_Z, rot: -Math.PI / 2, motor: true, pass: [[-0.46, -1.05], [0.46, -1.05]] }
+  'env-motorboat': { len: 4.6, draft: 0.34, bench: 1.0, seatX: 0, seatZ: 0.25, rot: Math.PI / 2, motor: false, thwart: 1.7, pass: [[-0.56, -0.9], [0.56, -0.9]], passZ: -0.9, passW: 1.56, bow: [1.12, -2.0] },
+  'prop-boat': { len: LEN, draft: DRAFT, bench: BENCH, seatX: 0, seatZ: SEAT_Z, rot: -Math.PI / 2, motor: true, pass: [[-0.46, -1.05], [0.46, -1.05]], bow: [RIM - 0.04, -LEN / 2 + 0.35] }
 };
+// bow — где на носу стоит шест с вымпелом у своей (купленной) лодки: [высота над килем, к носу от середины]
 export const BOAT_SEATS = 2; // сколько пассажиров берёт лодка
 export const VMAX = 12.5; // полный ход, м/с
 const VREV = 3.2; // задний ход
@@ -150,11 +152,47 @@ export class BoatVisual {
           this.motor.visible = spec.motor;
           if (spec.motor) this.motor.position.set(0, STERN - 0.02, LEN / 2 - 0.1);
           this.model = id;
+          this.dress();
         },
         () => tryHull(ids.filter((k) => k !== id))
       );
     };
     loadManifest().then(() => tryHull(['env-motorboat', 'prop-boat']));
+  }
+  /**
+   * Чья лодка. Прокатная — без примет (color = null). Своя — с вымпелом на носу и подушками на банках цвета хозяина
+   * (цвет его метки на карте): друзья издалека видят, чья лодка идёт.
+   */
+  setOwner(color) {
+    color = color || null;
+    if (color === this.owner) return;
+    this.owner = color;
+    this.dress();
+  }
+  /** Вымпел и подушки — по нынешнему корпусу (он меняется, когда догружается модель). */
+  dress() {
+    const g = this.group;
+    for (const k of ['pennant', 'cushion']) {
+      const o = this[k];
+      if (!o) continue;
+      g.remove(o);
+      o.geometry.dispose();
+      if (k === 'pennant') o.material.dispose();
+      this[k] = null;
+    }
+    const c = this.owner;
+    if (!c) return;
+    const s = this.spec;
+    this.pennant = makePennant(0.78, 0.66, 0.36, [c, '#ffffff', c]);
+    this.pennant.position.set(0, s.bow[0], s.bow[1]);
+    g.add(this.pennant);
+    if (s.thwart) {
+      const B = new Batch();
+      B.add(G.box(), c, M(0, s.bench + 0.025, s.seatZ, s.thwart * 0.42, 0.055, 0.31), { mat: 5 }); // ткань
+      if (s.passW) for (const p of s.pass) B.add(G.box(), c, M(p[0], s.bench + 0.025, p[1], 0.42, 0.055, 0.29), { mat: 5 });
+      this.cushion = B.build(BATCH_MAT, true);
+      g.add(this.cushion);
+    }
   }
   /** Ставит лодку: x, z — середина, yaw — куда смотрит нос; k — ход от −1 до 1, lean — руль от −1 до 1. */
   pose(x, z, yaw, t, k = 0, lean = 0, dt = 0.016) {
@@ -177,6 +215,14 @@ export class BoatVisual {
     this.motor.rotation.y = lean * 0.45;
     this.spin += dt * (6 + sp * 70) * (k < 0 ? -1 : 1);
     this.motor.userData.prop.rotation.z = this.spin;
+    if (this.pennant) {
+      // стоит — вымпел смотрит по ветру, как флаги на берегу; на ходу его вытягивает встречным потоком к корме
+      const go = Math.min(1, sp * 3);
+      const still = wind.dir - yaw;
+      this.pennant.rotation.y = still + angDiff(still, k < 0 ? Math.PI / 2 : -Math.PI / 2) * go;
+      // на воде всегда тянет ветерок: короткий вымпел в штиль не висит тряпочкой вдоль шеста, как большой флаг на берегу
+      this.pennant.userData.wind.value = Math.max(wind.k, go, 0.75);
+    }
   }
   /** Точка на банке, где сидит рыбак (в мире). */
   seat(out) {

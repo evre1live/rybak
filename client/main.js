@@ -19,14 +19,16 @@ import { Net } from './net.js';
 import { createVoice } from './voice.js';
 import { Audio2 } from './audio.js';
 import { UI } from './ui.js';
-import { loadProfile, saveProfile, settings, saveSettings, session } from './profile.js';
-import { S, FLAG } from './proto.js';
+import { loadProfile, saveProfile, saveProfileNow, settings, saveSettings, session } from './profile.js';
+import { S, FLAG, MARKS } from './proto.js';
+import { cardText, cardFile, drawCard } from './postcard.js';
 import { DECK_Y, MARKET, MOORINGS, RENT_DESK, MAP_VIEW, WRECK, SEA, ISLAND, palmR, canStand } from './terrain.js';
 import { ITEMS, FISH_BY_ID, JUNK, JUNK_BY_ID, RARITY, ZONES, BAITS, LURES, clockHours, dayPart, fmtW, fmtCoins, isLure } from '../shared/data.js';
 import {
   marketState, hashStr, buy, equip, sell, kitStats, levelInfo, tackleCount, fishValue, newProfile, speciesWeights,
   weatherAt, WEATHER, syncQuests, questEvent, questText, questDay,
-  TOURS, TOUR_COUNTDOWN, tourBlank, tourAdd, tourTable, tourPrize, tourMedal, medalPrize, tourScoreText, MEDALS
+  TOURS, TOUR_COUNTDOWN, tourBlank, tourAdd, tourTable, tourPrize, tourMedal, medalPrize, tourScoreText, MEDALS,
+  owns, assistBlock, fightAssist, recordAssist, assistXp, ASSIST_AT, ASSIST_REACH, exportSave, importSave
 } from '../shared/logic.js';
 import { $, esc, clamp, damp, angDiff, isTouch } from './util.js';
 import { Perf, isSoftware, newTuner, tuneStep, longShare, pickQuality, scaleFor, TARGET_MS, yieldNow } from './perf.js';
@@ -36,6 +38,15 @@ import { initCache, wakeServer } from './offline.js';
 const SPAWNS = [[-2, 9], [0.6, 9.4], [-4, 8.2], [2.6, 8.6], [-1, 11], [1.6, 11.4], [-3.6, 11], [3.6, 10.4]];
 const LINE_Z = 7;
 const WARM_FISH = 'plotva'; // на этой модели собираются шейдеры для всей рыбы (у моделей рыб материалы устроены одинаково)
+// почему рыбу друга сейчас не взять подсаком (ответ его игры на нашу просьбу; правила — assistBlock в logic.js)
+const ASSIST_NO = {
+  early: 'Рано: рыба ещё далеко от берега',
+  far: 'Подойдите ближе к рыбаку — подсак не достаёт',
+  boss: 'Легенда ещё не выдохлась — ждите её второго дыхания',
+  stuck: 'Рыба залегла на дно — сначала её надо поднять',
+  air: 'Рыба в воздухе — секунду!',
+  late: 'Рыбу уже взяли'
+};
 const CALIB_V = 4; // версия правил подбора качества: сменились пороги — запомненный итог не годится, меряем заново
 const lineX = (slot) => -5.0 + slot * 1.32;
 const v3 = new THREE.Vector3();
@@ -590,6 +601,8 @@ class Game {
       return;
     }
     if (was === 'editor') this.endEdit();
+    if (was === 'settings') this.pendingSave = null; // выбранный, но не подтверждённый файл сохранения забываем
+    if (was === 'card') this.card = null;
     if (this.state === 'world') {
       this.ui.hideScreen();
       this.input.enabled = true;
@@ -647,9 +660,19 @@ class Game {
   seaMap() {
     return this._seaMap || (this._seaMap = drawMinimap(256, SEA_VIEW));
   }
+  /** Своя лодка куплена (лавка, «Прочее»): за выходы не платят, сдавать её не нужно, на носу — вымпел цвета игрока. */
+  ownBoat() {
+    return owns(this.profile, 'boat');
+  }
+  /** Вымпел на своей лодке — цвета метки игрока на карте; у прокатной его нет. */
+  dressBoat() {
+    const own = this.ownBoat();
+    this.boat.vis.setOwner(own ? MARKS[this.me.slot % MARKS.length].color : null);
+    if (own) this.boat.rented = true;
+  }
   /** Первый выход бесплатный — чтобы новичок без монет тоже попробовал. */
   boatPrice() {
-    return this.profile.boatTrips ? BOAT_PRICE : 0;
+    return this.ownBoat() || !this.profile.boatTrips ? 0 : BOAT_PRICE;
   }
   rentBoat() {
     const p = this.profile;
@@ -692,14 +715,20 @@ class Game {
     this.audio.motor(-1);
     this.audio.step(true, true);
     if (m.rent && b.away) {
-      b.rented = false;
-      this.ui.toast('Лодка сдана. Захотите ещё — она ждёт у пирса', 'good', 3000);
+      b.away = false;
+      if (this.ownBoat()) this.ui.toast('Лодка на своём месте — выходите в море, когда захотите', 'good', 2600);
+      else {
+        b.rented = false;
+        this.ui.toast('Лодка сдана. Захотите ещё — она ждёт у пирса', 'good', 3000);
+      }
     } else if (!m.rent) this.ui.toast(`${m.name}. Лодка ждёт у причала`, '', 2600);
   }
   /** Лодка — на место у пирса, прокат закрыт: при входе в бухту и выходе из неё. */
   resetBoat() {
     this.boat.toMooring(0);
     this.boat.rented = false;
+    this.boat.away = false;
+    this.dressBoat();
     this.ride = null;
     this.player.boat = null;
     this.audio.motor(-1);
@@ -814,7 +843,7 @@ class Game {
     const m = MOORINGS[0];
     this.player.place(m.sx, m.sz, m.syaw);
     this.ui.closePanel();
-    this.ui.toast(rode ? 'Вы снова в Солнечной бухте' : 'Вы снова в Солнечной бухте. Лодка сдана', 'good', 3000);
+    this.ui.toast(rode ? 'Вы снова в Солнечной бухте' : this.ownBoat() ? 'Вы снова в Солнечной бухте. Лодка — у пирса' : 'Вы снова в Солнечной бухте. Лодка сдана', 'good', 3000);
   }
   /** В какой части мира точка. */
   areaAt(x, z) {
@@ -835,6 +864,11 @@ class Game {
     this.audio.buy();
     this.ui.toast(`Куплено: ${ITEMS[id].name}`, 'good');
     if (!ITEMS[id].count && !this.solo) this.net.send({ t: 'ev', k: 'buy', d: { id } });
+    if (id === 'boat') {
+      // лодка у пирса теперь своя: с вымпелом, без платы и без сдачи
+      this.dressBoat();
+      this.ui.toast('Лодка ваша — ждёт у пирса под вывеской проката. Платить за выходы больше не нужно', 'gold', 5200);
+    }
     this.afterGear();
   }
   equip(id) {
@@ -873,6 +907,117 @@ class Game {
     if (next === p.equip.tackle) return this.ui.toast('Другой наживки нет — купите на рынке');
     this.equip(next);
     this.ui.toast(`На крючке: ${ITEMS[next].name}`, '', 1400);
+  }
+  // ───── открытка ─────
+  /**
+   * Открытка: кадр игры с подписью. С уловом в руках — про улов (вид, вес, отметки), без него — просто вид бухты.
+   * Кадр рисуем сами и тут же забираем: у холста WebGL картинка живёт только до конца этого шага.
+   */
+  postcard() {
+    if (this.state !== 'world' || this.ui.panel) return null;
+    const f = this.fishing;
+    const c = f.state === 'landed' ? f.catch : null;
+    const lv = levelInfo(this.profile.xp);
+    const jn = c && !c.junk ? this.profile.journal[c.sp] : null;
+    const date = new Date();
+    const t = cardText({
+      c, name: this.profile.name, lvl: lv.lvl, title: lv.title, zone: c && f.spot ? f.spot.zone : '', date,
+      isNew: !!c && !c.junk && (!jn || jn.n === 0), record: !!c && !c.junk && !!jn && jn.n > 0 && c.w > jn.best,
+      site: /^https?:$/.test(location.protocol) && !/^(localhost|127\.)/.test(location.hostname) ? location.host : ''
+    });
+    let cv;
+    try {
+      this.gfx.render(this.scene, this.camera, this.world.exposure);
+      cv = drawCard(document.createElement('canvas'), this.gfx.renderer.domElement, t);
+    } catch (e) {
+      console.warn('открытка', e);
+      return this.ui.toast('Не получилось сделать открытку', 'bad');
+    }
+    this.card = { cv, t, file: cardFile(t, date), url: cv.toDataURL('image/jpeg', 0.9) };
+    this.audio.tick();
+    this.ui.flash('#ffffff');
+    this.ui.openPanel('card');
+    return this.card;
+  }
+  /** Скачать открытку файлом. */
+  saveCard() {
+    const k = this.card;
+    if (!k) return;
+    k.cv.toBlob((blob) => {
+      if (!blob) return this.ui.toast('Не получилось сохранить открытку', 'bad');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = k.file;
+      document.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      this.ui.toast(`Открытка скачана: ${k.file}`, 'good', 3200);
+    }, 'image/jpeg', 0.9);
+  }
+  /** Отправить открытку через «Поделиться» устройства (телефон, Safari); где этого нет — скачиваем. */
+  async shareCard() {
+    const k = this.card;
+    if (!k) return;
+    try {
+      const blob = await new Promise((ok) => k.cv.toBlob(ok, 'image/jpeg', 0.9));
+      const file = new File([blob], k.file, { type: 'image/jpeg' });
+      if (!navigator.canShare || !navigator.canShare({ files: [file] })) return this.saveCard();
+      await navigator.share({ files: [file], title: 'Рыбак', text: k.t.sub ? `${k.t.head} — ${k.t.sub}` : k.t.head });
+    } catch (e) {
+      if (e && e.name !== 'AbortError') this.saveCard();
+    }
+  }
+
+  /** Сохранение — файлом: перенести на другое устройство или оставить про запас. → { name, text } */
+  saveToFile() {
+    const p = this.profile;
+    const text = exportSave(p, Date.now());
+    const d = new Date();
+    const who = String(p.name || '').replace(/[^\p{L}\p{N}_-]+/gu, '') || 'save';
+    const name = `rybak-${who}-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}.json`;
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    this.ui.toast(`Файл сохранения скачан: ${name}`, 'good', 3600);
+    return { name, text };
+  }
+  /** Выбран файл сохранения: проверяем и спрашиваем, заменить ли нынешний прогресс (кнопка в настройках). */
+  async loadFromFile(file) {
+    // после загрузки игра открывается заново — в общей комнате это разорвало бы связь с друзьями посреди рыбалки
+    if (!this.solo && this.state !== 'title') return this.ui.toast('Загрузить сохранение можно в одиночной игре или с главного экрана', 'bad', 4200);
+    let text = '';
+    try {
+      if (file.size > 2e6) throw new Error('big');
+      text = await file.text();
+    } catch {
+      this.audio.error();
+      return this.ui.toast('Файл не читается', 'bad');
+    }
+    const r = importSave(text);
+    if (!r.ok) {
+      this.audio.error();
+      return this.ui.toast(r.why, 'bad', 4200);
+    }
+    if (this.fishing.state === 'fight' || this.fishing.state === 'landed') return this.ui.toast('Сначала вытащите рыбу', 'bad');
+    this.pendingSave = r;
+    if (this.ui.panel === 'settings') this.ui.renderSettings();
+  }
+  /** Заменить прогресс загруженным сохранением: пишем сразу и открываем игру заново — так всё встаёт на места. */
+  applySave() {
+    const r = this.pendingSave;
+    if (!r) return;
+    this.pendingSave = null;
+    const look = r.profile.look || this.profile.look;
+    saveProfileNow({ ...r.profile, look });
+    this.ui.toast('Сохранение загружено — открываем игру заново', 'good', 2000);
+    if (!this.noReload) setTimeout(() => location.reload(), 700);
   }
   resetProgress() {
     const name = this.profile.name;
@@ -1084,7 +1229,8 @@ class Game {
           if (rar >= 2) ui.flash(RARITY[rar].color);
         }
         this.tourCatch(c);
-        return this.ev('catch', { sp: c.sp, w: c.w, len: c.len, trophy: c.trophy });
+        if (c.help) ui.toast(`${c.help} подсачил вашу рыбу — спасибо другу!`, 'good', 3200);
+        return this.ev('catch', { sp: c.sp, w: c.w, len: c.len, trophy: c.trophy, by: c.help ? this.helperId : undefined });
       }
       case 'kept': {
         ui.catchCard(null);
@@ -1145,12 +1291,20 @@ class Game {
       const j = JUNK_BY_ID[d.sp];
       const nm = f ? f.name : j ? j.name : '?';
       const col = f ? RARITY[f.rar].color : '#cbd5e1';
-      this.ui.feed(`${name} — <b style="color:${col}">${esc(nm)}</b>, ${fmtW(Number(d.w) || 0)}${d.trophy ? ' · трофей!' : ''}`);
+      const by = Number(d.by) || 0;
+      const helper = by === this.me.id ? 'вы' : by && this.players.get(by) ? esc(this.players.get(by).card.name) : '';
+      this.ui.feed(`${name} — <b style="color:${col}">${esc(nm)}</b>, ${fmtW(Number(d.w) || 0)}${d.trophy ? ' · трофей!' : ''}${helper ? ` · подсачил${helper === 'вы' ? 'и' : ''} ${helper}` : ''}`);
+      if (by === this.me.id && this.assistAsk === p.id) this.assistDone(p, { sp: String(d.sp || ''), w: Number(d.w) || 0, trophy: !!d.trophy, junk: !f });
       p.remote.bubble(`${esc(nm)} · ${fmtW(Number(d.w) || 0)}`, 6);
       if (f && f.rar >= 3) {
         this.ui.toast(`${esc(p.card.name)} вытащил: ${f.name}, ${fmtW(d.w)}!`, 'gold', 5000);
         this.audio.catch(f.rar);
       }
+    } else if (m.k === 'assist') {
+      // друг просит подсачить нашу рыбу — или отвечает, почему нашу просьбу выполнить нельзя
+      if (Number(d.to) !== this.me.id) return;
+      if (d.no) this.ui.toast(ASSIST_NO[d.no] || ASSIST_NO.early, '', 2600);
+      else this.onAssist(p);
     } else if (m.k === 'lost') p.remote.bubble(d.why === 'snap' ? 'Обрыв!' : 'Сошла…', 3);
     else if (m.k === 'sold') this.ui.feed(`${name} продал улов на <b class="y">${fmtCoins(Number(d.total) || 0)}</b> монет`);
     else if (m.k === 'buy' && ITEMS[d.id]) this.ui.feed(`${name} купил: <b>${esc(ITEMS[d.id].name)}</b>`);
@@ -1163,6 +1317,64 @@ class Game {
         this.audio.step(true, true);
       } else if (host) this.ui.feed(`${name} садится в лодку к <b>${esc(host.card.name)}</b>`);
     } else if (m.k === 'boat' && d.k === 'off') this.ui.feed(`${name} сходит на причал`);
+  }
+
+  // ───── помощь друга: подсачить чужую рыбу ─────
+  /**
+   * Кому сейчас можно помочь подсаком: друг рядом (не дальше ASSIST_REACH) вываживает рыбу, а у нас руки свободны.
+   * → { p, ready, k } — игрок, дошла ли рыба (с ASSIST_AT пути) и сколько пройдено; или null.
+   */
+  assistTarget() {
+    if (this.solo || this.fishing.state !== 'idle' || this.boat.active) return null;
+    const pl = this.player;
+    let best = null;
+    let bd = ASSIST_REACH;
+    for (const p of this.players.values()) {
+      const st = p.st;
+      if (p.mode !== 'world' || !st || (st[S.FS] | 0) !== 5) continue;
+      const d = Math.hypot(st[S.X] - pl.x, st[S.Z] - pl.z);
+      if (d < bd) {
+        bd = d;
+        best = p;
+      }
+    }
+    if (!best) return null;
+    const k = clamp(Number(best.st[S.K]) || 0, 0, 1);
+    return { p: best, k, ready: k >= ASSIST_AT };
+  }
+  /** Мы подсачиваем рыбу друга: просим его игру отдать улов (решает она — рыба на его леске). */
+  assist(p) {
+    const now = performance.now();
+    if (now < (this.assistCd || 0)) return;
+    this.assistCd = now + 1400;
+    this.assistAsk = p.id;
+    this.ev('assist', { to: p.id });
+    this.audio.plop();
+    this.fx.splash(p.st[S.BX], p.st[S.BZ], 0.7);
+  }
+  /** Друг подсачивает нашу рыбу. Не вышло — отвечаем ему, почему. */
+  onAssist(p) {
+    const f = this.fishing;
+    const far = !p.st || Math.hypot(p.st[S.X] - this.player.x, p.st[S.Z] - this.player.z) > ASSIST_REACH + 1.5;
+    const why = f.state === 'landed' ? 'late' : f.state !== 'fight' ? 'early' : far ? 'far' : assistBlock(f.fight);
+    if (why) return this.ev('assist', { to: p.id, no: why });
+    this.helperId = p.id;
+    f.assist(p.card.name);
+  }
+  /** Рыба друга взята нашим подсаком: нам — четверть её опыта и отметка в журнале. */
+  assistDone(p, c) {
+    this.assistAsk = 0;
+    const r = recordAssist(this.profile, c);
+    const f = FISH_BY_ID[c.sp];
+    this.audio.catch(f ? Math.min(2, f.rar) : 0);
+    this.ui.toast(`Вы подсачили рыбу для ${p.card.name}${f ? `: ${f.name}, ${fmtW(c.w)}` : ''}. Опыт +${r.xp}`, 'good', 3600);
+    if (r.levelUp) {
+      this.audio.level();
+      this.ui.toast(`Уровень ${r.levelUp} — ${levelInfo(this.profile.xp).title}!`, 'gold', 4000);
+      this.sendCard();
+    }
+    this.ui.refreshHud();
+    saveProfile(this.profile);
   }
 
   // ───── задания на день ─────
@@ -1321,6 +1533,7 @@ class Game {
     if (i.hit('Enter') && !this.solo) return ui.chat(true);
     if (i.hit('Escape')) return ui.openPanel('pause');
     const busy = f.state === 'fight' || f.state === 'landed';
+    if (i.hit('KeyP') && f.state !== 'fight') return this.postcard();
     if (i.hit('Tab')) return busy ? ui.toast('Сначала вытащите рыбу') : ui.openPanel('tackle');
     if (i.hit('KeyJ') && !busy) return ui.openPanel('journal');
     if (i.hit('KeyK') && !busy) return ui.openPanel('quests');
@@ -1345,7 +1558,12 @@ class Game {
     // что сейчас делает кнопка «действие»: рынок, лодка, причал
     const pl = this.player;
     let act = null;
-    if (!f.lineOut && f.state !== 'charge') {
+    const help = this.assistTarget();
+    if (help) {
+      // друг рядом вываживает рыбу: с 70 % пути её можно взять подсаком — это важнее причала и лавки
+      const nm = help.p.card.name.toUpperCase();
+      act = help.ready ? { text: `ПОДСАЧИТЬ РЫБУ — ${nm}`, short: 'ПОДСАК', run: () => this.assist(help.p) } : { text: `ПОДСАК НАГОТОВЕ: РЫБА ${nm} ПОДОЙДЁТ — БЕРИТЕ (${Math.round(help.k * 100)} % ИЗ ${Math.round(ASSIST_AT * 100)})`, short: '', run: () => {} };
+    } else if (!f.lineOut && f.state !== 'charge') {
       // друг сидит в своей лодке у настила и ждёт — садимся к нему (свою лодку берут у прилавка будки или когда он отойдёт)
       const rt = ride || boat.active ? null : this.rideTarget(true);
       if (ride) {
@@ -1363,14 +1581,14 @@ class Game {
         const mi = boat.mooringNear();
         if (mi >= 0) {
           const m = MOORINGS[mi];
-          act = m.rent && !boat.away ? { text: 'ВЫЙТИ НА ПИРС', short: 'НА ПИРС' } : { text: `${m.rent ? 'ПРИЧАЛИТЬ И СДАТЬ ЛОДКУ' : 'ПРИЧАЛИТЬ'} — ${m.name.toUpperCase()}`, short: 'ПРИЧАЛИТЬ' };
+          act = m.rent && !boat.away ? { text: 'ВЫЙТИ НА ПИРС', short: 'НА ПИРС' } : { text: `${m.rent && !this.ownBoat() ? 'ПРИЧАЛИТЬ И СДАТЬ ЛОДКУ' : 'ПРИЧАЛИТЬ'} — ${m.name.toUpperCase()}`, short: 'ПРИЧАЛИТЬ' };
           act.run = () => this.dock(mi);
         }
       } else if (Math.hypot(pl.x - MARKET.x, pl.z - MARKET.z) < MARKET.r) act = { text: 'РЫНОК — ПРОДАТЬ УЛОВ, КУПИТЬ СНАСТИ', short: 'РЫНОК', run: () => ui.openPanel('sell') };
       // к лодке можно подойти самой, а дома — ещё и к прилавку будки проката
       else if (Math.hypot(pl.x - boat.x, pl.z - boat.z) < 3.6 || Math.hypot(pl.x - MOORINGS[boat.moor].sx, pl.z - MOORINGS[boat.moor].sz) < 2.6 || (boat.moor === 0 && Math.hypot(pl.x - RENT_DESK.x, pl.z - RENT_DESK.z) < RENT_DESK.r)) {
         const price = this.boatPrice();
-        act = boat.rented ? { text: 'СЕСТЬ В ЛОДКУ', short: 'В ЛОДКУ', run: () => this.boardBoat() } : { text: `ЛОДКА НАПРОКАТ — ${price ? `${price} МОНЕТ` : 'ПЕРВЫЙ ВЫХОД БЕСПЛАТНО'}`, short: 'ЛОДКА', run: () => this.rentBoat() };
+        act = boat.rented ? { text: this.ownBoat() && boat.moor === 0 ? 'СВОЯ ЛОДКА — В ПУТЬ' : 'СЕСТЬ В ЛОДКУ', short: 'В ЛОДКУ', run: () => this.boardBoat() } : { text: `ЛОДКА НАПРОКАТ — ${price ? `${price} МОНЕТ` : 'ПЕРВЫЙ ВЫХОД БЕСПЛАТНО'}`, short: 'ЛОДКА', run: () => this.rentBoat() };
       } else {
         // лодка друга, оставленная у причала (или стоящая у берега): можно сесть и подождать хозяина
         const any = this.rideTarget();
@@ -1397,7 +1615,7 @@ class Game {
       case 'wait': return f.lure ? `<span>${k('primary')} ДЕРЖИ — ВЕДИ ПРИМАНКУ</span>${sep}<span>${k('back')} СМОТАТЬ</span>` : `<span>ЖДЁМ ПОКЛЁВКУ</span>${sep}<span>${k('back')} СМОТАТЬ</span>`;
       case 'bite': return `<span>${k('primary')} ПОДСЕКАЙ!</span>`;
       case 'fight': return `<span>${k('primary')} МОТАТЬ</span>${sep}<span>ОТПУСТИ — ОСЛАБИТЬ</span>${sep}<span>${k('left')}${k('right')} ВЕСТИ</span>`;
-      case 'landed': return `<span>${k('primary')} В САДОК</span>${sep}<span>${k('release')} ОТПУСТИТЬ</span>`;
+      case 'landed': return `<span>${k('primary')} В САДОК</span>${sep}<span>${k('release')} ОТПУСТИТЬ</span>${this.input.device === 'pad' ? '' : `${sep}<span><kbd class="g">P</kbd> ОТКРЫТКА</span>`}`;
       default: return '';
     }
   }
@@ -1489,6 +1707,7 @@ class Game {
     }, () => (t.primary = false));
     hold('#tE', () => this.input.pressed.add('KeyE'));
     hold('#tR', () => this.input.pressed.add('KeyR'));
+    hold('#tP', () => this.input.pressed.add('KeyP'));
     hold('#tMenu', () => this.input.pressed.add('Escape'));
     hold('#tSit', () => this.input.pressed.add('KeyX'));
     hold('#tChat', () => this.input.pressed.add('Enter'));
@@ -1518,6 +1737,7 @@ class Game {
     $('#tAct').classList.toggle('go', st === 'bite');
     $('#tR').textContent = st === 'landed' ? 'ОТПУСТИТЬ' : 'СМОТАТЬ';
     $('#tR').classList.toggle('hidden', st !== 'landed' && st !== 'wait');
+    $('#tP').classList.toggle('hidden', st !== 'landed');
     $('#tE').classList.toggle('hidden', !(act && st === 'idle'));
     if (act) $('#tE').textContent = act;
     $('#tSit').classList.toggle('hidden', st !== 'idle' || !!act || inBoat);
@@ -1637,6 +1857,24 @@ class Game {
       } else ui.castMark(null);
       ui.power(f.state === 'charge' ? f.power : null, aim.dist / kit.cast);
       $('#cross').className = !i.grab && !i.touch.on ? 'off' : f.state === 'idle' && !aim.ok ? 'bad' : '';
+      // друг рядом с пустыми руками: на полосе пути — отметка «подсак с 70 %», и один раз за бой — подсказка
+      if (f.state === 'fight' && !this.solo) {
+        this.helpT = (this.helpT || 0) - dt;
+        if (this.helpT <= 0) {
+          this.helpT = 0.4;
+          const me = this.player;
+          let near = null;
+          for (const p of this.players.values()) {
+            const st = p.st;
+            if (p.mode === 'world' && st && (st[S.FS] | 0) === 0 && (st[S.BOAT] | 0) !== 1 && Math.hypot(st[S.X] - me.x, st[S.Z] - me.z) < ASSIST_REACH) near = p;
+          }
+          this.helperNear = near;
+          if (near && this.helpFight !== f.fight && !f.fight.junk) {
+            this.helpFight = f.fight;
+            ui.toast(`${near.card.name} рядом — с ${Math.round(ASSIST_AT * 100)} % пути возьмёт рыбу подсаком`, '', 3200);
+          }
+        }
+      } else this.helperNear = null;
       ui.fight(f.state === 'fight' ? f.fight : null, i.steer);
       // музыка слушает игру: вываживание — пульс, тугая леска — тревога, легенда — минор, ночь и дождь — тише и реже
       this.audio.mood({ fight: f.state === 'fight' ? 1 : 0, tension: f.fight ? f.fight.T : 0, run: f.fight && f.fight.phase === 'run' ? 1 : 0, boss: f.fight ? f.fight.bossMax : 0, night: this.world.night, rain: wx.rain });
@@ -1666,7 +1904,7 @@ class Game {
         this.sendT = 1 / 12;
         const n = f.net(this.netOut || (this.netOut = {}));
         const pl = this.player;
-        const flags = n.flags | (pl.sit ? FLAG.sit : 0) | (pl.dangle && pl.sit ? FLAG.dangle : 0);
+        const flags = n.flags | (pl.sit ? FLAG.sit : 0) | (pl.dangle && pl.sit ? FLAG.dangle : 0) | (this.ownBoat() ? FLAG.own : 0);
         const rd = this.ride;
         this.net.send({ t: 'st', s: [pl.x, pl.y + pl.jump, pl.z, pl.yaw, pl.pitch, boat.active ? boat.v : pl.speed, n.fs, n.bx, n.by, n.bz, n.t, flags, n.k, i.steer, 0, boat.yaw, boat.net, rd ? rd.id : 0, rd ? rd.seatI : 0] });
       }
