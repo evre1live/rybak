@@ -12,7 +12,8 @@ export const MAT = { PLAIN: 0, WOOD: 1, ROCK: 2, LEAF: 3, RINGS: 4, CLOTH: 5, PA
 
 /** Общие для всех материалов значения; обновляет мир раз в кадр. */
 /** Насколько далеко рисовать подробные модели леса и камней: 1 — «высокое» качество, меньше — ближе (см. gfx.js). */
-export const detail = { lod: 1, grass: 44, far: 170 }; // grass — на сколько метров вокруг игрока растут пучки травы (0 — нет); far — дальность мелочи
+export const detail = { lod: 1, grass: 44, far: 170, kelp: 1, rays: true }; // grass — на сколько метров вокруг игрока растут пучки травы (0 — нет); far — дальность мелочи;
+// kelp — доля водорослей на дне (0…1); rays — рисовать ли лучи низкого солнца
 export const surfaceU = {
   uDet: { value: null },
   uCaust: { value: null },

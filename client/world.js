@@ -1,12 +1,14 @@
 // Мир «Солнечной бухты»: рельеф, небо, облака, свет по времени суток — и сборка всего остального.
 import * as THREE from 'three';
 import { clamp, lerp, sstep, damp, fbm2, canvasTex, rng, TAU, isTouch } from './util.js';
-import { groundH, shoreZ, BOUNDS, WORLD, PALM, WRECK, palmR, capeDist, CAPE, ISLAND, islandR, MAP_VIEW, DECKS, LIGHTHOUSE, ARCH, MOORINGS } from './terrain.js';
+import { groundH, shoreZ, BOUNDS, WORLD, PALM, WRECK, palmR, capeDist, CAPE, ISLAND, islandR, MAP_VIEW, DECKS, DECK_Y, LIGHTHOUSE, ARCH, MOORINGS } from './terrain.js';
 import { createWater, createFoamRings } from './water.js';
 import { buildScenery, FOAM_SPOTS } from './scenery.js';
 import { patchSurface, surfaceU, detailTexture, loadPaint, detail } from './surface.js';
 import { ENV } from './envmodels.js';
 import { GrassField } from './grass.js';
+import { Seabed } from './seabed.js';
+import { Flags, SunRays } from './flags.js';
 import { Rain } from './weather.js';
 
 // ключевые часы суток: цвета неба, солнца, воды
@@ -397,6 +399,16 @@ export class World {
     this.scenery = buildScenery(scene);
     shadeUnderTrees(this.terrain);
     this.grass = new GrassField(scene, grassTint, isTouch() ? { max: 3000, maxFlowers: 500 } : {});
+    // дно, флаги на шестах (показывают ветер) и лучи низкого солнца
+    this.seabed = new Seabed(scene);
+    const STRIPES = (a, b) => [a, b, a, b, a];
+    this.flags = new Flags(scene, [
+      { x: -5.4, z: -26.4, y: DECK_Y, h: 3.4, len: 1.5, wide: 0.9, cols: ['#f04438', '#ffffff', '#f04438'], pennant: true }, // вымпел на конце главного пирса
+      { x: -12.6, z: 5.0, y: DECK_Y, h: 3.8, len: 1.7, wide: 1.05, cols: STRIPES('#22d3ee', '#ffffff') }, // у лавки на берегу
+      { x: -19.4, z: -77.6, y: DECK_Y, h: 3.2, len: 1.3, wide: 0.8, cols: ['#ffd60a', '#0e2140'], pennant: true }, // причал у маяка
+      { x: 209.8, z: -193.6, y: DECK_Y, h: 3.2, len: 1.3, wide: 0.8, cols: ['#ff8a3d', '#ffffff', '#ff8a3d'], pennant: true } // Пальмовый остров
+    ]);
+    this.rays = new SunRays(scene);
     this.rings = FOAM_SPOTS.length ? createFoamRings(FOAM_SPOTS, this.water.uniforms) : null;
     if (this.rings) scene.add(this.rings);
     this.sunDir = new THREE.Vector3(0, 1, 0);
@@ -513,6 +525,16 @@ export class World {
   update(dt, t, camera) {
     this.grass.setRange(detail.grass);
     this.grass.update(camera);
+    if (this.kelpK !== detail.kelp) this.seabed.setDetail((this.kelpK = detail.kelp));
+    this.flags.update(t, this.wx.wind);
+    {
+      // лучи — только когда солнце низко: на рассвете и на закате; в пасмурную погоду и в тумане их нет
+      const y = this.sunDir.y;
+      const day = this.hours >= 5 && this.hours < 21;
+      const low = day ? sstep(0.005, 0.07, y) * (1 - sstep(0.2, 0.42, y)) : 0;
+      this.rays.on = detail.rays;
+      this.rays.update(camera, this.sunDir, this.sun.color, low * 0.55 * (1 - this.wx.cover * 0.85) * (1 - this.wx.fog), t);
+    }
     this.water.uniforms.uTime.value = t;
     this.water.follow(camera);
     surfaceU.uTimeS.value = t;

@@ -95,7 +95,7 @@ function flowerGeometry() {
 }
 
 /** Материал травинок: качаются на ветру, у края видимости плавно уходят в землю. */
-function grassMaterial(U) {
+export function grassMaterial(U) {
   const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, side: THREE.DoubleSide });
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uTimeS = surfaceU.uTimeS;

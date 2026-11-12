@@ -198,7 +198,8 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
         const up = f.update;
         f.update = function (...a) {
           const s = this.fight;
-          if (window.__eternal && this.state === 'fight' && s) { s.slack = 0; s.strain = 0; }
+          // …и рывков нет: на долгом кадре (шаг правил до 0,3 с при ускоренном времени) рывок рвал бы леску за один шаг
+          if (window.__eternal && this.state === 'fight' && s) { s.slack = 0; s.strain = 0; s.phase = 'calm'; s.phaseT = 1e9; s.next = 'calm'; }
           return up.apply(this, a);
         };
       }
@@ -286,6 +287,8 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     // взгляд сам держится на рыбе (она левее середины кадра), пока мышь не трогают; выключили в настройках — стоит
     const view = () => G(page, () => { const g = RYBAK, f = g.fishing; const v = new g.camera.position.constructor(f.bx, 0, f.bz).project(g.camera); return { x: v.x, y: v.y, yaw: g.player.yaw }; });
     assert.equal(await G(page, () => RYBAK.fishing.state), 'fight', 'бой для проверки камеры идёт');
+    // на время проверки камеры правила боя стоят: рыба на месте, бой не кончается — смотрим только на взгляд
+    await G(page, () => { const f = RYBAK.fishing; window.__upd = f.update; f.update = () => {}; });
     // угол «после толчка» берём тем же вызовом, что и сам толчок: между двумя вызовами игра успевает прожить несколько кадров
     // (в проверке кадры не рисуются и идут быстро), и взгляд уже возвращается — на загруженной машине почти целиком
     const yawFar = await G(page, () => { RYBAK.player.yaw += 0.6; RYBAK.followT = 0; return RYBAK.player.yaw; });
@@ -310,7 +313,7 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     assert.equal(await G(page, () => RYBAK.fishing.state), 'fight');
     assert.ok(Math.abs((await view()).yaw - y0) < 1e-6, 'с выключенной настройкой взгляд не ведёт');
     await follow(true);
-    await G(page, () => { window.__eternal = false; });
+    await G(page, () => { RYBAK.fishing.update = window.__upd; window.__eternal = false; });
 
     // улов без подсака: рыба висит на леске под кончиком удилища, головой вверх
     const shown = (sp, net) => G(page, ([sp, net]) => new Promise((ok) => {
@@ -467,6 +470,52 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     }, [L2.x, L2.z]);
     assert.ok(steps.walk === 0 && steps.run > 0, 'шагом рыбу не пугаем, бегом — пугаем: ' + JSON.stringify(steps));
     console.log('  живая рыба: наживку у тени заметили, улов выслежен, плюхнули на рыбу — ушла, топот распугивает');
+  }
+  // ── дно и свет: водоросли и мелочь на дне, флаги по ветру, лучи низкого солнца ──
+  {
+    const w = await G(page, () => {
+      const g = RYBAK, W = g.world, sb = W.seabed, m = sb.kelp.instanceMatrix.array;
+      let top = -1e9, deep = 1e9;
+      for (let i = 0; i < sb.total; i++) {
+        const y = m[i * 16 + 13];
+        top = Math.max(top, y + Math.hypot(m[i * 16 + 4], m[i * 16 + 5], m[i * 16 + 6])); // куст высотой 1, растянут по высоте
+        deep = Math.min(deep, y);
+      }
+      sb.mesh.geometry.computeBoundingBox();
+      const U = W.flags.U.uWind;
+      const blow = (wind) => { for (let i = 0; i < 400; i++) W.flags.update(g.T || 0, wind); return +U.value.toFixed(3); };
+      const keep = U.value;
+      const wind = { storm: blow(1), calm: blow(0) };
+      U.value = keep;
+      return {
+        stats: sb.stats(), top, deep, dressTop: sb.mesh.geometry.boundingBox.max.y,
+        flags: W.flags.items.map((f) => ({ y: +f.position.y.toFixed(2), yaw: +f.rotation.y.toFixed(3), shadow: f.castShadow })), wind,
+        raysOn: W.rays.on, hidden: [sb.mesh, sb.kelp, W.rays.mesh].every((o) => g.gfx.reflHide ? g.gfx.reflHide.includes(o) : true)
+      };
+    });
+    assert.ok(w.stats.of > 300 && w.stats.tris > 1500, `дно обжито: ${JSON.stringify(w.stats)}`);
+    assert.equal(w.stats.kelp, Math.round(w.stats.of * 0.3), 'на «низком» качестве водорослей — треть');
+    assert.ok(w.top < -0.1 && w.deep > -4.4, `водоросли стоят под водой и там, где дно видно: верхушка ${w.top.toFixed(2)}, глубже всех ${w.deep.toFixed(2)}`);
+    assert.ok(w.dressTop < -0.05, `камни, ракушки и затонувшая мелочь — под водой: ${w.dressTop.toFixed(2)}`);
+    assert.equal(w.flags.length, 4);
+    assert.ok(w.flags.every((f) => f.y > 0.3 && f.yaw === w.flags[0].yaw && !f.shadow), `флаги стоят на настилах и смотрят в одну сторону: ${JSON.stringify(w.flags)}`);
+    assert.ok(w.wind.storm > 0.95 && w.wind.calm < 0.2, `полотнища вытягиваются по ветру и обвисают в штиль: ${JSON.stringify(w.wind)}`);
+    assert.equal(w.raysOn, false, 'на «низком» качестве лучей солнца нет');
+    assert.ok(w.hidden, 'дно, водоросли и лучи не попадают в отражение на воде');
+    // лучи: только когда солнце низко и в кадре; отвернулись или солнце поднялось — гаснут. (Здесь качество «низкое»,
+    // и сама игра их не включает — зовём расчёт напрямую, одним вызовом, чтобы кадры игры не вмешались.)
+    const rays = await G(page, () => {
+      const g = RYBAK, W = g.world, R = W.rays, cam = g.camera.clone();
+      const sun = new g.camera.position.constructor(0.95, 0.11, 0.31).normalize();
+      const run = (k, at) => { cam.lookAt(cam.position.clone().add(at)); cam.updateMatrixWorld(true); for (let i = 0; i < 120; i++) { R.on = true; R.update(cam, sun, W.sun.color, k, 1); } return { vis: R.mesh.visible, k: +R.U.uK.value.toFixed(3), sun: [+R.U.uSun.value.x.toFixed(2), +R.U.uSun.value.y.toFixed(2)], z: +R.U.uZ.value.toFixed(4) }; };
+      const flat = sun.clone().setY(0).normalize();
+      const out = { toSun: run(0.5, flat), away: run(0.5, flat.clone().negate()), noon: run(0, flat) };
+      R.on = false; R.U.uK.value = 0; R.mesh.visible = false;
+      return out;
+    });
+    assert.ok(rays.toSun.vis && rays.toSun.k > 0.45 && Math.abs(rays.toSun.sun[0]) < 0.1 && rays.toSun.sun[1] > 0 && rays.toSun.z > 0.9 && rays.toSun.z < 1, `лицом к низкому солнцу лучи видны: ${JSON.stringify(rays.toSun)}`);
+    assert.ok(!rays.away.vis && !rays.noon.vis, `спиной к солнцу и днём лучей нет: ${JSON.stringify(rays)}`);
+    console.log(`  дно и свет: водорослей ${w.stats.kelp} из ${w.stats.of}, мелочи на дне ${w.stats.tris} треугольников, флагов ${w.flags.length}, лучи по солнцу`);
   }
   if (process.env.UNTIL === 'fight') {
     // быстрый прогон только до вываживания: UNTIL=fight node test/play.cjs

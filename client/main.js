@@ -90,7 +90,7 @@ class Game {
     this.vm.setLook(fpLook(this.profile.look));
     this.vm.setVisible(false);
     // вода отражает мир; сама вода, пена у свай, руки с удочкой и трава в отражение не попадают
-    this.gfx.setReflection(this.world.water.uniforms, [this.world.water.mesh, this.world.rings, this.vm.root, this.world.grass.tufts, this.world.grass.flowers, this.world.rain.mesh, ...this.world.scenery.fauna.under].filter(Boolean));
+    this.gfx.setReflection(this.world.water.uniforms, [this.world.water.mesh, this.world.rings, this.vm.root, this.world.grass.tufts, this.world.grass.flowers, this.world.rain.mesh, this.world.seabed.mesh, this.world.seabed.kelp, this.world.rays.mesh, ...this.world.scenery.fauna.under].filter(Boolean));
     // живность: рыба и мальки шарахаются от шагов по воде, поплавка и лодки; всплеск играющей рыбы слышен неподалёку
     this.fauna = this.world.scenery.fauna;
     this.fauna.onSplash = (x, z, pw) => {

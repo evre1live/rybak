@@ -232,13 +232,26 @@ export function upgradeEnv(scene) {
       }, fail);
     // ── камни: процедурный камень задан размерами, модель растягивается под них ──
     const rocks = ['env-rock1', 'env-rock2', 'env-rock3', 'env-cliff1', 'env-cliff2'];
+    let turned = 0; // сколько утёсов встало «боком»
     if (rocks.every(has)) {
       const items = (id) => {
         const size = modelInfo(id).size;
-        return ENV.rocks[id].map((r) => ({
-          x: r.x, y: r.y, z: r.z, s: 1, sx: r.w / size[0], sy: r.h / size[1], sz: r.d / size[2], ry: r.ry,
-          rx: r.tilt ? (spot01(r.x, r.z, 8) - 0.5) * 0.3 : 0, rz: r.tilt ? (spot01(r.x, r.z, 9) - 0.5) * 0.3 : 0
-        }));
+        return ENV.rocks[id].map((r) => {
+          let { w, d, ry } = r;
+          if (r.turn) {
+            // «боком»: наружу смотрит другая грань той же модели. Только если её не придётся растягивать заметно сильнее обычного
+            const fit = (a, b) => Math.max(a, b) / Math.min(a, b);
+            if (fit(d / size[0], w / size[2]) < Math.max(1.6, fit(w / size[0], d / size[2]) * 1.2)) {
+              [w, d] = [d, w];
+              ry += Math.PI / 2;
+              turned++;
+            }
+          }
+          return {
+            x: r.x, y: r.y, z: r.z, s: 1, sx: w / size[0], sy: r.h / size[1], sz: d / size[2], ry,
+            rx: r.tilt ? (spot01(r.x, r.z, 8) - 0.5) * 0.3 : 0, rz: r.tilt ? (spot01(r.x, r.z, 9) - 0.5) * 0.3 : 0
+          };
+        });
       };
       Promise.all(rocks.map((id) => loadModel(id)))
         // скал в море немного, и они большие — всегда подробные; валуны вдали рисуются грубо.
@@ -250,6 +263,7 @@ export function upgradeEnv(scene) {
           drop(scene, 'rocks');
           state.rocks = true;
           state.cliffs = ENV.rocks['env-cliff1'].length + ENV.rocks['env-cliff2'].length;
+          state.turned = turned;
         }, fail);
     }
     // ── сваи причалов: рядом подробные, дальше — грубые копии ──

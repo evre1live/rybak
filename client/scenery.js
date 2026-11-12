@@ -734,9 +734,13 @@ function buildRocks(scene, r) {
         const depth = 7.2 + rc() * 1.6;
         const [x, z] = at(a, R - 1.7 + rc() * 0.8);
         const top = groundH(...at(a, R - 6.5)) + 0.5 + rc() * 1.1;
+        // Чтобы кольцо не читалось как одна и та же пара камней: уступ из глыб через раз ставится боком — наружу смотрит
+        // другая его грань (turn; встанет так, только если модель не придётся сильно растягивать — см. envmodels.js).
+        // У стены из пластов бока гладкие, её боком не ставим. Каждый утёс ещё и чуть довёрнут.
         ENV.rocks[narrow ? 'env-rock2' : wall ? 'env-cliff1' : 'env-cliff2'].push({
           x, y: -1.3, z, w: (len / n) * (1.2 + rc() * 0.12), h: top + 1.3, d: narrow ? Math.min(depth, 6.4) : depth,
-          ry: Math.atan2(-(bz - az) / tl, (bx - ax) / tl) + (rc() < 0.5 ? Math.PI : 0), tilt: false
+          ry: Math.atan2(-(bz - az) / tl, (bx - ax) / tl) + (rc() < 0.5 ? Math.PI : 0) + (narrow ? 0 : (rc() - 0.5) * 0.22), tilt: false,
+          turn: !narrow && !wall && rc() < 0.5
         });
       }
     }

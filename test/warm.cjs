@@ -185,6 +185,15 @@ const tier = process.argv[2] || 'medium';
   await p.waitForTimeout(800);
   await frame(2);
   await mark('снова ясно');
+  // рассвет: низкое солнце в кадре — веер лучей (на «низком» качестве их нет); флаги на шестах уже в кадре с первой минуты
+  await p.evaluate(() => { const g = RYBAK; g.fixedHour = 5.7; g.player.yaw = Math.atan2(-0.95, -0.31); g.player.pitch = 0.05; });
+  await p.waitForTimeout(1500);
+  await frame(4);
+  const dawn = await p.evaluate(() => { const W = RYBAK.world; return { rays: W.rays.mesh.visible, k: +W.rays.U.uK.value.toFixed(3), sunY: +W.sunDir.y.toFixed(3), flags: W.flags.items.filter((f) => f.visible).length, kelp: W.seabed.stats() }; });
+  await mark('рассвет, лучи солнца');
+  await p.evaluate(() => { RYBAK.fixedHour = 13; });
+  await frame(2);
+  await mark('снова день');
 
   await browser.close();
 
@@ -200,6 +209,10 @@ const tier = process.argv[2] || 'medium';
       if (h.junk || h.pre.includes('fish-' + h.sp)) assert.ok(r.tex <= 1, `${r.label}: текстуры уже у видеокарты (отправлено ${r.tex}, улов ${h.sp})`);
     }
   }
+  // лучи низкого солнца: на «среднем» и «высоком» видны на рассвете, на «низком» их нет; водорослей — по ступени качества
+  assert.equal(dawn.rays, tier !== 'low', `лучи на рассвете: ${JSON.stringify(dawn)}`);
+  assert.equal(dawn.flags, 4, 'флаги на месте');
+  assert.equal(dawn.kelp.kelp, Math.round(dawn.kelp.of * { high: 1, medium: 0.6, low: 0.3 }[tier]), `водорослей по качеству: ${JSON.stringify(dawn.kelp)}`);
   assert.equal(errors, 0, 'ошибок на странице нет');
   console.log(`ПРОГРЕВ «${tier}»: всё в порядке — после заставки не собрано ни одного шейдера`);
 })().catch((e) => { console.error('ПРОВАЛ:', e.message.split('\n').slice(0, 8).join('\n')); process.exit(1); });

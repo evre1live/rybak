@@ -247,11 +247,15 @@ void main() {
   float lap = 0.1 + 0.07 * swash;
   float edge = 1.0 - ss(0.0, lap + 0.1, depth + n1.x * 0.07);
   float ph = fract(depth * 0.95 + uTime * 0.17 + n2.x * 0.16 + n1.y * 0.1);
-  float crest = ss(0.0, 0.035, ph) * pow(1.0 - ph, 8.0);
+  float crest = ss(0.0, 0.035, ph) * pow(1.0 - ph, 6.0);
   float lace = ss(0.45, 0.85, n1.z * 0.45 + c1 * 0.8 + c2 * 0.35);
   // в тихой заводи прибоя нет: туда волна с моря не доходит
   float open = ss(uCalm.z, uCalm.z + 12.0, distance(p, uCalm.xy));
-  float band = crest * mix(1.0, lace, ss(0.03, 0.3, ph)) * ss(0.05, 0.2, depth) * (1.0 - ss(1.0, 2.3, depth)) * open;
+  // На крутом берегу (скала, обрыв) валу негде сложиться: там он шёл по линии глубины тонкой ниткой — убираем.
+  // Крутизна дна — насколько глубина меняется на метр, по соседним точкам кадра.
+  float slope = length(vec2(dFdx(depth), dFdy(depth))) / max(length(vec2(dFdx(p.x), dFdy(p.x))) + length(vec2(dFdx(p.y), dFdy(p.y))), 1e-4) * 1.6;
+  float gentle = 1.0 - ss(0.3, 0.75, slope);
+  float band = crest * mix(1.0, lace, ss(0.03, 0.3, ph)) * ss(0.05, 0.2, depth) * (1.0 - ss(1.0, 2.3, depth)) * open * gentle;
   // у самого берега после наката остаётся тонкое кружево пены — узкой полоской, без молочной каши на мели
   float wash = lace * (1.0 - ss(0.0, 0.13, depth)) * (0.5 + 0.4 * swash) * open;
   float foam = clamp(edge + band + wash * 0.35, 0.0, 1.0) * step(0.004, dv);
