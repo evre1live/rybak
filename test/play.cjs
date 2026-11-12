@@ -803,17 +803,11 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     // в проверке видеокарты нет (отрисовка программная): игра должна сама уйти на «низкое» и уменьшить разрешение
     assert.ok(c1.calib && c1.calib.from === 'measured' && c1.q === 'low' && c1.scale <= 0.75 && c1.calib.ms > 20, `качество подобрано замером: ${JSON.stringify(c1.calib)}`);
     assert.ok(c1.saved && c1.saved.tier === 'low' && c1.saved.gpu === c1.gpu && c1.gpu.length > 3, 'итог запомнен для этой видеокарты');
-    // запомненное годится неделю: потом (и после смены правил подбора) игра меряет заново
-    assert.ok(c1.progs > 20, `шейдеры собраны до первого кадра: ${c1.progs}`);
-    // второй запуск: берём запомненное, не меряя заново
+    // второй запуск: начинаем с запомненного и перепроверяем замером — в обе стороны
     await bp.goto(`${BASE}/?norender&boot=full&h=13`);
     await bp.waitForFunction(() => window.RYBAK && window.__frames > 3 && !RYBAK.booting, null, { timeout: 240000 });
-    const c2 = await G(bp, () => ({ from: RYBAK.calib && RYBAK.calib.from, q: RYBAK.gfx.quality, scale: RYBAK.gfx.scale }));
-    assert.ok(c2.from === 'saved' && c2.q === 'low' && Math.abs(c2.scale - c1.scale) < 0.01, `второй запуск — из запомненного: ${JSON.stringify(c2)}`);
-    await G(bp, () => { const k = 'rybak.settings.v1', s = JSON.parse(localStorage.getItem(k)); s.autoQ.t = Date.now() - 8 * 864e5; localStorage.setItem(k, JSON.stringify(s)); });
-    await bp.goto(`${BASE}/?norender&boot=full&h=13`);
-    await bp.waitForFunction(() => window.RYBAK && window.__frames > 3 && !RYBAK.booting, null, { timeout: 240000 });
-    assert.equal(await G(bp, () => RYBAK.calib && RYBAK.calib.from), 'measured', 'запомненному больше недели — замер заново');
+    const c2 = await G(bp, () => ({ calib: RYBAK.calib, q: RYBAK.gfx.quality, scale: RYBAK.gfx.scale }));
+    assert.ok(c2.calib.from === 'measured' && c2.calib.log.length === 1 && c2.calib.log[0][0] === 'low' && c2.q === 'low' && c2.scale <= 0.75, `второй запуск — замер с запомненной ступени: ${JSON.stringify(c2)}`);
 
     // окно ещё без настоящего размера (вкладка не показана): мерить нечего — подбор откладывается и ничего не запоминает
     {

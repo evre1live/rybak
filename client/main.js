@@ -29,13 +29,13 @@ import {
   TOURS, TOUR_COUNTDOWN, tourBlank, tourAdd, tourTable, tourPrize, tourMedal, medalPrize, tourScoreText, MEDALS
 } from '../shared/logic.js';
 import { $, esc, clamp, damp, isTouch } from './util.js';
-import { Perf, isSoftware, newTuner, tuneStep, needDrop, scaleFor, TARGET_MS, yieldNow } from './perf.js';
+import { Perf, isSoftware, newTuner, tuneStep, pickQuality, scaleFor, TARGET_MS, yieldNow } from './perf.js';
 import { surfaceU } from './surface.js';
 import { initCache, wakeServer } from './offline.js';
 
 const SPAWNS = [[-2, 9], [0.6, 9.4], [-4, 8.2], [2.6, 8.6], [-1, 11], [1.6, 11.4], [-3.6, 11], [3.6, 10.4]];
 const LINE_Z = 7;
-const CALIB_V = 2; // версия правил подбора качества: сменились пороги — запомненный итог не годится, меряем заново
+const CALIB_V = 4; // версия правил подбора качества: сменились пороги — запомненный итог не годится, меряем заново
 const lineX = (slot) => -5.0 + slot * 1.32;
 const v3 = new THREE.Vector3();
 /** Адрес комнаты в строке браузера; во встроенной рамке это может быть запрещено — тогда просто молчим. */
@@ -1698,7 +1698,15 @@ class Game {
             this.camera.aspect = this.gfx.w / this.gfx.h;
             this.camera.updateProjectionMatrix();
             await this.calibrate();
-          } else this.calib = { from: 'skipped' };
+          } else {
+            // мерить нечего — берём запомненное как есть (ступень уже стоит с конструктора)
+            const a = settings.autoQ;
+            if (a && a.v === CALIB_V && a.gpu === this.perf.gpu) {
+              this.gfx.setScale(a.scale || 1);
+              if (a.refl != null) this.gfx.setRefl(+a.refl);
+            }
+            this.calib = { from: 'skipped' };
+          }
         }
         say(0.94, 'Зажигаем фонари…');
         await this.prelight();
@@ -1709,7 +1717,7 @@ class Game {
         await yieldNow();
       } else if (this.auto && !this.params.get('q') && settings.autoQ && settings.autoQ.gpu === this.perf.gpu) {
         this.gfx.setScale(settings.autoQ.scale || 1);
-        if (settings.autoQ.refl === false) this.gfx.reflect = false;
+        if (settings.autoQ.refl != null && settings.autoQ.v === CALIB_V) this.gfx.setRefl(+settings.autoQ.refl);
       }
     } catch (e) {
       console.warn('загрузка', e);
@@ -1730,8 +1738,6 @@ class Game {
    */
   async prelight() {
     const lamps = this.world.scenery.lampLights;
-    const r = this.gfx.renderer;
-    const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
     const withLights = (L, F, fn) => {
       const keep = [lamps.map((l) => l.visible), this.fill.visible];
       lamps.forEach((l) => (l.visible = L));
@@ -1744,19 +1750,9 @@ class Game {
       }
     };
     // лобби понадобится через несколько секунд — ждём его шейдеры за заставкой (кадры в это время не рисуются)
-    try {
-      await withLights(false, true, () => Promise.race([r.compileAsync(this.scene, this.camera), wait(20000)]));
-    } catch (e) {
-      /* соберутся, когда понадобятся */
-    }
+    await withLights(false, true, () => this.gfx.shaders(this.scene, this.camera));
     // ночь наступит не скоро: её шейдеры отдаём собирать в фоне, когда заставка уже ушла
-    setTimeout(() => {
-      try {
-        withLights(true, false, () => r.compile(this.scene, this.camera));
-      } catch (e) {
-        /* соберутся на закате */
-      }
-    }, 2500);
+    setTimeout(() => withLights(true, false, () => this.gfx.shaders(this.scene, this.camera)), 2500);
   }
   /** Цена кадра, мс: рисуем кадр и ждём, пока видеокарта его закончит, — так видно настоящее время, а не частоту экрана. */
   async frameCost(n = 8, warm = 3) {
@@ -1774,52 +1770,38 @@ class Game {
       if (i % 4 === 3) await yieldNow(); // заставка и страница должны дышать
     }
     this.manual = manual;
-    return ms.sort((a, b) => a - b)[ms.length >> 1];
+    // Берём тяжёлые кадры (верхнюю четверть без самого долгого): отражение в воде рисуется через кадр, и ровность хода
+    // зависит от того, успевает ли к обновлению экрана именно кадр с отражением.
+    return ms.sort((a, b) => a - b)[Math.min(ms.length - 1, Math.floor(ms.length * 0.75))];
   }
   /**
-   * Подбор качества под машину (на «авто»). Меряем цену кадра заставки: дорого — ступень ниже и новый замер;
-   * укладываемся с небольшим превышением — берём разрешение поменьше. Итог запоминается для этой видеокарты,
-   * в следующий раз игра начнёт сразу с него. force — мерить заново.
+   * Подбор качества под машину (на «авто») — при каждой загрузке. Меряем цену кадра заставки, начиная с того,
+   * что подобрано в прошлый раз: дорого — ступень ниже, большой запас — пробуем ступень выше (pickQuality в perf.js);
+   * потом берём разрешение по цене кадра. Итог запоминается для этой видеокарты: с него начнёт следующий запуск.
+   * force — забыть запомненное и начать с верхней ступени.
    */
   async calibrate(force = false) {
     const g = this.gfx;
     const gpu = this.perf.gpu;
-    const saved = settings.autoQ;
-    // запомненное годится неделю: машину могли замерить в неудачный момент, а сама вверх по ступеням игра не идёт
-    const fresh = saved && saved.v === CALIB_V && Date.now() - (saved.t || 0) < 7 * 864e5;
-    if (!force && fresh && saved.gpu === gpu && QUALITIES.includes(saved.tier)) {
-      g.setQuality(saved.tier);
-      g.setScale(saved.scale || 1);
-      if (saved.refl === false) g.reflect = false; // от отражений в воде на этой машине уже отказывались
-      return (this.calib = { ...saved, from: 'saved' });
-    }
-    g.reflect = this.params.get('refl') !== '0';
+    const saved = !force && settings.autoQ && settings.autoQ.v === CALIB_V && settings.autoQ.gpu === gpu && QUALITIES.includes(settings.autoQ.tier) ? settings.autoQ : null;
+    const top = isSoftware(gpu) ? 'low' : isTouch() ? 'medium' : 'high';
+    const refl = this.params.get('refl') === '0' ? 0 : 2; // наибольший разрешённый уровень отражений
     g.setScale(1);
-    let tier = isSoftware(gpu) ? 'low' : isTouch() ? 'medium' : 'high';
-    g.setQuality(tier);
-    const log = [];
-    let ms = await this.frameCost();
-    log.push([tier, +ms.toFixed(1)]);
-    if (tier === 'high' && g.reflect && needDrop(ms, tier)) {
-      // сначала пробуем без отражений в воде: ради них сцена рисуется второй раз, а остальная красота остаётся
-      g.reflect = false;
-      ms = await this.frameCost();
-      log.push(['high без отражений', +ms.toFixed(1)]);
-    }
-    while (needDrop(ms, tier)) {
-      tier = tier === 'high' ? 'medium' : 'low';
-      g.reflect = this.params.get('refl') !== '0';
-      g.setQuality(tier);
-      // на «низком» нет теней — у всех материалов другие шейдеры: собираем их заранее, не подвешивая страницу
-      await g.prepare(this.scene, this.camera);
-      ms = await this.frameCost();
-      log.push([tier, +ms.toFixed(1)]);
-    }
-    g.setScale(scaleFor(ms, tier));
+    const set = async (tier, r) => {
+      if (g.quality !== tier) {
+        await g.shaders(this.scene, this.camera, tier); // у ступени свои шейдеры — собираем заранее, не подвешивая страницу
+        g.setQuality(tier);
+      }
+      g.setRefl(tier === 'high' ? r : refl);
+    };
+    const start = saved ? { tier: saved.tier, refl: saved.refl === false ? 0 : saved.refl === true ? 2 : saved.refl } : { tier: top };
+    const res = await pickQuality({ start, top, refl, cost: async (tier, r) => (await set(tier, r), this.frameCost(10, 4)) });
+    await set(res.tier, res.refl);
+    g.setScale(scaleFor(res.ms, res.tier));
     this.tuner = newTuner();
-    settings.autoQ = { gpu, tier, scale: g.scale, refl: g.reflect, ms: +ms.toFixed(1), v: CALIB_V, t: Date.now() };
+    settings.autoQ = { gpu, tier: res.tier, scale: g.scale, refl: g.reflLevel, ms: +res.ms.toFixed(1), v: CALIB_V, t: Date.now() };
     saveSettings();
-    return (this.calib = { ...settings.autoQ, from: 'measured', log });
+    return (this.calib = { ...settings.autoQ, from: 'measured', log: res.log });
   }
   /** Автоподбор на ходу: кадры проседают — уменьшаем разрешение, не помогло — картинка проще; полегчало — возвращаем. */
   tune(ms) {
@@ -1831,7 +1813,12 @@ class Game {
     if (A.sum < 500) return;
     const avg = A.sum / A.n;
     A.sum = A.n = 0;
-    const out = tuneStep(this.tuner, avg, { scale: g.scale, floor: g.quality === 'low' ? 0.5 : 0.62, canDrop: this.auto && g.quality !== 'low', drs: settings.drs !== false });
+    // во время заброса, поклёвки и вываживания картинку вверх не меняем: смена разрешения сама даёт рывок
+    const st = this.fishing.state;
+    const out = tuneStep(this.tuner, avg, {
+      scale: g.scale, floor: g.quality === 'low' ? 0.5 : 0.62, canDrop: this.auto && g.quality !== 'low' && !this.tierBusy, drs: settings.drs !== false,
+      refl: this.auto && g.quality === 'high' && g.canPost ? g.reflLevel : 0, busy: (st !== 'idle' && st !== 'wait') || !!this.benchOn
+    });
     if (!out) return;
     // вверх — сразу; вниз — после проверки настоящей цены следующего кадра (см. frame)
     if (out.scale && out.scale > g.scale) this.applyTune(out);
@@ -1839,16 +1826,29 @@ class Game {
   }
   applyTune(out) {
     const g = this.gfx;
-    if (out.scale) g.setScale(out.scale);
-    else if (g.quality === 'high' && g.canPost && g.reflect) g.reflect = false; // сначала отказываемся от самого дорогого — отражений (ради них сцена рисуется второй раз)
-    else {
-      g.setQuality(g.quality === 'high' ? 'medium' : 'low');
-      g.setScale(0.85);
+    if (out.refl != null) g.setRefl(out.refl); // отражения дешевле или совсем без них: меняется один небольшой буфер
+    else if (out.scale) g.setScale(out.scale);
+    else if (!this.tierBusy) {
+      // Ступень ниже. Её шейдеры сначала собираются в фоне, и только потом картинка переключается — без рывка.
+      const next = g.quality === 'high' ? 'medium' : 'low';
+      this.tierBusy = true;
+      g.shaders(this.scene, this.camera, next).then(() => {
+        this.tierBusy = false;
+        if (!this.auto || this.params.get('q')) return;
+        g.setQuality(next);
+        g.setScale(0.85);
+        this.tuner = newTuner();
+        this.saveAuto();
+      });
+      return;
     }
-    if (this.auto) {
-      settings.autoQ = { ...(settings.autoQ || {}), gpu: this.perf.gpu, tier: g.quality, scale: g.scale, refl: g.reflect, v: CALIB_V, t: (settings.autoQ && settings.autoQ.t) || Date.now() };
-      saveSettings();
-    }
+    this.saveAuto();
+  }
+  saveAuto() {
+    if (!this.auto) return;
+    const g = this.gfx;
+    settings.autoQ = { ...(settings.autoQ || {}), gpu: this.perf.gpu, tier: g.quality, scale: g.scale, refl: g.reflLevel, v: CALIB_V, t: (settings.autoQ && settings.autoQ.t) || Date.now() };
+    saveSettings();
   }
   /** Подбор качества заново (кнопка в «Проверке компьютера»): кадры на время замера идут по команде. */
   async recalibrate() {

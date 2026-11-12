@@ -337,12 +337,12 @@ test('турнир: зачёт, таблица, призы и медали', () 
 });
 
 // ───── автоподбор качества (client/perf.js): чистая логика, без отрисовки ─────
-import { newTuner, tuneStep, needDrop, scaleFor, TARGET_MS, BUDGET_MS, Perf, isSoftware } from '../client/perf.js';
+import { newTuner, tuneStep, needDrop, scaleFor, pickQuality, TARGET_MS, BUDGET_MS, Perf, isSoftware } from '../client/perf.js';
 
 test('подбор при загрузке: дорогой кадр — ступень ниже, небольшое превышение — разрешение меньше', () => {
   assert.ok(needDrop(40, 'high') && needDrop(40, 'medium') && !needDrop(40, 'low'), 'ниже «низкого» ступени нет');
   // с «высокого» уходим раньше, чем со «среднего»: разрешение ему помогает слабо (замер на Apple M4: 15,4 мс — остаёмся)
-  assert.ok(!needDrop(15.4, 'high') && needDrop(22, 'high') && !needDrop(22, 'medium') && needDrop(27, 'medium'));
+  assert.ok(!needDrop(15.4, 'high') && needDrop(19, 'high') && !needDrop(22, 'medium') && needDrop(27, 'medium'));
   assert.equal(scaleFor(6, 'high'), 1, 'запас есть — разрешение полное');
   assert.equal(scaleFor(BUDGET_MS * 1.05, 'high'), 1, 'чуть больше нормы — не трогаем');
   const s = scaleFor(20, 'high');
@@ -376,7 +376,7 @@ test('подбор на ходу: проседает — разрешение в
   Object.assign(st, newTuner());
   q.scale = 0.7;
   st.ceil = 0.8;
-  assert.ok(run(16.7, 12).some((r) => r.scale > 0.7), 'подняли');
+  assert.ok(run(16.7, 18).some((r) => r.scale > 0.7), 'подняли');
   assert.ok(run(30, 6).some((r) => r.scale < 0.76) && st.wait === 60, `просело сразу после подъёма — ждём дольше: ${st.wait}`);
   // кадры между нормой и порогом (20 мс) — ни вверх, ни вниз
   Object.assign(st, newTuner());
@@ -402,4 +402,79 @@ test('счётчик кадров: среднее, худшие кадры и р
   p.push(5000); // вкладка была в фоне — не считается
   const s = p.stats();
   assert.ok(s.n === 100 && Math.abs(s.avg - 10.7) < 0.01 && s.max === 80 && s.hitches === 1 && Math.round(s.fps) === 93, JSON.stringify(s));
+});
+
+test('подбор ступени замерами: вниз, пока кадр не укладывается; вверх, если запас; неудачный замер не закрепляется', async () => {
+  // «машина» — цена тяжёлого кадра: [высокое с отражениями в полкадра, в четверть, без отражений, среднее, низкое]
+  const run = async (m, start, top = 'high', refl = 2) => {
+    const seen = [];
+    const res = await pickQuality({ start, top, refl, cost: async (tier, r) => { seen.push(tier + (tier === 'high' ? r : '')); return tier === 'high' ? m[2 - r] : tier === 'medium' ? m[3] : m[4]; } });
+    return { ...res, seen: seen.join(' ') };
+  };
+  const fresh = { tier: 'high' };
+  let r = await run([8, 7, 6, 4, 3], fresh);
+  assert.ok(r.tier === 'high' && r.refl === 2 && r.seen === 'high2', 'сильная машина: один замер');
+  // Apple M4: с отражениями тяжёлый кадр не успевает к обновлению экрана — ход шёл рывками; без них — ровно
+  r = await run([18, 15.5, 12.5, 8, 4.6], fresh);
+  assert.ok(r.tier === 'high' && r.refl === 0 && r.ms === 12.5 && r.seen === 'high2 high1 high0', `отражения не укладываются — «высокое» без них: ${r.seen}`);
+  r = await run([17, 14, 12, 8, 5], fresh);
+  assert.ok(r.tier === 'high' && r.refl === 1 && r.seen === 'high2 high1', 'отражения в четверть кадра укладываются — оставляем их');
+  r = await run([60, 55, 50, 28, 13], fresh);
+  assert.ok(r.tier === 'low' && r.seen === 'high2 high1 high0 medium low', `слабая: до «низкого»: ${r.seen}`);
+  r = await run([60, 55, 50, 22, 13], fresh);
+  assert.equal(r.tier, 'medium', '22 мс на «среднем» ещё годится: дальше поможет разрешение');
+  r = await run([30, 26, 19, 9, 5], fresh);
+  assert.equal(r.tier, 'medium', '19 мс на «высоком» без отражений — уже не ровно: уходим на «среднее»');
+  // в прошлый раз вышло «среднее», а сегодня запас большой — поднимаемся
+  r = await run([14, 12, 10, 5, 3], { tier: 'medium' });
+  assert.ok(r.tier === 'high' && r.refl === 2 && r.seen === 'medium high2', `перепроверка вверх: ${r.seen}`);
+  // запас небольшой — ступень выше даже не пробуем (шейдеры лишний раз не собираем)
+  r = await run([20, 17, 14, 9, 6], { tier: 'medium' });
+  assert.ok(r.tier === 'medium' && r.seen === 'medium');
+  // попробовали выше — не потянула — остаёмся
+  r = await run([30, 27, 25, 6, 4], { tier: 'medium' });
+  assert.ok(r.tier === 'medium' && r.ms === 6 && r.seen === 'medium high2 high1 high0', `не потянула: ${r.seen}`);
+  // с «низкого» через «среднее» до «высокого» — если машина позволяет
+  r = await run([13, 11, 9, 6, 4], { tier: 'low' });
+  assert.ok(r.tier === 'high' && r.refl === 2 && r.seen === 'low medium high2', `с низкого наверх: ${r.seen}`);
+  r = await run([40, 35, 30, 12, 5], { tier: 'low' });
+  assert.ok(r.tier === 'medium' && r.seen === 'low medium', 'до «среднего» и стоп: запаса на «высокое» нет');
+  // телефон: выше «среднего» не поднимаемся; без видеокарты — только «низкое»
+  r = await run([10, 9, 8, 4, 3], { tier: 'medium' }, 'medium');
+  assert.ok(r.tier === 'medium' && r.seen === 'medium');
+  r = await run([10, 9, 8, 4, 3], { tier: 'high' }, 'low');
+  assert.ok(r.tier === 'low' && r.seen === 'low');
+  // отражения когда-то отключили, а теперь запас есть — возвращаем по уровню, пока укладывается
+  r = await run([14, 10.5, 9, 5, 3], { tier: 'high', refl: 0 });
+  assert.ok(r.tier === 'high' && r.refl === 2 && r.seen === 'high0 high1 high2', `вернули отражения: ${r.seen}`);
+  r = await run([19, 13, 9, 5, 3], { tier: 'high', refl: 0 });
+  assert.ok(r.refl === 1 && r.ms === 13 && r.seen === 'high0 high1', `вернули в четверть кадра, на полкадра запаса нет: ${r.seen}`);
+  r = await run([23, 18, 14, 5, 3], { tier: 'high', refl: 0 });
+  assert.ok(r.tier === 'high' && r.refl === 0 && r.seen === 'high0', 'запаса нет — не трогаем');
+  // отражения запрещены (?refl=0) — их и не пробуем
+  r = await run([8, 7, 6, 4, 3], fresh, 'high', 0);
+  assert.ok(r.tier === 'high' && r.refl === 0 && r.seen === 'high0');
+});
+
+test('подбор на ходу: первым делом — отражения; во время вываживания вверх не идём', () => {
+  const st = newTuner();
+  const q = { scale: 1, floor: 0.62, canDrop: true, drs: true, refl: 2, busy: false };
+  const outs = [];
+  for (let i = 0; i < 12; i++) { const r = tuneStep(st, 30, q); if (r) { outs.push(r); if (r.refl != null) q.refl = r.refl; if (r.scale) q.scale = r.scale; } }
+  assert.deepEqual(outs.slice(0, 2), [{ refl: 1 }, { refl: 0 }], 'отражения в четверть кадра, потом без них');
+  assert.ok(outs[2] && outs[2].scale < 1, 'и только потом разрешение');
+  // рыба на крючке: кадры ровные, но разрешение вверх не трогаем — смена сама даёт рывок
+  Object.assign(st, newTuner());
+  Object.assign(q, { scale: 0.7, refl: 0, busy: true });
+  for (let i = 0; i < 80; i++) assert.equal(tuneStep(st, 16.7, q), null);
+  q.busy = false;
+  let up = null;
+  for (let i = 0; i < 40 && !up; i++) up = tuneStep(st, 16.7, q);
+  assert.ok(up && up.scale > 0.7, 'вытащили рыбу — можно');
+  // а вниз — можно и во время вываживания: рывки хуже
+  Object.assign(st, newTuner());
+  Object.assign(q, { scale: 1, refl: 0, busy: true });
+  let down = null;
+  for (let i = 0; i < 6 && !down; i++) down = tuneStep(st, 30, q);
+  assert.ok(down && down.scale < 1);
 });

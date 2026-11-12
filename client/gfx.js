@@ -131,13 +131,34 @@ export class Gfx {
     this.post = null;
     // затенение в углах и отражения в воде можно выключить на ходу — для замеров, во что они обходятся
     this.aoK = AO_K;
-    this.reflect = REFLECT;
+    this.reflLevel = REFLECT ? 2 : 0; // отражения в воде: 2 — буфер в полкадра, 1 — в четверть (дешевле), 0 — нет
     r.info.autoReset = false; // счёт вызовов отрисовки — за весь кадр (тени, отражение, сцена), а не за последний проход
     this.scale = 1; // доля от разрешения ступени качества: её уменьшает автоподбор, когда кадры проседают
     this.quality = null;
     this.w = this.h = 0;
     this.ratio = 0;
     this.setQuality(quality || 'high');
+  }
+  /** Отражения в воде включены? (уровень — reflLevel, меняется через setRefl) */
+  get reflect() {
+    return this.reflLevel > 0;
+  }
+  set reflect(v) {
+    this.setRefl(v ? this.reflLevel || 2 : 0);
+  }
+  /** Уровень отражений: 2 — в полкадра, 1 — в четверть, 0 — выключены. Меняется только буфер отражения — это дёшево. */
+  setRefl(level) {
+    level = Math.max(0, Math.min(2, level | 0));
+    if (level === this.reflLevel) return;
+    this.reflLevel = level;
+    if (this.post) this.sizeRefl();
+  }
+  sizeRefl() {
+    const p = this.post;
+    const size = this.renderer.getDrawingBufferSize(new THREE.Vector2());
+    const div = this.reflLevel === 1 ? 4 : 2;
+    p.refl.setSize(Math.max(2, Math.round(size.x / div)), Math.max(2, Math.round(size.y / div)));
+    this.reflOk = false; // буфер отражения очищен — в ближайшем кадре снимаем заново
   }
   setQuality(q) {
     if (!QUALITIES.includes(q)) q = 'high';
@@ -170,17 +191,36 @@ export class Gfx {
     return true;
   }
   /**
-   * Перед первым кадром: собрать шейдеры всей сцены, не подвешивая страницу, и отдать текстуры видеокарте —
-   * иначе всё это случится рывками уже в игре, когда предмет впервые попадёт в кадр. onStep(доля) — для полосы загрузки.
+   * Собрать шейдеры сцены под ступень качества tier, не подвешивая страницу. У «высокого» они свои (сцена рисуется
+   * в буфер с запасом яркости, тональная кривая — отдельным проходом), у «низкого» — без теней. Собранное three.js
+   * держит по материалу, так что потом ступень (или набор источников света) переключается без рывка.
+   * Возвращает обещание: готово, когда видеокарта всё собрала.
+   */
+  shaders(scene, camera, tier = this.quality) {
+    const r = this.renderer;
+    const was = r.shadowMap.enabled;
+    let done;
+    try {
+      r.shadowMap.enabled = tier !== 'low';
+      if (tier === 'high' && this.canPost) {
+        this.ensurePost();
+        r.setRenderTarget(this.post.scene);
+      }
+      done = r.compileAsync(scene, camera); // сама сборка уходит в фон; что именно собирать, решается здесь, сразу
+    } finally {
+      r.setRenderTarget(null);
+      r.shadowMap.enabled = was;
+      if (tier === 'high' && this.quality !== 'high') this.dropPost(); // буферы «высокого» нужны были только чтобы назвать шейдеры
+    }
+    return Promise.race([done, new Promise((ok) => setTimeout(ok, 30000))]).catch(() => {});
+  }
+  /**
+   * Перед первым кадром: собрать шейдеры всей сцены (shaders) и отдать текстуры видеокарте — иначе всё это случится
+   * рывками уже в игре, когда предмет впервые попадёт в кадр. onStep(доля) — для полосы загрузки.
    */
   async prepare(scene, camera, onStep = () => {}, extra = []) {
     const r = this.renderer;
-    const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
-    try {
-      await Promise.race([r.compileAsync(scene, camera), wait(30000)]);
-    } catch (e) {
-      /* не вышло заранее — соберутся по ходу дела */
-    }
+    await this.shaders(scene, camera);
     onStep(0.5);
     const seen = new Set();
     const take = (t) => {
@@ -272,8 +312,8 @@ export class Gfx {
     p.scene.setSize(size.x, size.y);
     const hw = Math.max(2, Math.round(size.x / 2));
     const hh = Math.max(2, Math.round(size.y / 2));
-    for (const t of [p.ao, p.aoB, p.refl]) t.setSize(hw, hh);
-    this.reflOk = false; // буфер отражения очищен — в ближайшем кадре снимаем заново
+    for (const t of [p.ao, p.aoB]) t.setSize(hw, hh);
+    this.sizeRefl();
     p.aoM.uniforms.uTexel.value.set(1 / hw, 1 / hh);
     p.aoBlurM.uniforms.uTexel.value.set(1 / hw, 1 / hh);
     let w = Math.max(2, Math.round(size.x / 4));

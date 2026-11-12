@@ -159,12 +159,14 @@ kbd.g{background:#1b3566;color:#fff;box-shadow:0 .14em 0 #0a1a33}
 .tbar .ok{width:56%;background:var(--cy)}
 .tbar .dg{width:22%;background:repeating-linear-gradient(-55deg,#f04438 0 .5em,#d92d20 .5em 1em);color:#fff;border-radius:0 1.4em 1.4em 0}
 .tbar .dg .ic{color:var(--ye);width:1.1em;height:1.1em}
-#tptr{position:absolute;bottom:-.95em;left:0;width:0;height:0;border:.55em solid transparent;border-bottom:.95em solid #fff;border-top:0;margin-left:-.55em;filter:drop-shadow(0 1px 0 var(--ink)) drop-shadow(0 -1px 0 var(--ink));transition:left .06s linear}
+/* стрелка натяжения: двигается сдвигом (transform), без раскладки страницы и без сглаживающей задержки — иначе она отстаёт и дёргается */
+#tptr{position:absolute;bottom:-.95em;left:0;width:100%;height:0;pointer-events:none;will-change:transform}
+#tptr::after{content:"";position:absolute;left:-.55em;bottom:0;width:0;height:0;border:.55em solid transparent;border-bottom:.95em solid #fff;border-top:0;filter:drop-shadow(0 1px 0 var(--ink)) drop-shadow(0 -1px 0 var(--ink))}
 .fpanel.shake{animation:shake .08s linear infinite}
 @keyframes shake{25%{transform:translate(2px,-1px)}75%{transform:translate(-2px,1px)}}
 .prow{display:flex;align-items:center;gap:.8em;margin-top:1.3em;font-family:var(--disp);font-weight:900;font-style:italic;font-size:1.25em}
 .pbar{flex:1;height:.85em;border-radius:.5em;background:#0a1a33;border:1px solid rgba(120,190,255,.3);overflow:hidden}
-.pbar i{display:block;height:100%;width:0;background:var(--cy);border-radius:.5em}
+.pbar i{display:block;height:100%;width:100%;background:var(--cy);transform-origin:0 50%;transform:scaleX(0);will-change:transform}
 .prow b{width:2.6em;text-align:right;font-size:1.15em}
 
 /* карточка улова */

@@ -230,9 +230,11 @@ export class UI {
     const box = $('#fight');
     box.classList.toggle('hidden', !f);
     if (!f) return;
-    $('#tptr').style.left = clamp(f.T, 0, 1) * 100 + '%';
-    $('#pfill').style.width = f.p * 100 + '%';
-    $('#ppct').textContent = Math.round(f.p * 100) + '%';
+    // стрелка и полоса двигаются сдвигом и растяжением (transform): страница при этом не пересчитывается
+    $('#tptr').style.transform = `translateX(${(clamp(f.T, 0, 1) * 100).toFixed(2)}%)`;
+    $('#pfill').style.transform = `scaleX(${clamp(f.p, 0, 1).toFixed(4)})`;
+    const pct = Math.round(f.p * 100) + '%';
+    if (this.pctShown !== pct) $('#ppct').textContent = this.pctShown = pct;
     const st = $('#fstate');
     const run = f.phase === 'run';
     let txt = 'РОВНО';
