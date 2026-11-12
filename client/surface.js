@@ -199,11 +199,16 @@ float nearK = 1.0 - smoothstep(7.0, 20.0, length(vViewPosition));
   float land = clamp(W.x + W.y, 0.0, 1.0);
   // крутой склон — камень, даже если вершины «травяные»
   float steep = 1.0 - nW.y;
-  float crag = smoothstep(0.3, 0.38, steep + (f.r - 0.5) * 0.2 + (t.a - 0.5) * 0.1) * land;
+  // порог узкий: на склоне, который весь «около порога», камень проступает пятнами с чётким краем, а не полупрозрачной дымкой
+  float crag = smoothstep(0.33, 0.356, steep + (f.r - 0.5) * 0.2 + (t.a - 0.5) * 0.1) * land;
   // трава ↔ песок и трава ↔ тропа: порог с шумом — край «рваный», как мазок
   float gk = W.x / max(W.x + W.z + W.w, 1e-3);
   float gEdge = smoothstep(0.38, 0.62, gk + (f.a - 0.5) * 0.5);
-  float wRock = max(W.y, crag);
+  // Камень, заданный вершинами (обрывы острова, мыс, скалистое дно), — тоже через порог с шумом. Между «каменной»
+  // и «травяной» вершиной плавно меняется не только вес, но и цвет вершин: посередине трава выходила белёсой,
+  // а камень зелёным — «дымка». Поэтому порог низкий: вся переходная полоса — камень (свой цвет он берёт из uRockC),
+  // а трава начинается там, где её цвет уже чистый.
+  float wRock = max(smoothstep(0.08, 0.22, W.y * (0.55 + f.r * 0.9)), crag);
   if (uDetail > 0.5) {
     vec3 gM = paintGrass(vWp.xz);
     vec3 sM = texture2D(uSand, vWp.xz * 0.27).rgb * 2.0;
@@ -218,9 +223,8 @@ float nearK = 1.0 - smoothstep(7.0, 20.0, length(vViewPosition));
       vec3 rM = paintRock(vWp, nW, nearK);
       // камень, проступивший на склоне, берёт свой цвет; заданный вершинами — их цвет
       vec3 rc = mix(uRockC * mix(0.88, 1.1, t.a), diffuseColor.rgb, clamp(W.y * 1.6, 0.0, 1.0)) * rM;
-      // сверху на уступах — мох
-      float moss = smoothstep(0.62, 0.8, nW.y + (f.g - 0.5) * 0.3) * crag * (1.0 - W.y);
-      rc = mix(rc, uMossC * gM * 0.92, moss * 0.85);
+      // мха на таком камне нет: склон, который весь «около порога», он покрывал зелёной дымкой. Где полого — там
+      // и так трава, граница с ней резкая и рваная
       col = mix(col, rc, wRock);
     }
     diffuseColor.rgb = col;
@@ -334,7 +338,7 @@ export function patchSurface(material, { terrain = false } = {}) {
       .replace('#include <color_fragment>', '#include <color_fragment>\n' + DETAIL_F)
       .replace('#include <opaque_fragment>', UNDER_F + '\n#include <opaque_fragment>');
   };
-  material.customProgramCacheKey = () => 'surf5' + (terrain ? 'T' : 'B');
+  material.customProgramCacheKey = () => 'surf10' + (terrain ? 'T' : 'B');
   return material;
 }
 
