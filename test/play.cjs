@@ -815,6 +815,19 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     await bp.waitForFunction(() => window.RYBAK && window.__frames > 3 && !RYBAK.booting, null, { timeout: 240000 });
     assert.equal(await G(bp, () => RYBAK.calib && RYBAK.calib.from), 'measured', 'запомненному больше недели — замер заново');
 
+    // окно ещё без настоящего размера (вкладка не показана): мерить нечего — подбор откладывается и ничего не запоминает
+    {
+      const zp = await ctx.newPage();
+      zp.on('pageerror', (e) => { console.log('[zero] PAGEERROR', e.message.slice(0, 300)); bp.__err = (bp.__err || 0) + 1; });
+      await zp.addInitScript(() => localStorage.removeItem('rybak.settings.v1'));
+      await zp.setViewportSize({ width: 120, height: 90 }); // окно ещё не развернулось
+      await zp.goto(`${BASE}/?norender&boot=full&h=13`);
+      await zp.waitForFunction(() => window.RYBAK && window.__frames > 3 && !RYBAK.booting, null, { timeout: 240000 });
+      const z = await G(zp, () => ({ calib: RYBAK.calib, saved: (JSON.parse(localStorage.getItem('rybak.settings.v1') || '{}')).autoQ || null }));
+      assert.ok(z.calib && z.calib.from === 'skipped' && z.saved === null, `без размера окна замер не делается: ${JSON.stringify(z)}`);
+      await zp.close();
+    }
+
     // плавное разрешение на ходу: кадры долгие — буфер меньше; идёт ровно — возвращается
     await bp.setViewportSize({ width: 1280, height: 720 });
     await bp.waitForTimeout(300);

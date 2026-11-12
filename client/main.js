@@ -1690,7 +1690,15 @@ class Game {
         await this.gfx.prepare(this.scene, this.camera, (k) => say(0.6 + 0.26 * k), Object.values(surfaceU).map((u) => u.value));
         if (this.auto && !this.params.get('q')) {
           say(0.86, 'Подбираем качество…');
-          await this.calibrate();
+          // Мерить можно только то, что игрок увидит: вкладка в фоне или окно ещё без размера дали бы «всё летает».
+          // Ждём до 15 секунд; не дождались — играем с тем, что есть, а замер сделаем при следующем запуске.
+          const seen = () => !document.hidden && (this.gfx.resize(), this.gfx.w >= 200 && this.gfx.h >= 150);
+          for (let i = 0; i < 60 && !seen(); i++) await wait(250);
+          if (seen()) {
+            this.camera.aspect = this.gfx.w / this.gfx.h;
+            this.camera.updateProjectionMatrix();
+            await this.calibrate();
+          } else this.calib = { from: 'skipped' };
         }
         say(0.94, 'Зажигаем фонари…');
         await this.prelight();
