@@ -975,6 +975,17 @@
         1,
         0.749
       ]
+    },
+    "env-cottage": {
+      "file": "models/env-cottage.glb",
+      "group": "env",
+      "tris": 7990,
+      "kb": 218,
+      "size": [
+        1,
+        0.735,
+        0.73
+      ]
     }
   }
 }

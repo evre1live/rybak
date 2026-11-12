@@ -4,7 +4,9 @@ import { clamp, lerp, sstep, fbm2, canvasTex, rng, TAU, isTouch } from './util.j
 import { groundH, shoreZ, BOUNDS, WORLD, PALM, WRECK, palmR, capeDist, CAPE, ISLAND, islandR, MAP_VIEW, DECKS, LIGHTHOUSE, ARCH, MOORINGS } from './terrain.js';
 import { createWater, createFoamRings } from './water.js';
 import { buildScenery, FOAM_SPOTS } from './scenery.js';
-import { patchSurface, surfaceU, detailTexture } from './surface.js';
+import { patchSurface, surfaceU, detailTexture, loadPaint, detail } from './surface.js';
+import { ENV } from './envmodels.js';
+import { GrassField } from './grass.js';
 
 // ключевые часы суток: цвета неба, солнца, воды
 const K = (h, zen, hor, sun, sunI, hemiS, hemiG, hemiI, fog, wS, wD, cloud, stars, glit, exp) => ({
@@ -47,24 +49,33 @@ const sand = C('#f2e2b3');
 const sandWet = C('#e6d6a6');
 const sandWhite = C('#fbf3d6');
 const seabed = C('#9db9ad');
-const grassA = C('#74c44e');
-const grassB = C('#5aae44');
-const grassC = C('#96d466');
+// трава — жёлто-зелёная, в тон кронам и мху моделей (раньше была чисто зелёной и рядом с ними смотрелась кислотной)
+const grassA = C('#88b752');
+const grassB = C('#70a045');
+const grassC = C('#a9cb66');
 const dune = C('#b9d27a');
 const rockA = C('#8d95a1');
 const rockB = C('#a7adb7');
 const path = C('#dccb93');
-/** Цвет земли в точке: песок, трава, камень, дно. ny — насколько склон пологий (1 — ровно). */
-function groundTint(c, x, y, z, ny) {
+/**
+ * Цвет земли в точке: песок, трава, камень, дно. ny — насколько склон пологий (1 — ровно).
+ * w — что это за поверхность, для рисованных текстур (surface.js): [трава, камень, песок, тропа].
+ */
+function groundTint(c, x, y, z, ny, w) {
   const nz1 = fbm2(x * 0.11, z * 0.11, 3);
   const nz2 = fbm2(x * 0.5 + 9, z * 0.5 + 4, 2);
   const pr = palmR(x, z);
+  w[0] = w[1] = w[3] = 0;
+  w[2] = 1;
   if (pr < 3.4) {
     // Пальмовый остров: белый песок, в середине — редкая трава на дюне; под водой песок светлый — отмель бирюзовая
     if (y < -0.1) c.lerpColors(sandWhite, seabed, sstep(-2.5, -11, y)).multiplyScalar(0.95 + nz2 * 0.1);
     else {
       c.lerpColors(sandWet, sandWhite, sstep(-0.1, 0.5, y)).multiplyScalar(0.95 + nz2 * 0.08);
-      c.lerp(dune, sstep(1.25, 2.2, y + (nz1 - 0.5) * 0.9) * 0.8);
+      const g = sstep(1.25, 2.2, y + (nz1 - 0.5) * 0.9) * 0.8;
+      c.lerp(dune, g);
+      w[0] = g;
+      w[2] = 1 - g;
     }
     return;
   }
@@ -73,22 +84,54 @@ function groundTint(c, x, y, z, ny) {
   const inBay = x > BOUNDS.x0 && x < BOUNDS.x1 && z > BOUNDS.z0 && z < BOUNDS.z1;
   if (y < -0.12 || !inBay) {
     c.lerpColors(sandWet, seabed, sstep(-0.3, -8, y));
-    if (ny < 0.8) c.lerp(rockA, clamp((0.8 - ny) * 2.2, 0, 0.8));
+    if (ny < 0.8) {
+      const k = clamp((0.8 - ny) * 2.2, 0, 0.8);
+      c.lerp(rockA, k);
+      w[1] = k;
+      w[2] = 1 - k;
+    }
     c.multiplyScalar(0.93 + nz2 * 0.12);
   } else if (capeDist(x, z) < CAPE.r + 3.2 && d < 1) {
     c.lerpColors(rockA, rockB, nz2).multiplyScalar(0.92 + nz1 * 0.14);
+    w[1] = 1;
+    w[2] = 0;
   } else if (ny < (isl ? 0.74 : 0.5)) {
     c.lerpColors(rockA, rockB, nz2).multiplyScalar((0.84 + nz1 * 0.22) * (0.94 + 0.08 * Math.sin(y * 2.4 + nz1 * 5)));
+    w[1] = 1;
+    w[2] = 0;
   } else if (y < 0.85 + nz1 * 0.5 && !isl) {
     c.lerpColors(sand, sandWet, sstep(0.5, -0.1, y)).multiplyScalar(0.95 + nz2 * 0.08);
   } else {
     c.lerpColors(grassA, grassB, sstep(0.3, 0.7, nz1));
     c.lerp(grassC, sstep(0.55, 0.9, nz2) * 0.5);
-    if (isl && ny < 0.9) c.lerp(rockA, clamp((0.9 - ny) * 3, 0, 0.7));
-    else if (!isl && ny < 0.64) c.lerp(rockA, clamp((0.64 - ny) * 4, 0, 0.6));
-    if (x > -56 && x < 49 && d > 2.2 && d < 14) c.lerp(path, 0.8 * Math.exp(-(((d - 7.6) / 1.5) ** 2)) * (0.75 + 0.25 * nz2));
-    if (d > 0 && d < 4.2) c.lerp(sand, sstep(4.2, 2.2, d) * 0.85);
+    w[0] = 1;
+    w[2] = 0;
+    // на склонах камень проступает уже в шейдере — по каждой точке, с рваной границей; здесь цвет травы не трогаем
+    if (x > -56 && x < 49 && d > 2.2 && d < 14) {
+      const k = 0.8 * Math.exp(-(((d - 7.6) / 1.5) ** 2)) * (0.75 + 0.25 * nz2);
+      c.lerp(path, k);
+      w[3] = k;
+      w[0] = 1 - k;
+    }
+    if (d > 0 && d < 4.2) {
+      const k = sstep(4.2, 2.2, d) * 0.85;
+      c.lerp(sand, k);
+      w[2] = k;
+      w[0] *= 1 - k;
+      w[3] *= 1 - k;
+    }
   }
+}
+const _w = [0, 0, 1, 0];
+/** Цвет земли в точке и сколько там травы (0…1) — для пучков травы (grass.js). На склонах, где проступает камень, травы нет. */
+function grassTint(x, z, c) {
+  const e = 0.7;
+  const dx = groundH(x + e, z) - groundH(x - e, z);
+  const dz = groundH(x, z + e) - groundH(x, z - e);
+  const ny = (2 * e) / Math.hypot(dx, 2 * e, dz);
+  if (ny < 0.78) return 0;
+  groundTint(c, x, groundH(x, z), z, ny, _w);
+  return _w[0];
 }
 /** Кусок рельефа: сетка по groundH с цветом по вершинам. */
 function buildGround(x0, x1, z0, z1, nx, nz) {
@@ -101,17 +144,56 @@ function buildGround(x0, x1, z0, z1, nx, nz) {
   geo.computeVertexNormals();
   const n = geo.attributes.normal;
   const colors = new Float32Array(p.count * 3);
+  const ground = new Float32Array(p.count * 4);
   const c = new THREE.Color();
+  const w = [0, 0, 1, 0];
   for (let i = 0; i < p.count; i++) {
-    groundTint(c, p.getX(i), p.getY(i), p.getZ(i), n.getY(i));
+    groundTint(c, p.getX(i), p.getY(i), p.getZ(i), n.getY(i), w);
     colors[i * 3] = c.r;
     colors[i * 3 + 1] = c.g;
     colors[i * 3 + 2] = c.b;
+    ground.set(w, i * 4);
   }
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geo.setAttribute('aGround', new THREE.BufferAttribute(ground, 4));
   const m = new THREE.Mesh(geo, TERRAIN_MAT);
   m.receiveShadow = true;
+  m.userData.grid = { x0, x1, z0, z1, nx, nz };
   return m;
+}
+/**
+ * Тень-пятно под каждым деревом и кустом — прямо в цвете земли. У дальних деревьев настоящей тени нет,
+ * и без пятна они «висят» над лугом, как наклейки; с пятном стоят на земле, а трава под кронами темнее, как и должна.
+ */
+function shadeUnderTrees(terrain) {
+  const CROWN = { 'env-pine': 0.25, 'env-oak': 0.42, 'env-birch': 0.3, 'env-bush': 0.6, 'env-palm': 0.3 }; // радиус кроны в долях высоты
+  for (const m of terrain.children) {
+    const g = m.userData.grid;
+    if (!g) continue;
+    const col = m.geometry.attributes.color;
+    const k = new Float32Array(col.count).fill(1);
+    const dx = (g.x1 - g.x0) / g.nx;
+    const dz = (g.z1 - g.z0) / g.nz;
+    for (const id in CROWN)
+      for (const t of ENV.flora[id] || []) {
+        if (t.x < g.x0 || t.x > g.x1 || t.z < g.z0 || t.z > g.z1) continue;
+        const R = Math.max(1.6, CROWN[id] * t.s * 1.3);
+        const i0 = Math.max(0, Math.floor((t.x - R - g.x0) / dx));
+        const i1 = Math.min(g.nx, Math.ceil((t.x + R - g.x0) / dx));
+        const j0 = Math.max(0, Math.floor((t.z - R - g.z0) / dz));
+        const j1 = Math.min(g.nz, Math.ceil((t.z + R - g.z0) / dz));
+        for (let j = j0; j <= j1; j++)
+          for (let i = i0; i <= i1; i++) {
+            const d = Math.hypot(g.x0 + i * dx - t.x, g.z0 + j * dz - t.z) / R;
+            if (d >= 1) continue;
+            const v = 1 - (id === 'env-bush' ? 0.2 : 0.3) * (1 - d * d) ** 1.5;
+            const n = j * (g.nx + 1) + i;
+            if (v < k[n]) k[n] = v;
+          }
+      }
+    for (let i = 0; i < col.count; i++) if (k[i] < 1) col.setXYZ(i, col.getX(i) * k[i], col.getY(i) * k[i], col.getZ(i) * k[i]);
+    col.needsUpdate = true;
+  }
 }
 function buildTerrain() {
   const { x0, x1, z0, z1 } = BOUNDS;
@@ -129,6 +211,7 @@ function buildTerrain() {
   const c = new THREE.Color().copy(seabed).multiplyScalar(0.98);
   for (let i = 0; i < 4; i++) col.set([c.r, c.g, c.b], i * 3);
   far.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  far.setAttribute('aGround', new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0]), 4));
   far.deleteAttribute('uv');
   g.add(new THREE.Mesh(far, TERRAIN_MAT));
   return g;
@@ -241,6 +324,7 @@ export class World {
     scene.add(this.water.mesh);
     // фактура поверхностей и свет на дне — общие для рельефа и всех построек
     surfaceU.uDet.value = detailTexture(isTouch() ? 512 : 1024);
+    this.paint = loadPaint({ lite: isTouch(), offline: !!window.RYBAK_OFFLINE });
     surfaceU.uCaust.value = this.water.uniforms.uCaustic.value;
 
     this.skyU = {
@@ -295,6 +379,8 @@ export class World {
     scene.add(sun, sun.target);
 
     this.scenery = buildScenery(scene);
+    shadeUnderTrees(this.terrain);
+    this.grass = new GrassField(scene, grassTint, isTouch() ? { max: 3000, maxFlowers: 500 } : {});
     if (FOAM_SPOTS.length) scene.add(createFoamRings(FOAM_SPOTS, this.water.uniforms));
     this.sunDir = new THREE.Vector3(0, 1, 0);
     this.night = 0;
@@ -356,6 +442,8 @@ export class World {
   }
 
   update(dt, t, camera) {
+    this.grass.setRange(detail.grass);
+    this.grass.update(camera);
     this.water.uniforms.uTime.value = t;
     this.water.follow(camera);
     surfaceU.uTimeS.value = t;

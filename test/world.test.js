@@ -114,6 +114,28 @@ test('на Пальмовом острове можно ходить, а глу�
   assert.equal(T.canStand(222, -175), false, 'в лагуну по шею не зайти');
 });
 
+test('домик смотрителя: под ним ровная площадка, а холм под маяком и обрыв острова не тронуты', () => {
+  const C = T.COTTAGE;
+  const c = Math.cos(C.ry);
+  const s = Math.sin(C.ry);
+  // углы дома (вдоль — половина длины, поперёк — до стен) лежат на уровне пола
+  for (const [u, v] of [[0, 0], [0.46 * C.s, 0.33 * C.s], [-0.46 * C.s, 0.33 * C.s], [0.46 * C.s, -0.3 * C.s], [-0.46 * C.s, -0.3 * C.s]]) {
+    const h = T.groundH(C.x + u * c + v * s, C.z - u * s + v * c);
+    assert.ok(Math.abs(h - C.y) < 0.02, `под домом ровно: ${h.toFixed(2)} при поле ${C.y}`);
+  }
+  assert.ok(Math.hypot(...T.cottageUV(C.x, C.z)) < 1e-9, 'середина дома — начало его осей');
+  // маяк стоит на макушке холма, как и стоял: площадка до его основания не достаёт
+  const L = T.LIGHTHOUSE;
+  assert.ok(Math.abs(T.groundH(L.x, L.z) - 19.88) < 0.02, 'земля под маяком на месте');
+  for (let a = 0; a < 6.28; a += 0.4) {
+    const [u, v] = T.cottageUV(L.x + Math.cos(a) * 2.8, L.z + Math.sin(a) * 2.8);
+    const d = Math.hypot(Math.max(Math.abs(u) - C.pad[0], 0), Math.max(Math.abs(v) - C.pad[1], 0));
+    assert.ok(d >= C.pad[2], 'основание башни вне откоса площадки');
+  }
+  // и до обрыва далеко: кромка острова не изменилась
+  assert.ok(Math.hypot(C.x - T.ISLAND.x, C.z - T.ISLAND.z) + C.s < T.islandR(0) - 12, 'домик в глубине острова');
+});
+
 test('профиль: счётчик выходов на лодке появляется у старых сохранений и не ломается от мусора', () => {
   assert.equal(newProfile().boatTrips, 0);
   const old = newProfile();

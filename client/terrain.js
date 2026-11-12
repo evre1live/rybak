@@ -70,13 +70,30 @@ function mainH(x, z) {
 export function islandR(th) {
   return 30 + 4.5 * Math.sin(3 * th + 1.0) + 2.5 * Math.sin(5 * th + 2.2) + 1.5 * Math.sin(9 * th);
 }
+const islandTop = (x, z) => 10.5 + 3 * fbm2(x * 0.06 + 7, z * 0.06 + 3, 3) + 8 * Math.exp(-((x - ISLAND.x - 8) ** 2 + (z - ISLAND.z + 3) ** 2) / 110);
+/**
+ * Домик смотрителя на склоне холма под маяком: s — длина дома в метрах, ry — поворот (дверь смотрит на юго-запад,
+ * к бухте), y — уровень пола. Склон там крутой, поэтому под дом в холме срезана ровная площадка: с одной стороны
+ * она врезана в склон, с другой — подсыпана (pad — её полуразмеры вдоль и поперёк дома и ширина откоса).
+ */
+export const COTTAGE = { x: 21.5, z: -100, s: 8.5, ry: (2 * Math.PI) / 3, y: 0, pad: [5.4, 3.6, 2.4] };
+COTTAGE.y = +(islandTop(COTTAGE.x, COTTAGE.z) + 0.6).toFixed(2);
+const PAD_C = Math.cos(COTTAGE.ry);
+const PAD_S = Math.sin(COTTAGE.ry);
+/** Точка в осях домика: u — вдоль дома, v — поперёк (дверь на стороне −v). */
+export const cottageUV = (x, z) => [(x - COTTAGE.x) * PAD_C - (z - COTTAGE.z) * PAD_S, (x - COTTAGE.x) * PAD_S + (z - COTTAGE.z) * PAD_C];
 function islandH(x, z) {
   const dx = x - ISLAND.x;
   const dz = z - ISLAND.z;
   const r = Math.hypot(dx, dz);
   if (r > 64) return -99;
   const R = islandR(Math.atan2(dz, dx));
-  const top = 10.5 + 3 * fbm2(x * 0.06 + 7, z * 0.06 + 3, 3) + 8 * Math.exp(-((dx - 8) ** 2 + (dz + 3) ** 2) / 110);
+  let top = islandTop(x, z);
+  if (Math.abs(x - COTTAGE.x) < 14 && Math.abs(z - COTTAGE.z) < 14) {
+    const [u, v] = cottageUV(x, z);
+    const d = Math.hypot(Math.max(Math.abs(u) - COTTAGE.pad[0], 0), Math.max(Math.abs(v) - COTTAGE.pad[1], 0));
+    if (d < COTTAGE.pad[2]) top = lerp(top, COTTAGE.y, sstep(COTTAGE.pad[2], 0, d));
+  }
   const c = sstep(R + 1.5, R - 4.5, r);
   const shelf = -0.9 - 13 * sstep(R, R + 24, r);
   return shelf * (1 - c) + top * Math.pow(c, 0.7);

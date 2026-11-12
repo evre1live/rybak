@@ -591,6 +591,21 @@
       "tris": 8000
     },
     {
+      "id": "env-cottage",
+      "group": "env",
+      "name": "Дом смотрителя",
+      "prompt": "a small lighthouse keeper's cottage: white plastered stone walls, a red tiled gable roof with a short stone chimney, a wooden front door with one stone step in the middle of the long wall, two square windows with blue shutters on both sides of the door, a flower box under one window",
+      "tris": 8000,
+      "glow": [
+        [-0.295, 0.13, 0.28, -0.195, 0.25, 0.37],
+        [0.14, 0.13, 0.28, 0.24, 0.25, 0.37],
+        [-0.295, 0.13, -0.33, -0.195, 0.25, -0.23],
+        [0.14, 0.13, -0.33, 0.24, 0.25, -0.23],
+        [0.42, 0.13, -0.03, 0.5, 0.25, 0.075],
+        [-0.5, 0.13, -0.03, -0.42, 0.25, 0.075]
+      ]
+    },
+    {
       "id": "env-motorboat",
       "group": "env",
       "name": "Моторная лодка",

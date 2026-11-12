@@ -291,6 +291,26 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
       assert.ok(env.nHi + env.nLo > 600, `деревья, кусты и камни расставлены: ${env.nHi + env.nLo}`);
       assert.ok(env.nLo > env.nHi * 2, `вдали — грубые копии: подробных ${env.nHi}, дальних ${env.nLo}`);
       assert.ok(env.hi < 400000, `подробных треугольников в лесу немного: ${env.hi}`);
+      // цельная графика: рисованные текстуры земли и камня загружены, трава посажена, домик смотрителя — готовая модель
+      const art = await G(mp, async () => {
+        const w = RYBAK.world;
+        const r = RYBAK.gfx.renderer;
+        return { paint: await w.paint, grass: w.grass.stats(), tone: r.toneMapping, cottage: w.scenery.envState().cottage, lit: w.scenery.envState().lit };
+      });
+      assert.equal(art.paint, true, 'текстуры травы, камня, песка и тропы загрузились');
+      assert.ok(art.grass.planted > 3000 && art.grass.plantedFlowers > 300, `трава и цветы посажены: ${art.grass.planted} и ${art.grass.plantedFlowers}`);
+      assert.equal(art.grass.tufts, 0, 'на «низком» качестве траву не рисуем');
+      assert.equal(art.tone, 5, 'своя тональная кривая (CustomToneMapping) вместо Neutral: тени не проваливаются в чёрное');
+      assert.ok(art.cottage && art.lit >= 1, 'домик смотрителя на месте, окна умеют светиться');
+      // ночью окна домика горят, днём — нет
+      const glow = await G(mp, () => {
+        const sc = RYBAK.world.scenery;
+        sc.setNight(1, 0.2);
+        const night = sc.envState().glowing;
+        sc.setNight(0, 1);
+        return { night, day: sc.envState().glowing };
+      });
+      assert.ok(glow.night > 1 && glow.day === 0, `окна домика: ночью горят (${glow.night}), днём нет (${glow.day})`);
       // у будки проката можно встать перед прилавком, а сквозь неё не пройти
       await G(mp, () => { const g = RYBAK; g.input.locked = true; g.input.enabled = true; g.player.place(2.0, -6.4, -Math.PI / 2); g.input.keys.add('KeyW'); });
       await mp.waitForTimeout(1600);

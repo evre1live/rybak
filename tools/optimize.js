@@ -27,7 +27,8 @@ const BUDGET = { hero: { tris: 30000, tex: [2048, 2048] }, prop: { tris: 7000, t
 // У модели локации в art/models.json можно задать: tris — сколько треугольников оставить, tex — размеры текстур,
 // flat — без карты нормалей (деревья и кусты: их много, а рельеф листвы и так в сетке), lod — сколько треугольников
 // в дальней копии (<id>.lod.glb: вместо текстуры — цвет вершин), gamma — высветлить тёмную текстуру (меньше 1),
-// repaint — в какой цвет перекрасить чёрные детали.
+// repaint — в какой цвет перекрасить чёрные детали, glow — где у модели стёкла окон, которые ночью светятся
+// (коробки [x0, y0, z0, x1, y1, z1] в осях готовой модели; найти их помогает tools/dev/windows.mjs).
 
 await MeshoptEncoder.ready;
 await MeshoptSimplifier.ready;
@@ -207,6 +208,67 @@ async function tuneTexture(doc, { gamma = 1, repaint = null }) {
   }
 }
 
+/**
+ * Карта свечения окон: белым — стёкла, чёрным — всё остальное. В игре она гаснет днём и загорается ночью.
+ * Стекло ищется так: точка текстуры лежит на сетке внутри одной из коробок boxes и при этом тёмная — голубые
+ * переплёты и рамы окна в карту не попадают и ночью остаются тёмным рисунком поверх света.
+ */
+async function glowMap(doc, boxes) {
+  let lit = 0;
+  for (const mat of doc.getRoot().listMaterials()) {
+    const tex = mat.getBaseColorTexture();
+    if (!tex) continue;
+    const { data, info } = await sharp(Buffer.from(tex.getImage())).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    const W = info.width;
+    const H = info.height;
+    const mask = Buffer.alloc(W * H);
+    const inBox = (q) => boxes.some((b) => q[0] >= b[0] && q[0] <= b[3] && q[1] >= b[1] && q[1] <= b[4] && q[2] >= b[2] && q[2] <= b[5]);
+    for (const mesh of doc.getRoot().listMeshes())
+      for (const prim of mesh.listPrimitives()) {
+        if (prim.getMaterial() !== mat) continue;
+        const P = prim.getAttribute('POSITION');
+        const UV = prim.getAttribute('TEXCOORD_0');
+        const idx = prim.getIndices();
+        if (!UV) continue;
+        const n = idx ? idx.getCount() : P.getCount();
+        for (let i = 0; i < n; i += 3) {
+          const id = [0, 1, 2].map((k) => (idx ? idx.getScalar(i + k) : i + k));
+          const p = id.map((j) => P.getElement(j, [0, 0, 0]));
+          // треугольник целиком вне коробок — мимо
+          const lo = [0, 1, 2].map((k) => Math.min(p[0][k], p[1][k], p[2][k]));
+          const hi = [0, 1, 2].map((k) => Math.max(p[0][k], p[1][k], p[2][k]));
+          if (!boxes.some((b) => hi[0] >= b[0] && lo[0] <= b[3] && hi[1] >= b[1] && lo[1] <= b[4] && hi[2] >= b[2] && lo[2] <= b[5])) continue;
+          const t = id.map((j) => UV.getElement(j, [0, 0])).map(([u, v]) => [u * W, v * H]);
+          const den = (t[1][1] - t[2][1]) * (t[0][0] - t[2][0]) + (t[2][0] - t[1][0]) * (t[0][1] - t[2][1]);
+          if (Math.abs(den) < 1e-9) continue;
+          const x0 = Math.max(0, Math.floor(Math.min(t[0][0], t[1][0], t[2][0])));
+          const x1 = Math.min(W - 1, Math.ceil(Math.max(t[0][0], t[1][0], t[2][0])));
+          const y0 = Math.max(0, Math.floor(Math.min(t[0][1], t[1][1], t[2][1])));
+          const y1 = Math.min(H - 1, Math.ceil(Math.max(t[0][1], t[1][1], t[2][1])));
+          for (let y = y0; y <= y1; y++)
+            for (let x = x0; x <= x1; x++) {
+              const a = ((t[1][1] - t[2][1]) * (x + 0.5 - t[2][0]) + (t[2][0] - t[1][0]) * (y + 0.5 - t[2][1])) / den;
+              const b = ((t[2][1] - t[0][1]) * (x + 0.5 - t[2][0]) + (t[0][0] - t[2][0]) * (y + 0.5 - t[2][1])) / den;
+              const c = 1 - a - b;
+              if (a < -0.02 || b < -0.02 || c < -0.02) continue;
+              if (!inBox([0, 1, 2].map((k) => p[0][k] * a + p[1][k] * b + p[2][k] * c))) continue;
+              const o = (y * W + x) * 3;
+              const r = data[o] / 255;
+              const g = data[o + 1] / 255;
+              const bl = data[o + 2] / 255;
+              // стекло тёмное; яркое голубое (переплёт, рама, ставни) и светлое (стена) — не оно
+              if (Math.max(r, g, bl) < 0.5 && !(bl > 0.5 && bl - r > 0.2)) mask[y * W + x] = 255;
+            }
+        }
+      }
+    for (let i = 0; i < mask.length; i++) if (mask[i]) lit++;
+    if (!lit) continue;
+    const png = await sharp(mask, { raw: { width: W, height: H, channels: 1 } }).blur(0.8).toColourspace('srgb').png().toBuffer();
+    mat.setEmissiveTexture(doc.createTexture('glow').setImage(png).setMimeType('image/png')).setEmissiveFactor([1, 1, 1]);
+  }
+  return lit;
+}
+
 /** Цвет текстуры — в цвет вершин (усреднённый по соседству), развёртка убирается: дальней копии текстура не нужна. */
 async function bakeVertexColors(doc) {
   const buffer = doc.getRoot().listBuffers()[0];
@@ -300,6 +362,7 @@ for (const m of spec.models) {
     }
   }
   if (m.repaint || m.gamma) await tuneTexture(doc, { gamma: m.gamma || 1, repaint: m.repaint || null });
+  const glowPx = m.glow ? await glowMap(doc, m.glow) : 0;
   const ratio = Math.min(1, (m.tris || budget.tris) / Math.max(1, before));
   await doc.transform(
     unpartition(),
@@ -309,8 +372,9 @@ for (const m of spec.models) {
     ...(ratio < 0.98 ? [simplify({ simplifier: MeshoptSimplifier, ratio, error: m.err || (m.group === 'hero' ? 0.0015 : m.group === 'fish' ? 0.003 : m.group === 'env' ? 0.05 : 0.008), lockBorder: false })] : []),
     resample(),
     prune(),
-    textureCompress({ encoder: sharp, targetFormat: 'webp', slots: /^baseColorTexture$/, resize: [budget.tex[0], budget.tex[0]], quality: 86 }),
-    textureCompress({ encoder: sharp, targetFormat: 'webp', slots: /^(normalTexture|metallicRoughnessTexture|occlusionTexture|emissiveTexture)$/, resize: [budget.tex[1], budget.tex[1]], quality: 84 }),
+    // карта свечения окон — того же размера, что и цвет: стёкла в ней мелкие, а весит она почти ничего
+    textureCompress({ encoder: sharp, targetFormat: 'webp', slots: /^(baseColorTexture|emissiveTexture)$/, resize: [budget.tex[0], budget.tex[0]], quality: 86 }),
+    textureCompress({ encoder: sharp, targetFormat: 'webp', slots: /^(normalTexture|metallicRoughnessTexture|occlusionTexture)$/, resize: [budget.tex[1], budget.tex[1]], quality: 84 }),
     meshopt({ encoder: MeshoptEncoder, level: 'medium' })
   );
   const out = path.join(OUT, `${m.id}.glb`);
@@ -353,7 +417,7 @@ for (const m of spec.models) {
     const prev = manifest.props[m.id] || {};
     manifest.props[m.id] = { file: `models/${m.id}.glb`, group: m.group, tris, kb, size, ...(m.view ? { view: m.view } : {}), ...(prev.icon ? { icon: prev.icon } : {}), ...(lod ? { lod } : {}) };
   }
-  console.log(`${m.id}: ${before} → ${tris} треуг., ${kb} КБ${lod ? ` (вдали: ${lod.tris} треуг., ${lod.kb} КБ)` : ''}${lite ? ` (для телефонов: ${lite.tris} треуг., ${lite.kb} КБ)` : ''}${Object.keys(clips).length ? ', анимации: ' + Object.entries(clips).map(([k, v]) => `${k} ${v.dur} с (${v.tracks} дорожек)`).join(', ') : ''}`);
+  console.log(`${m.id}: ${before} → ${tris} треуг., ${kb} КБ${glowPx ? `, стёкла: ${glowPx} точек` : ''}${lod ? ` (вдали: ${lod.tris} треуг., ${lod.kb} КБ)` : ''}${lite ? ` (для телефонов: ${lite.tris} треуг., ${lite.kb} КБ)` : ''}${Object.keys(clips).length ? ', анимации: ' + Object.entries(clips).map(([k, v]) => `${k} ${v.dur} с (${v.tracks} дорожек)`).join(', ') : ''}`);
 }
 // герои идут в том же порядке, что и в art/models.json: так они выстроены на экране «Персонаж»
 const order = (id) => {

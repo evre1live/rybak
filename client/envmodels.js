@@ -19,20 +19,23 @@ export const ENV = {
   // камни: { x, y — низ, z, w, h, d — размеры, ry, tilt }
   rocks: { 'env-rock1': [], 'env-rock2': [], 'env-rock3': [] },
   // процедурные меши, которые убираются, когда встают модели
-  fallback: { trees: [], palms: [], rocks: [], lighthouse: [], wreck: [], hut: [], campfire: [], lamps: [], bench: [], sign: [] },
+  fallback: { trees: [], palms: [], rocks: [], lighthouse: [], cottage: [], wreck: [], hut: [], campfire: [], lamps: [], bench: [], sign: [] },
   lamps: [], // фонарные столбы: { x, y, z, side, glass, light }
   piles: [], // верхушки высоких свай — на них садятся чайки: [x, y, z]
-  singles: [], // одиночные модели: { id, key?, x, y, z, s, ry, rx?, rz?, block?, fire?, gain? — во сколько раз высветлить }
+  // одиночные модели: { id, key?, x, y, z, s, ry, rx?, rz?, block?, fire?, gain? — во сколько раз высветлить,
+  //   lit? — { color, k }: ночью загораются окна (карта свечения модели), glows? — тёплые ореолы: [x, y, z в долях модели, поперечник в метрах] }
+  singles: [],
   lighthouse: null, // { x, y, z, beam, face }
   signBlock: null
 };
 
-const state = { trees: false, palms: false, rocks: false, singles: 0, lamps: 0, gulls: 0, lighthouse: false, kiosk: false };
-/** Для проверок: что уже заменено готовыми моделями. */
-export const envState = () => ({ ...state });
+const state = { trees: false, palms: false, rocks: false, singles: 0, lamps: 0, gulls: 0, lighthouse: false, cottage: false, kiosk: false };
+/** Для проверок: что уже заменено готовыми моделями; lit — сколько материалов с окнами, которые загораются ночью, glowing — как ярко они горят сейчас. */
+export const envState = () => ({ ...state, lit: lits.length, glowing: lits.reduce((m, l) => Math.max(m, l.m.emissiveIntensity), 0) });
 
 const GREY = (k) => ({ r: k, g: k, b: k });
 const glows = []; // светящиеся пятна фонарей и маяка: { s, k, day }
+const lits = []; // материалы с окнами, которые загораются ночью: { m, k }
 const gulls = [];
 let fire = null; // костёр: { glow, flames, pool }
 let night = 0;
@@ -84,6 +87,7 @@ export function envNight(n) {
     g.s.material.opacity = o;
     g.s.visible = o > 0.01;
   }
+  for (const l of lits) l.m.emissiveIntensity = n * l.k;
 }
 
 /**
@@ -190,7 +194,14 @@ export function upgradeEnv(scene) {
       // Листва у моделей темнее, чем мир игры: без высветления тень на сосне выходила чёрной. Текстуры уже
       // высветлены при подготовке (gamma в art/models.json), здесь — общий множитель; оба подобраны по замерам
       // снимков, а не на глаз.
-      const opt = { 'env-pine': { sway: 0.01, tint: GREY(1.5) }, 'env-oak': { sway: 0.012, tint: GREY(1.25) }, 'env-birch': { sway: 0.016, tint: GREY(1.15) }, 'env-bush': { sway: 0.006, near: 22, tint: GREY(1.4) } };
+      // множители цвета подобраны под тональную кривую игры (gfx.js): у дуба и куста убавлен красный —
+      // стволы были рыжими, а кусты кислотно-жёлтыми рядом с травой
+      const opt = {
+        'env-pine': { sway: 0.01, tint: { r: 1.28, g: 1.36, b: 1.34 }, sat: 0.92 },
+        'env-oak': { sway: 0.012, tint: { r: 1.0, g: 1.1, b: 1.1 }, sat: 0.86 },
+        'env-birch': { sway: 0.016, tint: { r: 1.05, g: 1.2, b: 1.15 }, sat: 0.82 },
+        'env-bush': { sway: 0.006, near: 22, tint: { r: 0.74, g: 0.94, b: 0.9 }, sat: 0.78 }
+      };
       Promise.all(trees.map((id) => loadModel(id)))
         .then(() => Promise.all(trees.map((id) => scatter.add(id, ENV.flora[id], { cell: 56, near: 55, vary: 0.55, ...opt[id] }))))
         .then(() => {
@@ -199,7 +210,7 @@ export function upgradeEnv(scene) {
         }, fail);
     }
     if (has('env-palm'))
-      scatter.add('env-palm', ENV.flora['env-palm'], { cell: 90, near: 60, sway: 0.02, vary: 0.4, tint: GREY(1.2) }).then(() => {
+      scatter.add('env-palm', ENV.flora['env-palm'], { cell: 90, near: 60, sway: 0.02, vary: 0.4, tint: GREY(1.1) }).then(() => {
         drop(scene, 'palms');
         state.palms = true;
       }, fail);
@@ -217,7 +228,7 @@ export function upgradeEnv(scene) {
         // скал в море немного, и они большие — всегда подробные; валуны вдали рисуются грубо.
         // Камень у моделей тёмный, а мир игры светлый — высветляем (и текстуру, и множителем), иначе скалы
         // стоят чёрными столбами
-        .then(() => Promise.all(rocks.map((id) => scatter.add(id, items(id), id === 'env-rock1' ? { cell: 60, near: 45, vary: 0.3, tint: GREY(1.2) } : { cell: 400, near: 1e5, vary: 0.2, tint: GREY(id === 'env-rock2' ? 1.5 : 1.4) }))))
+        .then(() => Promise.all(rocks.map((id) => scatter.add(id, items(id), id === 'env-rock1' ? { cell: 60, near: 45, vary: 0.3, tint: GREY(1.25) } : { cell: 400, near: 1e5, vary: 0.2, tint: GREY(id === 'env-rock2' ? 1.3 : 1.25) }))))
         .then(() => {
           drop(scene, 'rocks');
           state.rocks = true;
@@ -233,8 +244,20 @@ export function upgradeEnv(scene) {
         }
         const o = put(scene, tpl, p);
         if (p.key) drop(scene, p.key);
+        if (p.key in state) state[p.key] = true;
         if (p.block) CIRCLES.push({ x: p.x, z: p.z, r: p.block });
         if (p.fire) fire = makeFire(scene, new THREE.Vector3(...p.fire).multiplyScalar(p.s).applyEuler(o.rotation).add(o.position), p.s);
+        if (p.lit)
+          o.traverse((c) => {
+            if (!c.isMesh || !c.material.emissiveMap) return;
+            c.material.emissive.set(p.lit.color);
+            lits.push({ m: c.material, k: p.lit.k });
+          });
+        for (const [gx, gy, gz, size] of p.glows || []) {
+          const at = new THREE.Vector3(gx, gy, gz).multiplyScalar(p.s).applyEuler(o.rotation).add(o.position);
+          glow(scene, at.x, at.y, at.z, size).k = 0.55;
+        }
+        if (p.lit || p.glows) envNight(night);
         state.singles++;
       }, fail);
     }

@@ -9,6 +9,37 @@ import * as THREE from 'three';
 import { surfaceU, detail } from './surface.js';
 import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 
+// Тональная кривая — своя, одна на все уровни качества: насыщенность → «подошва» и контраст по яркости → сжатие светов.
+// Стандартная «нейтральная» кривая three.js вычитает из каждого канала одно и то же число (до 0,04): у насыщенных цветов
+// наименьший канал уходит в ноль (трава становится кислотной, кожа — оранжевой), а тёмные краски моделей — в чёрное
+// и меняют оттенок (чёрное худи выходило коричневым). Здесь то же самое делается по яркости: цвет темнеет, оттенок остаётся.
+// Для подбора: ?tone=насыщенность,контраст,подошва
+const toneQ = (typeof location !== 'undefined' ? new URLSearchParams(location.search).get('tone') || '' : '').split(',').map(Number);
+export const TONE = { sat: toneQ[0] || 1.25, con: toneQ[1] || 1.08, toe: Number.isFinite(toneQ[2]) && toneQ.length > 2 ? toneQ[2] : 0.7 };
+THREE.ShaderChunk.tonemapping_pars_fragment = THREE.ShaderChunk.tonemapping_pars_fragment.replace(
+  'vec3 CustomToneMapping( vec3 color ) { return color; }',
+  /* glsl */ `vec3 CustomToneMapping( vec3 color ) {
+	const vec3 W = vec3( 0.2126, 0.7152, 0.0722 );
+	color *= toneMappingExposure;
+	float l = dot( color, W );
+	color = max( mix( vec3( l ), color, ${TONE.sat.toFixed(3)} ), 0.0 );
+	l = max( dot( color, W ), 1e-5 );
+	float toe = l < 0.08 ? l - 6.25 * l * l : 0.04;
+	float l2 = max( l - ${TONE.toe.toFixed(3)} * toe, 0.0 );
+	l2 = 0.18 * pow( l2 / 0.18, ${TONE.con.toFixed(3)} );
+	color *= l2 / l;
+	const float StartCompression = 0.8 - 0.04;
+	const float Desaturation = 0.15;
+	float peak = max( color.r, max( color.g, color.b ) );
+	if ( peak < StartCompression ) return color;
+	float d = 1. - StartCompression;
+	float newPeak = 1. - d * d / ( peak + d - StartCompression );
+	color *= newPeak / peak;
+	float g = 1. - 1. / ( Desaturation * ( peak - newPeak ) + 1. );
+	return mix( color, vec3( newPeak ), g );
+}`
+);
+
 const VERT = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
 // яркие места сцены → четверть разрешения (4 выборки накрывают блок 4×4 точки)
 const PRE = `uniform sampler2D tSrc; uniform vec2 uTexel; uniform float uThreshold; varying vec2 vUv;
@@ -28,12 +59,9 @@ const UP = `uniform sampler2D tSrc; uniform sampler2D tAdd; uniform vec2 uTexel;
     s += texture2D(tSrc, vUv + vec2(0.0, -2.0 * o.y)).rgb + texture2D(tSrc, vUv + vec2(0.0, 2.0 * o.y)).rgb;
     s += (texture2D(tSrc, vUv + vec2(-o.x, o.y)).rgb + texture2D(tSrc, vUv + o).rgb + texture2D(tSrc, vUv - o).rgb + texture2D(tSrc, vUv + vec2(o.x, -o.y)).rgb) * 2.0;
     gl_FragColor = vec4(texture2D(tAdd, vUv).rgb + s / 12.0, 1.0); }`;
-// итог: сцена + свечение → насыщенность, контраст, виньетка → тональная кривая и цветовое пространство экрана
-const FINAL = `uniform sampler2D tScene; uniform sampler2D tBloom; uniform float uBloom, uSat, uCon, uVig; varying vec2 vUv;
+// итог: сцена + свечение → виньетка → тональная кривая (в ней же насыщенность и контраст) и цветовое пространство экрана
+const FINAL = `uniform sampler2D tScene; uniform sampler2D tBloom; uniform float uBloom, uVig; varying vec2 vUv;
   void main(){ vec3 c = texture2D(tScene, vUv).rgb + texture2D(tBloom, vUv).rgb * uBloom;
-    float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
-    c = mix(vec3(l), c, uSat);
-    c = max((c - 0.18) * uCon + 0.18, 0.0);
     c *= 1.0 - uVig * smoothstep(0.42, 0.95, distance(vUv, vec2(0.5)));
     gl_FragColor = vec4(c, 1.0);
     #include <tonemapping_fragment>
@@ -51,7 +79,7 @@ export class Gfx {
   constructor(canvas, quality) {
     const r = (this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', stencil: false }));
     r.outputColorSpace = THREE.SRGBColorSpace;
-    r.toneMapping = THREE.NeutralToneMapping;
+    r.toneMapping = THREE.CustomToneMapping;
     r.shadowMap.enabled = true;
     r.shadowMap.type = THREE.PCFShadowMap;
     // буферы с запасом яркости умеют не все видеокарты; без них «высокое» рисуется напрямую, без свечения
@@ -71,6 +99,7 @@ export class Gfx {
     r.shadowMap.needsUpdate = true;
     surfaceU.uDetail.value = q === 'low' ? 0 : 1; // на «низком» — без фактуры дерева и камня: экономим выборки из текстур
     detail.lod = q === 'high' ? 1 : q === 'medium' ? 0.7 : 0.45; // подробные деревья и камни — только вблизи
+    detail.grass = q === 'high' ? 44 : q === 'medium' ? 30 : 0; // пучки травы вокруг игрока; на «низком» их нет
     this.dropPost();
     this.w = 0;
     this.resize();
@@ -115,7 +144,7 @@ export class Gfx {
       pre: mk(PRE, { tSrc: { value: null }, uTexel: { value: new THREE.Vector2() }, uThreshold: { value: 1.0 } }),
       downM: mk(DOWN, { tSrc: { value: null }, uTexel: { value: new THREE.Vector2() } }),
       upM: mk(UP, { tSrc: { value: null }, tAdd: { value: null }, uTexel: { value: new THREE.Vector2() } }),
-      final: mk(FINAL, { tScene: { value: null }, tBloom: { value: null }, uBloom: { value: 0.115 }, uSat: { value: 1.1 }, uCon: { value: 1.05 }, uVig: { value: 0.32 } }),
+      final: mk(FINAL, { tScene: { value: null }, tBloom: { value: null }, uBloom: { value: 0.115 }, uVig: { value: 0.32 } }),
       quad: new FullScreenQuad(null)
     });
     p.final.uniforms.tScene.value = p.scene.texture;

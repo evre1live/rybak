@@ -18,7 +18,8 @@ const faces = args.includes('--faces');
 
 (async () => {
   const manifest = JSON.parse(fs.readFileSync(manPath, 'utf8'));
-  const list = (ids.length ? ids : Object.keys(manifest.props)).filter((id) => manifest.props[id]);
+  // без списка — всё, кроме моделей локации: деревьям и домам значки ни к чему (для листа --sheet их называют явно)
+  const list = (ids.length ? ids : Object.keys(manifest.props).filter((id) => manifest.props[id].group !== 'env')).filter((id) => manifest.props[id]);
   const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   const page = await browser.newPage({ viewport: { width: 640, height: 360 } });
   page.on('pageerror', (e) => console.log('PAGEERROR', e.message.slice(0, 300)));

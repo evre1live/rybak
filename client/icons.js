@@ -24,7 +24,7 @@ function setup() {
   renderer.setPixelRatio(1);
   renderer.setSize(SIZE, SIZE, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.NeutralToneMapping;
+  renderer.toneMapping = THREE.CustomToneMapping; // та же кривая, что в игре (gfx.js)
   renderer.setClearColor(0x000000, 0);
   scene = new THREE.Scene();
   scene.add(new THREE.HemisphereLight('#ffffff', '#8aa0c0', 1.5));
@@ -140,5 +140,6 @@ export function modelShot(tpl, view = 'side') {
   if (view === 'three') g.rotation.set(0.42, -0.6, 0);
   else if (view === 'top') g.rotation.set(Math.PI / 2, 0, 0);
   else if (view === 'fish') g.rotation.set(0.1, 0.36, 0);
+  else if (Array.isArray(view)) g.rotation.set(view[0], view[1], view[2]);
   return shoot(g, frame(g, 1.06));
 }

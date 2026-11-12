@@ -875,6 +875,16 @@
         "walk": "3e528f1a-9056-430a-8545-b1a990b70b51",
         "run": "f8390cc4-0654-4475-9c65-f6eea0af7a52"
       }
+    },
+    "env-cottage": {
+      "concepts": [
+        {
+          "task": "7b26ae3b-e549-4f94-a9dc-b5bafd1a7070",
+          "file": "art/tripo/raw/env-cottage-concept1.jpg"
+        }
+      ],
+      "concept": "7b26ae3b-e549-4f94-a9dc-b5bafd1a7070",
+      "model": "8c1a6d13-72aa-455c-a6b4-9c0d648ebd78"
     }
   },
   "ledger": [
@@ -2452,6 +2462,20 @@
       "type": "animate_retarget",
       "task": "f8390cc4-0654-4475-9c65-f6eea0af7a52",
       "credits": 10
+    },
+    {
+      "at": "2026-11-12T07:10:58.510Z",
+      "label": "env-cottage образец",
+      "type": "text_to_image",
+      "task": "7b26ae3b-e549-4f94-a9dc-b5bafd1a7070",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-12T07:13:37.756Z",
+      "label": "env-cottage модель",
+      "type": "image_to_model",
+      "task": "8c1a6d13-72aa-455c-a6b4-9c0d648ebd78",
+      "credits": 30
     }
   ]
 }

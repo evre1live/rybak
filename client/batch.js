@@ -62,7 +62,9 @@ export class Batch {
   }
   /**
    * opts.grad: [k внизу, k вверху] — затемнение по высоте детали (ложная тень у основания);
-   * opts.top: [цвет, порог] — верхние грани красим другим цветом (трава на камнях);
+   * opts.top: [цвет, порог] — верхние грани красим другим цветом (трава на камнях). У камня (материал 2) мох кладёт
+   *   шейдер — по каждой точке, с рваной границей (surface.js): цвет вершин остаётся каменным, а порог уходит в aTex;
+   * opts.soft: камень-валун — рисунок кладки на нём едва намечен (на гладком валуне резкие «плиты» смотрятся сеткой);
    * opts.flat: пересчитать нормали по граням;
    * opts.mat: материал этой детали (иначе — this.mat).
    */
@@ -106,7 +108,7 @@ export class Batch {
     let az = 2;
     const e = matrix.elements;
     const sc = [Math.hypot(e[0], e[1], e[2]), Math.hypot(e[4], e[5], e[6]), Math.hypot(e[8], e[9], e[10])];
-    if (mat === 1 || mat === 5) {
+    if (mat === 1 || mat === 5 || mat === 7) {
       const o = [0, 1, 2].sort((a, b) => sc[b] - sc[a]);
       ax = o[0];
       ay = o[1];
@@ -114,9 +116,11 @@ export class Batch {
     }
     const off = mat ? ((++this.parts * 0.6180339887) % 1) * 9 : 0;
     if (mat) this.hasMat = true;
+    const mossy = mat === 2 && opts && opts.top;
     for (let i = 0; i < p.count; i++) {
       _v.fromBufferAttribute(p, i);
-      if (mat) {
+      if (mat === 2) this.tex.push((mossy ? 1 : 0) + (opts && opts.soft ? 2 : 0), mossy ? opts.top[1] : 2, off);
+      else if (mat) {
         const l = [_v.x * sc[0], _v.y * sc[1], _v.z * sc[2]];
         if (mat === 4) this.tex.push(l[0], l[1], l[2]);
         else this.tex.push(l[ax] + off, l[ay] + off * 0.37, l[az]);
@@ -128,7 +132,7 @@ export class Batch {
       this.pos.push(_v.x, _v.y, _v.z);
       _n.fromBufferAttribute(nAttr, i).applyMatrix3(_nm).normalize();
       this.nor.push(_n.x, _n.y, _n.z);
-      if (opts && opts.top && _n.y > opts.top[1]) this.col.push(_c2.r * k, _c2.g * k, _c2.b * k);
+      if (opts && opts.top && !mossy && _n.y > opts.top[1]) this.col.push(_c2.r * k, _c2.g * k, _c2.b * k);
       else this.col.push(_c.r * k, _c.g * k, _c.b * k);
     }
     return this;
