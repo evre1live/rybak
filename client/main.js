@@ -29,12 +29,13 @@ import {
   TOURS, TOUR_COUNTDOWN, tourBlank, tourAdd, tourTable, tourPrize, tourMedal, medalPrize, tourScoreText, MEDALS
 } from '../shared/logic.js';
 import { $, esc, clamp, damp, isTouch } from './util.js';
-import { Perf, isSoftware, newTuner, tuneStep, needDrop, scaleFor, TARGET_MS } from './perf.js';
+import { Perf, isSoftware, newTuner, tuneStep, needDrop, scaleFor, TARGET_MS, yieldNow } from './perf.js';
 import { surfaceU } from './surface.js';
 import { initCache, wakeServer } from './offline.js';
 
 const SPAWNS = [[-2, 9], [0.6, 9.4], [-4, 8.2], [2.6, 8.6], [-1, 11], [1.6, 11.4], [-3.6, 11], [3.6, 10.4]];
 const LINE_Z = 7;
+const CALIB_V = 2; // версия правил подбора качества: сменились пороги — запомненный итог не годится, меряем заново
 const lineX = (slot) => -5.0 + slot * 1.32;
 const v3 = new THREE.Vector3();
 /** Адрес комнаты в строке браузера; во встроенной рамке это может быть запрещено — тогда просто молчим. */
@@ -68,7 +69,7 @@ class Game {
     document.body.classList.toggle('touch', touch);
     this.auto = settings.quality === 'auto';
     // на «авто» начинаем с того, что подобрали на этой машине в прошлый раз (calibrate), а не с «высокого»
-    const was = this.auto && settings.autoQ && QUALITIES.includes(settings.autoQ.tier) ? settings.autoQ : null;
+    const was = this.auto && settings.autoQ && settings.autoQ.v === CALIB_V && QUALITIES.includes(settings.autoQ.tier) ? settings.autoQ : null;
     this.gfx = new Gfx(this.canvas, q.get('q') || (this.auto ? (was ? was.tier : touch ? 'medium' : 'high') : settings.quality));
     this.perf = new Perf(this.gfx.renderer);
     this.tuner = newTuner();
@@ -1697,7 +1698,7 @@ class Game {
         this.manual = true;
         if (this.noRender) window.__render = true;
         this.frame(performance.now());
-        await wait(0);
+        await yieldNow();
       } else if (this.auto && !this.params.get('q') && settings.autoQ && settings.autoQ.gpu === this.perf.gpu) {
         this.gfx.setScale(settings.autoQ.scale || 1);
         if (settings.autoQ.refl === false) this.gfx.reflect = false;
@@ -1721,19 +1722,33 @@ class Game {
    */
   async prelight() {
     const lamps = this.world.scenery.lampLights;
+    const r = this.gfx.renderer;
     const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
-    for (const [L, F] of [[true, false], [false, true]]) {
+    const withLights = (L, F, fn) => {
       const keep = [lamps.map((l) => l.visible), this.fill.visible];
       lamps.forEach((l) => (l.visible = L));
       this.fill.visible = F;
       try {
-        await Promise.race([this.gfx.renderer.compileAsync(this.scene, this.camera), wait(20000)]);
-      } catch (e) {
-        /* соберутся, когда понадобятся */
+        return fn();
+      } finally {
+        lamps.forEach((l, i) => (l.visible = keep[0][i]));
+        this.fill.visible = keep[1];
       }
-      lamps.forEach((l, i) => (l.visible = keep[0][i]));
-      this.fill.visible = keep[1];
+    };
+    // лобби понадобится через несколько секунд — ждём его шейдеры за заставкой (кадры в это время не рисуются)
+    try {
+      await withLights(false, true, () => Promise.race([r.compileAsync(this.scene, this.camera), wait(20000)]));
+    } catch (e) {
+      /* соберутся, когда понадобятся */
     }
+    // ночь наступит не скоро: её шейдеры отдаём собирать в фоне, когда заставка уже ушла
+    setTimeout(() => {
+      try {
+        withLights(true, false, () => r.compile(this.scene, this.camera));
+      } catch (e) {
+        /* соберутся на закате */
+      }
+    }, 2500);
   }
   /** Цена кадра, мс: рисуем кадр и ждём, пока видеокарта его закончит, — так видно настоящее время, а не частоту экрана. */
   async frameCost(n = 8, warm = 3) {
@@ -1748,7 +1763,7 @@ class Game {
       this.frame(t);
       gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
       if (i >= warm) ms.push(performance.now() - t);
-      if (i % 4 === 3) await new Promise((ok) => setTimeout(ok, 0)); // заставка и страница должны дышать
+      if (i % 4 === 3) await yieldNow(); // заставка и страница должны дышать
     }
     this.manual = manual;
     return ms.sort((a, b) => a - b)[ms.length >> 1];
@@ -1762,7 +1777,9 @@ class Game {
     const g = this.gfx;
     const gpu = this.perf.gpu;
     const saved = settings.autoQ;
-    if (!force && saved && saved.gpu === gpu && QUALITIES.includes(saved.tier)) {
+    // запомненное годится неделю: машину могли замерить в неудачный момент, а сама вверх по ступеням игра не идёт
+    const fresh = saved && saved.v === CALIB_V && Date.now() - (saved.t || 0) < 7 * 864e5;
+    if (!force && fresh && saved.gpu === gpu && QUALITIES.includes(saved.tier)) {
       g.setQuality(saved.tier);
       g.setScale(saved.scale || 1);
       if (saved.refl === false) g.reflect = false; // от отражений в воде на этой машине уже отказывались
@@ -1775,8 +1792,15 @@ class Game {
     const log = [];
     let ms = await this.frameCost();
     log.push([tier, +ms.toFixed(1)]);
+    if (tier === 'high' && g.reflect && needDrop(ms, tier)) {
+      // сначала пробуем без отражений в воде: ради них сцена рисуется второй раз, а остальная красота остаётся
+      g.reflect = false;
+      ms = await this.frameCost();
+      log.push(['high без отражений', +ms.toFixed(1)]);
+    }
     while (needDrop(ms, tier)) {
       tier = tier === 'high' ? 'medium' : 'low';
+      g.reflect = this.params.get('refl') !== '0';
       g.setQuality(tier);
       // на «низком» нет теней — у всех материалов другие шейдеры: собираем их заранее, не подвешивая страницу
       await g.prepare(this.scene, this.camera);
@@ -1785,7 +1809,7 @@ class Game {
     }
     g.setScale(scaleFor(ms, tier));
     this.tuner = newTuner();
-    settings.autoQ = { gpu, tier, scale: g.scale, ms: +ms.toFixed(1), v: 1 };
+    settings.autoQ = { gpu, tier, scale: g.scale, refl: g.reflect, ms: +ms.toFixed(1), v: CALIB_V, t: Date.now() };
     saveSettings();
     return (this.calib = { ...settings.autoQ, from: 'measured', log });
   }
@@ -1814,7 +1838,7 @@ class Game {
       g.setScale(0.85);
     }
     if (this.auto) {
-      settings.autoQ = { gpu: this.perf.gpu, tier: g.quality, scale: g.scale, refl: g.reflect, v: 1 };
+      settings.autoQ = { ...(settings.autoQ || {}), gpu: this.perf.gpu, tier: g.quality, scale: g.scale, refl: g.reflect, v: CALIB_V, t: (settings.autoQ && settings.autoQ.t) || Date.now() };
       saveSettings();
     }
   }
@@ -2003,6 +2027,14 @@ class Game {
 }
 
 // Мир строится одним куском и занимает страницу на несколько секунд: сначала даём браузеру нарисовать заставку.
-const start = () => (window.RYBAK = new Game());
+let started = false;
+const start = () => {
+  if (started) return;
+  started = true;
+  window.RYBAK = new Game();
+};
 if (new URLSearchParams(location.search).has('norender')) start();
-else requestAnimationFrame(() => setTimeout(start, 30));
+else {
+  requestAnimationFrame(() => setTimeout(start, 30));
+  setTimeout(start, 500); // вкладка открыта в фоне: кадра не будет, строим мир и так
+}

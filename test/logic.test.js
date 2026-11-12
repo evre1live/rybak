@@ -341,7 +341,8 @@ import { newTuner, tuneStep, needDrop, scaleFor, TARGET_MS, BUDGET_MS, Perf, isS
 
 test('подбор при загрузке: дорогой кадр — ступень ниже, небольшое превышение — разрешение меньше', () => {
   assert.ok(needDrop(40, 'high') && needDrop(40, 'medium') && !needDrop(40, 'low'), 'ниже «низкого» ступени нет');
-  assert.ok(!needDrop(BUDGET_MS * 2, 'high'));
+  // с «высокого» уходим раньше, чем со «среднего»: разрешение ему помогает слабо (замер на Apple M4: 15,4 мс — остаёмся)
+  assert.ok(!needDrop(15.4, 'high') && needDrop(22, 'high') && !needDrop(22, 'medium') && needDrop(27, 'medium'));
   assert.equal(scaleFor(6, 'high'), 1, 'запас есть — разрешение полное');
   assert.equal(scaleFor(BUDGET_MS * 1.05, 'high'), 1, 'чуть больше нормы — не трогаем');
   const s = scaleFor(20, 'high');

@@ -8,6 +8,7 @@
 //   4) один проход на экран: сцена × затенение + свечение, цвет, виньетка, тональная кривая.
 // Каждый лишний проход во весь экран на таких видеокартах стоит дорого, поэтому он ровно один.
 import * as THREE from 'three';
+import { yieldNow } from './perf.js';
 import { surfaceU, detail } from './surface.js';
 import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 
@@ -201,7 +202,7 @@ export class Gfx {
       }
       if (++i % 6 === 0) {
         onStep(0.5 + (0.5 * i) / seen.size);
-        await wait(0);
+        await yieldNow();
       }
     }
     onStep(1);

@@ -98,8 +98,19 @@ export function tuneStep(st, avg, q) {
 }
 /** Замер перед игрой: по цене кадра (мс, с ожиданием видеокарты) — нужна ли ступень ниже и какое взять разрешение. */
 export const BUDGET_MS = 12;
-export const needDrop = (ms, tier) => tier !== 'low' && ms > BUDGET_MS * 2.2;
+// «Высокое» дорого не числом точек (отражение мира, тени, свечение): уменьшение разрешения ему помогает слабо
+// (на Apple M4: 15,4 мс при 100 % и 13–14 мс при 88 %), поэтому с него уходим раньше — уже с 21 мс.
+export const DROP_MS = { high: 21, medium: BUDGET_MS * 2.2 };
+export const needDrop = (ms, tier) => tier !== 'low' && ms > DROP_MS[tier];
 export const scaleFor = (ms, tier) => {
   const s = Math.max(tier === 'low' ? 0.5 : 0.62, Math.min(1, Math.sqrt(BUDGET_MS / Math.max(ms, 0.1))));
   return s > 0.95 ? 1 : +s.toFixed(2);
 };
+
+/** Уступить очередь странице, не дожидаясь часов: в фоновой вкладке setTimeout срабатывает раз в секунду, а это — сразу. */
+export const yieldNow = () =>
+  new Promise((ok) => {
+    const c = new MessageChannel();
+    c.port1.onmessage = () => ok();
+    c.port2.postMessage(0);
+  });
