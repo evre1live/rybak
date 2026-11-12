@@ -387,7 +387,7 @@ function wood(n = 1024) {
   const cv = new Canvas(n, base);
   // сучки: где они и какого размера (волокна их огибают)
   const knots = [];
-  for (let i = 0; i < 4; i++) knots.push({ u: r(), v: r(), ru: 0.006 + r() * 0.006, rv: 0.022 + r() * 0.03 });
+  for (let i = 0; i < 2; i++) knots.push({ u: r(), v: r(), ru: 0.006 + r() * 0.006, rv: 0.022 + r() * 0.03 });
   const wrap = (d) => d - Math.round(d);
   cv.each((u, v) => {
     // волокна огибают сучки
@@ -421,8 +421,8 @@ function wood(n = 1024) {
     // мазок кисти: мелкая вытянутая рябь
     c = mulC(c, 0.93 + 0.14 * vnoise2(u, vv, 24, 150, 17));
     // сучок: тёмная сердцевина и кольцо вокруг
-    c = mixC(c, dark, knot * 0.8);
-    c = mixC(c, deep, ring * 0.45);
+    c = mixC(c, dark, knot * 0.62);
+    c = mixC(c, deep, ring * 0.4);
     return c;
   });
   const s = n / 1024;

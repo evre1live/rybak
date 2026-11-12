@@ -46,7 +46,7 @@ function flatTexture() {
  * В пробной версии одним файлом (без сети) текстур нет — мир остаётся с ровной заливкой.
  */
 // картинки сервер отдаёт с недельным сроком хранения: перерисовал текстуры (tools/paint-textures.js) — прибавь номер
-const TEX_V = 3;
+const TEX_V = 4;
 export function loadPaint({ lite = false, offline = false } = {}) {
   const flat = flatTexture();
   for (const k of ['uGrass', 'uRock', 'uSand', 'uDirt', 'uWood']) surfaceU[k].value = flat;
