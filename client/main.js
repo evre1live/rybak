@@ -882,28 +882,47 @@ class Game {
     this.ui.closePanel();
     this.ui.toast('Начинаем с чистого листа', 'good');
   }
+  /**
+   * Сменить ступень качества без замирания. У ступени свои шейдеры: если просто переключить, они соберутся разом
+   * в ближайшем кадре — на Apple M4 это три секунды неподвижной картинки. Поэтому сначала собираем их в фоне,
+   * потом переключаем и сразу показываем всё спрятанное (rewarm). then — что сделать вместе с переключением.
+   */
+  switchTier(tier, then = () => {}) {
+    const g = this.gfx;
+    this.tierWant = tier;
+    if (g.quality === tier) return then();
+    if (!this.prepared || this.noRender) {
+      // до конца загрузки и в проверках без отрисовки ждать нечего
+      g.setQuality(tier);
+      return then();
+    }
+    this.tierBusy = true;
+    g.shaders(this.scene, this.camera, tier).then(() => {
+      this.tierBusy = false;
+      if (this.tierWant !== tier) return; // пока собирали, выбрали другую
+      g.setQuality(tier);
+      then();
+      this.rewarm();
+      if (this.ui.panel === 'settings') this.ui.rerender();
+    });
+  }
   applySettings() {
     this.camera.fov = settings.fov;
     this.camera.updateProjectionMatrix();
     this.audio.applyVolume();
     const auto = settings.quality === 'auto';
-    const tierWas = this.gfx.quality;
     if (!this.params.get('q')) {
       if (!auto) {
-        this.gfx.setQuality(settings.quality);
-        if (this.auto || settings.drs === false) this.gfx.setScale(1); // выбрали качество сами — разрешение полное
+        const full = this.auto || settings.drs === false; // выбрали качество сами — разрешение полное
+        this.switchTier(settings.quality, () => full && this.gfx.setScale(1));
       } else if (!this.auto && !this.booting) {
         // вернулись на «авто»: берём то, что подобрано для этой видеокарты
         const a = settings.autoQ;
-        if (a && a.gpu === this.perf.gpu && QUALITIES.includes(a.tier)) {
-          this.gfx.setQuality(a.tier);
-          this.gfx.setScale(a.scale || 1);
-        }
+        if (a && a.gpu === this.perf.gpu && QUALITIES.includes(a.tier)) this.switchTier(a.tier, () => this.gfx.setScale(a.scale || 1));
       }
     }
     this.auto = auto;
     this.tuner = newTuner();
-    if (this.gfx.quality !== tierWas && this.prepared) this.rewarm(); // новая ступень — новые шейдеры: показываем всё сразу, пока открыто меню
     if (this.perfOn !== !!settings.fps) this.togglePerf(!!settings.fps);
     this.ui.hintKey = '';
   }
