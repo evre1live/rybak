@@ -1312,8 +1312,8 @@ class Game {
     const k = this.editH;
     // экран стоймя (планшет): список героев занимает низ экрана — героя ставим в верхнюю его часть и снимаем издалека
     const tall = cam.aspect < 1;
-    const d = k * (tall ? 2 : 1);
-    const look = (tall ? 0.26 : 0.98) * k;
+    const d = k * (tall ? 2 : 1.04);
+    const look = (tall ? 0.26 : 0.9) * k; // чуть ниже пояса: ноги героя встают над нижней строкой с кнопками
     if (this.state === 'world') {
       const fx = -Math.sin(this.editBase);
       const fz = -Math.cos(this.editBase);
