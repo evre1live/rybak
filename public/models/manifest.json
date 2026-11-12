@@ -986,6 +986,70 @@
         0.735,
         0.73
       ]
+    },
+    "env-cliff1": {
+      "file": "models/env-cliff1.glb",
+      "group": "env",
+      "tris": 3600,
+      "kb": 115,
+      "size": [
+        1,
+        0.716,
+        0.548
+      ],
+      "lod": {
+        "file": "models/env-cliff1.lod.glb",
+        "tris": 418,
+        "kb": 8
+      }
+    },
+    "env-cliff2": {
+      "file": "models/env-cliff2.glb",
+      "group": "env",
+      "tris": 3599,
+      "kb": 147,
+      "size": [
+        1,
+        0.993,
+        0.96
+      ],
+      "lod": {
+        "file": "models/env-cliff2.lod.glb",
+        "tris": 414,
+        "kb": 8
+      }
+    },
+    "env-arch": {
+      "file": "models/env-arch.glb",
+      "group": "env",
+      "tris": 8990,
+      "kb": 245,
+      "size": [
+        0.967,
+        1,
+        0.584
+      ],
+      "lod": {
+        "file": "models/env-arch.lod.glb",
+        "tris": 898,
+        "kb": 14
+      }
+    },
+    "env-pile": {
+      "file": "models/env-pile.glb",
+      "group": "env",
+      "tris": 813,
+      "kb": 75,
+      "size": [
+        0.249,
+        1,
+        0.246
+      ],
+      "lod": {
+        "file": "models/env-pile.lod.glb",
+        "tris": 110,
+        "kb": 5
+      }
     }
   }
 }

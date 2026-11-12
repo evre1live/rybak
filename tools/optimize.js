@@ -27,6 +27,7 @@ const BUDGET = { hero: { tris: 30000, tex: [2048, 2048] }, prop: { tris: 7000, t
 // У модели локации в art/models.json можно задать: tris — сколько треугольников оставить, tex — размеры текстур,
 // flat — без карты нормалей (деревья и кусты: их много, а рельеф листвы и так в сетке), lod — сколько треугольников
 // в дальней копии (<id>.lod.glb: вместо текстуры — цвет вершин), gamma — высветлить тёмную текстуру (меньше 1),
+// stretch — [y0, y1, k]: вытянуть по высоте только полосу от y0 до y1 в k раз (длинная свая из короткой модели),
 // repaint — в какой цвет перекрасить чёрные детали, glow — где у модели стёкла окон, которые ночью светятся
 // (коробки [x0, y0, z0, x1, y1, z1] в осях готовой модели; найти их помогает tools/dev/windows.mjs).
 
@@ -160,6 +161,29 @@ function normalize(doc, m) {
   const M = [R[0][0] * k, R[1][0] * k, R[2][0] * k, 0, R[0][1] * k, R[1][1] * k, R[2][1] * k, 0, R[0][2] * k, R[1][2] * k, R[2][2] * k, 0, t[0], t[1], t[2], 1];
   for (const mesh of meshes) transformMesh(mesh, M);
   return q.size.map((v) => +(v * k).toFixed(3));
+}
+
+/**
+ * Вытягивает модель по высоте только в полосе от y0 до y1 (в долях высоты готовой модели) в k раз: у сваи длинной
+ * становится гладкая середина, а канат, обруч и обросший низ остаются как были. Потом модель снова приводится
+ * к наибольшему размеру 1. Возвращает новые размеры.
+ */
+function stretchY(doc, [y0, y1, k], size) {
+  const add = (y1 - y0) * (k - 1);
+  const top = size[1] + add;
+  const scale = 1 / Math.max(size[0], top, size[2]);
+  for (const mesh of doc.getRoot().listMeshes())
+    for (const prim of mesh.listPrimitives()) {
+      const a = prim.getAttribute('POSITION');
+      const v = [0, 0, 0];
+      for (let i = 0; i < a.getCount(); i++) {
+        a.getElement(i, v);
+        if (v[1] > y1) v[1] += add;
+        else if (v[1] > y0) v[1] = y0 + (v[1] - y0) * k;
+        a.setElement(i, [v[0] * scale, v[1] * scale, v[2] * scale]);
+      }
+    }
+  return [size[0] * scale, top * scale, size[2] * scale].map((x) => +x.toFixed(3));
 }
 
 /**
@@ -330,6 +354,7 @@ const META = process.argv.includes('--meta');
 const want = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 for (const m of spec.models) {
   if (want.length && !want.includes(m.id)) continue;
+  if (m.skip && !want.includes(m.id)) continue; // модель есть, но в игру не пошла (в skip — почему)
   if (META) {
     const i = manifest.heroes.findIndex((h) => h.id === m.id);
     if (m.group !== 'hero' || i < 0) continue;
@@ -350,7 +375,8 @@ for (const m of spec.models) {
       clips[mm[1]] = await addClip(doc, path.join(RAW, f), mm[1]);
     }
   }
-  const size = m.group === 'hero' ? null : normalize(doc, m);
+  let size = m.group === 'hero' ? null : normalize(doc, m);
+  if (m.stretch) size = stretchY(doc, m.stretch, size);
   if (m.group === 'prop' || m.group === 'junk' || m.group === 'env') {
     // предметы в игре матовые: карта блеска им не нужна — минус файл и выборка из текстуры
     for (const mat of doc.getRoot().listMaterials()) {

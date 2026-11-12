@@ -54,8 +54,9 @@ const grassA = C('#88b752');
 const grassB = C('#70a045');
 const grassC = C('#a9cb66');
 const dune = C('#b9d27a');
-const rockA = C('#8d95a1');
-const rockB = C('#a7adb7');
+// камень рельефа — в тон утёсам-моделям: тёплый серый
+const rockA = C('#827f79');
+const rockB = C('#9a968e');
 const path = C('#dccb93');
 /**
  * Цвет земли в точке: песок, трава, камень, дно. ny — насколько склон пологий (1 — ровно).

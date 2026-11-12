@@ -885,6 +885,74 @@
       ],
       "concept": "7b26ae3b-e549-4f94-a9dc-b5bafd1a7070",
       "model": "8c1a6d13-72aa-455c-a6b4-9c0d648ebd78"
+    },
+    "env-cliff1": {
+      "concepts": [
+        {
+          "task": "f1fd3732-3539-406a-82e8-b83dcb7cd8ef",
+          "file": "art/tripo/raw/env-cliff1-concept1.jpg"
+        }
+      ],
+      "concept": "f1fd3732-3539-406a-82e8-b83dcb7cd8ef",
+      "model": "e3896362-62c2-4335-bcd3-97c2c46b2add"
+    },
+    "env-pile": {
+      "concepts": [
+        {
+          "task": "c5992d5d-bd87-4e5a-a3d9-5474e779c5bb",
+          "file": "art/tripo/raw/env-pile-concept1.jpg"
+        }
+      ],
+      "concept": "c5992d5d-bd87-4e5a-a3d9-5474e779c5bb",
+      "model": "d010379a-8f89-4320-991e-129181512bf6"
+    },
+    "env-deck": {
+      "concepts": [
+        {
+          "task": "98a80883-3246-4fbd-aa6e-0642e8facc78",
+          "file": "art/tripo/raw/env-deck-concept1.jpg"
+        },
+        {
+          "task": "3433c7c8-d309-48f1-bb67-2cfe8b67eb16",
+          "file": "art/tripo/raw/env-deck-concept2.jpg"
+        }
+      ],
+      "concept": "3433c7c8-d309-48f1-bb67-2cfe8b67eb16",
+      "pick": 0,
+      "model": "51518385-8dfd-460f-873e-7e8e321ae542"
+    },
+    "env-cliff2": {
+      "concepts": [
+        {
+          "task": "e5e60de8-fc8c-4718-b2d4-5ff81aa32d9a",
+          "file": "art/tripo/raw/env-cliff2-concept1.jpg"
+        }
+      ],
+      "concept": "e5e60de8-fc8c-4718-b2d4-5ff81aa32d9a",
+      "model": "452ce76c-3bbd-4743-a03c-d928cf309398"
+    },
+    "env-arch": {
+      "concepts": [
+        {
+          "task": "e7f0743d-e9db-4d8c-9f53-ddcced8fb03a",
+          "file": "art/tripo/raw/env-arch-concept1.jpg"
+        },
+        {
+          "task": "3fc53f4c-73eb-4e8f-a268-ce581fc0f7a7",
+          "file": "art/tripo/raw/env-arch-concept2.jpg"
+        }
+      ],
+      "concept": "3fc53f4c-73eb-4e8f-a268-ce581fc0f7a7",
+      "model": "ec0c3bbc-8a1f-4549-875d-3c1848913798"
+    },
+    "env-plank": {
+      "concepts": [
+        {
+          "task": "90dac1b9-8f38-4c1e-9f3f-b34d7e6bee26",
+          "file": "art/tripo/raw/env-plank-concept1.jpg"
+        }
+      ],
+      "concept": "90dac1b9-8f38-4c1e-9f3f-b34d7e6bee26"
     }
   },
   "ledger": [
@@ -2476,6 +2544,97 @@
       "type": "image_to_model",
       "task": "8c1a6d13-72aa-455c-a6b4-9c0d648ebd78",
       "credits": 30
+    },
+    {
+      "at": "2026-11-12T08:23:45.245Z",
+      "label": "env-cliff1 образец",
+      "type": "text_to_image",
+      "task": "f1fd3732-3539-406a-82e8-b83dcb7cd8ef",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-12T08:23:49.303Z",
+      "label": "env-pile образец",
+      "type": "text_to_image",
+      "task": "c5992d5d-bd87-4e5a-a3d9-5474e779c5bb",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-12T08:23:49.688Z",
+      "label": "env-deck образец",
+      "type": "text_to_image",
+      "task": "98a80883-3246-4fbd-aa6e-0642e8facc78",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-12T08:23:53.631Z",
+      "label": "env-cliff2 образец",
+      "type": "text_to_image",
+      "task": "e5e60de8-fc8c-4718-b2d4-5ff81aa32d9a",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-12T08:23:53.738Z",
+      "label": "env-arch образец",
+      "type": "text_to_image",
+      "task": "e7f0743d-e9db-4d8c-9f53-ddcced8fb03a",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-12T08:25:15.907Z",
+      "label": "env-deck образец",
+      "type": "text_to_image",
+      "task": "3433c7c8-d309-48f1-bb67-2cfe8b67eb16",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-12T08:25:16.094Z",
+      "label": "env-arch образец",
+      "type": "text_to_image",
+      "task": "3fc53f4c-73eb-4e8f-a268-ce581fc0f7a7",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-12T08:27:38.284Z",
+      "label": "env-pile модель",
+      "type": "image_to_model",
+      "task": "d010379a-8f89-4320-991e-129181512bf6",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-12T08:27:39.404Z",
+      "label": "env-cliff1 модель",
+      "type": "image_to_model",
+      "task": "e3896362-62c2-4335-bcd3-97c2c46b2add",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-12T08:27:46.873Z",
+      "label": "env-arch модель",
+      "type": "image_to_model",
+      "task": "ec0c3bbc-8a1f-4549-875d-3c1848913798",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-12T08:28:03.532Z",
+      "label": "env-cliff2 модель",
+      "type": "image_to_model",
+      "task": "452ce76c-3bbd-4743-a03c-d928cf309398",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-12T08:34:10.864Z",
+      "label": "env-deck модель",
+      "type": "image_to_model",
+      "task": "51518385-8dfd-460f-873e-7e8e321ae542",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-12T08:35:49.807Z",
+      "label": "env-plank образец",
+      "type": "text_to_image",
+      "task": "90dac1b9-8f38-4c1e-9f3f-b34d7e6bee26",
+      "credits": 5
     }
   ]
 }

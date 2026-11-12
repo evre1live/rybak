@@ -42,16 +42,17 @@ export class Scatter {
    * Расставить копии модели id. items: [{ x, y, z, s, ry, sx?, sy?, sz?, rx?, rz?, tint? }] — s общий масштаб
    * (модель приведена к наибольшему размеру 1), sx/sy/sz — растяжение по осям поверх него.
    * opts: cell — размер куска сетки, near — до какого расстояния рисовать подробную модель (на «высоком» качестве),
-   * shadow — тени, sway — качание кроны, vary — разброс оттенка между копиями (0…1), sat — насыщенность (1 — как в текстуре).
+   * shadow — тени, sway — качание кроны, vary — разброс оттенка между копиями (0…1), sat — насыщенность (1 — как в текстуре),
+   * rock — скала: вблизи поверх текстуры мелкий рисунок камня.
    * Возвращает обещание: готово, когда модели загружены и копии стоят в сцене.
    */
-  add(id, items, { cell = 64, near = 55, shadow = true, sway = 0, vary = 0.5, tint = null, sat = 1 } = {}) {
+  add(id, items, { cell = 64, near = 55, shadow = true, sway = 0, vary = 0.5, tint = null, sat = 1, rock = false } = {}) {
     if (!items.length) return Promise.resolve(false);
     return Promise.all([loadModel(id), loadLod(id).catch(() => null)]).then(([tpl, lod]) => {
       const src = meshesOf(tpl.scene);
       if (!src.length) return false;
       // общий материал на все копии модели: свой, чтобы не трогать одиночные копии той же модели
-      const mats = src.map((m) => patchModel(m.material.clone(), { sway, sat }));
+      const mats = src.map((m) => patchModel(m.material.clone(), { sway, sat, rock }));
       const lodSrc = lod ? meshesOf(lod.scene) : null;
       const lodMats = lodSrc ? lodSrc.map((m) => patchModel(m.material.clone(), { sway, sat })) : null;
       const groups = new Map();

@@ -7,10 +7,11 @@ import { buildPlaces } from './places.js';
 import { ENV, upgradeEnv, envNight, envState } from './envmodels.js';
 import { spot01 } from './scatter.js';
 import { rng, rockGeo, blobGeo, canvasTex, shade, sstep, TAU, fbm2 } from './util.js';
-import { DECKS, CIRCLES, DECK_Y, groundH, shoreZ, islandR, ISLAND, ARCH, REEF, CAPE, capeDist, FALLS, LIGHTHOUSE, COTTAGE, cottageUV, BACKWATER, deckAt, SCHOOL_HOMES } from './terrain.js';
+import { DECKS, CIRCLES, DECK_Y, groundH, shoreZ, islandR, ISLAND, ARCH, ARCH_LEGS, REEF, CAPE, capeDist, FALLS, LIGHTHOUSE, COTTAGE, cottageUV, BACKWATER, deckAt, SCHOOL_HOMES } from './terrain.js';
 import { waveH } from './water.js';
 
 const WOODS = ['#c58a4e', '#b97c42', '#d39a5d', '#a86f3a', '#c9945a'];
+const PILE_H = 2.1; // высота готовой сваи (env-pile), м: низ с водорослями приходится на кромку воды
 const DARK_WOOD = '#7a5230';
 const ROPE = '#ead9a7';
 // Столбы стоят на настиле у самого края (раньше — снаружи, у сваи: тонкому столбу это шло, а у готового
@@ -23,7 +24,14 @@ export const LAMP_POSTS = [
 
 /** Сваи, стоящие в воде: вокруг них пена и круги (water.js). */
 export const FOAM_SPOTS = [];
-function buildDocks(B, r, late = false) {
+/**
+ * Настилы причалов: доски, обвязка, сваи. PF — запасные сваи из кода: они убираются, когда на их места встают готовые
+ * модели свай (envmodels.js). Общий счётчик случайных чисел r тратится ровно как раньше — от него зависит весь мир,
+ * поэтому всё новое (гвозди) берёт числа из своего счётчика.
+ */
+function buildDocks(B, r, late = false, PF = B) {
+  const rn = rng(late ? 4243 : 4242);
+  const NAIL = '#3b4048';
   for (const d of DECKS) {
     if (!!d.late !== late) continue;
     const across = d.along === 'z';
@@ -47,8 +55,17 @@ function buildDocks(B, r, late = false) {
         const mid = (across ? d.x0 : d.z0) + (cuts[s] + cuts[s + 1]) / 2;
         const color = shade(WOODS[Math.floor(r() * WOODS.length)], (r() - 0.5) * 0.18);
         const y = DECK_Y - 0.04 + (r() - 0.5) * 0.012;
-        if (across) B.add(G.box(), color, M(mid, y, a, len, 0.08, step - 0.016, 0, (r() - 0.5) * 0.012, 0));
-        else B.add(G.box(), color, M(a, y, mid, step - 0.016, 0.08, len, 0, (r() - 0.5) * 0.012, 0));
+        const ry = (r() - 0.5) * 0.012;
+        // доска со стёсанной кромкой; у каждого конца — по две шляпки гвоздей
+        if (across) B.add(G.plank('x'), color, M(mid, y, a, len, 0.08, step - 0.016, 0, ry, 0), { mat: 1 });
+        else B.add(G.plank('z'), color, M(a, y, mid, step - 0.016, 0.08, len, 0, ry, 0), { mat: 1 });
+        for (const e of [-1, 1]) {
+          const along = mid + e * (len / 2 - 0.07 - rn() * 0.03);
+          for (const w of [-0.26, 0.26]) {
+            const side = a + (w + (rn() - 0.5) * 0.08) * step;
+            B.add(G.nail(), NAIL, M(across ? along : side, y + 0.0412, across ? side : along, 0.026, 1, 0.026, 0, rn() * 3, 0), { mat: 0 });
+          }
+        }
       }
     }
     // обвязка и лаги
@@ -90,11 +107,18 @@ function buildDocks(B, r, late = false) {
       const tall = r() < 0.62;
       const top = DECK_Y + (tall ? 0.62 + r() * 0.3 : 0.1);
       const bot = Math.min(gh - 0.6, -1.2);
-      if (gh < -0.25) FOAM_SPOTS.push([px, pz, 0.17]);
+      if (gh < -0.25) FOAM_SPOTS.push([px, pz, 0.2]);
       if (tall) ENV.piles.push([px, top + 0.03, pz]);
-      B.add(G.cyl(9), shade('#8a5f3a', (r() - 0.5) * 0.14), M(px, (top + bot) / 2, pz, 0.34, top - bot, 0.34, 0, r() * 3, (r() - 0.5) * 0.03), { grad: [0.5, 1.05] });
-      B.add(G.cyl(9), '#c79d6c', M(px, top + 0.012, pz, 0.3, 0.03, 0.3), { mat: 4 });
-      if (tall && r() < 0.5) for (let k = 0; k < 3; k++) B.add(G.torus(0.2, 12), ROPE, M(px, DECK_Y + 0.3 + k * 0.066, pz, 0.46, 0.46, 0.46, Math.PI / 2, r() * 3, 0));
+      // запасная свая из кода: бревно, срез с кольцами, у каждой второй высокой — канат
+      const ry = r() * 3;
+      const rz = (r() - 0.5) * 0.03;
+      PF.add(G.cyl(9), shade('#8a5f3a', (r() - 0.5) * 0.14), M(px, (top + bot) / 2, pz, 0.34, top - bot, 0.34, 0, ry, rz), { grad: [0.5, 1.05] });
+      PF.add(G.cyl(9), '#c79d6c', M(px, top + 0.012, pz, 0.3, 0.03, 0.3), { mat: 4 });
+      if (tall && r() < 0.5) for (let k = 0; k < 3; k++) PF.add(G.torus(0.2, 12), ROPE, M(px, DECK_Y + 0.3 + k * 0.066, pz, 0.46, 0.46, 0.46, Math.PI / 2, r() * 3, 0));
+      // Готовая свая (с канатом, обручем и обросшим низом) встаёт макушкой на ту же высоту; она короче, чем глубина
+      // у дальних причалов, поэтому под водой её продолжает тёмное бревно до дна — оно остаётся и с моделью.
+      ENV.docks.push({ x: px, y: top - PILE_H, z: pz, s: PILE_H, ry, rz: rz * 0.6 });
+      if (bot < top - PILE_H + 0.3) B.add(G.cyl(8), '#4b4a33', M(px, (top - PILE_H + 0.3 + bot) / 2, pz, 0.4, top - PILE_H + 0.3 - bot, 0.4, 0, ry, 0), { grad: [0.45, 1.0], mat: 1 });
     }
   }
 }
@@ -650,12 +674,77 @@ function buildRocks(scene, r) {
   const small = [rockGeo(11, 1), rockGeo(23, 1), rockGeo(37, 1)]; // мелким камням хватит и грубой сетки
   const GREYS = ['#8d95a1', '#7f8793', '#9aa2ad', '#868f9c', '#a3a9b3'];
   const GRASS = '#6dbd50';
+  // у водопадов в скалах просвет: вода падает по обрыву самого острова
+  const fallAngles = FALLS.map((f) => Math.atan2(f.nz, f.nx));
+  const arcDist = (a, b) => {
+    let d = Math.abs(a - b) % TAU;
+    if (d > Math.PI) d = TAU - d;
+    return d * islandR(b);
+  };
+  const nearFall = (a, m) => fallAngles.some((fa) => arcDist(a, fa) < m);
+  /**
+   * Кольцо утёсов вокруг острова с маяком — записи для готовых моделей: env-cliff1 (стена из пластов) и env-cliff2
+   * (уступ из глыб). Утёс стоит в воде у подножия обрыва и поднимается чуть выше плато. У водопадов и там, где
+   * к острову подходят мостки причала, — просветы: в них виден обрыв самого острова. Случайные числа свои.
+   */
+  const islandCliffs = () => {
+    const rc = rng(9091);
+    const at = (a, rad) => [ISLAND.x + Math.cos(a) * rad, ISLAND.z + Math.sin(a) * rad];
+    // просветы: [угол, полуширина в метрах]
+    const gaps = fallAngles.map((a) => [a, 3.1]);
+    for (const d of DECKS) {
+      // настил, дошедший до обрыва: его ближний к острову торец
+      const cx = Math.abs(d.x0 - ISLAND.x) < Math.abs(d.x1 - ISLAND.x) ? d.x0 : d.x1;
+      const cz = (d.z0 + d.z1) / 2;
+      const a = Math.atan2(cz - ISLAND.z, cx - ISLAND.x);
+      if (Math.hypot(cx - ISLAND.x, cz - ISLAND.z) < islandR(a) + 4) gaps.push([a, (d.z1 - d.z0) / 2 + 1.7]);
+    }
+    gaps.sort((p, q) => ((p[0] + TAU) % TAU) - ((q[0] + TAU) % TAU));
+    gaps.forEach((gp) => (gp[0] = (gp[0] + TAU) % TAU));
+    let n1 = 0;
+    for (let i = 0; i < gaps.length; i++) {
+      const [ga, gw] = gaps[i];
+      const [hb, hw] = gaps[(i + 1) % gaps.length];
+      const a0 = ga + gw / islandR(ga);
+      const a1 = hb + (i + 1 === gaps.length ? TAU : 0) - hw / islandR(hb);
+      if (a1 <= a0) continue;
+      // длина дуги по кромке и таблица «длина → угол»
+      const N = 96;
+      const acc = [0];
+      for (let k = 0; k < N; k++) acc.push(acc[k] + (islandR(a0 + ((k + 0.5) / N) * (a1 - a0)) * (a1 - a0)) / N);
+      const len = acc[N];
+      if (len < 3.5) continue;
+      const n = Math.max(1, Math.round(len / 11.5));
+      const narrow = len / n < 7.5; // в узкий промежуток встаёт скала-столб, а не широкий утёс
+      for (let j = 0; j < n; j++) {
+        const want = ((j + 0.5) / n) * len;
+        let k = 0;
+        while (k < N - 1 && acc[k + 1] < want) k++;
+        const a = a0 + ((k + (want - acc[k]) / Math.max(1e-6, acc[k + 1] - acc[k])) / N) * (a1 - a0);
+        const R = islandR(a);
+        const [ax, az] = at(a - 0.03, islandR(a - 0.03));
+        const [bx, bz] = at(a + 0.03, islandR(a + 0.03));
+        const tl = Math.hypot(bx - ax, bz - az);
+        // стена из пластов шире уступа из глыб; подряд одинаковые не ставим чаще двух раз
+        const wall = n1 >= 2 ? false : n1 <= -2 ? true : rc() < 0.5;
+        n1 = wall ? Math.max(1, n1 + 1) : Math.min(-1, n1 - 1);
+        const depth = 7.2 + rc() * 1.6;
+        const [x, z] = at(a, R - 1.7 + rc() * 0.8);
+        const top = groundH(...at(a, R - 6.5)) + 0.5 + rc() * 1.1;
+        ENV.rocks[narrow ? 'env-rock2' : wall ? 'env-cliff1' : 'env-cliff2'].push({
+          x, y: -1.3, z, w: (len / n) * (1.2 + rc() * 0.12), h: top + 1.3, d: narrow ? Math.min(depth, 6.4) : depth,
+          ry: Math.atan2(-(bz - az) / tl, (bx - ax) / tl) + (rc() < 0.5 ? Math.PI : 0), tilt: false
+        });
+      }
+    }
+  };
+  let own = true; // false — камень только запасной: готовая модель на его место не встаёт (там будет что-то другое)
   const rock = (x, y, z, sx, sy, sz, grass = false, tone = 0) => {
     const c = shade(GREYS[Math.floor(r() * GREYS.length)], tone + (r() - 0.5) * 0.1);
     const set = Math.max(sx, sy, sz) < 2.4 ? small : geos;
     (as ? S : B).add(set[Math.floor(r() * set.length)], c, M(x, y, z, sx, sy, sz, (r() - 0.5) * 0.5, r() * TAU, (r() - 0.5) * 0.5), grass ? { top: [shade(GRASS, (r() - 0.5) * 0.12), 0.72], grad: [0.72, 1.05], soft: true } : { grad: [0.72, 1.05], soft: true });
     // процедурный камень — приплюснутый шар радиуса 1: по его размерам и встанет готовая модель
-    if (as) ENV.rocks[as].push({ x, y: y - 0.72 * sy, z, w: 2 * sx, h: 1.52 * sy, d: 2 * sz, ry: spot01(x, z, 4) * TAU, tilt: Math.max(sx, sz) < 4 });
+    if (as && own) ENV.rocks[as].push({ x, y: y - 0.72 * sy, z, w: 2 * sx, h: 1.52 * sy, d: 2 * sz, ry: spot01(x, z, 4) * TAU, tilt: Math.max(sx, sz) < 4 });
   };
   // риф у причала
   as = 'env-rock1';
@@ -665,14 +754,17 @@ function buildRocks(scene, r) {
     const s = 0.7 + r() * 1.5;
     rock(REEF.x + Math.cos(a) * d, -0.35 + r() * 0.5 - d * 0.05, REEF.z + Math.sin(a) * d * 0.8, s * 1.2, s * 0.8, s);
   }
-  // остров: кромка воды и уступы обрыва
-  as = null;
+  // остров: у кромки воды — валуны
+  as = 'env-rock1';
   for (let i = 0; i < 56; i++) {
     const a = r() * TAU;
     const R = islandR(a) + 0.5 + r() * 4.5;
     const s = 1 + r() * 2.4;
     rock(ISLAND.x + Math.cos(a) * R, -0.3 + r() * 0.7, ISLAND.z + Math.sin(a) * R, s * 1.2, s * 0.8, s, false, -0.06);
   }
+  // Обрыв острова. Запасной вид — гладкие глыбы по верху обрыва; из готовых моделей вместо них встаёт кольцо
+  // утёсов (islandCliffs), а из глыб остаётся каждая третья — валуном поменьше на кромке.
+  own = false;
   for (let i = 0; i < 120; i++) {
     const a = r() * TAU;
     const R = islandR(a) - 0.4 - r() * 3.8;
@@ -681,7 +773,10 @@ function buildRocks(scene, r) {
     const h = groundH(x, z);
     const s = 2.3 + r() * 2.9;
     rock(x, h - s * 0.3, z, s, s * (0.8 + r() * 0.5), s, h > 7);
+    if (i % 3 === 0 && !nearFall(a, 5)) ENV.rocks['env-rock1'].push({ x, y: h - 0.45 * s, z, w: s * 1.25, h: s * 1.05, d: s * 1.25, ry: spot01(x, z, 4) * TAU, tilt: true });
   }
+  own = true;
+  islandCliffs();
   // мыс
   as = 'env-rock1';
   for (let i = 0; i < 34; i++) {
@@ -703,12 +798,12 @@ function buildRocks(scene, r) {
     const s = 0.3 + r() * 0.75;
     rock(x, groundH(x, z) + s * 0.12, z, s * 1.3, s * 0.75, s, false, 0.05);
   }
-  // западный мыс и скалы в море
-  as = null;
+  // западный мыс и скалы в море: большие глыбы — скальные уступы, поменьше — валуны
   for (let i = 0; i < 46; i++) {
     const x = -62 - r() * 80;
     const z = shoreZ(x) - 2 + r() * 5;
     const s = 2 + r() * 3.4;
+    as = s > 3.7 ? 'env-cliff2' : 'env-rock1';
     rock(x, groundH(x, z) + r() * 2, z, s * 1.2, s, s, r() < 0.5);
   }
   let stack = 0;
@@ -720,29 +815,48 @@ function buildRocks(scene, r) {
     for (let k = 0; k < 4; k++) rock(x + (r() - 0.5) * s * 2.2, -0.2, z + (r() - 0.5) * s * 2.2, 1.5 + r() * 2, 1 + r(), 1.5 + r() * 2);
   }
   as = null;
-  // арка: половина тора, помятая шумом
-  const ag = new THREE.TorusGeometry(8.6, 2.7, 7, 13, Math.PI).toNonIndexed();
+  // Арка. Запасной вид — половина тора, помятая шумом, тех же габаритов, что и готовая модель (envmodels.js).
+  const AB = new Batch();
+  AB.mat = 2;
+  const tube = 2.5;
+  const ag = new THREE.TorusGeometry(ARCH.leg, tube, 7, 13, Math.PI).toNonIndexed();
   const p = ag.attributes.position;
   const v = new THREE.Vector3();
+  const ky = (ARCH.h + 0.2) / (ARCH.leg + tube);
   for (let i = 0; i < p.count; i++) {
     v.fromBufferAttribute(p, i);
     const n = fbm2(v.x * 0.35 + 5 + v.z * 0.3, v.y * 0.35 + 9 - v.z * 0.2, 3);
-    const k = 1 + (n - 0.5) * 0.55;
+    const k = 1 + (n - 0.5) * 0.45;
     const foot = 1 + 0.45 * sstep(4, 0, v.y);
-    p.setXYZ(i, v.x * k * (0.94 + 0.06 * foot), v.y * 1.12 * k, v.z * k * foot * 1.25);
+    p.setXYZ(i, v.x * k * (0.94 + 0.06 * foot), v.y * ky * k, v.z * k * foot * 1.25);
   }
   ag.computeVertexNormals();
-  B.add(ag, '#8d95a1', M(ARCH.x, -1.4, ARCH.z, 1, 1, 1, 0, 1.92, 0), { top: [GRASS, 0.8], grad: [0.72, 1.05] });
+  AB.add(ag, '#8d95a1', M(ARCH.x, -1.4, ARCH.z, 1, 1, 1, 0, ARCH.ry, 0), { top: [GRASS, 0.8], grad: [0.72, 1.05] });
+  const mA = AB.build();
+  scene.add(mA);
+  ENV.fallback.arch.push(mA);
+  ENV.singles.push({ id: 'env-arch', key: 'arch', x: ARCH.x, y: -0.5, z: ARCH.z, s: 1, fit: [ARCH.w, ARCH.h, ARCH.d], ry: ARCH.ry, rock: true, gain: 1.15 });
+  // под водой опоры арки стоят на каменных подошвах до самого дна (арка стоит на глубине)
+  const ra = rng(5151);
+  for (const [lx, lz] of ARCH_LEGS) {
+    const bot = groundH(lx, lz);
+    for (let k = 0; k < 2; k++) {
+      const hh = (-1.2 - bot) / 1.46;
+      B.add(geos[Math.floor(ra() * 4)], shade('#7f8793', -0.12 + (ra() - 0.5) * 0.08), M(lx + (ra() - 0.5) * 2.4, bot + hh * 0.72 - 0.4, lz + (ra() - 0.5) * 2.4, 4.6 + ra() * 1.4, hh, 4.2 + ra() * 1.2, 0, ra() * TAU, 0), { grad: [0.6, 1.0], soft: true });
+    }
+  }
   as = 'env-rock1';
   for (let i = 0; i < 9; i++) {
     const s = i < 5 ? -1 : 1;
-    rock(ARCH.x + Math.cos(1.92) * s * (8.6 + (r() - 0.5) * 4) + (r() - 0.5) * 3, -0.2, ARCH.z - Math.sin(1.92) * s * (8.6 + (r() - 0.5) * 4) + (r() - 0.5) * 3, 1.6 + r() * 2.2, 1.2 + r() * 1.6, 1.6 + r() * 2.2, r() < 0.3);
+    rock(ARCH.x + Math.cos(ARCH.ry) * s * (ARCH.leg + 0.8 + (r() - 0.5) * 4) + (r() - 0.5) * 3, -0.2, ARCH.z - Math.sin(ARCH.ry) * s * (ARCH.leg + 0.8 + (r() - 0.5) * 4) + (r() - 0.5) * 3, 1.6 + r() * 2.2, 1.2 + r() * 1.6, 1.6 + r() * 2.2, r() < 0.3);
   }
   as = null;
+  // деревья на макушке арки
   const tb = new Batch();
-  roundTree(tb, ARCH.x + 0.4, 9.6, ARCH.z - 0.2, 0.8, r);
-  pine(tb, ARCH.x - 1.6, 9.2, ARCH.z + 0.9, 0.7, r);
-  bush(tb, ARCH.x + 1.8, 9.2, ARCH.z + 0.4, 0.8, r);
+  const ay = ARCH.h * 0.93 - 0.75;
+  roundTree(tb, ARCH.x + 0.4, ay + 0.1, ARCH.z - 0.2, 0.8, r);
+  pine(tb, ARCH.x - 1.6, ay - 0.1, ARCH.z + 0.9, 0.7, r);
+  bush(tb, ARCH.x + 1.8, ay, ARCH.z + 0.4, 0.8, r);
   const mS = S.build();
   const mT = tb.build();
   scene.add(B.build(), mS, mT);
@@ -1116,15 +1230,15 @@ export function buildScenery(scene) {
   const P = new Batch(); // процедурные двойники предметов, у которых есть готовые модели
   P.auto = true;
   // то, что заменяется готовыми моделями локации, собирается в отдельные меши — их можно спрятать
-  const X = { bench: new Batch(), lamps: new Batch() };
-  X.bench.auto = X.lamps.auto = true;
-  buildDocks(B, r);
+  const X = { bench: new Batch(), lamps: new Batch(), piles: new Batch() };
+  X.bench.auto = X.lamps.auto = X.piles.auto = true;
+  buildDocks(B, r, false, X.piles);
   const shack = buildShack(B, P, scene, r);
   buildProps(B, P, r, X);
   const lamps = buildLamps(X.lamps, scene);
-  buildDocks(B, rng(20261113), true);
+  buildDocks(B, rng(20261113), true, X.piles);
   scene.add(B.build());
-  for (const k of ['bench', 'lamps']) {
+  for (const k of ['bench', 'lamps', 'piles']) {
     const m = X[k].build();
     scene.add(m);
     ENV.fallback[k].push(m);

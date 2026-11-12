@@ -1,4 +1,4 @@
-// Рисует «рисованные» текстуры земли и камня — траву, скалу, песок, тропу — и кладёт их в public/tex/.
+// Рисует «рисованные» текстуры земли, камня и дерева — траву, скалу, песок, тропу, доску — и кладёт их в public/tex/.
 //
 //   node tools/paint-textures.js [куда положить картинки для просмотра]
 //
@@ -55,6 +55,26 @@ function vnoise(x, y, p, seed) {
   const xb = (xa + 1) % p;
   const ya = ((y0 % p) + p) % p;
   const yb = (ya + 1) % p;
+  const a = hash(xa, ya, seed);
+  const b = hash(xb, ya, seed);
+  const c = hash(xa, yb, seed);
+  const d = hash(xb, yb, seed);
+  return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
+}
+/** Плавный шум с разным числом клеток по осям: вытянутые пятна (волокна дерева). u, v — от 0 до 1. */
+function vnoise2(u, v, px, py, seed) {
+  const x = u * px;
+  const y = v * py;
+  const x0 = Math.floor(x);
+  const y0 = Math.floor(y);
+  const fx = x - x0;
+  const fy = y - y0;
+  const sx = fx * fx * (3 - 2 * fx);
+  const sy = fy * fy * (3 - 2 * fy);
+  const xa = ((x0 % px) + px) % px;
+  const xb = (xa + 1) % px;
+  const ya = ((y0 % py) + py) % py;
+  const yb = (ya + 1) % py;
   const a = hash(xa, ya, seed);
   const b = hash(xb, ya, seed);
   const c = hash(xa, yb, seed);
@@ -299,10 +319,11 @@ function rock(n = 1024) {
   const r = rng(29);
   const A = scatterPts(r, 26, 4, 1.7); // крупные глыбы
   const B = scatterPts(r, 150, 9, 1.35); // мелкие грани внутри расколотых глыб
-  const base = hex('#8a9099');
-  const cool = hex('#6f7c8b');
+  // тона — как у утёсов-моделей (env-cliff*): тёплый серый, без синевы; иначе обрыв из кода рядом с ними — «чужой»
+  const base = hex('#8d8c88');
+  const cool = hex('#7b7d80');
   const warm = hex('#a39884');
-  const dark = hex('#353b46');
+  const dark = hex('#37383b');
   const cv = new Canvas(n, base);
   cv.each((u, v) => {
     // границы неровные: сетку слегка «мнём»
@@ -349,6 +370,71 @@ function rock(n = 1024) {
     cv.stroke(x, y, a, len, 1.3 * s, 0.4 * s, (r() - 0.5) * 1.0, hex('#434955'), 0.45);
   }
   for (let i = 0; i < 500 * s * s; i++) cv.blob(r() * n, r() * n, (1 + r() * 2.6) * s, (1 + r() * 2) * s, r() * 3, r() < 0.5 ? hex('#5d646f') : hex('#b3b6bb'), 0.3, 0.4);
+  return cv;
+}
+
+// ───── дерево ─────
+// Доска расписана кистью: длинные мазки вдоль волокон, тёмные прожилки, сучки, выгоревшие полосы.
+// Волокна идут вдоль u. В игре плитка ложится так: по u — 2,5 м вдоль доски, по v — 0,6 м поперёк
+// (точка текстуры вчетверо длиннее вдоль волокон, чем поперёк, — поэтому сучки здесь нарисованы «сплюснутыми»).
+function wood(n = 1024) {
+  const r = rng(71);
+  const base = hex('#c58d54');
+  const dark = hex('#6f4526');
+  const deep = hex('#8f5c33');
+  const light = hex('#e8bf87');
+  const red = hex('#b9713d');
+  const cv = new Canvas(n, base);
+  // сучки: где они и какого размера (волокна их огибают)
+  const knots = [];
+  for (let i = 0; i < 4; i++) knots.push({ u: r(), v: r(), ru: 0.006 + r() * 0.006, rv: 0.022 + r() * 0.03 });
+  const wrap = (d) => d - Math.round(d);
+  cv.each((u, v) => {
+    // волокна огибают сучки
+    let bend = 0;
+    let knot = 0;
+    let ring = 0;
+    for (const k of knots) {
+      const du = wrap(u - k.u) / k.ru;
+      const dv = wrap(v - k.v) / k.rv;
+      const q = du * du + dv * dv;
+      if (q < 30) {
+        bend += (Math.sign(dv) || 1) * k.rv * 0.9 * Math.exp(-q * 0.22);
+        knot = Math.max(knot, 1 - sstep(0.5, 1.15, q));
+        ring = Math.max(ring, sstep(1.0, 1.5, q) * (1 - sstep(1.5, 2.6, q)));
+      }
+    }
+    const vv = v + bend + (vnoise2(u, v, 3, 6, 5) - 0.5) * 0.035 + (vnoise2(u, v, 9, 12, 7) - 0.5) * 0.012;
+    // широкие полосы тона: выгоревшие и тёмные доски «годовых слоёв»
+    const tone = vnoise2(u, vv, 2, 9, 11) * 0.6 + vnoise2(u, vv, 5, 26, 13) * 0.4;
+    let c = mixC(base, light, sstep(0.52, 0.9, tone) * 0.55);
+    c = mixC(c, deep, sstep(0.5, 0.12, tone) * 0.55);
+    c = mixC(c, red, sstep(0.55, 0.85, vnoise2(u, vv, 3, 17, 23)) * 0.22);
+    // прожилки: тонкие тёмные линии вдоль волокон, каждая своей силы, местами прерываются
+    const lines = 46;
+    const gi = Math.floor(vv * lines);
+    const gf = vv * lines - gi;
+    const str = hash(((gi % lines) + lines) % lines, 7, 99);
+    const gap = sstep(0.25, 0.6, vnoise2(u, vv, 7, lines, 41));
+    const line = (1 - sstep(0.04, 0.2, Math.abs(gf - 0.5))) * sstep(0.35, 0.9, str) * gap;
+    c = mixC(c, dark, line * 0.55);
+    // мазок кисти: мелкая вытянутая рябь
+    c = mulC(c, 0.93 + 0.14 * vnoise2(u, vv, 24, 150, 17));
+    // сучок: тёмная сердцевина и кольцо вокруг
+    c = mixC(c, dark, knot * 0.8);
+    c = mixC(c, deep, ring * 0.45);
+    return c;
+  });
+  const s = n / 1024;
+  // светлые потёртости и тонкие трещины вдоль волокон
+  for (let i = 0; i < 70 * s; i++) cv.stroke(r() * n, r() * n, (r() - 0.5) * 0.02, (120 + r() * 320) * s, (2 + r() * 5) * s, 1 * s, (r() - 0.5) * 0.02, light, 0.16);
+  for (let i = 0; i < 26 * s; i++) {
+    const x = r() * n;
+    const y = r() * n;
+    const len = (90 + r() * 260) * s;
+    cv.stroke(x, y + 2 * s, 0, len, 1.6 * s, 0.6 * s, (r() - 0.5) * 0.03, light, 0.3);
+    cv.stroke(x, y, 0, len, 1.5 * s, 0.5 * s, (r() - 0.5) * 0.03, dark, 0.6);
+  }
   return cv;
 }
 
@@ -407,5 +493,5 @@ function dirt(n = 512) {
 
 const t0 = Date.now();
 const out = {};
-for (const [name, fn] of [['grass', grass], ['rock', rock], ['sand', sand], ['dirt', dirt]]) out[name] = await save(fn(), name);
+for (const [name, fn] of [['grass', grass], ['rock', rock], ['sand', sand], ['dirt', dirt], ['wood', wood]]) out[name] = await save(fn(), name);
 console.log(`готово за ${((Date.now() - t0) / 1000).toFixed(1)} с →`, path.relative(ROOT, OUT));

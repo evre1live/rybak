@@ -606,6 +606,68 @@
       ]
     },
     {
+      "id": "env-cliff1",
+      "group": "env",
+      "name": "Утёс",
+      "prompt": "a massive free-standing chunk of a sea cliff: a thick wall of stacked angular rock layers with deep horizontal ledges and vertical cracks, light grey weathered stone with a few warm beige layers, sharp chiselled edges with lighter worn rims, a flat top covered with bright green grass and moss, about as wide as it is tall, a dark wet band at the very bottom",
+      "tris": 3600,
+      "lod": 420,
+      "gamma": 0.85
+    },
+    {
+      "id": "env-cliff2",
+      "group": "env",
+      "name": "Скальный уступ",
+      "prompt": "a massive rocky bluff: a tall heap of huge angular boulders and broken rock slabs fused into one solid rock mass, a heavy overhanging ledge near the top, grey stone with darker cracks, sharp chiselled facets with lighter worn edges, a rounded top covered with bright green grass, a dark wet band at the very bottom",
+      "tris": 3600,
+      "lod": 420,
+      "gamma": 0.66
+    },
+    {
+      "id": "env-arch",
+      "group": "env",
+      "name": "Каменная арка",
+      "lead": "A single object, 3D video game environment asset concept, front view at eye level turned slightly to the side, the whole object visible from bottom to top.",
+      "prompt": "a natural sea arch carved by waves out of one solid rock, standing alone: a single continuous organic rock mass with one big round hole through the middle, thick uneven legs wider at the base, an irregular lumpy top, rough layered grey stone with slanted strata and deep cracks, chiselled facets with lighter worn edges, patches of green grass and moss on top, dark wet bands and barnacles at the bottom, wild nature, not man-made, no blocks, no bricks, no masonry",
+      "tris": 9000,
+      "lod": 900,
+      "gamma": 0.66
+    },
+    {
+      "id": "env-deck",
+      "group": "env",
+      "name": "Секция настила",
+      "skip": "вышла поддоном из шести разных досок на толстой раме — как пол причала не годится; настил остался из кода",
+      "lead": "A single object, 3D video game environment asset concept, seen from above at a steep angle, the whole object visible.",
+      "prompt": "a square flat section of an old wooden pier deck: ten thick weathered planks laid tightly side by side, nailed to two dark cross beams underneath, rows of iron nail heads, chipped plank ends, narrow dark gaps between the planks, warm honey-brown sun-bleached wood with painted grain, nothing standing on it",
+      "tris": 1400,
+      "lod": 120,
+      "tex": [2048, 1024],
+      "textureQuality": "detailed"
+    },
+    {
+      "id": "env-plank",
+      "group": "env",
+      "name": "Доска настила",
+      "skip": "сделан только образец: доска вышла с торчащими гвоздями и бордовая; модель не заказывалась",
+      "lead": "A single object, 3D video game environment asset concept, seen from above at a steep angle, the whole object visible.",
+      "prompt": "one single thick weathered wooden deck plank lying flat: a long straight board with slightly rounded worn edges and chipped ends, two iron nail heads at each end, warm honey-brown sun-bleached wood with painted grain lines, a few small knots and a thin crack, nothing else",
+      "tris": 260,
+      "lod": 20,
+      "flat": true,
+      "tex": [1024, 512]
+    },
+    {
+      "id": "env-pile",
+      "group": "env",
+      "name": "Свая",
+      "prompt": "a thick round wooden mooring pile of a pier: one tall straight weathered log standing upright, thick rope wrapped five times around it near the top, a flat sawn top with tree rings and cracks, an iron band below the rope, dark wet wood with green algae and barnacles on the lower third",
+      "tris": 760,
+      "lod": 110,
+      "tex": [512, 512],
+      "stretch": [0.46, 0.6, 7.5]
+    },
+    {
       "id": "env-motorboat",
       "group": "env",
       "name": "Моторная лодка",

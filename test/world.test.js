@@ -114,6 +114,30 @@ test('на Пальмовом острове можно ходить, а глу�
   assert.equal(T.canStand(222, -175), false, 'в лагуну по шею не зайти');
 });
 
+test('арка: между опорами лодка проходит, в опоры упирается; опоры стоят на дне', () => {
+  const A = T.ARCH;
+  // ось опор и ось прохода (поперёк неё)
+  const ax = Math.cos(A.ry);
+  const az = -Math.sin(A.ry);
+  const yaw = Math.atan2(-az, ax); // нос — вдоль прохода: (sin yaw, cos yaw) = (−az, ax)
+  for (let d = -16; d <= 16; d += 1) {
+    const x = A.x - az * d;
+    const z = A.z + ax * d;
+    assert.ok(fits(x, z, yaw), `под аркой по оси прохода лодка идёт (${d} м от середины)`);
+    // и со смещением на метр в сторону — тоже: проход не «в нитку»
+    assert.ok(fits(x + ax, z + az, yaw) && fits(x - ax, z - az, yaw), `проход шире лодки (${d} м от середины)`);
+  }
+  assert.equal(T.ARCH_LEGS.length, 2);
+  for (const [lx, lz] of T.ARCH_LEGS) {
+    assert.equal(T.canSail(lx, lz), false, 'в опору не въехать');
+    assert.ok(T.groundH(lx, lz) < -5, 'опора стоит на глубине — у неё есть подводная подошва');
+    assert.ok(Math.abs(Math.hypot(lx - A.x, lz - A.z) - A.leg) < 1e-6);
+  }
+  // проход не уже лодки с запасом: между преградами опор остаётся больше трёх метров
+  assert.ok(2 * (A.leg - A.block) > 3, `проход ${(2 * (A.leg - A.block)).toFixed(1)} м`);
+  assert.equal(T.spotAt(A.x, A.z).zone, 'arch');
+});
+
 test('домик смотрителя: под ним ровная площадка, а холм под маяком и обрыв острова не тронуты', () => {
   const C = T.COTTAGE;
   const c = Math.cos(C.ry);

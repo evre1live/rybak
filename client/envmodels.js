@@ -17,23 +17,33 @@ export const ENV = {
   // деревья и кусты: { x, y, z, s — высота (у куста — ширина) в метрах, ry }
   flora: { 'env-pine': [], 'env-oak': [], 'env-birch': [], 'env-bush': [], 'env-palm': [] },
   // камни: { x, y — низ, z, w, h, d — размеры, ry, tilt }
-  rocks: { 'env-rock1': [], 'env-rock2': [], 'env-rock3': [] },
+  rocks: { 'env-rock1': [], 'env-rock2': [], 'env-rock3': [], 'env-cliff1': [], 'env-cliff2': [] },
   // процедурные меши, которые убираются, когда встают модели
-  fallback: { trees: [], palms: [], rocks: [], lighthouse: [], cottage: [], wreck: [], hut: [], campfire: [], lamps: [], bench: [], sign: [] },
+  fallback: { trees: [], palms: [], rocks: [], arch: [], piles: [], lighthouse: [], cottage: [], wreck: [], hut: [], campfire: [], lamps: [], bench: [], sign: [] },
   lamps: [], // фонарные столбы: { x, y, z, side, glass, light }
+  docks: [], // сваи причалов: { x, y — низ модели, z, s — высота, ry, rz }
   piles: [], // верхушки высоких свай — на них садятся чайки: [x, y, z]
   // одиночные модели: { id, key?, x, y, z, s, ry, rx?, rz?, block?, fire?, gain? — во сколько раз высветлить,
-  //   lit? — { color, k }: ночью загораются окна (карта свечения модели), glows? — тёплые ореолы: [x, y, z в долях модели, поперечник в метрах] }
+  //   lit? — { color, k }: ночью загораются окна (карта свечения модели), glows? — тёплые ореолы: [x, y, z в долях модели, поперечник в метрах],
+  //   fit? — [ширина, высота, глубина] в метрах: модель растягивается под них, rock? — скала: вблизи поверх текстуры мелкий рисунок камня }
   singles: [],
   lighthouse: null, // { x, y, z, beam, face }
   signBlock: null
 };
 
-const state = { trees: false, palms: false, rocks: false, singles: 0, lamps: 0, gulls: 0, lighthouse: false, cottage: false, kiosk: false };
+const state = { trees: false, palms: false, rocks: false, cliffs: 0, arch: false, piles: 0, singles: 0, lamps: 0, gulls: 0, lighthouse: false, cottage: false, kiosk: false };
 /** Для проверок: что уже заменено готовыми моделями; lit — сколько материалов с окнами, которые загораются ночью, glowing — как ярко они горят сейчас. */
 export const envState = () => ({ ...state, lit: lits.length, glowing: lits.reduce((m, l) => Math.max(m, l.m.emissiveIntensity), 0) });
 
 const GREY = (k) => ({ r: k, g: k, b: k });
+// как рисуются копии камней: rock — вблизи поверх текстуры мелкий рисунок камня (surface.js)
+const ROCK_OPT = {
+  'env-rock1': { cell: 60, near: 45, vary: 0.3, tint: GREY(1.25), rock: true },
+  'env-rock2': { cell: 400, near: 1e5, vary: 0.2, tint: GREY(1.45), rock: true },
+  'env-rock3': { cell: 400, near: 1e5, vary: 0.2, tint: GREY(1.42), rock: true },
+  'env-cliff1': { cell: 130, near: 140, vary: 0.25, tint: GREY(1.0), rock: true },
+  'env-cliff2': { cell: 130, near: 140, vary: 0.25, tint: GREY(1.15), rock: true }
+};
 const glows = []; // светящиеся пятна фонарей и маяка: { s, k, day }
 const lits = []; // материалы с окнами, которые загораются ночью: { m, k }
 const gulls = [];
@@ -142,16 +152,19 @@ function label(text, w, h, color = '#fff4d6') {
 }
 
 /** Готовой модели — тени облаков и подводный цвет (один раз на шаблон: копии делят материал). */
-function patched(tpl) {
+function patched(tpl, opts) {
   if (!tpl.patched) {
     tpl.patched = true;
-    tpl.scene.traverse((o) => o.isMesh && patchModel(o.material));
+    tpl.scene.traverse((o) => o.isMesh && patchModel(o.material, opts));
   }
   return tpl;
 }
 function put(scene, tpl, p) {
-  const o = spawn(patched(tpl));
-  o.scale.setScalar(p.s);
+  const o = spawn(patched(tpl, p.rock ? { rock: true } : undefined));
+  if (p.fit) {
+    const size = modelInfo(p.id).size;
+    o.scale.set(p.fit[0] / size[0], p.fit[1] / size[1], p.fit[2] / size[2]);
+  } else o.scale.setScalar(p.s);
   o.position.set(p.x, p.y, p.z);
   o.rotation.set(p.rx || 0, p.ry || 0, p.rz || 0, 'YXZ');
   scene.add(o);
@@ -215,7 +228,7 @@ export function upgradeEnv(scene) {
         state.palms = true;
       }, fail);
     // ── камни: процедурный камень задан размерами, модель растягивается под них ──
-    const rocks = ['env-rock1', 'env-rock2', 'env-rock3'];
+    const rocks = ['env-rock1', 'env-rock2', 'env-rock3', 'env-cliff1', 'env-cliff2'];
     if (rocks.every(has)) {
       const items = (id) => {
         const size = modelInfo(id).size;
@@ -228,12 +241,20 @@ export function upgradeEnv(scene) {
         // скал в море немного, и они большие — всегда подробные; валуны вдали рисуются грубо.
         // Камень у моделей тёмный, а мир игры светлый — высветляем (и текстуру, и множителем), иначе скалы
         // стоят чёрными столбами
-        .then(() => Promise.all(rocks.map((id) => scatter.add(id, items(id), id === 'env-rock1' ? { cell: 60, near: 45, vary: 0.3, tint: GREY(1.25) } : { cell: 400, near: 1e5, vary: 0.2, tint: GREY(id === 'env-rock2' ? 1.3 : 1.25) }))))
+        // утёсы (env-cliff*) — кольцо вокруг острова с маяком и глыбы западного берега: подробные издалека, это главный вид бухты
+        .then(() => Promise.all(rocks.map((id) => scatter.add(id, items(id), ROCK_OPT[id]))))
         .then(() => {
           drop(scene, 'rocks');
           state.rocks = true;
+          state.cliffs = ENV.rocks['env-cliff1'].length + ENV.rocks['env-cliff2'].length;
         }, fail);
     }
+    // ── сваи причалов: рядом подробные, дальше — грубые копии ──
+    if (has('env-pile'))
+      scatter.add('env-pile', ENV.docks, { cell: 36, near: 30, vary: 0.35 }).then(() => {
+        drop(scene, 'piles');
+        state.piles = ENV.docks.length;
+      }, fail);
     // ── одиночные модели на местах процедурных ──
     for (const p of ENV.singles) {
       if (!has(p.id)) continue;
@@ -244,7 +265,7 @@ export function upgradeEnv(scene) {
         }
         const o = put(scene, tpl, p);
         if (p.key) drop(scene, p.key);
-        if (p.key in state) state[p.key] = true;
+        if (p.key && p.key in state) state[p.key] = true;
         if (p.block) CIRCLES.push({ x: p.x, z: p.z, r: p.block });
         if (p.fire) fire = makeFire(scene, new THREE.Vector3(...p.fire).multiplyScalar(p.s).applyEuler(o.rotation).add(o.position), p.s);
         if (p.lit)

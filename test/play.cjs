@@ -286,11 +286,13 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
       await shot(mp, '23-model-journal', 300);
       // модели локации: лес, пальмы, камни, маяк, будка проката, фонари, чайки — встали на место нарисованных кодом
       await G(mp, () => RYBAK.ui.closePanel());
-      await mp.waitForFunction(() => { const e = RYBAK.world.scenery.envState(); return e.trees && e.palms && e.rocks && e.lighthouse && e.kiosk && e.lamps >= 5 && e.gulls >= 4 && e.singles >= 10; }, null, { timeout: 180000 });
+      await mp.waitForFunction(() => { const e = RYBAK.world.scenery.envState(); return e.trees && e.palms && e.rocks && e.lighthouse && e.kiosk && e.lamps >= 5 && e.gulls >= 4 && e.singles >= 10 && e.arch && e.piles > 0; }, null, { timeout: 180000 });
       const env = await G(mp, () => RYBAK.world.scenery.envState());
       assert.ok(env.nHi + env.nLo > 600, `деревья, кусты и камни расставлены: ${env.nHi + env.nLo}`);
       assert.ok(env.nLo > env.nHi * 2, `вдали — грубые копии: подробных ${env.nHi}, дальних ${env.nLo}`);
-      assert.ok(env.hi < 400000, `подробных треугольников в лесу немного: ${env.hi}`);
+      assert.ok(env.hi < 520000, `подробных треугольников в лесу и скалах немного: ${env.hi}`);
+      // скалы и пирс моделями: кольцо утёсов вокруг острова и глыбы западного берега, арка, сваи причалов
+      assert.ok(env.cliffs >= 30 && env.arch && env.piles >= 70, `утёсов ${env.cliffs}, арка ${env.arch}, свай ${env.piles}`);
       // цельная графика: рисованные текстуры земли и камня загружены, трава посажена, домик смотрителя — готовая модель
       const art = await G(mp, async () => {
         const w = RYBAK.world;

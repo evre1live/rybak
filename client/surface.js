@@ -29,7 +29,8 @@ export const surfaceU = {
   uSand: { value: null },
   uDirt: { value: null },
   uPaint: { value: 0 }, // 1 — текстуры на месте
-  uRockC: { value: new THREE.Color('#8b929c') }, // камень, проступающий на крутых склонах
+  uWood: { value: null }, // рисованная доска: волокна вдоль u
+  uRockC: { value: new THREE.Color('#85817a') }, // камень, проступающий на крутых склонах (в тон утёсам-моделям)
   uMossC: { value: new THREE.Color('#8fb436') } // мох и трава на камнях — в тон траве и мху моделей
 };
 
@@ -45,10 +46,10 @@ function flatTexture() {
  * В пробной версии одним файлом (без сети) текстур нет — мир остаётся с ровной заливкой.
  */
 // картинки сервер отдаёт с недельным сроком хранения: перерисовал текстуры (tools/paint-textures.js) — прибавь номер
-const TEX_V = 1;
+const TEX_V = 3;
 export function loadPaint({ lite = false, offline = false } = {}) {
   const flat = flatTexture();
-  for (const k of ['uGrass', 'uRock', 'uSand', 'uDirt']) surfaceU[k].value = flat;
+  for (const k of ['uGrass', 'uRock', 'uSand', 'uDirt', 'uWood']) surfaceU[k].value = flat;
   if (offline) return Promise.resolve(false);
   const loader = new THREE.TextureLoader();
   const one = (name) =>
@@ -75,12 +76,13 @@ export function loadPaint({ lite = false, offline = false } = {}) {
         () => res(null)
       );
     });
-  return Promise.all(['grass', 'rock', 'sand', 'dirt'].map(one)).then(([g, r, sd, d]) => {
-    if (!g || !r || !sd || !d) return false;
+  return Promise.all(['grass', 'rock', 'sand', 'dirt', 'wood'].map(one)).then(([g, r, sd, d, w]) => {
+    if (!g || !r || !sd || !d || !w) return false;
     surfaceU.uGrass.value = g;
     surfaceU.uRock.value = r;
     surfaceU.uSand.value = sd;
     surfaceU.uDirt.value = d;
+    surfaceU.uWood.value = w;
     surfaceU.uPaint.value = 1;
     return true;
   });
@@ -160,6 +162,7 @@ const PARS_F = /* glsl */ `
 uniform sampler2D uDet, uCaust, uGrass, uRock, uSand, uDirt;
 uniform float uDetail, uTimeS, uCaustK, uCloudK, uPaint;
 uniform vec3 uSunC, uWaterS, uWaterD, uRockC, uMossC;
+uniform sampler2D uWood;
 varying float vMat;
 varying vec3 vTex;
 varying vec3 vWp;
@@ -223,6 +226,12 @@ float nearK = 1.0 - smoothstep(7.0, 20.0, length(vViewPosition));
       vec3 rM = paintRock(vWp, nW, nearK);
       // камень, проступивший на склоне, берёт свой цвет; заданный вершинами — их цвет
       vec3 rc = mix(uRockC * mix(0.88, 1.1, t.a), diffuseColor.rgb, clamp(W.y * 1.6, 0.0, 1.0)) * rM;
+      // на отвесной стене — пласты: тёмный уступ по границе слоя, у каждого слоя свой тон (как у утёсов-моделей)
+      float st = vWp.y * 0.4 + (t.r - 0.5) * 1.7 + (f.g - 0.5) * 0.22;
+      float band = fract(st);
+      float ledge = smoothstep(0.0, 0.05, band) * (1.0 - smoothstep(0.93, 1.0, band));
+      float layer = 0.9 + 0.2 * fract(sin(floor(st) * 12.9898) * 43758.5453);
+      rc *= mix(1.0, layer * mix(0.6, 1.0, ledge), smoothstep(0.3, 0.55, 1.0 - abs(nW.y)));
       // мха на таком камне нет: склон, который весь «около порога», он покрывал зелёной дымкой. Где полого — там
       // и так трава, граница с ней резкая и рваная
       col = mix(col, rc, wRock);
@@ -254,14 +263,18 @@ if (vMat > 1.5 && vMat < 2.5) {
   diffuseColor.rgb = mix(rc, mc, mossK);
 } else if (uDetail > 0.5) {
     if (vMat > 0.5 && vMat < 1.5) {
-      // дерево: волокна вдоль длинной стороны, редкие тёмные прожилки
+      // дерево: рисованная доска — волокна вдоль длинной стороны (2,5 м на плитку), поперёк 0,6 м; пока текстура
+      // не загрузилась (и в пробной версии) — прежние волокна из шума
       vec2 q = vec2(vTex.x * 0.4, (vTex.y + vTex.z) * 1.7);
       vec4 a = texture2D(uDet, q);
       vec4 b = texture2D(uDet, q * vec2(0.31, 0.37) + 0.37);
       float k = mix(0.78, 1.1, a.b) * mix(0.9, 1.07, b.r);
       k *= 1.0 - 0.2 * smoothstep(0.6, 0.85, a.b * 0.55 + b.b * 0.65);
       k *= mix(0.97, 1.03, a.g);
-      diffuseColor.rgb *= k;
+      diffuseColor.rgb *= mix(vec3(k), texture2D(uWood, q).rgb * 2.0 * mix(0.93, 1.06, b.r), uPaint);
+      // стёсанная кромка доски (фаска смотрит вверх наискось) светлее: вытертое дерево
+      float bevel = smoothstep(0.3, 0.5, nGeo.y) * (1.0 - smoothstep(0.8, 0.93, nGeo.y));
+      diffuseColor.rgb *= 1.0 + 0.3 * bevel;
     } else if (vMat > 2.5 && vMat < 3.5) {
       // листва: светлые и тёмные «листья», крупные пятна света
       vec4 t = texture2D(uDet, vWp.xz * 0.31 + vWp.y * 0.17);
@@ -338,7 +351,7 @@ export function patchSurface(material, { terrain = false } = {}) {
       .replace('#include <color_fragment>', '#include <color_fragment>\n' + DETAIL_F)
       .replace('#include <opaque_fragment>', UNDER_F + '\n#include <opaque_fragment>');
   };
-  material.customProgramCacheKey = () => 'surf10' + (terrain ? 'T' : 'B');
+  material.customProgramCacheKey = () => 'surf12' + (terrain ? 'T' : 'B');
   return material;
 }
 
@@ -364,6 +377,21 @@ const MODEL_WP_V = /* glsl */ `
   vWp = (modelMatrix * wp).xyz;
 }
 `;
+// Скала-модель вблизи: поверх её текстуры — мелкий рисунок камня из общей рисованной текстуры, наложенный с трёх
+// сторон по месту в мире. Модель растянута на десяток метров, и своя текстура в двух шагах расплывается; а рисунок
+// от растяжения не зависит. На зелёном (трава и мох на макушке) его нет; на «низком» качестве — тоже.
+const ROCK_DETAIL_F = /* glsl */ `
+{
+  float nearR = (1.0 - smoothstep(9.0, 26.0, length(vViewPosition))) * step(0.5, uDetail);
+  if (nearR > 0.01) {
+    vec3 nR = normalize(cross(dFdx(vWp), dFdy(vWp)));
+    vec3 wR = abs(nR); wR = wR * wR * wR * wR; wR /= (wR.x + wR.y + wR.z);
+    vec3 dR = (texture2D(uRock, vWp.zy * 0.55).rgb * wR.x + texture2D(uRock, vWp.xz * 0.55).rgb * wR.y + texture2D(uRock, vWp.xy * 0.55).rgb * wR.z) * 2.0;
+    float green = clamp((diffuseColor.g - max(diffuseColor.r, diffuseColor.b)) * 8.0, 0.0, 1.0);
+    diffuseColor.rgb *= mix(vec3(1.0), dR, 0.5 * nearR * (1.0 - green));
+  }
+}
+`;
 // качание: чем выше над землёй, тем сильнее; у каждого дерева своя фаза (по месту, где оно стоит)
 const sway = (k) => /* glsl */ `
 {
@@ -383,7 +411,7 @@ const sway = (k) => /* glsl */ `
  * Готовой модели — тени облаков и подводный цвет; sway > 0 — качание на ветру (доля высоты модели);
  * sat < 1 — приглушить краски (у крон и кустов Tripo в текстуре почти нет синего: рядом с травой они кислотные).
  */
-export function patchModel(material, { sway: k = 0, sat = 1 } = {}) {
+export function patchModel(material, { sway: k = 0, sat = 1, rock = false } = {}) {
   material.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, surfaceU);
     sh.vertexShader = sh.vertexShader
@@ -391,11 +419,14 @@ export function patchModel(material, { sway: k = 0, sat = 1 } = {}) {
       .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + (k ? sway(k) : ''))
       .replace('#include <project_vertex>', '#include <project_vertex>\n' + MODEL_WP_V);
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\n' + MODEL_PARS_F)
-      .replace('#include <color_fragment>', '#include <color_fragment>' + (sat !== 1 ? `\ndiffuseColor.rgb = mix(vec3(dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722))), diffuseColor.rgb, ${sat.toFixed(3)});` : ''))
+      .replace('#include <common>', '#include <common>\n' + MODEL_PARS_F + (rock ? 'uniform sampler2D uRock;\nuniform float uDetail;\n' : ''))
+      .replace(
+        '#include <color_fragment>',
+        '#include <color_fragment>' + (sat !== 1 ? `\ndiffuseColor.rgb = mix(vec3(dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722))), diffuseColor.rgb, ${sat.toFixed(3)});` : '') + (rock ? ROCK_DETAIL_F : '')
+      )
       .replace('#include <opaque_fragment>', 'vec3 nGeo = normalize(cross(dFdx(vWp), dFdy(vWp)));\n' + UNDER_F + '\n#include <opaque_fragment>');
   };
-  material.customProgramCacheKey = () => 'model' + k + '|' + sat;
+  material.customProgramCacheKey = () => 'model' + k + '|' + sat + (rock ? 'R' : '');
   return material;
 }
 

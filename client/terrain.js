@@ -3,7 +3,10 @@ import { clamp, lerp, sstep, fbm2 } from './util.js';
 
 export const DECK_Y = 1.1;
 export const ISLAND = { x: 22, z: -100 };
-export const ARCH = { x: 66, z: -50 };
+// Каменная арка: ry — куда повёрнута (опоры стоят вдоль этой оси), leg — от середины до середины опоры,
+// block — радиус опоры для лодки (между опорами остаётся проход), w, h, d — габариты арки в метрах.
+export const ARCH = { x: 66, z: -50, ry: 1.92, leg: 6.9, block: 4.2, w: 22, h: 15.5, d: 13 };
+export const ARCH_LEGS = [-1, 1].map((k) => [ARCH.x + Math.cos(ARCH.ry) * ARCH.leg * k, ARCH.z - Math.sin(ARCH.ry) * ARCH.leg * k]);
 export const BACKWATER = { x: -40, z: 13, r: 14 };
 export const REEF = { x: 21, z: -15 };
 export const CAPE = { ax: 32, az: 13, bx: 41, bz: -9, r: 3.6 };
@@ -225,7 +228,7 @@ export const RENT_DESK = { x: 2.3, z: -6.4, r: 2.0 };
 // во что лодка упирается помимо берега и причалов: риф, опоры арки, скалы в море, корабль, буйки
 const SAIL_BLOCKS = [
   { x: REEF.x, z: REEF.z, r: 7.6 },
-  { x: ARCH.x - 2.94, z: ARCH.z - 8.08, r: 4.8 }, { x: ARCH.x + 2.94, z: ARCH.z + 8.08, r: 4.8 },
+  ...ARCH_LEGS.map(([x, z]) => ({ x, z, r: ARCH.block })),
   ...[[98, -72, 7], [112, -40, 5], [90, -104, 6], [126, -98, 9], [-58, -96, 5], [-76, -122, 7], [140, -20, 5]].map(([x, z, s]) => ({ x, z, r: s * 1.25 })),
   { x: WRECK.x, z: WRECK.z, r: 8.5 },
   ...[[-12, -43], [15, -37], [45, -31], [-27, -12]].map(([x, z]) => ({ x, z, r: 1.2 }))

@@ -27,6 +27,39 @@ export const G = {
   sph: (w = 12, h = 8) => cached(`sph${w}|${h}`, () => new THREE.SphereGeometry(0.5, w, h)),
   ico: (d = 1) => cached('ico' + d, () => new THREE.IcosahedronGeometry(0.5, d)),
   torus: (tube = 0.18, seg = 14, arc = Math.PI * 2) => cached(`tor${tube}|${seg}|${arc.toFixed(3)}`, () => new THREE.TorusGeometry(0.5, tube * 0.5, 6, seg, arc)),
+  /**
+   * Доска настила: брусок 1×1×1 без низа, со стёсанными длинными верхними рёбрами — свет ложится на кромку, а между
+   * досками остаётся тёмная щель. along — вдоль какой оси доска ('x' или 'z').
+   */
+  plank: (along = 'x') => cached('plank' + along, () => {
+    const cw = 0.055; // фаска: доля ширины и доля толщины
+    const ch = 0.22;
+    // сечение (поперёк, высота) по кругу, начиная с левого низа; низа у доски нет — его не видно
+    const P = [[-0.5, -0.5], [-0.5, 0.5 - ch], [-0.5 + cw, 0.5], [0.5 - cw, 0.5], [0.5, 0.5 - ch], [0.5, -0.5]];
+    const pos = [];
+    const v = (l, [w, h]) => (along === 'x' ? [l, h, w] : [-w, h, l]);
+    const quad = (a, b, c, d) => pos.push(...a, ...b, ...c, ...a, ...c, ...d);
+    for (let i = 0; i < P.length - 1; i++) quad(v(-0.5, P[i]), v(-0.5, P[i + 1]), v(0.5, P[i + 1]), v(0.5, P[i]));
+    for (const l of [-0.5, 0.5]) {
+      // торец веером; обход — наружу
+      for (let i = 1; i < P.length - 1; i++) {
+        const tri = [v(l, P[0]), v(l, P[i]), v(l, P[i + 1])];
+        if (l < 0) tri.reverse();
+        pos.push(...tri.flat());
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.computeVertexNormals();
+    return g;
+  }),
+  /** Шляпка гвоздя: плоский ромб 1×1, лежит на доске. */
+  nail: () => cached('nail', () => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute([-0.5, 0, 0, 0, 0, 0.5, 0.5, 0, 0, -0.5, 0, 0, 0.5, 0, 0, 0, 0, -0.5], 3));
+    g.computeVertexNormals();
+    return g;
+  }),
   prism: () => cached('prism', () => {
     // двускатная крыша: треугольная призма шириной 1 (x), высотой 1 (y), длиной 1 (z)
     const s = new THREE.Shape();
