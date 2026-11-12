@@ -40,7 +40,9 @@ export class FpArms {
     space.rotation.y = Math.PI;
     const wrap = new THREE.Group();
     wrap.quaternion.copy(tpl.fix);
-    const k = (this.k = 0.84); // руки чуть меньше настоящих: у героев крупные кисти, во весь размер они закрывают катушку
+    // руки чуть меньше настоящих: у героев крупные кисти, во весь размер они закрывают катушку;
+    // у здоровяка с кулаками-кувалдами — ещё меньше (fp.k в art/models.json)
+    const k = (this.k = 0.84 * ((tpl.info.fp && tpl.info.fp.k) || 1));
     wrap.scale.setScalar(tpl.scale * k);
     const model = cloneSkinned(tpl.scene);
     wrap.add(model);

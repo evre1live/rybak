@@ -40,17 +40,19 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
   const b = await open(browser, `${BASE}/?room=${code}&${Q}`, 'Б');
   assert.match(await b.textContent('.tcard .btn.pri'), new RegExp(code));
   await b.fill('#nm', 'Нори');
-  await G(b, () => { RYBAK.profile.look = { ...RYBAK.profile.look, hair: 5, hairC: '#e85d9a', hat: 1, hatC: '#e85d9a', top: 2, topC: '#c9a26b', topC2: '#f1efe6' }; });
+  // друг играет в старой версии и присылает персонажа «из частей»: у нас он всё равно выглядит героем (первым из списка)
+  await G(b, () => { RYBAK.profile.look = { body: 2, hair: 5, hairC: '#e85d9a', hat: 1, hatC: '#e85d9a', top: 2, topC: '#c9a26b', hero: '' }; });
   await b.click('[data-a="join"]');
   await b.waitForFunction(() => RYBAK.state === 'lobby');
   await a.waitForFunction(() => RYBAK.players.size === 1);
   assert.equal(await G(a, () => [...RYBAK.players.values()][0].card.name), 'Нори');
-  // друг с готовым героем: модель догружается и встаёт вместо куклы
-  if (await G(b, () => fetch('models/manifest.json').then((r) => r.json()).then((m) => m.heroes.some((h) => h.id === 'hero-nori'), () => false))) {
-    await G(b, () => { const g = RYBAK; g.profile.look = { ...g.profile.look, hero: 'hero-nori' }; g.meChar.setLook(g.profile.look); g.net.send({ t: 'card', card: g.card() }); });
-    await a.waitForFunction(() => { const r = [...RYBAK.players.values()][0].remote; return r.char.look.hero === 'hero-nori' && !!r.char.hero; }, null, { timeout: 60000 });
-    console.log('  герой друга загружен');
-  }
+  await a.waitForFunction(() => { const r = [...RYBAK.players.values()][0].remote; return r.char.look.hero === '' && r.char.hero && r.char.hero.tpl.info.id === 'hero-yellow'; }, null, { timeout: 60000 });
+  // друг выбирает героя: модель догружается, и всё это время куклы из частей не видно
+  await G(b, () => { const g = RYBAK; g.profile.look = { hero: 'hero-kai' }; g.meChar.setLook(g.profile.look); g.net.send({ t: 'card', card: g.card() }); });
+  await a.waitForFunction(() => [...RYBAK.players.values()][0].remote.char.look.hero === 'hero-kai');
+  assert.ok(await G(a, () => { const c = [...RYBAK.players.values()][0].remote.char; return !!c.hero || c.root.visible === false; }), 'пока герой друга грузится, куклы не видно');
+  await a.waitForFunction(() => { const r = [...RYBAK.players.values()][0].remote; return r.char.hero && r.char.hero.tpl.info.id === 'hero-kai'; }, null, { timeout: 60000 });
+  console.log('  герой друга загружен');
   assert.equal(await G(b, () => [...RYBAK.players.values()][0].card.name), 'Жамшид');
   assert.match(await a.textContent('.lob-tl'), /2\/8/);
   await a.waitForFunction(() => document.querySelectorAll('.plate').length === 2);

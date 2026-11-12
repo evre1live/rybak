@@ -3,6 +3,7 @@
     {
       "id": "hero-yellow",
       "name": "Санни",
+      "about": "Жёлтая куртка, очки на козырьке. На пирс прибегает первым.",
       "file": "models/hero-yellow.glb",
       "lite": "models/hero-yellow.lite.glb",
       "tris": 30000,
@@ -17,11 +18,13 @@
         "sleeve2": "#2c3554",
         "glove": "#2b2e35",
         "skin": "#f1b88c"
-      }
+      },
+      "face": "models/icons/hero-yellow.webp"
     },
     {
       "id": "hero-finn",
       "name": "Финн",
+      "about": "Бирюзовая куртка, шорты и вечная улыбка. Знает в бухте каждую мель.",
       "file": "models/hero-finn.glb",
       "lite": "models/hero-finn.lite.glb",
       "tris": 30000,
@@ -34,11 +37,13 @@
       "fp": {
         "bare": true,
         "skin": "#eeb088"
-      }
+      },
+      "face": "models/icons/hero-finn.webp"
     },
     {
       "id": "hero-nori",
       "name": "Нори",
+      "about": "Розовая кепка и жилет с сотней карманов. Ловит на спор — и выигрывает.",
       "file": "models/hero-nori.glb",
       "lite": "models/hero-nori.lite.glb",
       "tris": 30000,
@@ -52,11 +57,13 @@
         "bare": true,
         "glove": "#26272c",
         "skin": "#f3bd98"
-      }
+      },
+      "face": "models/icons/hero-nori.webp"
     },
     {
       "id": "hero-pip",
       "name": "Пип",
+      "about": "Борода, панама и фиолетовое худи. Душа любой рыбалки.",
       "file": "models/hero-pip.glb",
       "lite": "models/hero-pip.lite.glb",
       "tris": 29999,
@@ -69,7 +76,112 @@
       "fp": {
         "bare": true,
         "skin": "#e3a67c"
-      }
+      },
+      "face": "models/icons/hero-pip.webp"
+    },
+    {
+      "id": "hero-black",
+      "name": "Блэк",
+      "about": "Весь в чёрном. Говорит мало, забрасывает далеко.",
+      "file": "models/hero-black.glb",
+      "lite": "models/hero-black.lite.glb",
+      "tris": 30000,
+      "kb": 781,
+      "clips": [
+        "idle",
+        "run",
+        "walk"
+      ],
+      "fp": {
+        "sleeve": "#2b2b30",
+        "skin": "#e9b28c"
+      },
+      "eye": 1.66,
+      "face": "models/icons/hero-black.webp"
+    },
+    {
+      "id": "hero-archie",
+      "name": "Арчи",
+      "about": "Усы, очки и шляпа с мушками. Рыбачит шестьдесят лет и помнит каждую рыбу.",
+      "file": "models/hero-archie.glb",
+      "lite": "models/hero-archie.lite.glb",
+      "tris": 29996,
+      "kb": 805,
+      "clips": [
+        "idle",
+        "run",
+        "walk"
+      ],
+      "fp": {
+        "sleeve": "#4f6b3c",
+        "skin": "#e8a988"
+      },
+      "tall": 1.05,
+      "eye": 1.62,
+      "face": "models/icons/hero-archie.webp"
+    },
+    {
+      "id": "hero-bjorn",
+      "name": "Бьорн",
+      "about": "Рыжая борода в косу, оранжевый комбинезон. Рыбу тянет, как якорь.",
+      "file": "models/hero-bjorn.glb",
+      "lite": "models/hero-bjorn.lite.glb",
+      "tris": 30000,
+      "kb": 911,
+      "clips": [
+        "idle",
+        "run",
+        "walk"
+      ],
+      "fp": {
+        "sleeve": "#e6e0cf",
+        "skin": "#e79f7f",
+        "k": 0.72
+      },
+      "tall": 1.08,
+      "eye": 1.76,
+      "face": "models/icons/hero-bjorn.webp"
+    },
+    {
+      "id": "hero-gosha",
+      "name": "Гоша",
+      "about": "Гавайская рубашка, панама, сандалии с носками. Он в отпуске.",
+      "file": "models/hero-gosha.glb",
+      "lite": "models/hero-gosha.lite.glb",
+      "tris": 30000,
+      "kb": 877,
+      "clips": [
+        "idle",
+        "run",
+        "walk"
+      ],
+      "fp": {
+        "bare": true,
+        "skin": "#f0b08a"
+      },
+      "tall": 0.97,
+      "eye": 1.48,
+      "face": "models/icons/hero-gosha.webp"
+    },
+    {
+      "id": "hero-kai",
+      "name": "Кай",
+      "about": "Красная куртка и наушники. Рыбачит под музыку.",
+      "file": "models/hero-kai.glb",
+      "lite": "models/hero-kai.lite.glb",
+      "tris": 29998,
+      "kb": 877,
+      "clips": [
+        "idle",
+        "run",
+        "walk"
+      ],
+      "fp": {
+        "sleeve": "#d8322f",
+        "skin": "#7a4a30"
+      },
+      "eye": 1.65,
+      "face": "models/icons/hero-kai.webp"
     },
     {
       "id": "npc-vendor",

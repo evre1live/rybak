@@ -55,31 +55,42 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
   await page.click('.nav [data-p="editor"]');
   await page.waitForSelector('.editor .opts');
   await shot(page, '05-editor', 400);
-  // готовые герои: новичку достаётся один из них, в редакторе можно выбрать другого или собрать своего из частей
-  const heroIds = await G(page, () => fetch('models/manifest.json').then((r) => r.json()).then((m) => m.heroes.filter((h) => !h.npc).map((h) => h.id), () => []));
-  if (heroIds.length) {
-    assert.ok(heroIds.includes(await G(page, () => RYBAK.profile.look.hero)), 'новичок получает готового героя');
-    await page.click('.cats [data-id="presets"]');
-    assert.equal(await page.locator('.hlist button').count(), heroIds.length, 'все герои в списке');
-    const pick = heroIds[heroIds.length - 1];
-    await page.click(`.hlist [data-id="${pick}"]`);
-    await page.waitForFunction((id) => RYBAK.ui.ed.look.hero === id && RYBAK.meChar.hero && RYBAK.meChar.look.hero === id, pick, { timeout: 60000 });
-    assert.ok(await G(page, () => RYBAK.meChar.hero.act.idle && RYBAK.meChar.hero.act.walk && RYBAK.meChar.hero.bones.hR && RYBAK.meChar.j.rod.parent === RYBAK.meChar.hero.grip), 'герой со скелетом, анимациями и удочкой в руке');
-    await shot(page, '05b-editor-hero', 400);
-    await page.click('.cats [data-id="top"]');
-    await page.click('[data-a="nohero"]');
-    await page.waitForFunction(() => RYBAK.ui.ed.look.hero === '' && !RYBAK.meChar.hero);
-  }
-  for (const cat of ['presets', 'face', 'hair', 'head', 'top', 'bottom', 'shoes', 'hands', 'back']) {
-    await page.click(`.cats [data-id="${cat}"]`);
-    await page.locator(cat === 'presets' ? '.olist button' : '.opts button').nth(1).click();
-  }
-  await page.click('.cats [data-id="hair"]');
-  await page.click('.opts [data-k="hair"][data-id="7"]');
-  await shot(page, '06-editor-hair', 300);
+  // герои: других персонажей в игре нет. Новичку достаётся один из них, на экране «Персонаж» можно выбрать любого
+  const heroIds = await G(page, () => fetch('models/manifest.json').then((r) => r.json()).then((m) => m.heroes.filter((h) => !h.npc).map((h) => h.id)));
+  assert.ok(heroIds.length >= 9, 'героев девять');
+  assert.deepEqual(Object.keys(await G(page, () => RYBAK.profile.look)), ['hero'], 'внешность игрока — это только герой');
+  assert.ok(heroIds.includes(await G(page, () => RYBAK.profile.look.hero)), 'новичок получает героя');
+  assert.equal(await page.locator('.hlist button').count(), heroIds.length, 'все герои в списке');
+  assert.equal(await page.locator('.cats, .olist, .sw, [data-a="preset"], [data-a="rnd"], [data-a="nohero"], [data-a="opt"], [data-a="col"]').count(), 0, 'редактора из частей больше нет');
+  await page.waitForFunction(() => [...document.querySelectorAll('.hlist img')].every((i) => /^models\/icons\/hero-[a-z]+\.webp$/.test(i.getAttribute('src')) && i.complete && i.naturalWidth > 0), null, { timeout: 30000 }); // портреты — готовые картинки, модели ради них не грузятся
+  // куклу из частей не видно никогда: ни пока герой грузится, ни когда он встал
+  const puppetShown = () => G(page, () => {
+    const c = RYBAK.meChar; if (!c.root.visible) return 0;
+    const skip = new Set(); if (c.hero) c.hero.wrap.traverse((o) => skip.add(o)); c.j.rod.traverse((o) => skip.add(o));
+    let n = 0; c.root.traverse((o) => { if (o.isMesh && o.visible && !skip.has(o)) n++; }); return n;
+  });
+  const wear = async (id) => {
+    await page.click(`.hlist [data-id="${id}"]`);
+    assert.equal(await puppetShown(), 0, `${id}: пока модель грузится, старой куклы не видно`);
+    await page.waitForFunction((id) => RYBAK.ui.ed.look.hero === id && RYBAK.meChar.hero && RYBAK.meChar.hero.tpl.info.id === id, id, { timeout: 60000 });
+    assert.equal(await puppetShown(), 0, `${id}: на экране только герой`);
+    assert.ok(await G(page, () => RYBAK.meChar.hero.act.idle && RYBAK.meChar.hero.act.walk && RYBAK.meChar.hero.act.run && RYBAK.meChar.hero.bones.hR && RYBAK.meChar.j.rod.parent === RYBAK.meChar.hero.grip), `${id}: скелет, анимации, удочка в руке`);
+  };
+  await wear('hero-bjorn');
+  assert.equal(await page.textContent('.hinfo h2'), 'Бьорн');
+  assert.ok((await page.textContent('.hinfo p')).length > 10, 'строка о герое');
+  assert.ok(await G(page, () => RYBAK.meChar.look.height > 1.05), 'здоровяк выше остальных');
+  await shot(page, '05b-hero-bjorn', 500);
+  await wear('hero-gosha');
+  assert.ok(await G(page, () => RYBAK.meChar.look.height < 1), 'коротышка ниже остальных');
+  await wear('hero-black');
+  await shot(page, '05c-hero-black', 500);
+  await wear('hero-pip');
+  await shot(page, '06-hero-pip', 300);
   await page.click('[data-a="edsave"]');
-  assert.equal(await G(page, () => RYBAK.profile.look.hair), 7);
-  assert.equal(await G(page, () => RYBAK.profile.look.hero), '', 'собранный из частей остаётся собранным');
+  assert.deepEqual(await G(page, () => RYBAK.profile.look), { hero: 'hero-pip' });
+  assert.deepEqual(await G(page, () => RYBAK.card().look), { hero: 'hero-pip' }, 'друзьям уходит только имя героя');
+  assert.equal(await G(page, () => RYBAK.player.eye), 1.62);
 
   // на рыбалку
   await page.click('[data-a="start"]');
@@ -215,7 +226,7 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     if (models) {
       const mp = await open(browser, 'q=low&norender&h=13', 'models');
       await mp.fill('#nm', 'Модели');
-      await G(mp, () => { RYBAK.profile.seenIntro = true; });
+      await G(mp, () => { RYBAK.profile.seenIntro = true; RYBAK.saveLook({ hero: 'hero-pip' }); });
       await mp.click('[data-a="solo"]');
       await mp.waitForFunction(() => RYBAK.state === 'lobby');
       await mp.click('[data-a="start"]');
@@ -251,6 +262,24 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
         }
         await G(mp, () => RYBAK.fishing.finish(false));
       }
+      // угол обзора меняем как игрок — ползунком в настройках
+      const setFov = async (fov) => {
+        await G(mp, (fov) => { RYBAK.ui.openPanel('settings'); const r = document.querySelector('[data-set="fov"]'); r.value = fov; r.dispatchEvent(new Event('input', { bubbles: true })); RYBAK.ui.closePanel(); RYBAK.input.locked = true; RYBAK.input.enabled = true; }, fov);
+        await mp.waitForFunction((fov) => Math.abs(RYBAK.camera.fov - fov) < 0.5 && Math.abs(RYBAK.vm.root.scale.x - Math.tan((fov * Math.PI) / 360) / Math.tan((62 * Math.PI) / 360)) < 0.02, fov, { timeout: 10000 });
+      };
+      // у каждого героя свой рост — и высота глаз; у здоровяка руки от первого лица уменьшены (кулаки закрывали катушку),
+      // а плечи всё равно остаются за кадром, в том числе на самом широком угле обзора: у рук он свой, от настроек не зависит
+      for (const [id, eye] of [['hero-bjorn', 1.76], ['hero-gosha', 1.48]]) {
+        await G(mp, (id) => RYBAK.saveLook({ hero: id }), id);
+        await mp.waitForFunction((id) => RYBAK.vm.arms && RYBAK.vm.arms.tpl.info.id === id, id, { timeout: 60000 });
+        assert.equal(await G(mp, () => RYBAK.player.eye), eye, `${id}: высота глаз`);
+        for (const fov of [90, 62]) {
+          await setFov(fov);
+          const arm = await armAt();
+          for (const sd of ['L', 'R']) assert.ok(arm[sd].off, `${id}, угол ${fov}°: плечевой сустав ${sd} за кадром`);
+        }
+      }
+      await G(mp, () => RYBAK.saveLook({ hero: 'hero-pip' }));
       // значки из готовых моделей — обычные картинки, которые действительно загружаются
       await G(mp, () => RYBAK.ui.openPanel('journal'));
       await mp.waitForFunction(() => { const im = [...document.querySelectorAll('.tile img')]; return im.length >= 25 && im.every((i) => /models\/icons\/fish-.*\.webp$/.test(i.getAttribute('src')) && i.complete && i.naturalWidth > 0); }, null, { timeout: 60000 });
@@ -492,6 +521,22 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     assert.ok(!bp.__err, 'ошибки на странице (лодка)');
     await bp.close();
     console.log(`  лодка: разгон ${run.d.toFixed(0)} м за 4 с, из бухты в море за ${(out1.t + sea.t).toFixed(0)} с, к маяку за ${toLight.t} с, домой за ${home.t} с`);
+  }
+
+  // старое сохранение с персонажем «из частей»: такого персонажа больше нет — игрок получает героя, остальное на месте
+  {
+    const old = await browser.newPage({ viewport: { width: W, height: H } });
+    old.on('pageerror', (e) => { console.log('[old] PAGEERROR', e.message.slice(0, 300)); old.__err = 1; });
+    await old.addInitScript(() => { if (!localStorage.getItem('rybak.profile.v1')) localStorage.setItem('rybak.profile.v1', JSON.stringify({ name: 'Старожил', coins: 77, heroSeen: true, look: { body: 3, height: 1.1, hair: 7, hairC: '#e85d9a', hat: 0, top: 4, topC: '#22c55e', hero: '' } })); });
+    await old.goto(`${BASE}/?q=low&norender`);
+    await old.waitForFunction(() => window.RYBAK && RYBAK.profile.look.hero && RYBAK.meChar.hero, null, { timeout: 60000 });
+    const o = await G(old, () => ({ look: RYBAK.profile.look, coins: RYBAK.profile.coins, name: RYBAK.profile.name, shown: RYBAK.meChar.hero.tpl.info.id, h: RYBAK.meChar.look.height }));
+    assert.deepEqual(Object.keys(o.look), ['hero'], 'от персонажа из частей в сохранении ничего не осталось');
+    assert.ok(heroIds.includes(o.look.hero) && o.shown === o.look.hero, 'вместо него — герой');
+    assert.ok(o.coins === 77 && o.name === 'Старожил', 'монеты и имя на месте');
+    await old.waitForFunction(() => { const p = JSON.parse(localStorage.getItem('rybak.profile.v1')); return p.look && p.look.hero && Object.keys(p.look).length === 1; }, null, { timeout: 5000 });
+    assert.ok(!old.__err, 'ошибки на странице (старое сохранение)');
+    await old.close();
   }
 
   // сохранение переживает перезагрузку

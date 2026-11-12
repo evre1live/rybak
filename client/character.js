@@ -1,16 +1,14 @@
-// Персонаж: собирается из настроек внешности (телосложение, лицо, волосы, одежда…), анимируется без костей — суставы-группы.
-import { heroTemplate, loadHero, HeroBody } from './hero.js';
+// Персонаж. Игрок выбирает готового героя (hero.js) — других персонажей в игре нет.
+// Кукла из частей, с которой игра начиналась, осталась «скелетом»: по её суставам считаются позы (заброс, вываживание,
+// сидение, жесты), а герой их повторяет. Видно куклу только там, где готовых моделей нет вовсе (пробная версия одним файлом).
+import { heroTemplate, loadHero, loadManifest, heroes, heroOf, heroTall, HeroBody } from './hero.js';
 import * as THREE from 'three';
 import { Batch, M, G, BATCH_MAT } from './batch.js';
 import { loft } from './shapes.js';
 import { shade, clamp, damp, rng, TAU } from './util.js';
 
-// ───── каталог внешности ─────
-export const SKINS = ['#fbe0c8', '#f3c9a3', '#e8b48a', '#d99a6c', '#c07f52', '#9c6238', '#7a4a2a', '#5a3620'];
-export const HAIR_COLORS = ['#1c1410', '#3b2a1a', '#5a3a22', '#8a5a2b', '#c98a3a', '#e8c66a', '#f4ead0', '#b0b6bf', '#c2412d', '#e85d9a', '#3b82f6', '#22c55e', '#a855f7'];
-export const CLOTH_COLORS = ['#f6c21c', '#f97316', '#ef4444', '#e85d9a', '#a855f7', '#6366f1', '#2f6fd6', '#22d3ee', '#14b8a6', '#22c55e', '#84cc16', '#7c5c3a', '#c9a26b', '#f1efe6', '#9ca3af', '#4b5563', '#2a2f3a', '#111827'];
-export const EYE_COLORS = ['#3b2a1a', '#6b4423', '#2f6f4f', '#2f6fd6', '#6b7280', '#0f172a'];
-export const OPTIONS = {
+// ───── настройки куклы: что значит каждое число ─────
+const OPTIONS = {
   body: ['Стройное', 'Обычное', 'Крепкое', 'Плотное'],
   eyes: ['Круглые', 'Весёлые', 'Спокойные', 'Хитрые', 'Большие'],
   brows: ['Прямые', 'Домиком', 'Густые', 'Тонкие', 'Суровые'],
@@ -27,26 +25,25 @@ export const OPTIONS = {
   gloves: ['Нет', 'Без пальцев', 'Перчатки'],
   pack: ['Нет', 'Рюкзак', 'Ящик на ремне', 'Тубус']
 };
-export const COLOR_KEYS = { skin: SKINS, hairC: HAIR_COLORS, eyeC: EYE_COLORS, hatC: CLOTH_COLORS, topC: CLOTH_COLORS, topC2: CLOTH_COLORS, botC: CLOTH_COLORS, shoeC: CLOTH_COLORS, gloveC: CLOTH_COLORS, packC: CLOTH_COLORS };
-export const DEFAULT_LOOK = {
+const DEFAULT_LOOK = {
   body: 1, height: 1, skin: '#f3c9a3', eyes: 0, eyeC: '#3b2a1a', brows: 0, mouth: 0, nose: 0, cheeks: 0,
   hair: 2, hairC: '#5a3a22', beard: 0, hat: 1, hatC: '#f6c21c', glasses: 4,
   top: 1, topC: '#f6c21c', topC2: '#2a2f3a', bottom: 0, botC: '#2a2f3a', shoes: 0, shoeC: '#f6c21c', gloves: 1, gloveC: '#2a2f3a', pack: 1, packC: '#2f6fd6'
 };
-// готовые образы — как на макетах: жёлтый, бирюзовый, розовый, фиолетовый
-export const PRESETS = [
-  { name: 'Жёлтый', look: { ...DEFAULT_LOOK } },
-  { name: 'Финн', look: { ...DEFAULT_LOOK, hair: 7, hairC: '#5a3a22', hat: 1, hatC: '#22d3ee', glasses: 4, top: 3, topC: '#22d3ee', topC2: '#f1efe6', bottom: 1, botC: '#c9a26b', shoeC: '#22d3ee', gloves: 0, packC: '#2a2f3a', mouth: 1 } },
-  { name: 'Нори', look: { ...DEFAULT_LOOK, body: 0, height: 0.95, hair: 5, hairC: '#e85d9a', hat: 1, hatC: '#e85d9a', glasses: 0, top: 2, topC: '#c9a26b', topC2: '#f1efe6', bottom: 0, botC: '#2a2f3a', shoeC: '#f6c21c', gloveC: '#2a2f3a', pack: 2, packC: '#e85d9a', eyes: 4, cheeks: 1, skin: '#fbe0c8' } },
-  { name: 'Пип', look: { ...DEFAULT_LOOK, body: 3, height: 1.04, hair: 1, hairC: '#3b2a1a', beard: 5, hat: 3, hatC: '#2f6fd6', glasses: 0, top: 2, topC: '#4b5563', topC2: '#a855f7', bottom: 1, botC: '#7c5c3a', shoeC: '#a855f7', gloves: 1, gloveC: '#2a2f3a', pack: 3, packC: '#a855f7', mouth: 1, skin: '#e8b48a', brows: 2 } },
-  { name: 'Капитан', look: { ...DEFAULT_LOOK, body: 2, hair: 1, hairC: '#b0b6bf', beard: 4, hat: 6, hatC: '#f1efe6', glasses: 0, top: 6, topC: '#f1efe6', topC2: '#2f6fd6', bottom: 2, botC: '#2f6fd6', shoes: 1, shoeC: '#111827', gloves: 0, pack: 0, brows: 4, mouth: 2, skin: '#d99a6c' } },
-  { name: 'Дождь', look: { ...DEFAULT_LOOK, body: 0, hair: 6, hairC: '#1c1410', hat: 0, glasses: 3, top: 5, topC: '#f6c21c', topC2: '#2a2f3a', bottom: 3, botC: '#4b5563', shoes: 1, shoeC: '#22c55e', gloves: 2, gloveC: '#f97316', pack: 2, packC: '#22c55e', eyes: 2, skin: '#c07f52' } }
-];
+/** Запасной вид скупщика (пока его модель не загрузилась или если моделей нет вовсе). */
+export const VENDOR_PUPPET = { ...DEFAULT_LOOK, body: 3, hair: 1, hairC: '#f4ead0', beard: 5, hat: 5, hatC: '#f1efe6', glasses: 0, top: 4, topC: '#ef4444', topC2: '#f1efe6', bottom: 2, botC: '#2f6fd6', shoes: 1, shoeC: '#111827', gloves: 0, pack: 0, brows: 4, mouth: 2, skin: '#d99a6c' };
+const HERO_ID = /^[a-z0-9-]{1,40}$/;
+/**
+ * Внешность игрока — это выбранный герой, и только он. Всё остальное, что может прийти
+ * (старое сохранение с персонажем из частей, друг со старой версией игры), отбрасывается.
+ */
 export function fixLook(l) {
-  const out = { ...DEFAULT_LOOK, hero: '' };
+  return { hero: l && typeof l.hero === 'string' && HERO_ID.test(l.hero) ? l.hero : '' };
+}
+/** Настройки куклы-скелета (и запасного вида жителей бухты). */
+function puppetLook(l) {
+  const out = { ...DEFAULT_LOOK };
   if (!l || typeof l !== 'object') return out;
-  // герой из готовой модели (пусто — собранный из частей)
-  out.hero = typeof l.hero === 'string' && /^[a-z0-9-]{1,40}$/.test(l.hero) ? l.hero : '';
   for (const k of Object.keys(DEFAULT_LOOK)) {
     const v = l[k];
     if (OPTIONS[k]) out[k] = Number.isInteger(v) && v >= 0 && v < OPTIONS[k].length ? v : DEFAULT_LOOK[k];
@@ -54,21 +51,6 @@ export function fixLook(l) {
     else out[k] = typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v : DEFAULT_LOOK[k];
   }
   return out;
-}
-export function randomLook(seed = Math.floor(Math.random() * 1e9)) {
-  const r = rng(seed);
-  const pick = (a) => a[Math.floor(r() * a.length)];
-  const l = { ...DEFAULT_LOOK };
-  for (const k of Object.keys(OPTIONS)) l[k] = Math.floor(r() * OPTIONS[k].length);
-  if (r() < 0.6) l.beard = 0;
-  if (r() < 0.45) l.glasses = 0;
-  if (r() < 0.3) l.hat = 0;
-  l.height = 0.92 + r() * 0.16;
-  l.skin = pick(SKINS);
-  l.hairC = pick(HAIR_COLORS.slice(0, r() < 0.8 ? 8 : 13));
-  l.eyeC = pick(EYE_COLORS);
-  for (const k of ['hatC', 'topC', 'topC2', 'botC', 'shoeC', 'gloveC', 'packC']) l[k] = pick(CLOTH_COLORS);
-  return l;
 }
 
 const BODIES = [
@@ -245,7 +227,9 @@ function drawFace(g, l, blink, talk) {
 }
 
 export class Character {
-  constructor(look) {
+  /** look — { hero }. opts.puppet — житель бухты со своим запасным видом из частей (скупщик): тогда look — настройки куклы + hero. */
+  constructor(look, opts = {}) {
+    this.puppet = !!opts.puppet;
     this.group = new THREE.Group();
     this.rod = null;
     this.pose = {};
@@ -266,6 +250,7 @@ export class Character {
 
   dispose() {
     this.gone = true;
+    clearTimeout(this.retryT);
     this.clear();
     this.faceTex.dispose();
     this.faceMat.dispose();
@@ -288,7 +273,9 @@ export class Character {
   }
 
   setLook(look) {
-    const l = (this.look = fixLook(look));
+    const hero = fixLook(look).hero;
+    // у игрока кукла — только скелет нужного роста; у жителя бухты — ещё и запасной вид
+    const l = (this.look = this.puppet ? { ...puppetLook(look), hero } : { ...DEFAULT_LOOK, height: heroTall(heroOf({ hero })), hero });
     this.clear();
     const b = BODIES[l.body];
     const lm = b.limb;
@@ -495,19 +482,50 @@ export class Character {
     this.group.traverse((o) => {
       if (o.isMesh) o.castShadow = true;
     });
-    if (l.hero) this.useHero(l);
+    if (l.hero || !this.puppet) this.useHero(l);
     if (this.rod) J.rod.add(this.rod.group);
     this.redrawFace(true);
     return this;
   }
-  /** Готовая модель вместо куклы: кукла остаётся невидимым «скелетом», который задаёт позу. */
+  /**
+   * Готовая модель вместо куклы: кукла остаётся невидимым «скелетом», который задаёт позу.
+   * Пока модель грузится, персонажа не видно вовсе — кукла из частей игроку больше не показывается.
+   */
   useHero(l) {
-    const tpl = heroTemplate(l.hero);
-    if (!tpl) {
-      // модель ещё грузится — пока показываем куклу, потом перестроимся
-      loadHero(l.hero).then(() => !this.gone && this.look === l && this.setLook(l), () => {});
+    const again = () => !this.gone && this.look === l && this.setLook(l);
+    if (!heroes.ready) {
+      // список героев ещё не пришёл
+      this.root.visible = false;
+      loadManifest().then(again);
       return;
     }
+    const id = this.puppet ? l.hero : heroOf(l);
+    if (!id || !heroes.byId.has(id)) return; // готовых моделей нет вовсе (пробная версия одним файлом) — остаётся кукла
+    let tpl = heroTemplate(id);
+    if (!tpl && this.failed === id) {
+      // своя модель не загрузилась: показываем любого уже загруженного героя (у жителя бухты — его запасной вид)
+      const other = this.puppet ? null : heroes.list.find((h) => heroTemplate(h.id));
+      if (!other) return;
+      tpl = heroTemplate(other.id);
+    }
+    if (!tpl) {
+      this.root.visible = false;
+      loadHero(id).then(again, () => {
+        if (this.gone || this.look !== l) return;
+        this.failed = id;
+        this.setLook(l);
+        // сеть могла моргнуть — пробуем ещё пару раз
+        if ((this.tries = (this.tries || 0) + 1) > 3) return;
+        clearTimeout(this.retryT);
+        this.retryT = setTimeout(() => {
+          if (this.gone || this.failed !== id) return;
+          this.failed = null;
+          this.setLook(this.look);
+        }, 12000);
+      });
+      return;
+    }
+    if (tpl.info.id === id) this.failed = null; // своя модель на месте (а не чужая вместо неё)
     this.root.traverse((o) => {
       if (o.isMesh) o.visible = false;
     });
@@ -850,7 +868,10 @@ export class Character {
     J.lL.rotation.set(p.lLx, 0, p.lLz);
     J.kL.rotation.x = p.kL;
     J.rod.rotation.x = Math.PI / 2 + p.rod;
-    if (this.hero) this.hero.update(dt, st, J);
+    if (this.hero) {
+      this.hero.update(dt, st, J);
+      return; // лицо куклы не видно — моргать нечему
+    }
     // лицо: моргание и разговор
     this.blinkT -= dt;
     if (this.blinkT <= 0) {

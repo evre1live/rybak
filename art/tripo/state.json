@@ -769,6 +769,112 @@
       ],
       "concept": "8eaeb6c8-a4b9-460f-b386-d5c665bbcf03",
       "model": "9c0dca4e-7857-4fca-ab68-d3d012a4d441"
+    },
+    "hero-archie": {
+      "concepts": [
+        {
+          "task": "d76ac553-58db-4e33-9a9f-3de4729b4a0d",
+          "file": "art/tripo/raw/hero-archie-concept1.jpg"
+        },
+        {
+          "task": "8131c32e-6491-465e-9d71-5d6a9d4c1451",
+          "file": "art/tripo/raw/hero-archie-concept2.jpg"
+        }
+      ],
+      "concept": "8131c32e-6491-465e-9d71-5d6a9d4c1451",
+      "pick": 0,
+      "model": "5d8bb568-5728-425b-9c2d-7daeaf2580f1",
+      "rig": "67cd5b85-8d6f-4819-a2ca-5eb5549e7d4c",
+      "anims": {
+        "idle": "136a291e-f05c-4710-a13a-3764a6b73a33",
+        "walk": "f12ccca6-1a9d-4e15-ae32-a538e0cc2c05",
+        "run": "7c4ef405-d00f-43b4-9a02-2c3553e7a231"
+      }
+    },
+    "hero-black": {
+      "concepts": [
+        {
+          "task": "39489f97-99d4-4c75-be64-35bdb70a97eb",
+          "file": "art/tripo/raw/hero-black-concept1.jpg"
+        },
+        {
+          "task": "40e2fa59-4210-4f33-9db8-165f89eb324d",
+          "file": "art/tripo/raw/hero-black-concept2.jpg"
+        },
+        {
+          "task": "c3dd206c-8331-4221-9378-d6e6421df418",
+          "file": "art/tripo/raw/hero-black-concept3.jpg"
+        },
+        {
+          "task": "dcf5652c-aa0d-47c7-9add-28b5a9fbfa17",
+          "file": "art/tripo/raw/hero-black-concept4.jpg"
+        }
+      ],
+      "concept": "dcf5652c-aa0d-47c7-9add-28b5a9fbfa17",
+      "pick": 0,
+      "model": "1922a6a5-7827-4ff6-b829-18e359b82b69",
+      "rig": "7827c538-fde5-48b2-86f6-a2da16be1f16",
+      "anims": {
+        "idle": "8579a6a9-3ab9-4e91-8b12-4bab65376877",
+        "walk": "91048ba9-5494-4210-80fa-9d5228b02c00",
+        "run": "98dc6596-5ef2-4974-bb2b-83f1e7d03ab8"
+      }
+    },
+    "hero-gosha": {
+      "concepts": [
+        {
+          "task": "e5ac87ab-8f7e-4613-9953-53eac393113d",
+          "file": "art/tripo/raw/hero-gosha-concept1.jpg"
+        }
+      ],
+      "concept": "e5ac87ab-8f7e-4613-9953-53eac393113d",
+      "model": "7bc7a3f3-b35b-4988-8bff-ef95fb0eba8c",
+      "rig": "bb16894a-857e-4660-9583-aac4e075e485",
+      "anims": {
+        "idle": "579b8c05-4b74-4601-a1db-27d3fbaf9912",
+        "walk": "e2bfab26-a371-483c-9ef7-43ee6db422c2",
+        "run": "f2beea11-dcb0-47a8-9729-dd59640da08e"
+      }
+    },
+    "hero-kai": {
+      "concepts": [
+        {
+          "task": "1bd8ce47-57e1-495d-9873-4cddf7ab9e50",
+          "file": "art/tripo/raw/hero-kai-concept1.jpg"
+        },
+        {
+          "task": "ee2fb25a-cf38-4a11-af86-c774c6b3f04e",
+          "file": "art/tripo/raw/hero-kai-concept2.jpg"
+        }
+      ],
+      "concept": "ee2fb25a-cf38-4a11-af86-c774c6b3f04e",
+      "model": "f9f7b047-72a9-4bd3-be9d-4b6b6897593e",
+      "rig": "01d81d6e-f588-46c6-94be-3dadf1ac5b9f",
+      "anims": {
+        "idle": "1607e166-576b-4d47-8c4e-5a6884ffbcfd",
+        "walk": "2b996b96-890f-45ca-862b-11681b04d8f6",
+        "run": "4bc15291-fe34-48f4-a8a0-902c867b8f0c"
+      }
+    },
+    "hero-bjorn": {
+      "concepts": [
+        {
+          "task": "b6827af5-eeb8-4054-a3ec-159ece798b1d",
+          "file": "art/tripo/raw/hero-bjorn-concept1.jpg"
+        },
+        {
+          "task": "ea760d1e-a171-4b22-804b-6e2a6a21f212",
+          "file": "art/tripo/raw/hero-bjorn-concept2.jpg"
+        }
+      ],
+      "concept": "ea760d1e-a171-4b22-804b-6e2a6a21f212",
+      "model": "967b33d4-31ee-40ba-bec7-2f4b0017fcef",
+      "rig": "b026344e-6b16-4e59-a5b9-25fe9148395d",
+      "anims": {
+        "idle": "dfa156dd-747a-4ae3-b5e5-e9488fd57f6a",
+        "walk": "3e528f1a-9056-430a-8545-b1a990b70b51",
+        "run": "f8390cc4-0654-4475-9c65-f6eea0af7a52"
+      }
     }
   },
   "ledger": [
@@ -2059,6 +2165,293 @@
       "type": "image_to_model",
       "task": "9c0dca4e-7857-4fca-ab68-d3d012a4d441",
       "credits": 30
+    },
+    {
+      "at": "2026-11-12T05:35:01.149Z",
+      "label": "hero-archie образец",
+      "type": "text_to_image",
+      "task": "d76ac553-58db-4e33-9a9f-3de4729b4a0d",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-12T05:35:05.330Z",
+      "label": "hero-black образец",
+      "type": "text_to_image",
+      "task": "39489f97-99d4-4c75-be64-35bdb70a97eb",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-12T05:35:06.989Z",
+      "label": "hero-gosha образец",
+      "type": "text_to_image",
+      "task": "e5ac87ab-8f7e-4613-9953-53eac393113d",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-12T05:35:08.166Z",
+      "label": "hero-kai образец",
+      "type": "text_to_image",
+      "task": "1bd8ce47-57e1-495d-9873-4cddf7ab9e50",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-12T05:35:10.420Z",
+      "label": "hero-bjorn образец",
+      "type": "text_to_image",
+      "task": "b6827af5-eeb8-4054-a3ec-159ece798b1d",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-12T05:36:40.047Z",
+      "label": "hero-black образец",
+      "type": "text_to_image",
+      "task": "40e2fa59-4210-4f33-9db8-165f89eb324d",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-12T05:36:44.838Z",
+      "label": "hero-archie образец",
+      "type": "text_to_image",
+      "task": "8131c32e-6491-465e-9d71-5d6a9d4c1451",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-12T05:36:46.132Z",
+      "label": "hero-bjorn образец",
+      "type": "text_to_image",
+      "task": "ea760d1e-a171-4b22-804b-6e2a6a21f212",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-12T05:36:47.007Z",
+      "label": "hero-kai образец",
+      "type": "text_to_image",
+      "task": "ee2fb25a-cf38-4a11-af86-c774c6b3f04e",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-12T05:37:52.957Z",
+      "label": "hero-black образец",
+      "type": "text_to_image",
+      "task": "c3dd206c-8331-4221-9378-d6e6421df418",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-12T05:38:26.026Z",
+      "label": "hero-black образец",
+      "type": "text_to_image",
+      "task": "dcf5652c-aa0d-47c7-9add-28b5a9fbfa17",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-12T05:43:30.896Z",
+      "label": "hero-archie модель",
+      "type": "image_to_model",
+      "task": "5d8bb568-5728-425b-9c2d-7daeaf2580f1",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-12T05:43:35.081Z",
+      "label": "hero-kai модель",
+      "type": "image_to_model",
+      "task": "f9f7b047-72a9-4bd3-be9d-4b6b6897593e",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-12T05:43:36.550Z",
+      "label": "hero-black модель",
+      "type": "image_to_model",
+      "task": "1922a6a5-7827-4ff6-b829-18e359b82b69",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-12T05:43:37.295Z",
+      "label": "hero-archie проверка скелета",
+      "type": "animate_prerigcheck",
+      "task": "2aac1ad9-0733-4ad6-b67f-a84c2e082523",
+      "credits": 0
+    },
+    {
+      "at": "2026-11-12T05:43:41.100Z",
+      "label": "hero-kai проверка скелета",
+      "type": "animate_prerigcheck",
+      "task": "2779d119-762c-4c7c-b215-8c938a9a8bda",
+      "credits": 0
+    },
+    {
+      "at": "2026-11-12T05:43:42.755Z",
+      "label": "hero-black проверка скелета",
+      "type": "animate_prerigcheck",
+      "task": "3279096b-983e-4dbf-984d-2255b7543367",
+      "credits": 0
+    },
+    {
+      "at": "2026-11-12T05:43:57.434Z",
+      "label": "hero-bjorn модель",
+      "type": "image_to_model",
+      "task": "967b33d4-31ee-40ba-bec7-2f4b0017fcef",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-12T05:43:58.239Z",
+      "label": "hero-gosha модель",
+      "type": "image_to_model",
+      "task": "7bc7a3f3-b35b-4988-8bff-ef95fb0eba8c",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-12T05:44:03.319Z",
+      "label": "hero-bjorn проверка скелета",
+      "type": "animate_prerigcheck",
+      "task": "9a161c28-cee8-4036-a203-fe51cf5f6fdd",
+      "credits": 0
+    },
+    {
+      "at": "2026-11-12T05:44:04.288Z",
+      "label": "hero-gosha проверка скелета",
+      "type": "animate_prerigcheck",
+      "task": "333bd931-367f-4d44-9d84-93bea8403eae",
+      "credits": 0
+    },
+    {
+      "at": "2026-11-12T05:45:13.300Z",
+      "label": "hero-archie скелет",
+      "type": "animate_rig",
+      "task": "67cd5b85-8d6f-4819-a2ca-5eb5549e7d4c",
+      "credits": 25
+    },
+    {
+      "at": "2026-11-12T05:45:23.855Z",
+      "label": "hero-archie idle",
+      "type": "animate_retarget",
+      "task": "136a291e-f05c-4710-a13a-3764a6b73a33",
+      "credits": 10
+    },
+    {
+      "at": "2026-11-12T05:45:33.791Z",
+      "label": "hero-archie walk",
+      "type": "animate_retarget",
+      "task": "f12ccca6-1a9d-4e15-ae32-a538e0cc2c05",
+      "credits": 10
+    },
+    {
+      "at": "2026-11-12T05:45:39.334Z",
+      "label": "hero-archie run",
+      "type": "animate_retarget",
+      "task": "7c4ef405-d00f-43b4-9a02-2c3553e7a231",
+      "credits": 10
+    },
+    {
+      "at": "2026-11-12T05:46:52.667Z",
+      "label": "hero-kai скелет",
+      "type": "animate_rig",
+      "task": "01d81d6e-f588-46c6-94be-3dadf1ac5b9f",
+      "credits": 25
+    },
+    {
+      "at": "2026-11-12T05:47:06.128Z",
+      "label": "hero-black скелет",
+      "type": "animate_rig",
+      "task": "7827c538-fde5-48b2-86f6-a2da16be1f16",
+      "credits": 25
+    },
+    {
+      "at": "2026-11-12T05:47:11.485Z",
+      "label": "hero-kai idle",
+      "type": "animate_retarget",
+      "task": "1607e166-576b-4d47-8c4e-5a6884ffbcfd",
+      "credits": 10
+    },
+    {
+      "at": "2026-11-12T05:47:16.327Z",
+      "label": "hero-black idle",
+      "type": "animate_retarget",
+      "task": "8579a6a9-3ab9-4e91-8b12-4bab65376877",
+      "credits": 10
+    },
+    {
+      "at": "2026-11-12T05:47:22.184Z",
+      "label": "hero-kai walk",
+      "type": "animate_retarget",
+      "task": "2b996b96-890f-45ca-862b-11681b04d8f6",
+      "credits": 10
+    },
+    {
+      "at": "2026-11-12T05:47:25.827Z",
+      "label": "hero-black walk",
+      "type": "animate_retarget",
+      "task": "91048ba9-5494-4210-80fa-9d5228b02c00",
+      "credits": 10
+    },
+    {
+      "at": "2026-11-12T05:47:31.825Z",
+      "label": "hero-kai run",
+      "type": "animate_retarget",
+      "task": "4bc15291-fe34-48f4-a8a0-902c867b8f0c",
+      "credits": 10
+    },
+    {
+      "at": "2026-11-12T05:47:35.571Z",
+      "label": "hero-black run",
+      "type": "animate_retarget",
+      "task": "98dc6596-5ef2-4974-bb2b-83f1e7d03ab8",
+      "credits": 10
+    },
+    {
+      "at": "2026-11-12T05:48:53.878Z",
+      "label": "hero-bjorn скелет",
+      "type": "animate_rig",
+      "task": "b026344e-6b16-4e59-a5b9-25fe9148395d",
+      "credits": 25
+    },
+    {
+      "at": "2026-11-12T05:48:59.273Z",
+      "label": "hero-gosha скелет",
+      "type": "animate_rig",
+      "task": "bb16894a-857e-4660-9583-aac4e075e485",
+      "credits": 25
+    },
+    {
+      "at": "2026-11-12T05:49:09.493Z",
+      "label": "hero-gosha idle",
+      "type": "animate_retarget",
+      "task": "579b8c05-4b74-4601-a1db-27d3fbaf9912",
+      "credits": 10
+    },
+    {
+      "at": "2026-11-12T05:49:20.863Z",
+      "label": "hero-bjorn idle",
+      "type": "animate_retarget",
+      "task": "dfa156dd-747a-4ae3-b5e5-e9488fd57f6a",
+      "credits": 10
+    },
+    {
+      "at": "2026-11-12T05:49:27.522Z",
+      "label": "hero-gosha walk",
+      "type": "animate_retarget",
+      "task": "e2bfab26-a371-483c-9ef7-43ee6db422c2",
+      "credits": 10
+    },
+    {
+      "at": "2026-11-12T05:49:31.127Z",
+      "label": "hero-bjorn walk",
+      "type": "animate_retarget",
+      "task": "3e528f1a-9056-430a-8545-b1a990b70b51",
+      "credits": 10
+    },
+    {
+      "at": "2026-11-12T05:49:42.267Z",
+      "label": "hero-gosha run",
+      "type": "animate_retarget",
+      "task": "f2beea11-dcb0-47a8-9729-dd59640da08e",
+      "credits": 10
+    },
+    {
+      "at": "2026-11-12T05:49:46.418Z",
+      "label": "hero-bjorn run",
+      "type": "animate_retarget",
+      "task": "f8390cc4-0654-4475-9c65-f6eea0af7a52",
+      "credits": 10
     }
   ]
 }

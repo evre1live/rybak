@@ -22,6 +22,7 @@
       "id": "hero-yellow",
       "group": "hero",
       "name": "Санни",
+      "about": "Жёлтая куртка, очки на козырьке. На пирс прибегает первым.",
       "faces": 60000,
       "prompt": "A cheerful young fisherman with curly brown hair, wearing a navy baseball cap with a yellow brim and yellow goggles strapped on top, a yellow hooded jacket with a dark navy zip-up fishing vest over it, a navy backpack with yellow straps, plain black gloves, a brown leather belt, dark grey cargo trousers with thigh pockets and knee pads, yellow work boots with black soles",
       "fp": {
@@ -36,6 +37,7 @@
       "id": "hero-finn",
       "group": "hero",
       "name": "Финн",
+      "about": "Бирюзовая куртка, шорты и вечная улыбка. Знает в бухте каждую мель.",
       "faces": 60000,
       "prompt": "A laughing young angler with curly brown hair, wearing a navy baseball cap with a yellow brim and teal goggles on top, a teal short-sleeved jacket over a white long-sleeved shirt, grey backpack straps, a smartwatch, tan cargo shorts with pockets, a belt with a teal pouch, white socks, grey hiking boots with teal laces",
       "fp": {
@@ -47,6 +49,7 @@
       "id": "hero-nori",
       "group": "hero",
       "name": "Нори",
+      "about": "Розовая кепка и жилет с сотней карманов. Ловит на спор — и выигрывает.",
       "faces": 60000,
       "prompt": "A smiling young woman angler with long pink hair, wearing a pink baseball cap, a white long-sleeved shirt under a yellow-olive fishing vest with many pockets, black gloves with yellow pads, dark grey cargo trousers rolled at the ankle, a pink pouch on the belt, grey boots with yellow laces",
       "fp": {
@@ -59,12 +62,84 @@
       "id": "hero-pip",
       "group": "hero",
       "name": "Пип",
+      "about": "Борода, панама и фиолетовое худи. Душа любой рыбалки.",
       "faces": 60000,
       "prompt": "A stocky cheerful fisherman with a thick dark beard, wearing a blue bucket hat, a purple hoodie with white sleeves under an olive fishing vest with purple pockets, khaki cargo shorts, a purple pouch on the belt, grey boots with purple laces",
       "fp": {
         "bare": true,
         "skin": "#e3a67c"
       }
+    },
+    {
+      "id": "hero-black",
+      "group": "hero",
+      "name": "Блэк",
+      "about": "Весь в чёрном. Говорит мало, забрасывает далеко.",
+      "faces": 60000,
+      "prompt": "A sturdy athletic man about 30 years old with a completely bald shaved head and a short neat trimmed dark beard, calm confident half-smile, wearing a plain black hoodie with the hood down, wide-leg baggy black denim jeans, and plain black-and-white low-top leather skate sneakers with white soles, no logos and no brand marks anywhere",
+      "style": "Fortnite-like art style, clean smooth shapes, slightly exaggerated proportions, hand-painted textures, soft matte materials",
+      "fp": {
+        "sleeve": "#2b2b30",
+        "skin": "#e9b28c"
+      },
+      "eye": 1.66
+    },
+    {
+      "id": "hero-archie",
+      "group": "hero",
+      "name": "Арчи",
+      "about": "Усы, очки и шляпа с мушками. Рыбачит шестьдесят лет и помнит каждую рыбу.",
+      "faces": 60000,
+      "prompt": "A very tall, thin, lanky elderly angler about 70 years old with a long narrow wrinkled face, a neat grey moustache and round wire glasses, wearing an olive-green floppy fishing hat decorated with colourful fishing flies, an open dark green waxed jacket over a cream knitted sweater, brown waterproof wading trousers held by suspenders, dark brown rubber boots",
+      "fp": {
+        "sleeve": "#4f6b3c",
+        "skin": "#e8a988"
+      },
+      "tall": 1.05,
+      "eye": 1.62
+    },
+    {
+      "id": "hero-bjorn",
+      "group": "hero",
+      "name": "Бьорн",
+      "about": "Рыжая борода в косу, оранжевый комбинезон. Рыбу тянет, как якорь.",
+      "faces": 60000,
+      "prompt": "A huge towering fisherman about 40 years old built like a bear, with very broad shoulders, a barrel chest and massive arms, short ginger hair and a big ginger beard tied into one braid, wearing a dark knitted beanie, a thick cream cable-knit sweater with long cream sleeves down to the wrists under bright orange waterproof bib overalls with black suspenders, big black rubber boots",
+      "fp": {
+        "sleeve": "#e6e0cf",
+        "skin": "#e79f7f",
+        "k": 0.72
+      },
+      "tall": 1.08,
+      "eye": 1.76
+    },
+    {
+      "id": "hero-gosha",
+      "group": "hero",
+      "name": "Гоша",
+      "about": "Гавайская рубашка, панама, сандалии с носками. Он в отпуске.",
+      "faces": 60000,
+      "prompt": "A short, plump, cheerful middle-aged tourist about 50 years old with a big round belly, a thick dark moustache and rosy cheeks, wearing a white straw panama hat with a blue band, a royal-blue short-sleeved Hawaiian shirt with white flowers, sand-coloured knee-length shorts, a small tan waist bag, white socks and brown leather sandals",
+      "fp": {
+        "bare": true,
+        "skin": "#f0b08a"
+      },
+      "tall": 0.97,
+      "eye": 1.48
+    },
+    {
+      "id": "hero-kai",
+      "group": "hero",
+      "name": "Кай",
+      "about": "Красная куртка и наушники. Рыбачит под музыку.",
+      "faces": 60000,
+      "prompt": "A skinny lanky young man about 20 years old with dark brown skin, shoulder-length black dreadlocks tied back and a wide friendly grin, big red headphones resting around his neck, wearing a bright red windbreaker with a light grey collar zipped halfway over a white t-shirt, light grey jogger trousers and white canvas sneakers with red laces",
+      "pose": "standing perfectly straight and symmetrical in a strict T-pose, facing the camera, both arms stretched straight out to the sides at shoulder height, both hands are tightly clenched fists like a boxer (all fingers curled into the palm, no open palms, no pointing fingers, no thumbs up), legs slightly apart, feet pointing forward, nothing in the hands",
+      "fp": {
+        "sleeve": "#d8322f",
+        "skin": "#7a4a30"
+      },
+      "eye": 1.65
     },
     {
       "id": "hero-captain",

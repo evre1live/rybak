@@ -42,6 +42,25 @@ export function loadManifest() {
     }));
 }
 export const heroTemplate = (id) => templates.get(id) || null;
+/**
+ * Какой герой на самом деле будет показан: выбранный, а если такого нет (старое сохранение с персонажем из частей,
+ * друг играет в старой версии) — первый из списка. Пусто — список ещё не пришёл или готовых моделей нет вовсе.
+ */
+export function heroOf(look) {
+  const id = look && look.hero;
+  if (id && heroes.byId.has(id)) return id;
+  return heroes.list.length ? heroes.list[0].id : '';
+}
+/** Рост героя относительно обычного (1,76 м): здоровяк выше, коротышка ниже. */
+export const heroTall = (id) => {
+  const h = heroes.byId.get(id);
+  return (h && h.tall) || 1;
+};
+/** Высота глаз героя над землёй — оттуда игрок смотрит от первого лица. */
+export const heroEye = (look) => {
+  const h = heroes.byId.get(heroOf(look));
+  return (h && h.eye) || 1.62 * ((h && h.tall) || 1);
+};
 /** Загрузчик GLB. Распаковщик сжатой геометрии (WebAssembly) подключается при первом обращении. */
 export function gltfLoader() {
   return import('three/addons/libs/meshopt_decoder.module.js').then((lib) => (loader ||= new GLTFLoader().setMeshoptDecoder(lib.MeshoptDecoder)));
@@ -407,11 +426,11 @@ export class HeroBody {
 // чьей воле подчиняется кость: 1 — ноги и таз, 2 — корпус и левая рука, 3 — правая рука; голова всегда смотрит, куда кукла
 const GROUP = { hips: 1, lL: 1, kL: 1, fL: 1, lR: 1, kR: 1, fR: 1, spine: 2, spine1: 2, spine2: 2, shL: 2, aL: 2, eL: 2, hL: 2, shR: 3, aR: 3, eR: 3, hR: 3 };
 
-/** Цвета рук от первого лица под героя: рукав, перчатка, кожа. */
+/** Цвета запасных рук от первого лица (их видно, только если модель героя не загрузилась): рукав, перчатка, кожа. */
 export function fpLook(look) {
-  const h = look && look.hero && heroes.byId.get(look.hero);
-  if (!h || !h.fp) return look;
-  const f = h.fp;
+  const id = heroOf(look);
+  const h = heroes.byId.get(id);
+  const f = (h && h.fp) || {};
   // bare — короткий рукав: предплечье голое; иначе рукав цвета куртки
-  return { ...look, top: f.bare ? 3 : 1, topC: f.sleeve || look.topC, topC2: f.sleeve2 || f.sleeve || look.topC2, gloves: f.glove ? 1 : 0, gloveC: f.glove || look.gloveC, skin: f.skin || look.skin };
+  return { hero: id, top: f.bare ? 3 : 1, topC: f.sleeve || '#f6c21c', topC2: f.sleeve2 || f.sleeve || '#2a2f3a', gloves: f.glove ? 1 : 0, gloveC: f.glove || '#2a2f3a', skin: f.skin || '#f3c9a3' };
 }

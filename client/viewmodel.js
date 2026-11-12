@@ -57,6 +57,8 @@ void main() {
   #include <colorspace_fragment>
 }`;
 
+const VM_TAN = Math.tan((62 * Math.PI) / 360); // угол обзора, под который поставлены руки
+
 export class ViewModel {
   constructor(camera) {
     this.camera = camera;
@@ -193,6 +195,10 @@ export class ViewModel {
   update(dt, st) {
     if (!this.rod || !this.handL) return;
     this.t += dt;
+    // У рук и удочки «свой» угол обзора: какой бы ни был выбран в настройках, в кадре они такие же, как при обычном.
+    // Иначе широкий угол отодвигал руки от камеры и показывал, где они кончаются у плеча.
+    const fk = Math.tan((this.camera.fov * Math.PI) / 360) / VM_TAN;
+    this.root.scale.set(fk, fk, 1);
     if (this.auraMesh.visible) {
       const u = this.auraU;
       u.uT.value += dt;

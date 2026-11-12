@@ -2,6 +2,7 @@
 // Герой: модель со скелетом + все его анимации в одном файле, сетка упрощена, текстуры в WebP, геометрия сжата.
 //   node tools/optimize.js            — всё из art/tripo/raw, что есть в art/models.json
 //   node tools/optimize.js hero-yellow
+//   node tools/optimize.js --meta     — только обновить в manifest.json сведения о героях из art/models.json (имя, описание, рост…), модели не трогать
 // Модель локации (деревья, камни, постройки): как предмет — наибольший размер 1, стоит на y = 0; плюс дальняя копия.
 // Результат: public/models/<id>.glb и public/models/manifest.json
 import fs from 'node:fs';
@@ -261,9 +262,19 @@ function hardSimplify(doc, target, error) {
   }
 }
 
-const want = process.argv.slice(2);
+/** Сведения о герое, которые игра берёт из manifest.json: about — строка на экране «Персонаж», tall — рост относительно обычного, eye — высота глаз (м). */
+const heroMeta = (m) => ({ ...(m.fp ? { fp: m.fp } : {}), ...(m.tint ? { tint: m.tint } : {}), ...(m.npc ? { npc: true } : {}), ...(m.hands ? { hands: m.hands } : {}), ...(m.tall ? { tall: m.tall } : {}), ...(m.eye ? { eye: m.eye } : {}) });
+const META = process.argv.includes('--meta');
+const want = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 for (const m of spec.models) {
   if (want.length && !want.includes(m.id)) continue;
+  if (META) {
+    const i = manifest.heroes.findIndex((h) => h.id === m.id);
+    if (m.group !== 'hero' || i < 0) continue;
+    const h = manifest.heroes[i];
+    manifest.heroes[i] = { id: h.id, name: m.name, ...(m.about ? { about: m.about } : {}), file: h.file, lite: h.lite, tris: h.tris, kb: h.kb, clips: h.clips, ...heroMeta(m), ...(h.face ? { face: h.face } : {}) };
+    continue;
+  }
   const base = path.join(RAW, m.group === 'hero' ? `${m.id}-rig.glb` : `${m.id}.glb`);
   if (!fs.existsSync(base)) continue;
   const budget = { ...(BUDGET[m.group] || BUDGET.prop), ...(m.tex ? { tex: m.tex } : {}) };
@@ -332,8 +343,10 @@ for (const m of spec.models) {
     lod = { file: `models/${m.id}.lod.glb`, tris: triCount(doc), kb: Math.round(fs.statSync(lo).size / 1024) };
   }
   if (m.group === 'hero') {
-    const entry = { id: m.id, name: m.name, file: `models/${m.id}.glb`, lite: lite.file, tris, kb, clips: Object.keys(clips), ...(m.fp ? { fp: m.fp } : {}), ...(m.tint ? { tint: m.tint } : {}), ...(m.npc ? { npc: true } : {}), ...(m.hands ? { hands: m.hands } : {}) };
     const i = manifest.heroes.findIndex((h) => h.id === m.id);
+    const prev = i >= 0 ? manifest.heroes[i] : {};
+    // face — запечённый портрет (tools/bake-icons.cjs --faces)
+    const entry = { id: m.id, name: m.name, ...(m.about ? { about: m.about } : {}), file: `models/${m.id}.glb`, lite: lite.file, tris, kb, clips: Object.keys(clips), ...heroMeta(m), ...(prev.face ? { face: prev.face } : {}) };
     if (i >= 0) manifest.heroes[i] = entry;
     else manifest.heroes.push(entry);
   } else {
@@ -342,5 +355,11 @@ for (const m of spec.models) {
   }
   console.log(`${m.id}: ${before} → ${tris} треуг., ${kb} КБ${lod ? ` (вдали: ${lod.tris} треуг., ${lod.kb} КБ)` : ''}${lite ? ` (для телефонов: ${lite.tris} треуг., ${lite.kb} КБ)` : ''}${Object.keys(clips).length ? ', анимации: ' + Object.entries(clips).map(([k, v]) => `${k} ${v.dur} с (${v.tracks} дорожек)`).join(', ') : ''}`);
 }
+// герои идут в том же порядке, что и в art/models.json: так они выстроены на экране «Персонаж»
+const order = (id) => {
+  const i = spec.models.findIndex((x) => x.id === id);
+  return i < 0 ? 1e6 : i;
+};
+manifest.heroes.sort((a, b) => order(a.id) - order(b.id));
 fs.writeFileSync(manPath, JSON.stringify(manifest, null, 2));
 console.log('manifest:', manifest.heroes.length, 'героев,', Object.keys(manifest.props).length, 'предметов');

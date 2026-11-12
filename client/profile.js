@@ -1,6 +1,6 @@
 // Сохранение игрока в браузере: монеты, снасти, улов, внешность, настройки.
 import { newProfile, fixProfile } from '../shared/logic.js';
-import { fixLook, PRESETS } from './character.js';
+import { fixLook } from './character.js';
 
 const KEY = 'rybak.profile.v1';
 const SKEY = 'rybak.settings.v1';
@@ -23,7 +23,7 @@ const store = {
 export function loadProfile() {
   const raw = store.get(KEY);
   const p = fixProfile(raw || newProfile());
-  p.look = fixLook(p.look || PRESETS[Math.floor(Math.random() * 4)].look);
+  p.look = fixLook(p.look); // герой; кому он ещё не выбран, тому его назначит игра, когда придёт список героев (main.js)
   p.fresh = !raw;
   return p;
 }

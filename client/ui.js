@@ -1,9 +1,8 @@
-// Интерфейс: HUD как на макетах, лобби, снасти и магазин, рынок, журнал, редактор персонажа, настройки.
+// Интерфейс: HUD как на макетах, лобби, снасти и магазин, рынок, журнал, выбор героя, настройки.
 import { CATS, ITEMS, FISH, FISH_BY_ID, JUNK_BY_ID, RARITY, ZONES, DAY_PARTS, RODS, MAX_PLAYERS, fmtW, fmtCoins, fmtClock, dayPart, isLure } from '../shared/data.js';
 import { kitStats, rodBars, owns, tackleCount, priceOf, fishValue, coolerValue, levelInfo, fightGrade, T_LOW, T_DANGER } from '../shared/logic.js';
 import { itemIcon, fishIcon, faceIcon } from './icons.js';
-import { heroes } from './hero.js';
-import { OPTIONS, COLOR_KEYS, PRESETS, randomLook, fixLook } from './character.js';
+import { heroes, heroOf, heroTemplate } from './hero.js';
 import { MARKS, markSvg } from './proto.js';
 import { MAP_VIEW, MARKET, MOORINGS, WRECK } from './terrain.js';
 import { settings, saveSettings } from './profile.js';
@@ -478,7 +477,7 @@ export class UI {
       <div class="lcard">
         <h2>${ic('pin')}СОЛНЕЧНАЯ БУХТА</h2>
         <div class="mode">СВОБОДНАЯ РЫБАЛКА</div>
-        <img class="shot" src="${g.shot || ''}" alt="">
+        ${g.shot ? `<img class="shot" src="${g.shot}" alt="">` : '<div class="shot"></div>'}
         <div class="ready">${ic('users')}${n} ${word(n)}</div>
         <button class="btn pri big" data-a="start"><kbd class="g">↵</kbd><span>НАЧАТЬ РЫБАЛКУ</span></button>
         ${g.solo ? '' : `<div class="sub"><button class="btn ${v.on ? (v.muted ? 'ghost' : 'cy') : 'ghost'}" data-a="voice"><span>${ic(v.on && !v.muted ? 'mic' : 'micoff')} ${v.joining ? 'ПОДКЛЮЧАЮ…' : v.on ? (v.muted ? 'МИКРОФОН ВЫКЛ' : 'ГОЛОС ВКЛЮЧЁН') : 'ВКЛЮЧИТЬ ГОЛОС'}</span></button></div>
@@ -644,49 +643,23 @@ export class UI {
       <div class="loadout"><span class="hd">ДО УРОВНЯ ${lv.lvl + 1}</span><div class="it" style="border:0;flex:1;max-width:30em"><div class="pbar" style="flex:1;height:1em"><i style="width:${Math.round((lv.cur / lv.need) * 100)}%;background:var(--ye)"></i></div>&nbsp;${lv.cur} / ${lv.need}</div>${this.footKeys('')}</div></div>`;
   }
 
+  /** Экран «Персонаж»: выбор героя. Других персонажей в игре нет — собрать своего из частей больше нельзя. */
   renderEditor(first) {
     const g = this.g;
     if (first) {
-      this.ed = { look: { ...g.profile.look }, cat: 'body' };
+      this.ed = { look: { hero: heroOf(g.profile.look) } };
       g.editLook(this.ed.look);
     }
-    const E = this.ed;
-    const L = E.look;
-    const cats = [['presets', 'ОБРАЗЫ'], ['body', 'ТЕЛО'], ['face', 'ЛИЦО'], ['hair', 'ВОЛОСЫ'], ['head', 'ГОЛОВА'], ['top', 'ВЕРХ'], ['bottom', 'НИЗ'], ['shoes', 'ОБУВЬ'], ['hands', 'РУКИ'], ['back', 'СПИНА']];
-    const GROUPS = {
-      body: [['Телосложение', 'body'], ['Рост', 'height'], ['Кожа', 'skin']],
-      face: [['Глаза', 'eyes'], ['Цвет глаз', 'eyeC'], ['Брови', 'brows'], ['Рот', 'mouth'], ['Нос', 'nose'], ['Щёки', 'cheeks']],
-      hair: [['Причёска', 'hair'], ['Цвет волос', 'hairC'], ['Борода и усы', 'beard']],
-      head: [['Головной убор', 'hat'], ['Цвет убора', 'hatC'], ['Очки', 'glasses']],
-      top: [['Одежда', 'top'], ['Основной цвет', 'topC'], ['Второй цвет', 'topC2']],
-      bottom: [['Одежда', 'bottom'], ['Цвет', 'botC']],
-      shoes: [['Обувь', 'shoes'], ['Цвет', 'shoeC']],
-      hands: [['Перчатки', 'gloves'], ['Цвет перчаток', 'gloveC']],
-      back: [['За спиной', 'pack'], ['Цвет', 'packC']]
-    };
-    let body = '';
-    if (E.cat === 'presets') {
-      const hs = heroes.list;
-      body = `${hs.length ? `<h3>Герои</h3><div class="hlist">${hs.map((h) => `<button class="${L.hero === h.id ? 'on' : ''}" data-a="hero" data-id="${h.id}"><img src="${faceIcon(fixLook({ hero: h.id }))}" alt=""><span>${esc(h.name)}</span></button>`).join('')}</div>` : ''}
-        <h3>${hs.length ? 'Собрать своего из частей' : 'Готовые образы'}</h3><div class="olist">${PRESETS.map((p, i) => `<button data-a="preset" data-id="${i}">${esc(p.name)}</button>`).join('')}</div>
-        <h3>Или доверьтесь случаю</h3><button class="btn cy sm" data-a="rnd" style="width:100%"><span>СЛУЧАЙНЫЙ РЫБАК</span></button>`;
-    } else if (L.hero) {
-      body = `<h3>Выбран готовый герой</h3><p class="ednote">Телосложение, лицо и одежда настраиваются у персонажа, собранного из частей. Герой — цельная модель.</p>
-        <button class="btn cy sm" data-a="nohero" style="width:100%"><span>СОБРАТЬ СВОЕГО</span></button>`;
-    } else {
-      for (const [title, key] of GROUPS[E.cat]) {
-        body += `<h3>${title}</h3>`;
-        if (key === 'height') body += `<input type="range" min="0.88" max="1.12" step="0.01" value="${L.height}" data-k="height">`;
-        else if (OPTIONS[key]) body += `<div class="olist">${OPTIONS[key].map((n, i) => `<button class="${L[key] === i ? 'on' : ''}" data-a="opt" data-k="${key}" data-id="${i}">${n}</button>`).join('')}</div>`;
-        else body += `<div class="sw">${COLOR_KEYS[key].map((c) => `<button class="${L[key].toLowerCase() === c ? 'on' : ''}" style="background:${c}" data-a="col" data-k="${key}" data-id="${c}"></button>`).join('')}<label title="Свой цвет"><input type="color" value="${L[key]}" data-k="${key}"></label></div>`;
-      }
-    }
+    const hs = heroes.list;
+    const cur = heroes.byId.get(heroOf(this.ed.look));
+    const list = hs.length
+      ? `<div class="hlist">${hs.map((h) => `<button class="${cur && cur.id === h.id ? 'on' : ''}" data-a="hero" data-id="${h.id}"><img src="${faceIcon({ hero: h.id })}" alt=""><span>${esc(h.name)}</span></button>`).join('')}</div>`
+      : `<p class="ednote">${heroes.ready ? 'В этой версии игры готовых героев нет.' : 'Герои загружаются…'}</p>`;
     this.screen.innerHTML = `<div class="editor">
-      <div class="ptitle"><h1>ПЕРСОНАЖ</h1><span class="sp"></span><button class="btn sm cy" data-a="rnd"><span>СЛУЧАЙНО</span></button></div>
-      <div class="cats">${cats.map(([k, n]) => `<button class="btn ${E.cat === k ? 'on' : ''}" data-a="ecat" data-id="${k}"><span>${n}</span></button>`).join('')}</div>
-      <div class="edhint">${this.g.input.touch.on ? 'Ведите пальцем — персонаж повернётся' : 'Зажмите мышь и ведите — персонаж повернётся'}</div>
-      <div class="opts">${body}</div>
-      <div class="edfoot"><button class="btn ghost" data-a="edcancel"><kbd class="b">ESC</kbd><span>ОТМЕНА</span></button><span class="sp"></span><button class="btn pri big" data-a="edsave" style="height:2.2em"><span>ГОТОВО</span></button></div></div>`;
+      <div class="ptitle"><h1>ПЕРСОНАЖ</h1></div>
+      <div class="hinfo">${cur ? `<h2>${esc(cur.name)}</h2>${cur.about ? `<p>${esc(cur.about)}</p>` : ''}${heroTemplate(cur.id) ? '' : '<p class="load">Модель загружается…</p>'}` : ''}</div>
+      <div class="opts"><h3>Выберите героя</h3>${list}</div>
+      <div class="edfoot"><button class="btn ghost" data-a="edcancel"><kbd class="b">ESC</kbd><span>ОТМЕНА</span></button><span class="sp"></span><span class="edhint">${this.g.input.touch.on ? 'Ведите пальцем — герой повернётся' : 'Зажмите мышь и ведите — герой повернётся'}</span><span class="sp"></span><button class="btn pri big" data-a="edsave" style="height:2.2em"><span>ГОТОВО</span></button></div></div>`;
   }
 
   renderSettings() {
@@ -756,7 +729,7 @@ export class UI {
         <span>${k('E')}</span><span>Говорить с торговцем у лавки «Рынок»: продать улов, купить удочки, леску, наживку.</span>
         <span>${k('E')}</span><span><b>Лодка:</b> подойдите к лодке у пирса — её дают напрокат. ${k('W', 'g')}${k('S', 'g')} — ход, ${k('A', 'g')}${k('D', 'g')} — руль. Рыбачить можно прямо с борта: в открытом море, у затонувшего корабля, в лагуне Пальмового острова. Причалить можно у маяка и на острове.</span>
         <span>${k('TAB', 'x')} ${k('Q', 'x')}</span><span>Снасти и набор. ${k('Q', 'x')} — быстро сменить наживку.</span>
-        <span>${k('J', 'g')} ${k('C', 'g')}</span><span>Журнал рыб и редактор персонажа.</span>
+        <span>${k('J', 'g')} ${k('C', 'g')}</span><span>Журнал рыб и выбор героя.</span>
         <span>${k('M', 'g')} ${k('V', 'g')} ${k('ENTER', 'g')}</span><span>Микрофон вкл/выкл, говорить по кнопке, написать в чат.</span>
         <span>${k('1', 'g')}${k('2', 'g')}${k('3', 'g')}${k('4', 'g')}</span><span>Жесты: привет, класс, ура, танец.</span>
       </div>
@@ -819,35 +792,12 @@ export class UI {
       case 'jpick':
         this.js = id;
         return this.renderJournal();
-      case 'ecat':
-        this.ed.cat = id;
-        return this.renderEditor();
-      case 'opt':
-        this.ed.look[t.dataset.k] = Number(id);
-        g.editLook(this.ed.look);
-        return this.renderEditor();
-      case 'col':
-        this.ed.look[t.dataset.k] = id;
-        g.editLook(this.ed.look);
-        return this.renderEditor();
       case 'hero':
-        this.ed.look = { ...this.ed.look, hero: id };
-        g.editLook(this.ed.look);
-        return this.renderEditor();
-      case 'nohero':
-        this.ed.look = { ...this.ed.look, hero: '' };
-        g.editLook(this.ed.look);
-        return this.renderEditor();
-      case 'preset':
-        this.ed.look = { ...PRESETS[Number(id)].look };
-        g.editLook(this.ed.look);
-        return this.renderEditor();
-      case 'rnd':
-        this.ed.look = randomLook();
+        this.ed.look = { hero: id };
         g.editLook(this.ed.look);
         return this.renderEditor();
       case 'edsave':
-        g.saveLook(fixLook(this.ed.look));
+        g.saveLook({ hero: this.ed.look.hero });
         return this.closePanel();
       case 'edcancel': return this.closePanel();
       case 'tog':
@@ -870,10 +820,6 @@ export class UI {
       settings[t.dataset.set] = t.type === 'range' ? Number(t.value) : t.value;
       saveSettings();
       this.g.applySettings();
-    } else if (t.dataset.k && this.ed) {
-      this.ed.look[t.dataset.k] = t.type === 'range' ? Number(t.value) : t.value;
-      this.g.editLook(this.ed.look);
-      if (t.type === 'color') for (const b of $$('.sw button.on', t.closest('.sw'))) b.classList.remove('on');
     }
   }
   /** Главное действие панели по клавише E / Enter. */
@@ -886,7 +832,7 @@ export class UI {
       else if (act.a === 'equip' || act.also === 'equip') g.equip(it.id);
     } else if (this.panel === 'sell') g.sell(null);
     else if (this.panel === 'editor') {
-      g.saveLook(fixLook(this.ed.look));
+      g.saveLook({ hero: this.ed.look.hero });
       this.closePanel();
     } else if (this.panel === 'help' || this.panel === 'settings') this.closePanel();
   }

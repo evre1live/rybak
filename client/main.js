@@ -1,13 +1,13 @@
 // РЫБАК — сборка игры: состояния (меню → лобби → рыбалка), главный цикл, связь всех частей.
 import * as THREE from 'three';
 import { Gfx } from './gfx.js';
-import { loadManifest, heroes, fpLook } from './hero.js';
+import { loadManifest, loadHero, heroes, fpLook, heroEye } from './hero.js';
 import { loadModel, modelInfo } from './models.js';
 import { setEnvLight } from './env.js';
 import { adopt } from './fish3d.js';
-import { modelShot } from './icons.js';
+import { modelShot, faceShot } from './icons.js';
 import { World, drawMinimap, SEA_VIEW } from './world.js';
-import { Character, PRESETS, fixLook } from './character.js';
+import { Character, VENDOR_PUPPET } from './character.js';
 import { buildRod, itemModel } from './gear3d.js';
 import { ViewModel } from './viewmodel.js';
 import { Input, Player } from './player.js';
@@ -128,24 +128,29 @@ class Game {
     this.meChar.group.visible = false;
     this.scene.add(this.meChar.group);
     // торговец за прилавком
-    this.vendor = new Character(fixLook({ ...PRESETS[4].look, hat: 5, top: 4, topC: '#ef4444', topC2: '#f1efe6', beard: 5, hairC: '#f4ead0', body: 3 }));
-    // герои из готовых моделей: список приходит отдельным файлом; кому герой ещё не показывался — ставим его
+    this.vendor = new Character(VENDOR_PUPPET, { puppet: true });
     /** Снимок модели в картинку — им пользуются tools/bake-icons.cjs и проверочные листы. */
     this.modelShot = (id, view) => loadModel(id).then((t) => modelShot(t, view));
+    /** Портрет героя — для tools/bake-icons.cjs --faces. */
+    this.faceShot = (id) => loadHero(id).then(() => faceShot({ hero: id }));
     heroes.onLoad = () => {
       this.vm.setLook(fpLook(this.profile.look));
       this.ui.rerender();
     };
+    // герои: список приходит отдельным файлом. У кого герой не выбран (новичок) или в сохранении остался
+    // персонаж из частей (их в игре больше нет) — тому достаётся случайный герой, сменить можно на экране «Персонаж»
     loadManifest().then(() => {
       if (heroes.byId.has('npc-vendor')) this.vendor.setLook({ ...this.vendor.look, hero: 'npc-vendor' });
       const p = this.profile;
-      if (!heroes.list.length || p.heroSeen) return;
-      p.heroSeen = true;
-      p.look = fixLook({ ...p.look, hero: heroes.list[Math.floor(Math.random() * heroes.list.length)].id });
-      saveProfile(p);
+      if (!heroes.list.length) return;
+      if (!heroes.list.some((h) => h.id === p.look.hero)) {
+        p.look = { hero: heroes.list[Math.floor(Math.random() * heroes.list.length)].id };
+        saveProfile(p);
+        if (!this.solo && this.net.room) this.net.send({ t: 'card', card: this.card() });
+      }
       this.meChar.setLook(p.look);
       this.vm.setLook(fpLook(p.look));
-      if (!this.solo && this.net.room) this.net.send({ t: 'card', card: this.card() });
+      this.player.eye = heroEye(p.look);
       this.ui.rerender();
     });
     this.vendor.group.position.set(-8.35, DECK_Y, 12.9);
@@ -441,7 +446,7 @@ class Game {
     const sp = SPAWNS[this.me.slot % SPAWNS.length];
     this.resetBoat();
     this.player.place(sp[0], sp[1], 0);
-    this.player.eye = 1.62 * this.profile.look.height;
+    this.player.eye = heroEye(this.profile.look);
     this.ui.hideScreen();
     this.ui.setPlates([]);
     this.ui.hudShow(true);
@@ -503,6 +508,7 @@ class Game {
   // ───── редактор персонажа ─────
   startEdit() {
     this.editing = true;
+    this.editH = null;
     this.editYaw = 0.35;
     if (this.state === 'world') {
       this.meChar.group.position.set(this.player.x, this.player.y, this.player.z);
@@ -525,7 +531,7 @@ class Game {
     this.profile.look = look;
     saveProfile(this.profile);
     this.vm.setLook(fpLook(look));
-    this.player.eye = 1.62 * look.height;
+    this.player.eye = heroEye(look);
     this.sendCard();
     this.rosterChanged();
     this.ui.toast('Образ сохранён', 'good');
@@ -1297,18 +1303,25 @@ class Game {
     }
     cam.updateProjectionMatrix();
   }
-  editCamera() {
+  editCamera(dt = 0.016) {
     const cam = this.camera;
     const g = this.meChar.group.position;
-    const h = this.profile.look.height;
+    // по росту героя, которого сейчас примеряют: высокого снимаем с большего расстояния, чтобы он помещался с головы до пят
+    const h = this.meChar.look.height;
+    this.editH = damp(this.editH ?? h, h, 8, dt);
+    const k = this.editH;
+    // экран стоймя (планшет): список героев занимает низ экрана — героя ставим в верхнюю его часть и снимаем издалека
+    const tall = cam.aspect < 1;
+    const d = k * (tall ? 2 : 1);
+    const look = (tall ? 0.26 : 0.98) * k;
     if (this.state === 'world') {
       const fx = -Math.sin(this.editBase);
       const fz = -Math.cos(this.editBase);
-      cam.position.set(g.x + fx * 3.1, g.y + 1.15 * h, g.z + fz * 3.1);
-      cam.lookAt(g.x, g.y + 0.98 * h, g.z);
+      cam.position.set(g.x + fx * 3.1 * d, g.y + 1.15 * k, g.z + fz * 3.1 * d);
+      cam.lookAt(g.x, g.y + look, g.z);
     } else {
-      cam.position.set(g.x, g.y + 1.15 * h, g.z + 3.2);
-      cam.lookAt(g.x, g.y + 0.98 * h, g.z);
+      cam.position.set(g.x, g.y + 1.15 * k, g.z + 3.2 * d);
+      cam.lookAt(g.x, g.y + look, g.z);
     }
     cam.fov = 38;
     cam.updateProjectionMatrix();

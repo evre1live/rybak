@@ -137,7 +137,7 @@ async function concept(id) {
   const from = flag('from', null);
   let body;
   if (from) body = { type: 'image_to_image', file: await upload(path.resolve(from)), prompt: `${m.prompt}. ${spec.pose}. ${spec.concept}`.slice(0, 1024), ...(spec.imageModel ? { model_version: spec.imageModel } : {}) };
-  else if (m.group === 'hero') body = { type: 'text_to_image', prompt: `${spec.conceptLead} ${m.pose || spec.pose}. ${m.prompt}. ${spec.style}. ${spec.concept}`.slice(0, 1024) };
+  else if (m.group === 'hero') body = { type: 'text_to_image', prompt: `${spec.conceptLead} ${m.pose || spec.pose}. ${m.prompt}. ${m.style || spec.style}. ${spec.concept}`.slice(0, 1024) };
   else {
     // рыба — строго сбоку головой влево (плоская — сверху), предметы — в три четверти: так модель выходит в известном положении
     const L = spec.leads[m.group === 'fish' ? 'fish' : m.group === 'env' ? 'env' : 'prop'];

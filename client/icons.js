@@ -1,5 +1,5 @@
 // Иконки предметов, рыб и портреты игроков: маленький отдельный рендерер рисует 3D-модель в картинку.
-import { heroTemplate, loadHero } from './hero.js';
+import { heroes, heroOf, heroTemplate, loadHero } from './hero.js';
 import * as THREE from 'three';
 import { itemModel } from './gear3d.js';
 import { buildFish } from './fish3d.js';
@@ -93,24 +93,38 @@ export function fishIcon(sp) {
   cache.set(key, url);
   return url;
 }
-/** Портрет игрока для списка друзей. */
+const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='; // прозрачная точка
+/** Портрет героя: для списка друзей и экрана «Персонаж». */
 export function faceIcon(look) {
-  // портрет героя снимаем, когда его модель загрузилась; до тех пор — кукла, и в запас она не кладётся
-  const heroReady = !look.hero || !!heroTemplate(look.hero);
-  if (!heroReady) loadHero(look.hero).catch(() => {});
-  const key = 'p:' + JSON.stringify(look);
+  const id = heroOf(look);
+  const info = heroes.byId.get(id);
+  // портреты запечены заранее (tools/bake-icons.cjs --faces): ради значка модель героя грузить не приходится
+  if (info && info.face) return info.face;
+  if (id && !heroTemplate(id)) {
+    // запечённого портрета нет — снимем с модели, когда она загрузится (до тех пор значок пустой)
+    loadHero(id).catch(() => {});
+    return BLANK;
+  }
+  if (!id && !heroes.ready) return BLANK;
+  const key = 'p:' + id;
   if (cache.has(key)) return cache.get(key);
+  const url = faceShot(look);
+  if (cache.size > 400) cache.clear();
+  cache.set(key, url);
+  return url;
+}
+/** Снимок лица с модели (герой должен быть загружен; нет героев вовсе — снимается запасная кукла). */
+export function faceShot(look) {
   setup();
   const c = new Character(look);
   c.update(0.016, { mode: 'idle', snap: true });
   c.group.rotation.y = -0.22;
-  const hy = (0.84 + 0.505 + 0.18) * c.look.height;
-  persp.position.set(0, hy + 0.04, 1.42);
-  persp.lookAt(0, hy + 0.035, 0);
+  // целимся в голову: у героя — по кости головы (шляпы и рост у всех разные), у куклы — по её росту
+  const head = c.hero ? c.hero.tpl.at.head.y * c.look.height + 0.115 : (0.84 + 0.505 + 0.18) * c.look.height;
+  persp.position.set(0, head + 0.04, 1.42);
+  persp.lookAt(0, head + 0.035, 0);
   const url = shoot(c.group, persp);
   c.dispose();
-  if (cache.size > 400) cache.clear();
-  if (heroReady) cache.set(key, url);
   return url;
 }
 

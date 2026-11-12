@@ -2,6 +2,7 @@
 // Игра должна быть запущена локально (PORT, по умолчанию 3111).
 //   node tools/bake-icons.cjs                 — значки для всех моделей из manifest.json
 //   node tools/bake-icons.cjs --sheet лист.png [id…]   — лист «сбоку / три четверти / сверху» для проверки, без записи значков
+//   node tools/bake-icons.cjs --faces [id…]          — портреты героев (экран «Персонаж», список друзей): ради значка модель грузить не придётся
 const { chromium } = require(process.env.PLAYWRIGHT || '/opt/npm-tools/node_modules/playwright');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -13,6 +14,7 @@ const args = process.argv.slice(2);
 const si = args.indexOf('--sheet');
 const sheet = si >= 0 ? args[si + 1] : null;
 const ids = args.filter((a, i) => !a.startsWith('--') && !(si >= 0 && i === si + 1));
+const faces = args.includes('--faces');
 
 (async () => {
   const manifest = JSON.parse(fs.readFileSync(manPath, 'utf8'));
@@ -23,7 +25,17 @@ const ids = args.filter((a, i) => !a.startsWith('--') && !(si >= 0 && i === si +
   await page.goto(`http://127.0.0.1:${process.env.PORT || 3111}/?q=low&norender`);
   await page.waitForFunction(() => window.RYBAK && window.RYBAK.modelShot, null, { timeout: 60000 });
   const shot = async (id, view) => Buffer.from((await page.evaluate(([id, view]) => RYBAK.modelShot(id, view), [id, view])).split(',')[1], 'base64');
-  if (sheet) {
+  if (faces) {
+    fs.mkdirSync(path.join(OUT, 'icons'), { recursive: true });
+    const heroes = manifest.heroes.filter((h) => !h.npc && (!ids.length || ids.includes(h.id)));
+    for (const h of heroes) {
+      const png = Buffer.from((await page.evaluate((id) => RYBAK.faceShot(id), h.id)).split(',')[1], 'base64');
+      await sharp(png).resize(256, 256).webp({ quality: 90, alphaQuality: 92 }).toFile(path.join(OUT, 'icons', `${h.id}.webp`));
+      h.face = `models/icons/${h.id}.webp`;
+    }
+    fs.writeFileSync(manPath, JSON.stringify(manifest, null, 2));
+    console.log('портреты:', heroes.map((h) => h.id).join(', '));
+  } else if (sheet) {
     const cell = 200;
     const views = ['side', 'three', 'top'];
     const comp = [];
