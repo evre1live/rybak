@@ -4,6 +4,10 @@
 // по весам костей. Кости рук ставим «от кисти к плечу»: кулак — на рукоять удилища (или на ручку катушки),
 // предплечье уходит к локтю за нижний край кадра, плечо — ещё дальше. Так рукава, перчатки и кожа всегда те же,
 // что у выбранного героя, без отдельных моделей рук.
+//
+// Рука рисуется целиком, до самого плечевого сустава. У героев Tripo плечо привязано не только к своей кости,
+// но и к ключице (у Пипа — по всей длине, до локтя), поэтому ключица тоже входит в «руку» и жёстко идёт
+// за плечом. Без этого плечо отбрасывалось, и рука обрывалась у локтя прямо в кадре.
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { HERO_TONE } from './hero.js';
@@ -18,6 +22,7 @@ const E = new THREE.Vector3();
 const S = new THREE.Vector3();
 const T = new THREE.Vector3();
 const m4 = new THREE.Matrix4();
+const mA = new THREE.Matrix4();
 const qF = new THREE.Quaternion();
 const qH = new THREE.Quaternion();
 const qU = new THREE.Quaternion();
@@ -44,18 +49,23 @@ export class FpArms {
     this.L2 = tpl.at.eR.distanceTo(tpl.at.hR) * k;
     const b = (this.b = {});
     for (const k of ['aL', 'eL', 'hL', 'aR', 'eR', 'hR']) b[k] = model.getObjectByName(tpl.names[k]);
-    // всё, что выше плеча, стоит как в исходной позе: запоминаем, как из осей персонажа попасть в оси родителя плечевой кости
+    // Ключица (родитель плечевой кости) идёт за плечом как приклеенная: плечо относительно неё стоит как в исходной
+    // позе. Всё, что выше ключицы, остаётся на месте — запоминаем, как из осей персонажа попасть в оси её родителя.
     space.updateMatrixWorld(true);
     const inv = new THREE.Matrix4().copy(space.matrixWorld).invert();
     this.par = {};
     for (const s of ['L', 'R']) {
-      const rel = new THREE.Matrix4().multiplyMatrices(inv, b['a' + s].parent.matrixWorld);
-      const pq = new THREE.Quaternion();
-      rel.decompose(new THREE.Vector3(), pq, new THREE.Vector3());
-      this.par[s] = { inv: rel.clone().invert(), qInv: pq.invert() };
+      const a = b['a' + s];
+      const sh = a.parent;
+      const up = sh.parent ? new THREE.Matrix4().multiplyMatrices(inv, sh.parent.matrixWorld) : new THREE.Matrix4();
+      const scale = new THREE.Vector3();
+      new THREE.Matrix4().multiplyMatrices(inv, a.matrixWorld).decompose(new THREE.Vector3(), new THREE.Quaternion(), scale);
+      this.par[s] = { sh, upInv: up.invert(), aInv: new THREE.Matrix4().compose(a.position, a.quaternion, a.scale).invert(), scale };
     }
-    // от модели оставляем только руки
+    // От модели оставляем только руки. Вес ключицы засчитывается руке (у героев Tripo плечо привязано и к ней),
+    // но только там, где есть и вес самой руки: иначе вместе с плечом рисовался бы кусок груди и воротника.
     const mask = new Float32Array(64);
+    const maskSh = new Float32Array(64);
     model.traverse((o) => {
       if (!o.isSkinnedMesh) return;
       const bones = o.skeleton.bones;
@@ -65,6 +75,7 @@ export class FpArms {
         let n = bones[i];
         while (n && !arm.has(n)) n = n.parent && n.parent.isBone ? n.parent : null;
         mask[i] = n ? 1 : 0;
+        maskSh[i] = bones[i] === b.aL.parent || bones[i] === b.aR.parent ? 1 : 0;
       }
       o.frustumCulled = false;
       o.castShadow = false;
@@ -72,22 +83,46 @@ export class FpArms {
       const m = (o.material = src.clone());
       m.onBeforeCompile = (sh) => {
         sh.uniforms.uArmMask = { value: mask };
+        sh.uniforms.uShMask = { value: maskSh };
+        // Вершина руки привязывается только к костям руки и ключицы (веса пересчитываются на них): доля туловища,
+        // которое осталось стоять где-то в стороне, растягивала бы плечо в клочья.
         sh.vertexShader = sh.vertexShader
-          .replace('#include <common>', '#include <common>\nuniform float uArmMask[64];\nvarying float vArm;')
+          .replace('#include <common>', '#include <common>\nuniform float uArmMask[64];\nuniform float uShMask[64];\nvarying float vArm;')
+          .replace(
+            '#include <skinbase_vertex>',
+            `#include <skinbase_vertex>
+            ivec4 armI = ivec4(skinIndex);
+            vec4 armM = vec4(uArmMask[armI.x], uArmMask[armI.y], uArmMask[armI.z], uArmMask[armI.w]);
+            vec4 armK = armM + vec4(uShMask[armI.x], uShMask[armI.y], uShMask[armI.z], uShMask[armI.w]);
+            float armW = dot(skinWeight, armM);
+            float armA = dot(skinWeight, armK);
+            vec4 armSW = skinWeight * armK / max(armA, 1e-4);
+            vArm = armA * smoothstep(0.22, 0.34, armW);`
+          )
+          .replace(
+            '#include <skinnormal_vertex>',
+            `mat4 skinMatrix = bindMatrixInverse * (armSW.x * boneMatX + armSW.y * boneMatY + armSW.z * boneMatZ + armSW.w * boneMatW) * bindMatrix;
+            objectNormal = vec4(skinMatrix * vec4(objectNormal, 0.0)).xyz;
+            #ifdef USE_TANGENT
+              objectTangent = vec4(skinMatrix * vec4(objectTangent, 0.0)).xyz;
+            #endif`
+          )
           .replace(
             '#include <skinning_vertex>',
-            '#include <skinning_vertex>\nvArm = dot(skinWeight, vec4(uArmMask[int(skinIndex.x)], uArmMask[int(skinIndex.y)], uArmMask[int(skinIndex.z)], uArmMask[int(skinIndex.w)]));'
+            `vec4 skinVertex = bindMatrix * vec4(transformed, 1.0);
+            vec4 skinned = boneMatX * skinVertex * armSW.x + boneMatY * skinVertex * armSW.y + boneMatZ * skinVertex * armSW.z + boneMatW * skinVertex * armSW.w;
+            transformed = (bindMatrixInverse * skinned).xyz;`
           );
         sh.fragmentShader = sh.fragmentShader
           .replace('#include <common>', '#include <common>\nvarying float vArm;')
-          .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\nif (vArm < 0.97) discard;')
+          .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\nif (vArm < 0.6) discard;')
           .replace(
             '#include <roughnessmap_fragment>',
             'float roughnessFactor = roughness;\n#ifdef USE_ROUGHNESSMAP\n  roughnessFactor *= mix(0.55, 1.0, texture2D(roughnessMap, vRoughnessMapUv).g);\n#endif'
           )
           .replace('#include <color_fragment>', '#include <color_fragment>\n' + HERO_TONE);
       };
-      m.customProgramCacheKey = () => 'hero-fp2';
+      m.customProgramCacheKey = () => 'hero-fp5';
     });
   }
 
@@ -139,12 +174,12 @@ export class FpArms {
     basis(Z2, Y2, Z, qU);
     // мировые (в осях персонажа) ориентации костей → локальные
     const par = this.par[s];
-    const a = b['a' + s];
     const e = b['e' + s];
     const h = b['h' + s];
-    a.position.copy(S).applyMatrix4(par.inv);
     qU.multiply(c['a' + s]);
-    a.quaternion.copy(par.qInv).multiply(qU);
+    // ключица встаёт так, чтобы плечо (оно при ней в исходной позе) оказалось где нужно
+    mA.compose(S, qU, par.scale).multiply(par.aInv).premultiply(par.upInv);
+    mA.decompose(par.sh.position, par.sh.quaternion, par.sh.scale);
     qF.multiply(c['e' + s]);
     e.quaternion.copy(q.copy(qU).invert()).multiply(qF);
     qH.multiply(c['h' + s]);

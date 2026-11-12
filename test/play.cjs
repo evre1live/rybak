@@ -223,12 +223,32 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
       await mp.waitForFunction(() => { const st = RYBAK.world.scenery.propsState(); return !st.fallback && st.placed >= 20 && st.floaters >= 5; }, null, { timeout: 120000 });
       // руки от первого лица — руки героя
       await mp.waitForFunction(() => RYBAK.vm.arms && RYBAK.vm.arms.b.hR && RYBAK.vm.hands.every((h) => !h.visible), null, { timeout: 60000 });
+      // рука героя рисуется целиком, до плеча: ключица идёт за плечом как приклеенная, а плечевой сустав — за кадром
+      // (раньше у Пипа плечо отбрасывалось, и рука обрывалась у локтя прямо на экране)
+      const armAt = () => G(mp, () => {
+        const g = RYBAK; const a = g.vm.arms; g.scene.updateMatrixWorld(true);
+        const V = a.b.aL.position.constructor; const out = {};
+        for (const s of ['L', 'R']) {
+          const p = a.b['a' + s].getWorldPosition(new V()); const q = a.b['a' + s].parent.getWorldPosition(new V());
+          const n = p.clone().project(g.camera);
+          out[s] = { d: p.distanceTo(q), off: n.z > 1 || Math.abs(n.x) > 1 || n.y < -1 };
+        }
+        return out;
+      });
+      const arm0 = await armAt();
       for (const sp of ['okun', 'skat', 'chest']) {
         await G(mp, (sp) => { RYBAK.ui.closePanel(); RYBAK.fishing.showCatch(sp, 0.5); }, sp);
         await mp.waitForFunction((id) => RYBAK.fishing.fish && (RYBAK.fishing.fish.userData.model === id || (RYBAK.fishing.fish.children[0] && RYBAK.fishing.fish.children[0].userData.model === id) || RYBAK.fishing.fish.userData.model === id), (sp === 'chest' ? 'junk-' : 'fish-') + sp, { timeout: 60000 });
         // рыба долетает до рук, за ней загорается сияние
         await mp.waitForFunction(() => !RYBAK.fishing.fly && RYBAK.fishing.fish.parent === RYBAK.vm.fishSlot && RYBAK.vm.auraMesh.visible, null, { timeout: 30000 });
-        if (sp === 'okun') await shot(mp, '22-model-fish', 400);
+        if (sp === 'okun') {
+          await shot(mp, '22-model-fish', 400);
+          const arm1 = await armAt();
+          for (const sd of ['L', 'R']) {
+            assert.ok(Math.abs(arm1[sd].d - arm0[sd].d) < 1e-3, `ключица ${sd} идёт за плечом: ${arm0[sd].d.toFixed(4)} → ${arm1[sd].d.toFixed(4)}`);
+            assert.ok(arm0[sd].off && arm1[sd].off, `плечевой сустав ${sd} за кадром — обрыва руки не видно`);
+          }
+        }
         await G(mp, () => RYBAK.fishing.finish(false));
       }
       // значки из готовых моделей — обычные картинки, которые действительно загружаются
