@@ -159,13 +159,33 @@ kbd.g{background:#1b3566;color:#fff;box-shadow:0 .14em 0 #0a1a33}
 .tbar .ok{width:56%;background:var(--cy)}
 .tbar .dg{width:22%;background:repeating-linear-gradient(-55deg,#f04438 0 .5em,#d92d20 .5em 1em);color:#fff;border-radius:0 1.4em 1.4em 0}
 .tbar .dg .ic{color:var(--ye);width:1.1em;height:1.1em}
+/* особые зоны шкалы: в свече «опасно» начинается раньше; залёгшую рыбу отрывают у верхней границы нормы; тяжеловес не идёт на вялой леске */
+.tz{position:absolute;top:0;bottom:0;display:none;align-items:center;justify-content:center;pointer-events:none;overflow:hidden;white-space:nowrap}
+.tz.jump{left:62%;width:16%;background:repeating-linear-gradient(-55deg,#f04438 0 .5em,#d92d20 .5em 1em);color:#fff;font-size:.72em;box-shadow:-.16em 0 0 #fff;animation:tzpulse .25s ease-in-out infinite alternate}
+.tz.lift{left:60%;width:18%;background:#0e2a52;color:#fff;font-size:.78em;box-shadow:0 0 0 .14em var(--ye),0 0 1em rgba(255,214,10,.9)}
+.tz.lift i{position:absolute;inset:0;background:var(--ye);transform-origin:0 50%;transform:scaleX(0);will-change:transform}
+.tz.lift b{position:relative;color:#fff;text-shadow:0 1px 0 var(--ink),0 0 .3em var(--ink)}
+.tz.slack{left:22%;width:28%;background:rgba(10,26,51,.55);color:rgba(255,255,255,.75);font-size:.72em}
+.tbar.air .tz.jump,.tbar.stuck .tz.lift,.tbar.bull .tz.slack{display:flex}
+.tbar.bull .ok{padding-left:28%}
+.tbar.stuck .ok,.tbar.air .ok{color:transparent}
+@keyframes tzpulse{to{filter:brightness(1.35)}}
 /* стрелка натяжения: двигается сдвигом (transform), без раскладки страницы и без сглаживающей задержки — иначе она отстаёт и дёргается */
 #tptr{position:absolute;bottom:-.95em;left:0;width:100%;height:0;pointer-events:none;will-change:transform}
 #tptr::after{content:"";position:absolute;left:-.55em;bottom:0;width:0;height:0;border:.55em solid transparent;border-bottom:.95em solid #fff;border-top:0;filter:drop-shadow(0 1px 0 var(--ink)) drop-shadow(0 -1px 0 var(--ink))}
 .fpanel.shake{animation:shake .08s linear infinite}
 @keyframes shake{25%{transform:translate(2px,-1px)}75%{transform:translate(-2px,1px)}}
 .prow{display:flex;align-items:center;gap:.8em;margin-top:1.3em;font-family:var(--disp);font-weight:900;font-style:italic;font-size:1.25em}
-.pbar{flex:1;height:.85em;border-radius:.5em;background:#0a1a33;border:1px solid rgba(120,190,255,.3);overflow:hidden}
+.pbar{flex:1;height:.85em;border-radius:.5em;background:#0a1a33;border:1px solid rgba(120,190,255,.3);overflow:hidden;position:relative}
+/* легенда: отметки, где она соберётся с силами, и сколько «дыханий» у неё осталось */
+.pbar .pm{display:none;position:absolute;top:0;bottom:0;width:.22em;margin-left:-.11em;background:var(--red);box-shadow:0 0 .4em var(--red)}
+.pbar.boss .pm{display:block}.pbar .pm.used{background:rgba(255,255,255,.35);box-shadow:none}
+#fboss{display:none;width:auto!important;gap:.25em;font-size:1em!important}
+#fboss.on{display:inline-flex}
+#fboss i{width:.7em;height:.7em;background:var(--red);transform:rotate(45deg);border-radius:.12em;box-shadow:0 0 .5em var(--red)}
+#fboss i.used{background:rgba(255,255,255,.25);box-shadow:none}
+#ftip{margin-top:.6em;text-align:center;font-size:1.02em;color:#cfe3ff;min-height:1.3em}
+#ftip b{font-family:var(--disp);font-weight:900;font-style:italic;color:var(--ye);margin-right:.5em;letter-spacing:.02em}
 .pbar i{display:block;height:100%;width:0;background:var(--cy);border-radius:.5em}
 /* полоса вываживания меняется каждый кадр — она растёт растяжением (transform), без раскладки страницы; остальные полосы — обычной шириной */
 #pfill{width:100%;border-radius:0;transform-origin:0 50%;transform:scaleX(0);will-change:transform}

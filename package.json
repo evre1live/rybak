@@ -15,6 +15,7 @@
     "balance": "node tools/balance.js",
     "test:devices": "node test/devices.cjs",
     "test:warm": "node test/warm.cjs",
+    "test:music": "node test/music.cjs",
     "solo": "node tools/artifact.js"
   },
   "engines": {

@@ -27,8 +27,8 @@ export class FishLine {
   hide() {
     this.line.visible = false;
   }
-  /** a — кончик удочки, b — поплавок; sag — провис в метрах; floor — ниже воды не опускаться */
-  set(a, b, sag = 0.3, floor = 0.02) {
+  /** a — кончик удочки, b — поплавок; sag — провис в метрах; floor — ниже воды не опускаться; wob — дрожь натянутой лески (метры), t — время */
+  set(a, b, sag = 0.3, floor = 0.02, wob = 0, t = 0) {
     const arr = this.arr;
     let px = a.x;
     let py = a.y;
@@ -38,6 +38,7 @@ export class FishLine {
       const x = a.x + (b.x - a.x) * u;
       const z = a.z + (b.z - a.z) * u;
       let y = a.y + (b.y - a.y) * u - sag * 4 * u * (1 - u);
+      if (wob) y += Math.sin(u * 12.6 + t * 58) * Math.sin(Math.PI * u) * wob;
       if (u < 1 && y < floor) y = floor;
       const k = i * 6;
       arr[k] = px;

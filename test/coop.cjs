@@ -123,7 +123,7 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
       if (f.state === 'idle') { i.primary = true; i.pressed.add('Primary'); }
       else if (f.state === 'charge') { if (f.power > 0.9) i.primary = false; }
       else if (f.state === 'bite') { i.pressed.add('Primary'); }
-      else if (f.state === 'fight') { const s = f.fight; const run = s.phase === 'run'; i.primary = s.T < (run ? 0.5 : s.warned ? 0.42 : 0.64); i.keys.delete('KeyA'); i.keys.delete('KeyD'); if (run && s.dir) i.keys.add(s.dir > 0 ? 'KeyA' : 'KeyD'); }
+      else if (f.state === 'fight') { const s = f.fight; const run = s.phase === 'run'; i.primary = s.T < (s.jumpT > 0 ? 0.45 : s.stuck ? 0.72 : run ? 0.5 : s.warned ? 0.42 : 0.64); i.keys.delete('KeyA'); i.keys.delete('KeyD'); if (run && s.dir) i.keys.add(s.dir > 0 ? 'KeyA' : 'KeyD'); }
       else if (f.state === 'landed') { i.primary = false; if (f.landT > 2.5) i.pressed.add('Primary'); }
       else i.primary = false;
     }, 30);

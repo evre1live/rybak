@@ -229,7 +229,7 @@ export class Player {
     // горизонт чуть кренится вместе с лодкой — куда бы ни смотрел
     const a = this.yaw - b.yaw;
     this.camera.rotation.set(this.pitch, this.yaw, (b.vis.roll * Math.cos(a) + b.vis.pitch * Math.sin(a)) * 0.6, 'YXZ');
-    const fov = settings.fov + 6 * k;
+    const fov = settings.fov + 6 * k - (this.zoom || 0);
     if (Math.abs(this.camera.fov - fov) > 0.02) {
       this.camera.fov = fov;
       this.camera.updateProjectionMatrix();
@@ -326,7 +326,7 @@ export class Player {
     this.camera.position.set(this.x + (Math.random() - 0.5) * sh, this.y + this.eyeNow + this.jump - bob + (Math.random() - 0.5) * sh, this.z);
     this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
     // на бегу поле зрения чуть шире — скорость чувствуется
-    const fov = settings.fov + 7 * this.run * Math.min(1, this.speed / RUN);
+    const fov = settings.fov + 7 * this.run * Math.min(1, this.speed / RUN) - (this.zoom || 0);
     if (Math.abs(this.camera.fov - fov) > 0.02) {
       this.camera.fov = fov;
       this.camera.updateProjectionMatrix();

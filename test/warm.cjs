@@ -105,6 +105,7 @@ const tier = process.argv[2] || 'medium';
         // проверяем прогрев, а не умение вываживать: кадры здесь идут по секунде, и леска рвалась бы сама
         s.strain = 0;
         s.slack = 0;
+        s.stuck = 0; // залёгшую рыбу здесь не отрываем — просто не даём залечь
         s.T = Math.min(0.7, Math.max(0.3, s.T));
         i.primary = s.T < 0.55;
       } else if (f.state !== 'wait') i.primary = false;
@@ -155,6 +156,17 @@ const tier = process.argv[2] || 'medium';
   assert.equal(inst, 'fish-' + sp, 'загруженная модель встаёт сразу, без процедурной заглушки');
   await frame(2);
   await mark('показ улова из загруженных');
+  // улов на леске (без подсака) и в подсаке: сетка, её рукоять и леска показа собраны заранее — новых шейдеров нет
+  for (const net of [false, true]) {
+    await p.evaluate(([sp, net]) => { const f = RYBAK.fishing; f.kit.net = net; f.showCatch(sp, 0.5); }, [sp, net]);
+    await p.waitForFunction(() => !RYBAK.fishing.fly, null, { timeout: 60000 });
+    await frame(3);
+    const on = await p.evaluate(() => ({ net: RYBAK.vm.net.group.visible, line: RYBAK.vm.hangLine.line.visible }));
+    assert.deepEqual(on, { net, line: !net }, `показ улова ${net ? 'в подсаке' : 'на леске'}: ${JSON.stringify(on)}`);
+    await mark(net ? 'улов в подсаке' : 'улов на леске');
+    await p.evaluate(() => { RYBAK.fishing.toIdle(); RYBAK.ui.catchCard(null); RYBAK.fishing.refreshGear(); });
+    await frame(2);
+  }
 
   // ночь в бухте, непогода
   await p.evaluate(() => { RYBAK.fixedHour = 23; });

@@ -1,12 +1,13 @@
 // Рыбалка игрока: прицел и заброс, поплавок, поклёвка, подсечка, вываживание, улов.
 import * as THREE from 'three';
 import { ITEMS, FISH_BY_ID, JUNK_BY_ID, RARITY, isLure } from '../shared/data.js';
-import { kitStats, biteDelay, rollFish, fightInit, fightStep, spendTackle, addCatch, recordCatch, activity, T_DANGER, T_LOW } from '../shared/logic.js';
+import { kitStats, biteDelay, rollFish, fightInit, fightStep, dangerAt, spendTackle, addCatch, recordCatch, activity, T_DANGER, T_LOW } from '../shared/logic.js';
 import { spotAt } from './terrain.js';
 import { waveH } from './water.js';
 import { buildFloat, buildLure } from './gear3d.js';
 import { buildFish, wiggleFish } from './fish3d.js';
 import { FishLine } from './line.js';
+import { HANG_K } from './viewmodel.js';
 import { clamp, damp, lerp, angDiff } from './util.js';
 import { FS, FLAG } from './proto.js';
 
@@ -123,8 +124,20 @@ export class Fishing {
       this.fish = null;
     }
     this.fly = null;
+    this.shown = null;
     this.drip = 0;
+    this.kick = 0;
+    this.big = 0;
     this.vm.setAura(null);
+    this.vm.present(null);
+  }
+  /** Шум у самой наживки (рядом плюхнулась чужая снасть): выслеженная рыба уходит, клюнет теперь нескоро и кто придётся. */
+  spook() {
+    if (this.state !== 'wait' || !this.big) return false;
+    this.big = 0;
+    this.spot.big = 0;
+    this.biteLeft += 3 + Math.random() * 3;
+    return true;
   }
   /** Смотать леску (отмена). */
   reelIn(silent) {
@@ -204,8 +217,14 @@ export class Fishing {
         this.bob.rotation.set(0, 0, 0);
         this.dip = -0.35;
         this.fx.splash(this.bx, this.bz, 0.45);
+        // Рядом ходит крупная рыба (тень в воде)? Заметит наживку — дальше подойдёт и клюнет именно она, скоро и не мелкая.
+        // Плюхнули прямо на неё — испугается и уйдёт.
+        const seen = this.stalk ? this.stalk(this.bx, this.bz) : null;
+        this.big = seen && !seen.spooked ? Math.max(0.05, seen.big) : 0;
+        this.spot.big = this.big;
         this.startBite();
-        this.emit('land', { x: this.bx, z: this.bz, zone: this.spot.zone, hot: this.spot.hot, short: this.short });
+        if (this.big) this.biteLeft = Math.min(this.biteLeft, 3.2 + Math.random() * 3);
+        this.emit('land', { x: this.bx, z: this.bz, zone: this.spot.zone, hot: this.spot.hot, short: this.short, big: this.big, spooked: !!(seen && seen.spooked) });
       }
     } else if (st === 'wait' || st === 'bite') {
       const dx = this.bx - player.x;
@@ -230,6 +249,18 @@ export class Fishing {
             return;
           }
           s.hot = this.schools.isHot(this.bx, this.bz);
+          // блесна прошла мимо крупной рыбы — та бросается следом
+          this.stalkT = (this.stalkT || 0) - dt;
+          if (!this.big && this.stalk && this.stalkT <= 0) {
+            this.stalkT = 0.25;
+            const seen = this.stalk(this.bx, this.bz, 2.6, true);
+            if (seen) {
+              this.big = Math.max(0.05, seen.big);
+              this.biteLeft = Math.min(this.biteLeft, 0.9 + Math.random() * 1.2);
+              this.emit('stalk', { big: this.big });
+            }
+          }
+          s.big = this.big;
           this.spot = s;
           if (Math.random() < dt * 5) this.fx.ripple(this.bx, this.bz, 0.35, 0.7);
         }
@@ -280,19 +311,35 @@ export class Fishing {
       const f = this.fight;
       const evs = fightStep(f, { reel: input.hold, steer: input.steer }, dt, this.kit, Math.random);
       this.reeling = input.hold;
-      // рыба ходит под водой: ближе по мере вываживания, в рывке уходит вбок
+      const sty = f.style;
+      const run = f.phase === 'run';
+      const wide = sty === 'runner' || sty === 'snag';
+      // Рыба ходит под водой: ближе по мере вываживания, в рывке уходит вбок. Путь для картинки сглажен:
+      // когда легенда собралась с силами и забрала часть лески, она уносится назад броском, а не перескакивает.
+      this.fp = damp(this.fp, f.p, 5, dt);
       const near = this.minD + 0.2;
-      const d = near + (this.startDist - near) * (1 - f.p);
-      this.side = damp(this.side, f.phase === 'run' ? f.dir * Math.min(4, d * 0.4) : Math.sin(this.t * 0.9) * 0.6, 2.2, dt);
-      const fx = player.x + this.hx * d + -this.hz * this.side;
-      const fz = player.z + this.hz * d + this.hx * this.side;
-      let fy = -0.28;
-      if (this.jumpT > 0) {
+      const d = near + (this.startDist - near) * (1 - this.fp);
+      // вбок: бегун и хитрец уходят дальше и быстрее, тяжеловес ходит медленными дугами, залёгшая стоит на месте
+      const sway = f.stuck ? this.side : run ? f.dir * Math.min(wide ? 6 : 4, d * (wide ? 0.55 : 0.4)) : Math.sin(this.t * (sty === 'bulldog' ? 0.5 : 0.9)) * (sty === 'bulldog' ? 1.1 : 0.6);
+      this.side = damp(this.side, sway, wide && run ? 3 : 2.2, dt);
+      const jit = sty === 'thrash' ? Math.sin(this.t * 21) * 0.06 * (run ? 1.6 : 1) : 0; // трясун мотает головой
+      const fx = player.x + this.hx * d - this.hz * (this.side + jit);
+      const fz = player.z + this.hz * d + this.hx * (this.side + jit);
+      // глубина: залёгшая лежит на дне, тяжеловес ходит низом, в рывке рыба идёт под самой поверхностью
+      this.deep = damp(this.deep, f.stuck ? -0.8 : sty === 'bulldog' && !run ? -0.5 : run ? -0.18 : -0.28, 4, dt);
+      let fy = this.deep;
+      const air = this.jumpT > 0;
+      if (air) {
         this.jumpT -= dt;
         const u = 1 - this.jumpT / 0.75;
-        fy = -0.28 + Math.sin(Math.PI * u) * (0.75 + this.fishLen * 0.35);
+        fy = this.deep + Math.sin(Math.PI * u) * (0.75 + this.fishLen * 0.35) * (sty === 'jumper' ? 1.3 : 1);
         this.fish.rotation.z = Math.cos(Math.PI * u) * 0.9;
-        if (this.jumpT <= 0) this.fx.splash(fx, fz, 0.9);
+        this.fish.rotation.x = sty === 'jumper' ? Math.sin(Math.PI * u) * 1.2 : 0; // прыгун в воздухе ложится на бок
+        if (Math.random() < dt * 40) this.fx.drip(fx, fy + waveH(fx, fz, t), fz, 1, 0.1 + this.fishLen * 0.15);
+        if (this.jumpT <= 0) {
+          this.fish.rotation.x = 0;
+          this.fx.splash(fx, fz, 0.9 + Math.min(0.6, this.fishLen * 0.3));
+        }
       } else this.fish.rotation.z = damp(this.fish.rotation.z, 0, 6, dt);
       const pxp = this.bx;
       const pzp = this.bz;
@@ -301,13 +348,31 @@ export class Fishing {
       this.by = fy + waveH(fx, fz, t);
       this.fish.position.set(fx, this.by, fz);
       // голова модели смотрит в −X: поворачиваем по ходу движения
-      if (Math.hypot(fx - pxp, fz - pzp) > 0.002) this.fish.rotation.y += angDiff(this.fish.rotation.y, Math.atan2(fz - pzp, -(fx - pxp))) * (1 - Math.exp(-6 * dt));
-      wiggleFish(this.fish, this.t, f.phase === 'run' ? 1.6 : 0.9);
-      this.wakeT -= dt;
-      if (this.wakeT <= 0) {
-        this.wakeT = f.phase === 'run' ? 0.12 : 0.4;
-        this.fx.ripple(fx, fz, f.phase === 'run' ? 0.7 : 0.4, 0.9);
+      const step = Math.hypot(fx - pxp, fz - pzp);
+      if (step > 0.002) this.fish.rotation.y += angDiff(this.fish.rotation.y, Math.atan2(fz - pzp, -(fx - pxp))) * (1 - Math.exp(-6 * dt));
+      wiggleFish(this.fish, this.t, f.stuck ? 0.25 : run ? 1.6 : sty === 'thrash' ? 1.3 : 0.9);
+      this.vm.tipWorld(tip);
+      if (!air) {
+        this.wakeT -= dt;
+        if (this.wakeT <= 0) {
+          this.wakeT = run ? 0.1 : f.stuck ? 0.8 : 0.4;
+          this.fx.ripple(fx, fz, run ? 0.7 : f.stuck ? 0.22 : 0.4, 0.9);
+          // в рывке рыба идёт под самой поверхностью — за ней остаётся пенный след
+          if (run) this.fx.wake(fx, fz, 0.2 + this.fishLen * 0.2, 1.3);
+        }
+        // леска режет воду: у точки входа летят брызги, назад по ходу рыбы
+        if (run && step > 0.004 && Math.random() < dt * 34) {
+          const k = Math.min(3, step / Math.max(dt, 0.004)) * 0.35;
+          this.fx.drop(fx, 0.04, fz, (-(fx - pxp) / step) * k + (Math.random() - 0.5) * 0.5, 0.7 + Math.random() * 0.9, (-(fz - pzp) / step) * k + (Math.random() - 0.5) * 0.5, 0.028 + Math.random() * 0.02, 0.6);
+        }
       }
+      const hot = f.T > dangerAt(f);
+      // леска на пределе: с неё срывает капли
+      if (hot && Math.random() < dt * 26) {
+        const u = 0.25 + Math.random() * 0.7;
+        this.fx.drop(lerp(tip.x, fx, u), lerp(tip.y, 0.05, u), lerp(tip.z, fz, u), (Math.random() - 0.5) * 0.9, 0.3 + Math.random() * 0.8, (Math.random() - 0.5) * 0.9, 0.018 + Math.random() * 0.014, 0.5);
+      }
+      this.kick -= Math.sign(this.kick) * Math.min(Math.abs(this.kick), dt * 3.2);
       for (const e of evs) {
         if (e === 'jump') {
           this.jumpT = 0.75;
@@ -315,10 +380,29 @@ export class Fishing {
           this.emit('jump', { x: fx, z: fz });
         } else if (e === 'run') {
           this.fx.splash(fx, fz, 0.6);
+          this.kick = Math.max(this.kick, 0.55);
           this.emit('run', { dir: f.dir });
         } else if (e === 'warn') this.emit('warn');
         else if (e === 'calm') this.emit('calm');
-        else if (e === 'landed') return this.land();
+        else if (e === 'rage') {
+          // легенда собралась с силами: вода вскипает, леска уходит обратно
+          this.fx.splash(fx, fz, 1.6);
+          this.fx.ripple(fx, fz, 3.4, 2.2, 0.25);
+          this.fx.ripple(fx, fz, 4.6, 2.8, 0.5);
+          this.kick = 1;
+          this.emit('rage', { left: f.boss, x: fx, z: fz });
+        } else if (e === 'stuck') {
+          this.fx.ripple(fx, fz, 0.9, 1.6);
+          this.emit('stuck');
+        } else if (e === 'unstuck') {
+          this.fx.splash(fx, fz, 0.7);
+          this.kick = Math.max(this.kick, 0.4);
+          this.emit('unstuck');
+        } else if (e === 'wrap') {
+          this.fx.splash(fx, fz, 0.5);
+          this.kick = Math.max(this.kick, 0.8);
+          this.emit('wrap');
+        } else if (e === 'landed') return this.land();
         else if (e === 'snap' || e === 'escape') {
           if (e === 'snap') p.stats.snaps++;
           else p.stats.escapes++;
@@ -329,51 +413,75 @@ export class Fishing {
             if (r.switched) this.bobId = null;
           }
           this.fx.splash(fx, fz, 0.8);
-          this.emit('lost', { why: e, sp: this.catch.sp, w: this.catch.w, lostLure });
+          this.emit('lost', { why: e, sp: this.catch.sp, w: this.catch.w, lostLure, style: sty, air: f.jumpT > 0, wrapped: f.wrapped });
           this.toIdle();
           this.refreshGear();
           return;
         }
       }
-      this.vm.tipWorld(tip);
       end.set(fx, Math.max(this.by + 0.05, -0.05), fz);
-      this.line.set(tip, end, f.T < T_LOW ? 0.5 : 0.02, -5);
+      this.line.set(tip, end, f.T < T_LOW ? 0.5 : 0.02, -5, hot ? 0.014 : sty === 'thrash' ? 0.007 : 0, this.t);
     } else if (st === 'landed') {
       this.landT += dt;
+      const sh = this.shown;
+      const fish = this.fish;
       if (this.fly) {
-        // полёт: из воды по дуге к рукам, с вращением и шлейфом капель
         const fl = this.fly;
         fl.t += dt;
-        const e = Math.min(1, fl.t / 0.46);
-        const k = e * e * (3 - 2 * e);
-        this.vm.fishSlot.getWorldPosition(tip);
-        const p = this.fish.position;
-        p.lerpVectors(fl.from, tip, k);
-        p.y += Math.sin(e * Math.PI) * (0.8 + fl.from.distanceTo(tip) * 0.06);
-        this.fish.scale.setScalar(fl.s0 + (fl.s1 - fl.s0) * k);
-        this.fish.rotation.set(0, e * 9, (1 - e) * 1.2);
-        this.fx.drip(p.x, p.y, p.z, 2, 0.08);
-        wiggleFish(this.fish, this.t, 1.4);
-        if (e >= 1) {
-          this.scene.remove(this.fish);
-          this.fish.scale.setScalar(fl.s1);
-          this.fish.position.set(0, 0, 0);
-          this.fish.rotation.set(0, 0, 0);
-          this.vm.fishSlot.add(this.fish);
-          if (fl.rar >= 0) this.vm.setAura(RARITY[fl.rar].color, fl.rar);
-          this.drip = 1.6;
-          this.fly = null;
+        const pos = fish.position;
+        this.vm.tipWorld(tip);
+        if (sh.net) {
+          // С подсаком: последняя подмотка — рыба скользит по воде к ногам, там её подхватывают сеткой.
+          const e = Math.min(1, fl.t / 0.34);
+          const k = e * e;
+          const tx = player.x + this.hx * 1.1;
+          const tz = player.z + this.hz * 1.1;
+          pos.set(lerp(fl.from.x, tx, k), 0, lerp(fl.from.z, tz, k));
+          pos.y = waveH(pos.x, pos.z, t) - 0.07;
+          fish.rotation.set(0, Math.atan2(-this.hz, this.hx), 0); // головой к рыбаку
+          wiggleFish(fish, this.t, 1.8);
+          this.fx.drop(pos.x, 0.05, pos.z, this.hx * 1.2 + (Math.random() - 0.5), 0.8 + Math.random(), this.hz * 1.2 + (Math.random() - 0.5), 0.03 + Math.random() * 0.02, 0.6);
+          if (Math.random() < dt * 22) this.fx.wake(pos.x, pos.z, 0.2 + this.fishLen * 0.2, 1.1);
+          end.set(pos.x, 0, pos.z);
+          this.line.set(tip, end, 0.02, -5);
+          if (e >= 1) {
+            this.fx.splash(tx, tz, 0.9);
+            this.present();
+          }
+        } else {
+          // Без подсака: рыбу выдёргивают из воды, она по дуге прилетает под кончик удилища и повисает на леске.
+          const e = Math.min(1, fl.t / 0.5);
+          const k = e * e * (3 - 2 * e);
+          this.vm.fishSlot.getWorldPosition(end);
+          end.y -= fl.s1 * 0.5; // в гнезде — рот рыбы, сама она на полдлины ниже
+          pos.lerpVectors(fl.from, end, k);
+          pos.y += Math.sin(e * Math.PI) * (0.5 + fl.from.distanceTo(end) * 0.05);
+          const s = fl.s0 + (fl.s1 - fl.s0) * k;
+          fish.scale.setScalar(s);
+          fish.rotation.set(0, this.camera.rotation.y + (1 - k) * 2.2, -Math.PI / 2 * Math.min(1, e * 1.6)); // голова — вверх, к леске
+          this.fx.drip(pos.x, pos.y, pos.z, 2, 0.08);
+          wiggleFish(fish, this.t, 1.6);
+          end.set(pos.x, pos.y + s * 0.5 * Math.min(1, e * 1.6), pos.z);
+          this.line.set(tip, end, 0.01, -5);
+          if (e >= 1) this.present();
         }
       } else {
-        this.fish.rotation.y += dt * 0.9;
-        this.fish.position.y = Math.sin(this.t * 2) * 0.01;
-        wiggleFish(this.fish, this.t, 0.5);
+        // рыба в руках: на леске медленно поворачивается, в подсаке бьёт хвостом; первое время с неё течёт
+        const flap = Math.max(0, Math.sin(this.landT * 2.3 + 1)) ** 6; // раз в пару секунд — взмах хвостом
+        if (sh.net) {
+          // в сетке рыба лежит на боку, спиной от ручки; время от времени бьёт хвостом
+          fish.rotation.set(-Math.PI / 2 + flap * 0.1, Math.sin(this.t * 1.1) * 0.03, 0.05);
+          wiggleFish(fish, this.t, 0.2 + flap * 1.6);
+        } else {
+          this.spin += dt * 0.55;
+          fish.rotation.set(0, this.spin, -Math.PI / 2);
+          wiggleFish(fish, this.t, 0.2 + flap * 1.3);
+        }
         if (this.drip > 0) {
-          // с рыбы ещё пару секунд капает
           this.drip -= dt;
-          if (Math.random() < dt * 22 * this.drip) {
-            this.fish.getWorldPosition(tip);
-            this.fx.drip(tip.x, tip.y - 0.06, tip.z, 1, 0.1);
+          if (Math.random() < dt * 26 * this.drip) {
+            (sh.net ? this.vm.netSlot : fish).getWorldPosition(tip);
+            this.fx.drip(tip.x, tip.y - (sh.net ? 0.1 : sh.s * 0.45), tip.z, 1, sh.net ? sh.hoop * 0.4 : 0.05);
           }
         }
       }
@@ -383,10 +491,35 @@ export class Fishing {
     }
   }
 
+  /** Рыба долетела: теперь она в кадре у рыбака — висит на леске под кончиком удилища или лежит в подсаке. */
+  present() {
+    const sh = this.shown;
+    const fish = this.fish;
+    this.scene.remove(fish);
+    this.line.hide();
+    fish.scale.setScalar(sh.s);
+    if (sh.net) {
+      fish.position.set(0, sh.dy, 0);
+      fish.rotation.set(-Math.PI / 2, 0, 0.05);
+      this.vm.netSlot.add(fish);
+    } else {
+      fish.position.set(0, -sh.s * 0.5, 0);
+      this.spin = 0.35;
+      fish.rotation.set(0, this.spin, -Math.PI / 2);
+      this.vm.fishSlot.add(fish);
+    }
+    this.vm.present(sh);
+    if (sh.rar >= 0) this.vm.setAura(RARITY[sh.rar].color, sh.rar);
+    this.drip = 1.8;
+    this.fly = null;
+  }
+
   hook(dist) {
     const p = this.profile;
-    const c = rollFish(this.spot, p.equip.tackle, this.hour(), Math.random);
-    if (!this.lure) {
+    const c = this.rollOnce || rollFish(this.spot, p.equip.tackle, this.hour(), Math.random);
+    const forced = !!this.rollOnce; // проверки и снимки: рыба задана заранее, наживка не тратится
+    this.rollOnce = null;
+    if (!this.lure && !forced) {
       const r = spendTackle(p);
       if (r.switched) this.pendingGear = true;
       this.emit('bait', r);
@@ -404,6 +537,9 @@ export class Fishing {
     this.side = 0;
     this.jumpT = 0;
     this.wakeT = 0;
+    this.fp = this.fight.p;
+    this.deep = -0.3;
+    this.kick = -1; // подсечка: удилище рывком идёт вверх
     this.bob.visible = false;
     const f = FISH_BY_ID[c.sp];
     this.fishLen = c.junk ? 0.3 : clamp(c.len / 100, 0.16, 2.6);
@@ -412,25 +548,35 @@ export class Fishing {
     this.fish.position.set(this.bx, -0.3, this.bz);
     this.scene.add(this.fish);
     this.fx.splash(this.bx, this.bz, 0.8);
-    this.emit('hook', { rho: this.fight.rho, rar: f ? f.rar : 0 });
+    this.emit('hook', { rho: this.fight.rho, rar: f ? f.rar : 0, style: this.fight.style, boss: this.fight.boss });
   }
 
   land() {
     const c = this.catch;
     this.state = 'landed';
     this.landT = 0;
-    this.line.hide();
-    // рыба вылетает из воды и по дуге летит в руки; там её показываем перед камерой
     if (c.junk) {
       this.scene.remove(this.fish);
       this.fish = this.junkModel(c.sp);
       this.scene.add(this.fish);
     }
-    const show = c.junk ? 0.3 : clamp(0.2 + this.fishLen * 0.22, 0.24, 0.62);
     const f0 = FISH_BY_ID[c.sp];
     const rar = f0 ? f0.rar : c.sp === 'chest' ? 4 : -1;
-    this.fly = { t: 0, from: new THREE.Vector3(this.bx, -0.1, this.bz), s0: c.junk ? 0.3 : this.fishLen, s1: show, rar };
+    // Как показываем улов. Без подсака рыба висит на леске под кончиком удилища — в двух метрах от глаз, поэтому крупнее.
+    // С подсаком — лежит в сетке, которую держит левая рука; длинная рыба стоит в ней наискось, головой над обручем.
+    const net = !!this.kit.net;
+    const base = c.junk ? 0.3 : clamp(0.2 + this.fishLen * 0.22, 0.24, 0.62);
+    const s = base * (net ? 1.08 : HANG_K);
+    const hoop = clamp(s * 1.02, 0.38, 0.6); // поперечник обруча: под рыбу
+    const over = clamp((s - hoop * 0.92) / (hoop * 0.3), 0, 1); // рыба длиннее сетки — лежит поверх обруча, а не в мешке
+    this.shown = {
+      net, s, rar, junk: !!c.junk, hoop,
+      heavy: c.junk ? 0.3 : clamp(Math.log10(1 + c.w * 3) / 2.2, 0.12, 1), // насколько гнёт удилище
+      dy: -0.07 * hoop / 0.45 + over * 0.09 // середина рыбы относительно плоскости обруча
+    };
+    this.fly = { t: 0, from: new THREE.Vector3(this.bx, -0.1, this.bz), s0: c.junk ? 0.3 : this.fishLen, s1: s, rar };
     this.fish.position.copy(this.fly.from);
+    this.fish.rotation.x = 0;
     this.fx.splash(this.bx, this.bz, 1.2 + Math.max(0, rar) * 0.15);
     const full = this.profile.cooler.length >= this.kit.bagCap;
     this.emit('caught', { c, full });
@@ -453,19 +599,40 @@ export class Fishing {
       this.refreshGear();
     }
   }
+  /** Для проверок и снимков: сразу начать вываживание рыбы sp (u — размер от 0 до 1) в dist метрах перед собой. */
+  startFight(sp, u = 0.5, dist = 9) {
+    if (this.fish) (this.fish.parent || this.scene).remove(this.fish);
+    this.vm.setAura(null);
+    this.vm.present(null);
+    const f = FISH_BY_ID[sp];
+    const w = Math.round((f.w[0] + (f.w[1] - f.w[0]) * u) * 1000) / 1000;
+    const yaw = this.camera.rotation.y;
+    this.bx = this.camera.position.x - Math.sin(yaw) * dist;
+    this.bz = this.camera.position.z - Math.cos(yaw) * dist;
+    this.spot = spotAt(this.bx, this.bz) || { zone: 'bay', depth: 4 };
+    const roll = { sp, w, len: Math.round(f.look.lenK * Math.cbrt(w)), trophy: u > 0.8, junk: false };
+    this.rollOnce = roll;
+    this.hook(dist);
+    return this.fight;
+  }
   /** Для проверок и снимков: сразу показать улов в руках, минуя заброс и вываживание. u — размер от 0 до 1. */
   showCatch(sp, u = 0.5) {
     const f = FISH_BY_ID[sp];
     const j = f || JUNK_BY_ID[sp];
     if (!j) return;
     if (this.fish) (this.fish.parent || this.scene).remove(this.fish);
+    this.vm.setAura(null);
+    this.vm.present(null);
     const w = Math.round((j.w[0] + (j.w[1] - j.w[0]) * u) * 1000) / 1000;
     const c = (this.catch = { sp, w, len: f ? Math.round(f.look.lenK * Math.cbrt(w)) : 0, trophy: u > 0.8, junk: !f });
     this.fishLen = c.junk ? 0.3 : clamp(c.len / 100, 0.16, 2.6);
     this.fish = c.junk ? new THREE.Group() : buildFish(sp);
     this.scene.add(this.fish);
-    this.bx = this.camera.position.x;
-    this.bz = this.camera.position.z - 3;
+    const yaw = this.camera.rotation.y;
+    this.hx = -Math.sin(yaw);
+    this.hz = -Math.cos(yaw);
+    this.bx = this.camera.position.x + this.hx * 3;
+    this.bz = this.camera.position.z + this.hz * 3;
     this.land();
   }
   junkModel(id) {
@@ -487,7 +654,14 @@ export class Fishing {
   /** Что показывать рукам от первого лица. */
   view() {
     const s = this.state;
-    return { mode: s, power: this.power, castK: this.castK, tension: this.fight ? this.fight.T : 0, pull: this.fight && this.fight.phase === 'run' ? this.fight.dir : 0, reel: this.reeling };
+    const f = this.fight;
+    const sh = this.shown;
+    return {
+      mode: s, power: this.power, castK: this.castK, tension: f ? f.T : 0, pull: f && f.phase === 'run' ? f.dir : 0, reel: this.reeling,
+      kick: this.kick || 0, // толчок: подсечка, начало рывка, «второе дыхание»
+      shake: f && f.style === 'thrash' ? (f.phase === 'run' ? 1 : 0.6) : f && f.stuck ? 0.25 : 0, // дрожь удилища
+      net: s === 'landed' && sh ? sh.net : false, held: s === 'landed' && !this.fly, landT: this.landT
+    };
   }
 }
 export { T_DANGER, T_LOW };

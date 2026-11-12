@@ -28,7 +28,7 @@ import {
   weatherAt, WEATHER, syncQuests, questEvent, questText, questDay,
   TOURS, TOUR_COUNTDOWN, tourBlank, tourAdd, tourTable, tourPrize, tourMedal, medalPrize, tourScoreText, MEDALS
 } from '../shared/logic.js';
-import { $, esc, clamp, damp, isTouch } from './util.js';
+import { $, esc, clamp, damp, angDiff, isTouch } from './util.js';
 import { Perf, isSoftware, newTuner, tuneStep, longShare, pickQuality, scaleFor, TARGET_MS, yieldNow } from './perf.js';
 import { surfaceU } from './surface.js';
 import { initCache, wakeServer } from './offline.js';
@@ -125,7 +125,11 @@ class Game {
         this.audio.splash(0.3 + p.wade * 0.5, land ? 0.45 : 0.2);
         this.fx.ripple(p.x, p.z, 0.6 + p.wade, 0.9);
         this.fauna.scare(p.x, p.z, 2.8);
-      } else this.audio.step(p.onDeck, land);
+      } else {
+        this.audio.step(p.onDeck, land);
+        // топот у воды распугивает рыбу: к тени под причалом подходят шагом
+        if (land || p.run > 0.5) this.fauna.scare(p.x, p.z, land ? 3.6 : 2.4, 0.6);
+      }
     };
     this.state = 'title';
     this.solo = false;
@@ -146,6 +150,8 @@ class Game {
     this.timeScale = Number(q.get('ts')) || 1;
     this.noRender = q.has('norender');
     this.fishing = new Fishing({ scene: this.scene, camera: this.camera, vm: this.vm, fx: this.fx, schools: this.world.scenery.schools, profile: this.profile, hour: () => this.hours, wx: () => this.weather.bite, emit: (t, d) => this.onFish(t, d) });
+    // крупная рыба в воде замечает наживку, которая легла рядом (fauna.notice)
+    this.fishing.stalk = (x, z, R, soft) => this.fauna.notice(x, z, R, soft);
     this.fishing.makeJunk = (id) => {
       // готовая модель стоит на «полу» (y = 0) — опускаем на половину высоты, чтобы в руках она была по центру, как процедурная
       const g = new THREE.Group();
@@ -973,12 +979,16 @@ class Game {
         a.cast();
         return this.ev('cast', { x: +d.x.toFixed(1), z: +d.z.toFixed(1) });
       case 'land':
-        a.splash(0.5);
+        a.plop();
         this.fauna.scare(d.x, d.z, 2.4);
         this.preloadCatch();
         if (d.short) ui.toast('Недолёт: держите кнопку дольше — до белой риски', '', 2200);
+        else if (d.big) ui.toast(d.big > 0.6 ? 'Крупная тень заметила наживку!' : 'Рыба рядом заметила наживку', 'good', 2200);
+        else if (d.spooked) ui.toast('Плюхнули прямо на рыбу — она ушла. Бросайте чуть в стороне', '', 2800);
         else if (d.hot) ui.toast('Прямо в косяк!', 'good', 1600);
         return this.ev('land', { x: +d.x.toFixed(1), z: +d.z.toFixed(1) });
+      case 'stalk':
+        return ui.toast('Хищник пошёл за блесной!', 'good', 1800);
       case 'nibble':
         this.fauna.nibble();
         return a.nibble();
@@ -1002,9 +1012,12 @@ class Game {
       case 'hook': {
         this.fauna.baitTaken();
         ui.alert(null);
-        ui.banner('НА КРЮЧКЕ!');
+        this.hookText = d.boss ? 'ЛЕГЕНДА НА КРЮЧКЕ!' : 'НА КРЮЧКЕ!';
+        ui.banner(this.hookText);
         a.hook();
         this.rumble(120, 0.6);
+        this.stopTime(0.07, 0.04);
+        this.player.shake = Math.max(this.player.shake, 0.5);
         const c = this.fishing.catch;
         return this.ev('hook', { sp: c.sp, len: c.len });
       }
@@ -1016,7 +1029,29 @@ class Game {
       case 'jump':
         this.fauna.scare(d.x, d.z, 3.5);
         a.splash(1);
+        a.leap();
         return this.ev('jump', { x: +d.x.toFixed(1), z: +d.z.toFixed(1) });
+      case 'rage':
+        // легенда собралась с силами: это видно, слышно и чувствуется в руке
+        this.fauna.scare(d.x, d.z, 6);
+        this.fightBanner(d.left ? 'ВТОРОЕ ДЫХАНИЕ!' : 'ПОСЛЕДНИЙ РЫВОК!', 1500);
+        ui.flash('#f04438');
+        a.rage();
+        this.rumble(420, 1);
+        this.stopTime(0.12, 0.2);
+        this.player.shake = Math.max(this.player.shake, 1);
+        return this.ev('jump', { x: +d.x.toFixed(1), z: +d.z.toFixed(1) });
+      case 'stuck':
+        a.stuck();
+        return this.rumble(90, 0.5);
+      case 'unstuck':
+        a.unstuck();
+        return this.rumble(120, 0.6);
+      case 'wrap':
+        this.fightBanner('ЛЕСКА ЗА КАМНЯМИ!', 1300);
+        a.wrap();
+        this.player.shake = Math.max(this.player.shake, 0.7);
+        return this.rumble(220, 1);
       case 'lost': {
         ui.banner(d.why === 'snap' ? 'ОБРЫВ!' : 'СОШЛА!', 'red', 1600);
         a.strain(-1);
@@ -1025,7 +1060,9 @@ class Game {
         this.player.shake = 1;
         const f = FISH_BY_ID[d.sp];
         const big = f && d.w > 2 ? ` Похоже, это была ${f.rar >= 3 ? 'настоящая громадина' : 'крупная рыба'}.` : '';
-        ui.toast(d.why === 'snap' ? `Леска лопнула: держали в красной зоне.${d.lostLure ? ' Приманка потеряна.' : ''}${big}` : `Рыба сошла: леска провисла.${big}`, 'bad', 3600);
+        // почему порвалась: обычная красная зона, свеча на тугой леске или камни
+        const why = d.air ? 'в свече леску надо отпускать — рыба в воздухе рвёт тугую' : d.wrapped ? 'рыба завела её за камни — уводите против рывка' : 'держали в красной зоне';
+        ui.toast(d.why === 'snap' ? `Леска лопнула: ${why}.${d.lostLure ? ' Приманка потеряна.' : ''}${big}` : `Рыба сошла: леска провисла.${big}`, 'bad', 4200);
         ui.refreshHud();
         saveProfile(p);
         return this.ev('lost', { why: d.why });
@@ -1038,6 +1075,8 @@ class Game {
         a.catch(f ? f.rar : 0);
         ui.catchCard(d);
         this.rumble(300, 0.5);
+        this.stopTime(0.26, 0.45);
+        this.lookUp = settings.follow !== false ? 1.1 : 0; // взгляд после вываживания смотрел в воду у ног — поднимаем к улову
         {
           // чем реже рыба, тем заметнее момент: встряска камеры и цветная вспышка
           const rar = f ? f.rar : c.sp === 'chest' ? 4 : 0;
@@ -1068,6 +1107,20 @@ class Game {
       default:
     }
   }
+  /** Красная плашка посреди вываживания (легенда собралась, леска за камнями); потом возвращается обычная «НА КРЮЧКЕ!». */
+  fightBanner(text, ms) {
+    this.ui.banner(text, 'red');
+    clearTimeout(this.fbT);
+    this.fbT = setTimeout(() => {
+      if (this.fishing.state === 'fight') this.ui.banner(this.hookText || 'НА КРЮЧКЕ!');
+    }, ms);
+  }
+  /** Остановить или замедлить время игры: sec — на сколько настоящих секунд, k — во сколько раз медленнее (0.05 — почти стоп). */
+  stopTime(sec, k) {
+    if (this.noRender) return; // в проверках время идёт ровно
+    this.hitT = sec;
+    this.hitK = k;
+  }
   onRemoteEvent(m) {
     const p = this.players.get(m.id);
     if (!p) return;
@@ -1076,7 +1129,15 @@ class Game {
     p.remote.event(m.k, d, this.state === 'world' || this.state === 'lobby' ? this.fx : null);
     const near = p.st ? Math.hypot(p.st[S.X] - this.player.x, p.st[S.Z] - this.player.z) : 99;
     const vol = clamp(1.1 - near / 40, 0.1, 1);
-    if ((m.k === 'land' || m.k === 'jump') && d.x != null) this.fauna.scare(d.x, d.z, 2.6);
+    if ((m.k === 'land' || m.k === 'jump') && d.x != null) {
+      this.fauna.scare(d.x, d.z, 2.6);
+      // друг плюхнул снасть рядом с нашей наживкой — выслеженная рыба уходит
+      const F = this.fishing;
+      if (Math.hypot(d.x - F.bx, d.z - F.bz) < 2.6 && F.spook()) {
+        this.fauna.spook();
+        this.ui.toast('Рядом плюхнулась чужая снасть — крупная рыба ушла', '', 2600);
+      }
+    }
     if (m.k === 'land' || m.k === 'bite') this.audio.splash(0.4, vol);
     else if (m.k === 'jump') this.audio.splash(0.9, vol);
     else if (m.k === 'catch') {
@@ -1471,12 +1532,19 @@ class Game {
     if (!this.manual) requestAnimationFrame((t) => this.frame(t)); // при замерах кадры идут по команде, а не по часам экрана
     const frameT0 = performance.now();
     const rawMs = now - this.last;
-    const dt = Math.max(0, Math.min(0.1, rawMs / 1000)) * this.timeScale;
+    // «стоп-кадр»: на подсечке время на миг замирает, а когда рыба выходит из воды — течёт медленнее
+    let slow = 1;
+    if (this.hitT > 0) {
+      this.hitT -= Math.min(0.1, rawMs / 1000);
+      slow = this.hitK;
+    }
+    const dt = Math.max(0, Math.min(0.1, rawMs / 1000)) * this.timeScale * slow;
     this.last = now;
     if (this.gfx.resize()) {
       this.camera.aspect = this.gfx.w / this.gfx.h;
       this.camera.updateProjectionMatrix();
       this.fishing.line.resize(this.gfx.w, this.gfx.h);
+      this.vm.hangLine.resize(this.gfx.w, this.gfx.h);
       for (const p of this.players.values()) p.remote.line.resize(this.gfx.w, this.gfx.h);
     }
     const i = this.input;
@@ -1516,6 +1584,31 @@ class Game {
       if (!ui.panel || !this.editing) {
         const noLook = !!ui.panel;
         if (noLook) i.lookDX = i.lookDY = 0;
+        {
+          // взгляд собирается на рыбе: при вываживании поле зрения чуть уже, в рывке — ещё; при замахе — тоже немного
+          const ft = f.state === 'fight' ? f.fight : null;
+          const want = ft ? 5 + (ft.phase === 'run' ? 3 : 0) + (ft.T > 0.78 ? 2 : 0) : f.state === 'charge' ? 3 * f.power : f.state === 'bite' ? 2 : 0;
+          this.player.zoom = damp(this.player.zoom || 0, want, f.state === 'fight' ? 4 : 7, dt);
+          // …и сам держится на ней, пока игрок не ведёт мышью: рыба — левее середины кадра, удилище с катушкой её не закрывают
+          if (ft && settings.follow !== false && !noLook) {
+            if (Math.abs(i.lookDX) + Math.abs(i.lookDY) > 0.6) this.followT = 1.3;
+            else this.followT = Math.max(0, (this.followT || 0) - dt);
+            if (!this.followT) {
+              const pl = this.player;
+              const dx = f.bx - pl.x;
+              const dz = f.bz - pl.z;
+              const k = 1 - Math.exp(-(ft.phase === 'run' ? 2.6 : 1.8) * dt);
+              pl.yaw += angDiff(pl.yaw, Math.atan2(-dx, -dz) - 0.22) * k;
+              pl.pitch += (clamp(-Math.atan2(cam.position.y, Math.hypot(dx, dz)), -0.85, 0.1) - pl.pitch) * k;
+            }
+          } else this.followT = 0.4; // после подсечки — короткая пауза, потом взгляд идёт к рыбе
+          if (this.lookUp > 0) {
+            // улов показываем на фоне моря и неба, а не досок под ногами; повёл мышью — дальше игрок смотрит сам
+            this.lookUp = f.state !== 'landed' || Math.abs(i.lookDX) + Math.abs(i.lookDY) > 0.6 ? 0 : this.lookUp - dt;
+            const pl = this.player;
+            if (pl.pitch < -0.08) pl.pitch += (-0.05 - pl.pitch) * (1 - Math.exp(-5 * dt));
+          }
+        }
         this.player.update(dt, i, free);
         f.update(dt, tw, i, this.player);
         const v = f.view();
@@ -1545,6 +1638,10 @@ class Game {
       ui.power(f.state === 'charge' ? f.power : null, aim.dist / kit.cast);
       $('#cross').className = !i.grab && !i.touch.on ? 'off' : f.state === 'idle' && !aim.ok ? 'bad' : '';
       ui.fight(f.state === 'fight' ? f.fight : null, i.steer);
+      // музыка слушает игру: вываживание — пульс, тугая леска — тревога, легенда — минор, ночь и дождь — тише и реже
+      this.audio.mood({ fight: f.state === 'fight' ? 1 : 0, tension: f.fight ? f.fight.T : 0, run: f.fight && f.fight.phase === 'run' ? 1 : 0, boss: f.fight ? f.fight.bossMax : 0, night: this.world.night, rain: wx.rain });
+      // фрикцион трещит, когда рыба в рывке стягивает леску
+      this.audio.drag(f.state === 'fight' && f.fight.phase === 'run' ? (i.hold ? 0.45 : 1) : 0);
       if (f.state === 'fight') {
         this.audio.strain(f.fight.T);
         if (f.fight.T > 0.78) this.player.shake = Math.max(this.player.shake, 0.5);

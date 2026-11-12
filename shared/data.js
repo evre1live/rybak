@@ -111,6 +111,26 @@ export const FISH = [
     { shape: 'grouper', back: '#4a3a2a', side: '#8a6f4f', belly: '#d9c9a8', fin: '#5a4532', pat: 'marble', patC: '#cdb890', lenK: 31 },
     'Старожил арки. Смотрители маяка рассказывают о нём уже сорок лет — а кто-то видел его в трюме затонувшего корабля.')
 ];
+
+// Манера при вываживании: у каждого вида своя. Подпись и совет видит игрок, правила — в shared/logic.js (STYLE_K).
+export const FIGHT_STYLES = {
+  plain: { name: 'Без затей', tip: 'Держите натяжение в норме' },
+  runner: { name: 'Бегун', tip: 'Рывки длинные и частые — ведите против рывка' },
+  jumper: { name: 'Прыгун', tip: 'Делает свечи: в прыжке ослабьте леску' },
+  bulldog: { name: 'Тяжеловес', tip: 'Упирается: идёт, только пока леска внатяг' },
+  thrash: { name: 'Трясун', tip: 'Мотает головой — не жмитесь к краю шкалы' },
+  snag: { name: 'Хитрец', tip: 'Тянет в укрытие: не увели — заведёт леску за камни' },
+  flat: { name: 'Присоска', tip: 'Залегает на дно — подорвите, держа стрелку в рамке' }
+};
+const STYLE_OF = {
+  bychok: 'thrash', plotva: 'plain', karas: 'bulldog', stavrida: 'runner', okun: 'thrash', kefal: 'jumper',
+  kambala: 'flat', skumbria: 'runner', lesh: 'bulldog', morokun: 'snag', sargan: 'jumper', karp: 'bulldog',
+  shuka: 'jumper', sudak: 'plain', forel: 'jumper', dorado: 'runner', sibas: 'runner', ugor: 'snag',
+  som: 'bulldog', tunec: 'runner', losos: 'jumper', skat: 'flat',
+  mech: 'jumper', koi: 'snag', starik: 'bulldog'
+};
+for (const f of FISH) f.style = STYLE_OF[f.id] || 'plain';
+
 export const FISH_BY_ID = Object.fromEntries(FISH.map((f) => [f.id, f]));
 
 // хлам и находки: попадаются у берега вместо рыбы

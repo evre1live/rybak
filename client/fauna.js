@@ -344,7 +344,7 @@ export class Fauna {
     this.loners = HOMES.slice(0, LONERS).map(([hx, hz, hr], i) => {
       const f = this.list[SCHOOL_FISH + i];
       f.len = 0.32 + r() * 0.45;
-      const o = { f, hx, hz, hr, tx: hx, tz: hz, v: 0.4, timer: 0, flee: 0, ok: true };
+      const o = { f, i: SCHOOL_FISH + i, len: f.len, hx, hz, hr, tx: hx, tz: hz, v: 0.4, timer: 0, flee: 0, ok: true, gone: 0 };
       // начальное место — где есть вода
       for (let k = 0; k < 30; k++) {
         const x = hx + (r() - 0.5) * 2 * hr, z = hz + (r() - 0.5) * 2 * hr;
@@ -441,6 +441,34 @@ export class Fauna {
       o.tz = o.f.z + dz * k;
     }
   }
+  /**
+   * Наживка легла на воду в точке (x, z): заметила ли её крупная рыба? Одиночки — те самые тени, что ходят у свай, рифа и арки.
+   * Рядом (до R метров) — заметила: дальше именно она подойдёт к наживке и клюнет. Плюхнули прямо на неё — испугалась.
+   * soft — наживка не упала, а плывёт мимо (блесна): тогда рыба не пугается и вблизи.
+   * → null | { big: 0…1 (насколько крупная), spooked: true/false }
+   */
+  notice(x, z, R = 3.4, soft = false) {
+    let best = null, bd = R;
+    for (const o of this.loners) {
+      if (!o.ok || o.gone > 0 || o.flee > 0) continue;
+      const d = Math.hypot(o.f.x - x, o.f.z - z);
+      if (d < bd) { bd = d; best = o; }
+    }
+    if (!best) return null;
+    const big = clamp((best.len - 0.32) / 0.45, 0, 1);
+    if (bd < 0.9 && !soft) return { big, spooked: true }; // дальше её спугнёт всплеск (scare); блесна, идущая мимо (soft), не пугает
+    this.claimed = best;
+    return { big, spooked: false };
+  }
+  /** Выслеженную рыбу спугнули шумом: уходит, наживка ей больше не интересна. → была ли такая рыба */
+  spook() {
+    const S = this.suitor;
+    if (!S.own || S.st !== 'come') return false;
+    S.st = 'flee';
+    S.t = 1.6;
+    S.a = Math.atan2(S.f.z - S.bz, S.f.x - S.bx);
+    return true;
+  }
   /** Наживка в воде: { x, z, left — секунд до поклёвки, bite — клюёт } или null. */
   bait(b) {
     this.bobber = b;
@@ -451,13 +479,42 @@ export class Fauna {
   }
   /** Подсечка удалась: дальше рыбу на леске рисует сама рыбалка. */
   baitTaken() {
-    this.suitor.st = 'none';
-    this.suitor.f.len = 0;
+    const S = this.suitor;
+    // выслеженную рыбу поймали: на её место другая придёт не скоро
+    if (S.own) {
+      S.own.gone = 180 + this.rnd() * 60;
+      S.own = null;
+    }
+    S.st = 'none';
+    S.f.len = 0;
     this.bobber = null;
+    this.claimed = null;
   }
 
   stepSuitor(dt) {
     const S = this.suitor, f = S.f, b = this.bobber;
+    if (S.st === 'none' && this.claimed && b) {
+      // наживку заметила одиночка: она сама и становится «рыбой у наживки» — разворачивается и идёт к поплавку
+      const o = this.claimed, lf = o.f;
+      this.claimed = null;
+      S.own = o;
+      o.gone = 1e9; // пока она у наживки, на прежнем месте её нет
+      S.st = 'come';
+      S.a = Math.atan2(lf.z - b.z, lf.x - b.x);
+      S.r = Math.hypot(lf.x - b.x, lf.z - b.z);
+      S.turn = this.rnd() < 0.5 ? 1 : -1;
+      f.len = o.len;
+      f.x = lf.x;
+      f.z = lf.z;
+      f.yaw = lf.yaw;
+      S.scale = 1;
+      S.bx = b.x;
+      S.bz = b.z;
+      this.tint.setXYZ(SUITOR, this.tint.getX(o.i), this.tint.getY(o.i), this.tint.getZ(o.i));
+      this.tint.needsUpdate = true;
+      lf.len = 0;
+    }
+    if (!b) this.claimed = null;
     if (S.st === 'none') {
       if (!b || b.bite || b.left > 4.6 || b.left < 0.4) return;
       // подходит с глубины
@@ -487,8 +544,16 @@ export class Fauna {
       tz = f.z + Math.sin(S.a) * 6;
       speed = 3.2;
       S.scale = Math.max(0, S.scale - dt * 0.9);
-      if (S.t <= 0 || S.scale <= 0) { S.st = 'none'; f.len = 0; return; }
-    } else if (!b || (!b.bite && b.left > 6)) {
+      if (S.t <= 0 || S.scale <= 0) {
+        S.st = 'none';
+        f.len = 0;
+        if (S.own) {
+          S.own.gone = 6 + this.rnd() * 6; // ушла — скоро вернётся на своё место
+          S.own = null;
+        }
+        return;
+      }
+    } else if (!b || (!b.bite && b.left > 6 && !S.own)) {
       // наживку убрали, или рыба сорвалась и следующая поклёвка нескоро — уходит
       S.st = 'flee';
       S.t = 1.5;
@@ -530,6 +595,17 @@ export class Fauna {
     for (const o of this.loners) {
       if (!o.ok) continue;
       const f = o.f;
+      if (o.gone > 0) {
+        // рыбы нет на месте (у наживки, поймана или ушла): по истечении срока появляется у своего дома
+        o.gone -= dt;
+        if (o.gone > 0) continue;
+        for (let k = 0; k < 12; k++) {
+          const x = o.hx + (this.rnd() - 0.5) * 2 * o.hr, z = o.hz + (this.rnd() - 0.5) * 2 * o.hr;
+          if (open(x, z, 0.8)) { f.x = x; f.z = z; o.tx = x; o.tz = z; break; }
+        }
+        f.len = o.len;
+        o.timer = 0;
+      }
       o.timer -= dt;
       o.flee = Math.max(0, o.flee - dt);
       const dx = o.tx - f.x, dz = o.tz - f.z, d = Math.hypot(dx, dz);

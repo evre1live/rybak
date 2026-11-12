@@ -43,8 +43,9 @@
         <div id="steer"><span class="st l"><kbd>A</kbd>◀</span><b id="fstate">РОВНО</b><span class="st r">▶<kbd>D</kbd></span></div>
         <div class="fpanel">
           <div class="ftitle"><i></i>НАТЯЖЕНИЕ ЛЕСКИ<i></i></div>
-          <div class="tbar"><span class="lo">СЛАБО</span><span class="ok">НОРМА</span><span class="dg"><span class="ic" data-ic="warn"></span>ОПАСНО</span><div id="tptr"></div></div>
-          <div class="prow"><span>ВЫВАЖИВАНИЕ</span><div class="pbar"><i id="pfill"></i></div><b id="ppct">0%</b></div>
+          <div class="tbar" id="tbar"><span class="lo">СЛАБО</span><span class="ok" id="tok">НОРМА</span><span class="dg"><span class="ic" data-ic="warn"></span>ОПАСНО</span><div class="tz slack">ВЯЛО</div><div class="tz lift" id="tzLift"><i id="tzLiftK"></i><b>ДЕРЖИ</b></div><div class="tz jump" id="tzJump">ОСЛАБЬ</div><div id="tptr"></div></div>
+          <div class="prow"><span>ВЫВАЖИВАНИЕ</span><b id="fboss"></b><div class="pbar" id="pbar"><i id="pfill"></i><em class="pm" style="left:45%"></em><em class="pm" style="left:80%"></em></div><b id="ppct">0%</b></div>
+          <div id="ftip"></div>
         </div>
       </div>
       <div id="power" class="hidden"><span>СИЛА ЗАБРОСА</span><div class="pw"><i id="pwfill"></i><em id="pwneed"></em></div></div>

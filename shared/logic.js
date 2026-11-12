@@ -74,7 +74,9 @@ export function speciesWeights(spot, tackleId, hour) {
 }
 export function rollFish(spot, tackleId, hour, rng) {
   const tk = tackleInfo(tackleId);
-  const junkChance = tk.lure ? 0.015 : { shallow: 0.07, pier: 0.07, backwater: 0.06, mid: 0.025 }[spot.zone] || 0.008;
+  // spot.big (0…1) — рыбу выследили: наживка легла рядом с крупной тенью в воде. Тогда это точно рыба, а не хлам,
+  // и не мелочь: чем крупнее тень, тем выше нижняя граница веса.
+  const junkChance = spot.big ? 0 : tk.lure ? 0.015 : { shallow: 0.07, pier: 0.07, backwater: 0.06, mid: 0.025 }[spot.zone] || 0.008;
   const list = speciesWeights(spot, tackleId, hour);
   if (!list.length || rng() < junkChance) {
     let j = JUNK[Math.floor(rng() * 4)];
@@ -94,9 +96,12 @@ export function rollFish(spot, tackleId, hour, rng) {
   }
   const sizeBoost = tk.size * (spot.hot ? 1.15 : 1);
   const k = clamp(2.6 - (sizeBoost - 1) * 1.6, 1.3, 2.6);
-  const u = Math.pow(rng(), k);
+  let u = Math.pow(rng(), k);
+  if (spot.big) u = Math.min(1, Math.max(u, 0.35 + 0.4 * clamp(spot.big, 0, 1) + rng() * 0.1));
   const w = round3(f.w[0] + (f.w[1] - f.w[0]) * u);
-  return { sp: f.id, w, len: Math.round(f.look.lenK * Math.cbrt(w)), trophy: u > 0.8, junk: false };
+  const c = { sp: f.id, w, len: Math.round(f.look.lenK * Math.cbrt(w)), trophy: u > 0.8, junk: false };
+  if (spot.big) c.stalked = true; // «выслежена»: за такую дают больше опыта
+  return c;
 }
 const round3 = (v) => Math.round(v * 1000) / 1000;
 
@@ -107,6 +112,7 @@ export function biteDelay(spot, tackleId, hour, kit, rng) {
   const partMult = { dawn: 1.2, day: 1, dusk: 1.2, night: 0.85 }[part];
   let rate = (1 / 10.5) * (ZONES[spot.zone] ? ZONES[spot.zone].act : 1) * tk.attract * kit.biteMult * partMult;
   if (spot.hot) rate *= 1.8;
+  if (spot.big) rate *= 2.4; // крупная рыба рядом и уже заметила наживку
   if (spot.wx) rate *= spot.wx; // погода: в дождь и туман рыба берёт охотнее
   if (part === 'night') rate *= kit.nightMult;
   const t = clamp(-Math.log(1 - rng() * 0.999) / rate, 2.5, 28);
@@ -153,6 +159,40 @@ export function fishValue(c, market) {
 // ───── вываживание ─────
 export const T_LOW = 0.22;
 export const T_DANGER = 0.78;
+export const T_JUMP = 0.62; // пока рыба в прыжке, «опасно» начинается раньше: леску надо ослабить
+export const T_LIFT = 0.6; // залёгшую рыбу отрывают от дна натяжением у верхней границы нормы
+export const T_TIGHT = 0.5; // тяжеловес идёт к берегу, только пока леска внатяг
+// Манера рыбы (FISH[].style): множители к общим правилам борьбы —
+// runs: как часто рывки, len: их длина, pull: сила, jump: шанс свечи в рывке, calm: тяга между рывками.
+// Таблицы открыты наружу только для подбора баланса и тестов: игра их не меняет.
+export const STYLE_K = {
+  plain: { runs: 1, len: 1, pull: 1, jump: 0.3, calm: 1 },
+  runner: { runs: 1.2, len: 1.3, pull: 1, jump: 0.15, calm: 0.95 },
+  jumper: { runs: 1.1, len: 0.9, pull: 1, jump: 0.9, calm: 1 },
+  bulldog: { runs: 0.65, len: 1.15, pull: 1, jump: 0.05, calm: 1.15 },
+  thrash: { runs: 1.2, len: 0.6, pull: 0.85, jump: 0.3, calm: 1 },
+  snag: { runs: 1.05, len: 1, pull: 0.9, jump: 0.1, calm: 1 },
+  flat: { runs: 0.8, len: 0.9, pull: 1, jump: 0, calm: 1.1 }
+};
+export const FIGHT_K = {
+  leap: 0.35, // рыба в воздухе не держит отпущенную леску: та успевает ослабнуть
+  slackBulldog: 0.6, // сколько хода теряет тяжеловес на вялой леске
+  snagPush: 0.12, // прибавка натяжения, пока хитреца не увели от укрытия
+  snagWrap: 1.1, // через столько секунд леска заходит за камни
+  shake: 1, // размах тряски трясуна
+  stick: 0.75, // шанс, что присоска заляжет в очередную передышку
+  lift: 1.6, // сколько секунд держать натяжение в зоне отрыва (для рыбы в полную силу снасти)
+  bossBack: 0.1, // сколько пути забирает легенда, собравшись с силами
+  bossRest: 0.75, // какая доля усталости при этом остаётся
+  bossLen: 1.3, // её рывок после этого длиннее
+  bossPull: 1.1 // и сильнее
+};
+const JUMP_T = 0.75; // столько длится свеча (и у картинки тоже)
+const JUMP_GRACE = 0.2; // первые доли секунды прыжка — время заметить и отпустить кнопку
+/** Сколько секунд держать натяжение в зоне отрыва, чтобы залёгшая рыба подалась. */
+export const liftNeed = (s) => (0.5 + 0.5 * Math.min(1, s.rho)) * FIGHT_K.lift;
+/** Где сейчас начинается опасная зона шкалы натяжения: пока рыба в воздухе — раньше обычного. */
+export const dangerAt = (s) => (s.jumpT > 0 && s.jumpT < JUMP_T - JUMP_GRACE ? T_JUMP : T_DANGER);
 export function fightInit(c, kit, rng) {
   const f = FISH_BY_ID[c.sp];
   const power = c.junk || !f ? 0.25 : f.str * Math.pow(c.w, 0.55);
@@ -161,52 +201,112 @@ export function fightInit(c, kit, rng) {
     power, rho, junk: !!c.junk, temper: f ? f.str : 0.5,
     stamina: 1.7 + 2.9 * Math.pow(power, 0.75),
     T: 0.45, p: 0.06, strain: 0, slack: 0,
-    phase: 'calm', phaseT: 1.2 + rng() * 1.2, pull: 0.35, dir: 0, t: 0, result: null, next: null, warned: false
+    phase: 'calm', phaseT: 1.2 + rng() * 1.2, pull: 0.35, dir: 0, t: 0, fat: 0, result: null, next: null, warned: false,
+    style: c.junk || !f ? 'plain' : f.style || 'plain',
+    boss: f && !c.junk && f.rar >= 4 ? 2 : 0, // у легенды два «вторых дыхания»
+    bossMax: f && !c.junk && f.rar >= 4 ? 2 : 0,
+    rage: false, jumpT: 0, stuck: 0, stuckT: 0, lift: 0, stickCd: 0, wrapT: 0, wrapped: false
   };
 }
-// input: { reel: boolean, steer: -1|0|1 } → список событий: 'run', 'calm', 'jump', 'landed', 'snap', 'escape'
+// input: { reel: boolean, steer: -1|0|1 } → список событий:
+// 'warn', 'run', 'calm', 'jump', 'landed', 'snap', 'escape' — у всех; 'rage' — легенда собралась с силами;
+// 'stuck' / 'unstuck' — присоска залегла и оторвана; 'wrap' — хитрец завёл леску за камни.
 export function fightStep(s, input, dt, kit, rng) {
   const ev = [];
   if (s.result) return ev;
   s.t += dt;
+  s.fat += dt; // усталость рыбы: растёт со временем, у легенды частично сбрасывается
   s.phaseT -= dt;
+  const K = STYLE_K[s.style] || STYLE_K.plain;
+  const F = FIGHT_K;
   const rc = Math.min(1.6, s.rho);
+  const k01 = Math.min(1, s.rho); // слабая для этой снасти рыба чудит вполсилы
+  // легенда: на 45 % и на 80 % пути собирается с силами — часть лески уходит обратно, усталость сбрасывается, сразу рывок
+  if (s.boss > 0 && s.p >= (s.boss === 2 ? 0.45 : 0.8)) {
+    s.boss--;
+    s.p = Math.max(0.02, s.p - F.bossBack);
+    s.fat *= F.bossRest;
+    s.rage = true;
+    s.next = 'run';
+    s.phase = 'calm';
+    s.phaseT = 0.6; // рывок — через полсекунды: успеть ослабить
+    s.warned = true;
+    s.stuck = 0;
+    ev.push('rage');
+  }
   // следующая фаза решается заранее: за полсекунды до рывка рыба «предупреждает» всплеском
-  if (s.next == null) s.next = nextPhase(s, rng);
+  if (s.next == null) s.next = nextPhase(s, rng, K);
   if (s.phase === 'calm' && s.next === 'run' && !s.warned && s.phaseT <= 0.5) {
     s.warned = true;
     ev.push('warn');
   }
   if (s.phaseT <= 0) {
     if (s.next === 'run') {
+      const rage = s.rage;
+      s.rage = false;
       s.phase = 'run';
-      s.phaseT = 0.9 + rng() * 1.5 + 0.6 * Math.min(1, s.rho);
-      s.pull = (0.9 + 0.5 * Math.min(1, s.rho) + rng() * 0.15) * (0.72 + 0.28 * tired(s));
+      s.phaseT = (0.9 + rng() * 1.5 + 0.6 * k01) * K.len * (rage ? F.bossLen : 1);
+      s.pull = (0.9 + 0.5 * k01 + rng() * 0.15) * (0.72 + 0.28 * tired(s)) * K.pull * (rage ? F.bossPull : 1);
       s.dir = rng() < 0.5 ? -1 : 1;
+      s.wrapT = 0;
+      s.wrapped = false;
       ev.push('run');
-      if (rng() < 0.4) ev.push('jump');
+      if (rng() < K.jump) {
+        s.jumpT = JUMP_T;
+        s.phaseT += JUMP_T * (1 - F.leap); // свеча не съедает рывок: после неё рыба дотягивает своё
+        ev.push('jump');
+      }
     } else {
       s.phase = 'calm';
-      s.phaseT = (1.6 + rng() * 2.2) * (1.25 - 0.35 * Math.min(1, s.rho));
-      s.pull = (0.25 + rng() * 0.25) * (s.p > 0.75 ? 0.8 : 1);
+      s.phaseT = (1.6 + rng() * 2.2) * (1.25 - 0.35 * k01);
+      s.pull = (0.25 + rng() * 0.25) * (s.p > 0.75 ? 0.8 : 1) * K.calm;
       s.dir = 0;
       ev.push('calm');
+      // присоска залегает на дно: пока не оторвёшь — ни с места
+      if (s.style === 'flat' && !s.stuck && s.stickCd <= 0 && s.p > 0.12 && s.p < 0.92 && rng() < F.stick) {
+        s.stuck = 1;
+        s.stuckT = 0;
+        s.lift = 0;
+        ev.push('stuck');
+      }
     }
     s.next = null;
     s.warned = false;
   }
   const run = s.phase === 'run';
+  const leap = s.jumpT > 0;
+  // залёгшая рыба тянет слабее; рыба в воздухе не держит отпущенную леску — та быстро слабнет,
+  // а вот подмотка в прыжке тянет в полную силу
+  const pull = s.pull * (leap && !input.reel ? F.leap : s.stuck ? 0.6 : 1);
   let dT;
-  if (input.reel) dT = (0.1 + 0.55 * s.pull * (0.3 + rc)) / kit.smooth;
-  else dT = -(0.5 - 0.38 * s.pull * Math.min(1.2, 0.2 + rc));
+  if (input.reel) dT = (0.1 + 0.55 * pull * (0.3 + rc)) / kit.smooth;
+  else dT = -(0.5 - 0.38 * pull * Math.min(1.2, 0.2 + rc));
   if (run && s.dir) {
     if (input.steer === -s.dir) dT -= 0.22;
     else if (input.steer === s.dir) dT += 0.2;
+    // хитрец тянет в укрытие: не увёл — натяжение растёт, а через секунду леска заходит за камни
+    if (s.style === 'snag') {
+      if (input.steer === -s.dir) s.wrapT = Math.max(0, s.wrapT - dt * 2);
+      else {
+        dT += F.snagPush * k01;
+        s.wrapT += dt;
+        if (s.wrapT >= F.snagWrap && !s.wrapped) {
+          s.wrapped = true;
+          s.T = Math.min(1, s.T + 0.1 + 0.08 * k01);
+          ev.push('wrap');
+        }
+      }
+    }
   }
+  // трясун мотает головой: стрелка дрожит (размах 1–3 % шкалы, в рывке в полтора раза шире)
+  if (s.style === 'thrash') dT += Math.cos(s.t * 21) * 21 * (0.012 + 0.022 * k01) * (run ? 1.4 : 1) * F.shake;
   s.T = clamp(s.T + dT * dt, 0, 1);
 
-  if (s.T > T_DANGER) {
-    s.strain += dt * clamp(s.rho * 1.1 + 0.3, 0.4, 1.6) * (1 + (2.5 * (s.T - T_DANGER)) / (1 - T_DANGER));
+  // пока рыба в прыжке, тугая леска — почти верный обрыв: опасная зона начинается раньше
+  const danger = dangerAt(s);
+  if (leap) s.jumpT -= dt;
+  if (s.T > danger) {
+    s.strain += dt * clamp(s.rho * 1.1 + 0.3, 0.4, 1.6) * (1 + (2.5 * (s.T - danger)) / (1 - danger));
     if (s.strain >= 1) {
       s.result = 'snap';
       ev.push('snap');
@@ -214,7 +314,7 @@ export function fightStep(s, input, dt, kit, rng) {
     }
   } else s.strain = Math.max(0, s.strain - dt * 1.0);
 
-  if (s.T < T_LOW) {
+  if (s.T < T_LOW && !leap) {
     s.slack += dt * (0.4 + 0.6 * s.pull) * kit.hold * (run ? 1.6 : 1);
     if (s.slack >= 1.6 && !s.junk) {
       s.result = 'escape';
@@ -223,8 +323,21 @@ export function fightStep(s, input, dt, kit, rng) {
     }
   } else s.slack = Math.max(0, s.slack - dt * 0.5);
 
-  const eff = s.T < T_LOW ? 0.35 : s.T > T_DANGER ? 0.85 : 1;
-  if (input.reel) s.p += (kit.reel * eff * (run ? (input.steer === -s.dir ? 0.75 : 0.35) : 1) * dt) / s.stamina;
+  let eff = s.T < T_LOW ? 0.35 : s.T > T_DANGER ? 0.85 : 1;
+  // тяжеловес идёт к берегу, только пока леска внатяг
+  if (s.style === 'bulldog' && s.T < T_TIGHT) eff *= 1 - F.slackBulldog * k01;
+  if (s.stickCd > 0) s.stickCd -= dt;
+  if (s.stuck) {
+    // залегла: отрывают натяжением у верхней границы нормы; через шесть секунд снимется сама
+    s.stuckT += dt;
+    if (s.T >= T_LIFT && s.T <= T_DANGER) s.lift += dt;
+    if (s.lift >= liftNeed(s) || s.stuckT > 9) {
+      s.stuck = 0;
+      s.stickCd = 6;
+      s.p = Math.min(1, s.p + 0.03);
+      ev.push('unstuck');
+    }
+  } else if (input.reel) s.p += (kit.reel * eff * (run ? (input.steer === -s.dir ? 0.75 : 0.35) : 1) * dt) / s.stamina;
   else s.p -= ((run ? 0.1 : 0.03) * (0.5 + Math.min(1.2, s.rho)) * tired(s) * dt) / Math.sqrt(s.stamina);
   s.p = clamp(s.p, 0, 1);
   if (s.p >= (kit.net ? 0.85 : 1)) {
@@ -234,10 +347,10 @@ export function fightStep(s, input, dt, kit, rng) {
   return ev;
 }
 // рыба устаёт: чем дольше борьба, тем слабее и реже рывки
-const tired = (s) => 1 / (1 + s.t / 35);
-function nextPhase(s, rng) {
-  if (s.junk || s.phase === 'run') return 'calm';
-  const runChance = clamp(0.35 + 0.5 * Math.min(1, s.rho) + (s.temper - 1) * 0.3, 0.15, 0.95);
+const tired = (s) => 1 / (1 + s.fat / 35);
+function nextPhase(s, rng, K) {
+  if (s.junk || s.phase === 'run' || s.stuck) return 'calm';
+  const runChance = Math.min(0.97, clamp(0.35 + 0.5 * Math.min(1, s.rho) + (s.temper - 1) * 0.3, 0.15, 0.95) * K.runs);
   return rng() < runChance * (0.55 + 0.45 * tired(s)) ? 'run' : 'calm';
 }
 // насколько тяжёлой будет борьба — подсказка для карточки и ленты
@@ -249,7 +362,7 @@ export function fightGrade(rho) {
 export function xpFor(c) {
   if (c.junk) return 2;
   const f = FISH_BY_ID[c.sp];
-  return Math.round(6 * Math.pow(f.rar + 1, 1.6) * (c.trophy ? 1.5 : 1) + 3 * Math.sqrt(c.w));
+  return Math.round((6 * Math.pow(f.rar + 1, 1.6) * (c.trophy ? 1.5 : 1) + 3 * Math.sqrt(c.w)) * (c.stalked ? 1.2 : 1));
 }
 const TITLES = ['Новичок', 'Новичок', 'Любитель', 'Любитель', 'Рыбак', 'Рыбак', 'Бывалый', 'Бывалый', 'Знаток', 'Знаток', 'Мастер', 'Мастер', 'Капитан', 'Капитан', 'Морской волк'];
 export function levelInfo(xp) {
@@ -278,7 +391,7 @@ export function newProfile() {
     tackle: { worm: 20 },
     cooler: [],
     journal: {},
-    stats: { casts: 0, caught: 0, sold: 0, earned: 0, snaps: 0, escapes: 0, best: null, legends: 0, quests: 0, tours: 0, medals: 0 },
+    stats: { casts: 0, caught: 0, sold: 0, earned: 0, snaps: 0, escapes: 0, best: null, legends: 0, quests: 0, tours: 0, medals: 0, stalked: 0 },
     seenIntro: false,
     boatTrips: 0,
     quests: null // задания на день: появляются при первом входе (syncQuests)
@@ -362,6 +475,7 @@ export function recordCatch(p, c, released) {
   const before = levelInfo(p.xp).lvl;
   p.xp += xp;
   p.stats.caught++;
+  if (c.stalked) p.stats.stalked++; // выслежена: наживку положили рядом с тенью в воде
   let isNew = false;
   let record = false;
   if (!c.junk) {
@@ -636,7 +750,7 @@ export function tourMedal(kind, len, kit, s) {
 export const medalPrize = (medal, len) => Math.round(([0, 15, 35, 70][medal] * Math.max(0.6, len / 300)) / 5) * 5;
 
 // ───── бот для проверки баланса (и для тестов) ─────
-export function botFight(c, kit, rng, skill = 0.85) {
+export function botFight(c, kit, rng, skill = 0.85, maxT = 240) {
   const s = fightInit(c, kit, rng);
   let steer = 0;
   let react = 0;
@@ -644,12 +758,15 @@ export function botFight(c, kit, rng, skill = 0.85) {
   let think = 0;
   const lag = 0.08 + (1 - skill) * 0.55; // как быстро человек замечает перемену
   const dt = 1 / 30;
-  for (let i = 0; i < 30 * 240 && !s.result; i++) {
+  const seen = {}; // что случилось за бой: сколько рывков, свечей, «вторых дыханий»…
+  for (let i = 0; i < 30 * maxT && !s.result; i++) {
     const run = s.phase === 'run';
     think -= dt;
     if (think <= 0) {
       think = lag * (0.6 + rng() * 0.8);
-      const limit = (run ? 0.5 : s.warned ? 0.4 : 0.66) + (rng() - 0.5) * (1 - skill) * 0.3;
+      // человек читает подсказки: в прыжке ослабляет леску, залёгшую рыбу отрывает натяжением
+      const base = s.jumpT > 0 ? 0.45 : s.stuck ? 0.72 : run ? 0.5 : s.warned ? 0.4 : 0.66;
+      const limit = base + (rng() - 0.5) * (1 - skill) * 0.3;
       reel = s.T < limit || s.T < 0.3;
     }
     if (run && s.dir) {
@@ -659,7 +776,7 @@ export function botFight(c, kit, rng, skill = 0.85) {
       react = 0;
       steer = 0;
     }
-    fightStep(s, { reel, steer }, dt, kit, rng);
+    for (const e of fightStep(s, { reel, steer }, dt, kit, rng)) seen[e] = (seen[e] || 0) + 1;
   }
-  return { result: s.result || 'timeout', t: s.t, rho: s.rho };
+  return { result: s.result || 'timeout', t: s.t, rho: s.rho, seen };
 }

@@ -1,9 +1,11 @@
 // Руки и удочка от первого лица: живут в пространстве камеры, двигаются по состоянию рыбалки.
 import * as THREE from 'three';
-import { buildRod } from './gear3d.js';
+import { buildRod, buildNet } from './gear3d.js';
+import { ITEMS } from '../shared/data.js';
+import { FishLine } from './line.js';
 import { Batch, M, G, BATCH_MAT } from './batch.js';
 import { loft } from './shapes.js';
-import { shade, damp, clamp } from './util.js';
+import { shade, damp, clamp, lerp } from './util.js';
 import { heroTemplate } from './hero.js';
 import { FpArms } from './fparms.js';
 
@@ -25,8 +27,21 @@ const AZ = new THREE.Vector3(0, 0, 1);
 const v1 = new THREE.Vector3();
 const v2 = new THREE.Vector3();
 const v3 = new THREE.Vector3();
+const v4 = new THREE.Vector3();
+const v5 = new THREE.Vector3();
+const m4 = new THREE.Matrix4();
 // левая рука героя: локоть (x, y, z), куда смотрит тыл кисти (x, y, z), на сколько пальцы дальше середины кулака
 const LEFT = [-0.42, -0.62, -0.12, 0.1, 0.35, 1, 0.05];
+// Подсак в кадре: где левый кулак на его рукояти, на сколько он опущен под кадр, пока сетка не поднята,
+// куда от обруча идёт ручка (к кулаку у нижнего левого края) и куда смотрит обруч — вверх и к нам: в сетку заглядываем.
+const NET_FIST = new THREE.Vector3(-0.42, -0.3, -0.6);
+const NET_DROP = new THREE.Vector3(0.08, -0.9, 0.2);
+const NET_AXIS = new THREE.Vector3(-0.598, -0.717, 0.359).normalize();
+const NET_FACE = new THREE.Vector3(0, 0.552, 0.834);
+const NET_ELBOW = new THREE.Vector3(-0.52, -0.78, -0.02);
+// Улов на леске: поза удилища (кончик виден вверху, над левой половиной кадра) и во сколько раз рыба крупнее обычного показа —
+// она висит в двух метрах от глаз, а не на расстоянии вытянутой руки.
+export const HANG_K = 2.4;
 
 // Сияние за пойманной рыбой: мягкое свечение, вращающиеся лучи, искры и расходящееся кольцо. Цвет и сила — по редкости.
 const AURA_FRAG = /* glsl */ `
@@ -87,6 +102,18 @@ export class ViewModel {
     this.auraMesh.visible = false;
     this.fishSlot.add(this.auraMesh);
     this.auraK = 0;
+    // подсак (его держит левая рука) и гнездо для рыбы в нём; леска, на которой улов висит под кончиком удилища
+    this.net = buildNet();
+    this.net.group.visible = false;
+    this.root.add(this.net.group);
+    this.netSlot = new THREE.Group();
+    this.root.add(this.netSlot);
+    this.netK = 0; // 0 — подсак под кадром, 1 — поднят
+    this.handK = 0; // 0 — левая рука на катушке, 1 — на ручке подсака
+    this.hangLine = new FishLine(this.root);
+    this.show = null; // что сейчас показываем: { net, s, hoop, heavy } — см. Fishing.land
+    this.swX = 0;
+    this.swV = 0;
     this.rod = null;
     this.hands = [];
     this.arms = null; // руки готового героя (fparms.js)
@@ -111,6 +138,22 @@ export class ViewModel {
     this.auraU.uRays.value = [0, 0.3, 0.6, 0.85, 1.1][power] ?? 0;
     this.auraU.uPulse.value = 0;
     this.auraMesh.visible = true;
+  }
+
+  /** Показ улова: sh — как в Fishing.land ({ net, s, hoop, heavy, … }); null — убрать. */
+  present(sh) {
+    this.show = sh;
+    this.hangLine.hide();
+    this.fishSlot.position.set(-0.2, -0.1, -0.78);
+    const hang = sh && !sh.net;
+    // сияние стоит за рыбой: на леске она в двух метрах и крупнее, в подсаке — ближе
+    this.auraMesh.position.set(0, hang ? -sh.s * 0.5 : 0.02, hang ? -0.6 : -0.35);
+    this.auraMesh.scale.setScalar(hang ? 2.3 : 1.15);
+    if (hang) {
+      this.swX = -0.16; // прилетела по дуге — качнулась
+      this.swV = 0.5;
+    }
+    if (sh && sh.net) this.net.setSize(sh.hoop);
   }
 
   setLook(look) {
@@ -184,6 +227,7 @@ export class ViewModel {
       this.pivot.remove(this.rod.group);
       this.rod.group.traverse((o) => o.isMesh && o.geometry && o.geometry.dispose && o.userData.own && o.geometry.dispose());
     }
+    this.hangLine.setColor((ITEMS[lineId] || {}).col || '#e8f4ff');
     this.rod = buildRod(rodId, reelId, lineId, 1);
     this.rod.group.traverse((o) => {
       if (o.isMesh) o.castShadow = false;
@@ -248,13 +292,35 @@ export class ViewModel {
         // при вываживании руки опускаем, чтобы середина экрана оставалась свободной
         P.ox += 0.05;
         P.oy -= 0.075;
+        // толчок: на подсечке удилище идёт вверх, на рывке рыба дёргает его к воде; трясун мелко бьёт кончиком
+        if (st.kick) {
+          P.th += st.kick * 10;
+          P.bend += Math.abs(st.kick) * 0.3;
+        }
+        if (st.shake) {
+          P.th += Math.sin(t * 43) * 1.3 * st.shake;
+          P.side += Math.sin(t * 37) * 0.4 * st.shake;
+        }
+        fast = !!st.kick && Math.abs(st.kick) > 0.5;
         break;
       }
       case 'landed':
-        P.th = 36;
-        P.be = -0.5;
-        P.ox = 0.1;
-        P.oy = -0.05;
+        if (st.net) {
+          // улов в подсаке: удилище отведено вправо, чтобы не мешать
+          P.th = 36;
+          P.be = -0.5;
+          P.ox = 0.1;
+          P.oy = -0.05;
+        } else {
+          // улов на леске: удилище поднято вперёд, кончик согнут весом и виден вверху кадра
+          const hv = this.show ? this.show.heavy : 0.4;
+          P.th = 44;
+          P.be = 0.3;
+          P.ox = 0.04;
+          P.oy = -0.07; // руки ниже: левая кисть на катушке не закрывает рыбу
+          P.bend = 0.55 + 0.45 * hv + Math.abs(this.swX) * 0.5;
+          P.side = -this.swX * 1.2;
+        }
         break;
       default:
         break;
@@ -293,15 +359,76 @@ export class ViewModel {
     this.foreL.position.copy(v2);
     this.foreL.lookAt(v1.copy(ELBOW_L).applyMatrix4(this.root.matrixWorld));
     this.foreL.scale.set(1, 1, v2.distanceTo(ELBOW_L));
+    // ── показ улова ──
+    const sh = this.show;
+    const landed = st.mode === 'landed';
+    const wantNet = landed && !!st.net;
+    this.handK = damp(this.handK, wantNet ? 1 : 0, wantNet ? 10 : 14, dt);
+    this.netK = damp(this.netK, wantNet && st.held ? 1 : 0, wantNet ? 6.5 : 12, dt);
+    const netOn = this.netK > 0.004 || this.handK > 0.02;
+    const net = this.net.group;
+    net.visible = netOn;
+    this.netSlot.visible = netOn;
+    let fist = null; // где левый кулак, если он на ручке подсака
+    if (netOn) {
+      const e = this.netK * this.netK * (3 - 2 * this.netK);
+      // оси сетки: Z — вдоль ручки к кулаку, Y — из обруча наружу (вверх и к нам), X — поперёк
+      v2.copy(NET_AXIS);
+      v3.copy(NET_FACE).addScaledVector(v2, -NET_FACE.dot(v2)).normalize();
+      v5.crossVectors(v3, v2);
+      net.quaternion.setFromRotationMatrix(m4.makeBasis(v5, v3, v2));
+      // сетка поднимается из-под кадра; с рыбой её чуть водит
+      v4.copy(NET_FIST).addScaledVector(NET_DROP, 1 - e).addScaledVector(v2, -this.net.grip());
+      v4.y += Math.sin(t * 2.1) * 0.006 * e;
+      v4.x += Math.sin(t * 1.3) * 0.004 * e;
+      net.position.copy(v4);
+      // гнездо для рыбы: та же плоскость обруча, но рыба лежит в ней поперёк кадра, а не поперёк ручки
+      v1.set(1, 0, 0).addScaledVector(v3, -v3.x).normalize();
+      v5.crossVectors(v1, v3);
+      this.netSlot.quaternion.setFromRotationMatrix(m4.makeBasis(v1, v3, v5));
+      this.netSlot.position.copy(v4);
+      if (landed && st.held && sh && sh.net) this.fishSlot.position.copy(v4).addScaledVector(v3, -0.1); // сияние — за сеткой
+      fist = v4.addScaledVector(v2, this.net.grip()); // v4 теперь — кулак на рукояти
+    }
+    if (landed && !st.net && sh && !sh.net) {
+      // Рыба на леске: гнездо (рот рыбы) — под кончиком удилища, качается маятником и откликается на поворот головы.
+      this.rod.tip.getWorldPosition(v1);
+      this.root.worldToLocal(v1);
+      const acc = -8.5 * this.swX - 1.5 * this.swV - clamp((st.lookDX || 0) * 0.05, -3, 3);
+      this.swV += acc * dt;
+      this.swX = clamp(this.swX + this.swV * dt, -0.3, 0.3);
+      const mouthY = Math.min(v1.y - 0.2, -0.1 + sh.s * 0.5);
+      if (st.held) {
+        this.fishSlot.position.set(v1.x + this.swX, mouthY + Math.abs(this.swX) * 0.12, v1.z);
+        this.hangLine.set(v1, this.fishSlot.position, 0, -99);
+      } else this.fishSlot.position.set(v1.x, mouthY, v1.z); // сюда рыба прилетит
+    }
+    if (fist) {
+      // процедурная левая кисть — тоже на ручке подсака
+      const k = this.handK;
+      this.handL.position.lerp(fist, k);
+      v2.set(this.handL.position.x - 0.02, this.handL.position.y - 0.028, this.handL.position.z + 0.04);
+      this.foreL.position.copy(v2);
+      this.foreL.lookAt(v1.copy(ELBOW_L).applyMatrix4(this.root.matrixWorld));
+      this.foreL.scale.set(1, 1, v2.distanceTo(ELBOW_L));
+    }
     if (this.arms) {
       // правый кулак — на рукояти над катушкой, большой палец к кончику удилища
       v1.set(0, GRIP_Y, 0).applyQuaternion(this.pivot.quaternion).add(this.pivot.position);
       v2.copy(AY).applyQuaternion(this.pivot.quaternion);
       this.arms.arm('R', v1, v2, ELBOW_R);
-      // левый — на ручке катушки, ходит по кругу вместе с ней
+      // левый — на ручке катушки, ходит по кругу вместе с ней…
       v1.copy(this.rod.knob).applyAxisAngle(AX, this.crank).add(this.rod.handle.position).applyQuaternion(this.pivot.quaternion).add(this.pivot.position);
       const lh = LEFT;
-      this.arms.arm('L', v1, v2.set(lh[3], lh[4], lh[5]), v3.set(lh[0], lh[1], lh[2]), lh[6]); // ручку держим пальцами снизу, тыл кисти — к нам
+      if (fist && this.handK > 0.5) {
+        // …а с подсаком — сжат на его рукояти, большой палец к обручу
+        const k = (this.handK - 0.5) * 2;
+        v1.lerp(fist, k);
+        this.arms.arm('L', v1, v2.copy(NET_AXIS).negate(), v3.set(lh[0], lh[1], lh[2]).lerp(NET_ELBOW, k));
+      } else {
+        if (fist) v1.lerp(v3.copy(v1).setY(v1.y - 0.5), this.handK * 2); // рука уходит вниз за подсаком
+        this.arms.arm('L', v1, v2.set(lh[3], lh[4], lh[5]), v3.set(lh[0], lh[1], lh[2]), lh[6]); // ручку держим пальцами снизу, тыл кисти — к нам
+      }
     }
   }
 

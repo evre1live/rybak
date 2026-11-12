@@ -2,7 +2,7 @@
 // Нужна там, где страницу показывают в рамке без сети — например, как артефакт Claude.
 // В ней только одиночная рыбалка: комнаты и голос живут на сервере.
 // Запуск: node tools/artifact.js [куда положить]  → dist/rybak-solo.html
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -31,8 +31,11 @@ swap('<link rel="icon" href="favicon.svg">', `<link rel="icon" href="${icon}">`)
 swap('<link rel="stylesheet" href="style.css">', `<style>${css}</style>`);
 // пробная версия живёт одним файлом: ни значков приложения, ни кэша на устройстве у неё нет
 swap('<link rel="manifest" href="manifest.webmanifest">\n<link rel="apple-touch-icon" href="icon-192.png">\n', '');
-swap('<script src="app.js"></script>', `<script>window.RYBAK_OFFLINE = true;</script>\n<script>${js}</script>`);
+// записи звуков (их четыре, по 2–3 КБ) — тоже внутрь: из сети пробная версия ничего не берёт
+const audio = {};
+for (const f of readdirSync(join(pub, 'audio')).filter((f) => f.endsWith('.webm')).sort()) audio[f.replace(/\.webm$/, '')] = readFileSync(join(pub, 'audio', f)).toString('base64');
+swap('<script src="app.js"></script>', `<script>window.RYBAK_OFFLINE = true; window.RYBAK_AUDIO = ${JSON.stringify(audio)};</script>\n<script>${js}</script>`);
 
 mkdirSync(dirname(out), { recursive: true });
 writeFileSync(out, html);
-console.log(`${out}: ${(Buffer.byteLength(html) / 1024).toFixed(0)} КБ, шрифтов внутри: ${fonts}`);
+console.log(`${out}: ${(Buffer.byteLength(html) / 1024).toFixed(0)} КБ, шрифтов внутри: ${fonts}, записей звука: ${Object.keys(audio).length}`);

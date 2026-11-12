@@ -1,7 +1,7 @@
 // Интерфейс: HUD как на макетах, лобби, снасти и магазин, рынок, журнал, выбор героя, настройки.
-import { CATS, ITEMS, FISH, FISH_BY_ID, JUNK_BY_ID, RARITY, ZONES, DAY_PARTS, RODS, MAX_PLAYERS, fmtW, fmtCoins, fmtClock, dayPart, isLure } from '../shared/data.js';
+import { CATS, ITEMS, FISH, FISH_BY_ID, FIGHT_STYLES, JUNK_BY_ID, RARITY, ZONES, DAY_PARTS, RODS, MAX_PLAYERS, fmtW, fmtCoins, fmtClock, dayPart, isLure } from '../shared/data.js';
 import {
-  kitStats, rodBars, owns, tackleCount, priceOf, fishValue, coolerValue, levelInfo, fightGrade, T_LOW, T_DANGER,
+  kitStats, rodBars, owns, tackleCount, priceOf, fishValue, coolerValue, levelInfo, fightGrade, T_LOW, T_DANGER, T_TIGHT, dangerAt, liftNeed,
   WEATHER, questText, questCount, questReward, QUEST_BONUS, TOURS, TOUR_LENS, tourTable, tourScoreText, tourTargets, tourPrize, medalPrize, MEDALS
 } from '../shared/logic.js';
 import { itemIcon, fishIcon, faceIcon } from './icons.js';
@@ -215,6 +215,7 @@ export class UI {
     if (f && (!jn || jn.n === 0)) bd.push('<span class="bd cy">НОВЫЙ ВИД!</span>');
     else if (f && jn && c.w > jn.best) bd.push('<span class="bd gr">ЛИЧНЫЙ РЕКОРД!</span>');
     if (c.trophy) bd.push('<span class="bd">ТРОФЕЙ</span>');
+    if (c.stalked) bd.push('<span class="bd gr">ВЫСЛЕЖЕНА</span>');
     if (f && this.g.market().hot.includes(c.sp)) bd.push('<span class="bd">В ЦЕНЕ ×1,6</span>');
     box.style.setProperty('--rc', rar.color);
     box.innerHTML = `<div class="rar">${rar.name}</div><h2>${esc((f || j).name)}</h2>
@@ -229,21 +230,61 @@ export class UI {
   fight(f, steer) {
     const box = $('#fight');
     box.classList.toggle('hidden', !f);
-    if (!f) return;
+    if (!f) {
+      this.fNow = null;
+      return;
+    }
+    // что за бой не меняется — манера рыбы и отметки легенды — пишем один раз, в его начале
+    if (this.fNow !== f) {
+      this.fNow = f;
+      this.fMode = this.fBoss = null;
+      const S = FIGHT_STYLES[f.style] || FIGHT_STYLES.plain;
+      $('#ftip').innerHTML = f.junk ? '' : `<b>${esc(S.name.toUpperCase())}</b>${esc(S.tip)}`;
+      $('#tok').textContent = f.style === 'bulldog' ? 'ВНАТЯГ' : 'НОРМА';
+      $('#pbar').classList.toggle('boss', f.bossMax > 0);
+      $('#fboss').classList.toggle('on', f.bossMax > 0);
+    }
     // стрелка и полоса двигаются сдвигом и растяжением (transform): страница при этом не пересчитывается
     $('#tptr').style.transform = `translateX(${(clamp(f.T, 0, 1) * 100).toFixed(2)}%)`;
     $('#pfill').style.transform = `scaleX(${clamp(f.p, 0, 1).toFixed(4)})`;
     const pct = Math.round(f.p * 100) + '%';
     if (this.pctShown !== pct) $('#ppct').textContent = this.pctShown = pct;
+    // особые зоны шкалы: свеча, залёгшая рыба, тяжеловес — классы меняем только при смене режима
+    const air = f.jumpT > 0;
+    const mode = (air ? 'air ' : '') + (f.stuck ? 'stuck ' : '') + (f.style === 'bulldog' ? 'bull' : '');
+    if (this.fMode !== mode) {
+      this.fMode = mode;
+      $('#tbar').className = 'tbar ' + mode;
+    }
+    if (f.stuck) $('#tzLiftK').style.transform = `scaleX(${clamp(f.lift / liftNeed(f), 0, 1).toFixed(3)})`;
+    if (f.bossMax && this.fBoss !== f.boss) {
+      this.fBoss = f.boss;
+      const used = f.bossMax - f.boss;
+      $('#fboss').innerHTML = Array.from({ length: f.bossMax }, (_, i) => `<i${i < f.boss ? '' : ' class="used"'}></i>`).join('');
+      $$('#pbar .pm').forEach((m, i) => m.classList.toggle('used', i < used));
+    }
     const st = $('#fstate');
     const run = f.phase === 'run';
+    const danger = dangerAt(f);
     let txt = 'РОВНО';
     let cls = '';
-    if (f.T > T_DANGER) {
-      txt = 'ОПАСНО!';
+    if (f.T > danger) {
+      txt = air ? 'ОТПУСТИ!' : 'ОПАСНО!';
       cls = 'bad';
+    } else if (air) {
+      txt = 'СВЕЧА — ОСЛАБЬ!';
+      cls = 'warn';
     } else if (f.T < T_LOW) {
       txt = 'СЛАБИНА!';
+      cls = 'warn';
+    } else if (f.stuck) {
+      txt = 'ЗАЛЕГЛА — ПОДОРВИ!';
+      cls = 'warn';
+    } else if (f.wrapped) {
+      txt = 'ЗА КАМНЯМИ!';
+      cls = 'bad';
+    } else if (run && f.style === 'snag' && steer !== -f.dir) {
+      txt = 'УВОДИ ОТ КАМНЕЙ!';
       cls = 'warn';
     } else if (run) {
       txt = 'РЫВОК!';
@@ -251,10 +292,12 @@ export class UI {
     } else if (f.warned) {
       txt = 'ГОТОВИТСЯ…';
       cls = 'warn';
+    } else if (f.style === 'bulldog' && f.T < T_TIGHT) {
+      txt = 'ТЯНИ ВНАТЯГ';
     }
-    if (st.textContent !== txt) st.textContent = txt;
-    st.className = cls;
-    $('.fpanel').classList.toggle('shake', f.T > T_DANGER);
+    if (this.fTxt !== txt) st.textContent = this.fTxt = txt;
+    if (st.className !== cls) st.className = cls;
+    $('.fpanel').classList.toggle('shake', f.T > danger);
     // куда вести: против рывка
     const need = run ? -f.dir : 0;
     const L = $('#steer .l');
@@ -700,6 +743,7 @@ export class UI {
         <h2 style="margin-top:-.1em">${j ? esc(f.name) : '???'}</h2>
         <p class="desc">${j ? esc(f.desc) : 'Эту рыбу вы ещё не ловили. Подсказки ниже помогут её найти.'}</p>
         <div class="kv" style="grid-column:1/-1"><span>Где</span><span>${zones}</span><span>На что</span><span>${baits || '—'}</span><span>Когда</span><span>${times}</span>
+          <span>Манера</span><span>${esc(FIGHT_STYLES[f.style].name)}: ${esc(FIGHT_STYLES[f.style].tip.charAt(0).toLowerCase() + FIGHT_STYLES[f.style].tip.slice(1))}${f.rar >= 4 ? '. Легенда: дважды собирается с силами' : ''}</span>
           <span>Вес</span><span>${fmtW(f.w[0])} – ${fmtW(f.w[1])}</span>${j ? `<span>Поймано</span><span>${j.n}</span><span>Рекорд</span><span class="y">${fmtW(j.best)}</span>` : ''}</div>
       </div>
       <div class="loadout"><span class="hd">ДО УРОВНЯ ${lv.lvl + 1}</span><div class="it" style="border:0;flex:1;max-width:30em"><div class="pbar" style="flex:1;height:1em"><i style="width:${Math.round((lv.cur / lv.need) * 100)}%;background:var(--ye)"></i></div>&nbsp;${lv.cur} / ${lv.need}</div>${this.footKeys('')}</div></div>`;
@@ -734,12 +778,14 @@ export class UI {
         <span>Чувствительность мыши</span>${rng('sens', 0.3, 3, 0.05)}
         <span>Перевернуть мышь по вертикали</span>${tog('invertY')}
         <span>Угол обзора</span>${rng('fov', 50, 90, 1)}
+        <span>Взгляд сам держится на рыбе<small class="sub">при вываживании, пока вы не ведёте мышью</small></span>${tog('follow')}
         <span>Графика${s.quality === 'auto' ? `<small class="sub">сейчас: ${{ low: 'низкая', medium: 'средняя', high: 'высокая' }[this.g.gfx.quality]}${this.g.gfx.scale < 0.99 ? `, разрешение ${Math.round(this.g.gfx.scale * 100)}%` : ''}</small>` : ''}</span><select data-set="quality">${[['auto', 'Авто'], ['high', 'Высокая'], ['medium', 'Средняя'], ['low', 'Низкая']].map(([v, n]) => `<option value="${v}" ${s.quality === v ? 'selected' : ''}>${n}</option>`).join('')}</select>
         <span>Плавное разрешение<small class="sub">кадры проседают — картинка чуть мельче</small></span>${tog('drs')}
         <span>Счётчик кадров (F3)</span>${tog('fps')}
         <span>Общая громкость</span>${rng('master', 0, 1, 0.02)}
         <span>Море, чайки, ветер</span>${rng('amb', 0, 1, 0.02)}
         <span>Звуки рыбалки</span>${rng('sfx', 0, 1, 0.02)}
+        <span>Музыка<small class="sub">её сочиняет сама игра; на нуле — выключена</small></span>${rng('music', 0, 1, 0.02)}
         <span>Громкость голосов друзей</span>${rng('voiceVol', 0, 1, 0.02)}
         <span>Говорить только с зажатой V</span>${tog('ptt')}
         <span>Голос тише с расстоянием</span>${tog('near')}
@@ -874,7 +920,7 @@ export class UI {
         <span>${k('ДЖОЙСТИК', 'g')}</span><span>Слева — ходить; отведите до упора — бег. Палец по экрану — смотреть по сторонам.</span>
         <span>${k('ЗАБРОС')}</span><span>Наведите прицел на воду, зажмите жёлтую кнопку — шкала силы растёт — и отпустите. Белая риска показывает, сколько силы нужно до метки.</span>
         <span>${k('ПОДСЕКАЙ')}</span><span>Поплавок нырнул и кнопка замигала — жмите сразу.</span>
-        <span>${k('МОТАЙ')}</span><span><b>Вываживание:</b> держите кнопку — мотаете, отпускаете — леска слабеет. Стрелка натяжения должна быть в голубой зоне. Рыба рванула вбок — ведите джойстик в другую сторону.</span>
+        <span>${k('МОТАЙ')}</span><span><b>Вываживание:</b> держите кнопку — мотаете, отпускаете — леска слабеет. Стрелка натяжения должна быть в голубой зоне. Рыба рванула вбок — ведите джойстик в другую сторону. У каждой рыбы своя манера — подсказка под шкалой: прыгнула свечой — отпустите кнопку, залегла на дно — держите стрелку в рамке.</span>
         <span>${k('СМОТАТЬ', 'g')}</span><span>Вернуть снасть. После улова рядом появится «ОТПУСТИТЬ» — за это дают больше опыта.</span>
         <span>${k('РЫНОК')}</span><span>Кнопка появляется у лавки на берегу: продать улов, купить удочки, леску, наживку.</span>
         <span>${k('ЛОДКА')}</span><span>Подойдите к лодке у пирса — её дают напрокат. Джойстик вперёд — ход, в стороны — руль. Рыбачить можно прямо с борта: в открытом море, у затонувшего корабля, в лагуне Пальмового острова. К другу в лодку можно сесть пассажиром.</span>
@@ -891,7 +937,7 @@ export class UI {
         <span>${k('W')}${k('A')}${k('S')}${k('D')}</span><span>Ходить. ${k('SHIFT', 'g')} — бег, ${k('ПРОБЕЛ', 'g')} — прыжок, ${k('X', 'g')} — сесть (на краю причала ноги свесятся).</span>
         <span>${k('ЛКМ')}</span><span><b>Заброс:</b> наведите прицел на воду, зажмите кнопку — шкала силы растёт — и отпустите. Белая риска на шкале показывает, сколько силы нужно до метки.</span>
         <span>${k('ЛКМ')}</span><span><b>Подсечка:</b> поплавок нырнул и появилось «КЛЮЁТ!» — жмите сразу.</span>
-        <span>${k('ЛКМ')}${k('A', 'g')}${k('D', 'g')}</span><span><b>Вываживание:</b> держите кнопку — мотаете, отпускаете — леска слабеет. Стрелка натяжения должна быть в голубой зоне. В красной леска рвётся, в жёлтой рыба сходит. Рванула вбок — ведите удочку в другую сторону.</span>
+        <span>${k('ЛКМ')}${k('A', 'g')}${k('D', 'g')}</span><span><b>Вываживание:</b> держите кнопку — мотаете, отпускаете — леска слабеет. Стрелка натяжения должна быть в голубой зоне. В красной леска рвётся, в жёлтой рыба сходит. Рванула вбок — ведите удочку в другую сторону. У каждой рыбы своя манера — подсказка под шкалой: прыгнула свечой — отпустите кнопку, залегла на дно — держите стрелку в рамке.</span>
         <span>${k('ПКМ', 'x')} / ${k('R', 'b')}</span><span>Смотать леску. После улова ${k('R', 'b')} — отпустить рыбу (за это дают больше опыта).</span>
         <span>${k('E')}</span><span>Говорить с торговцем у лавки «Рынок»: продать улов, купить удочки, леску, наживку.</span>
         <span>${k('E')}</span><span><b>Лодка:</b> подойдите к лодке у пирса — её дают напрокат. ${k('W', 'g')}${k('S', 'g')} — ход, ${k('A', 'g')}${k('D', 'g')} — руль. Рыбачить можно прямо с борта: в открытом море, у затонувшего корабля, в лагуне Пальмового острова. Причалить можно у маяка и на острове. В лодку друга тоже можно сесть — в ней два места для пассажиров.</span>

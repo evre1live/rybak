@@ -4,7 +4,7 @@ import { ITEMS, RODS, FLOATS, LINES, REELS } from '../shared/data.js';
 import { Batch, M, G, BATCH_MAT, BATCH_MAT_2S } from './batch.js';
 import { METAL_MAT, GLOSS_MAT, RING_MAT } from './env.js';
 import { loft, tube } from './shapes.js';
-import { shade, mat } from './util.js';
+import { shade, mat, canvasTex } from './util.js';
 
 const METAL = '#3b424c';
 export const ROD_LEN = 1.98;
@@ -128,6 +128,84 @@ export function buildRod(rodId, reelId = 'reel1', lineId = 'line1', handleSide =
       }
     }
   };
+}
+
+let netTex = null;
+/**
+ * Подсак. head — обруч единичного поперечника в плоскости XZ с мешком из сетки вниз (−Y): его размер задаётся масштабом.
+ * stem — развилка и ручка вдоль +Z, длина у неё всегда одна; setSize(d) ставит обруч поперечника d и придвигает к нему ручку.
+ * grip(d) — на каком расстоянии от середины обруча лежит кулак.
+ */
+export function buildNet() {
+  const g = new THREE.Group();
+  const head = new THREE.Group();
+  const stem = new THREE.Group();
+  g.add(head, stem);
+  const metal = mat('#cfd8e2', 0.32, 0.85);
+  const dark = mat('#1d2733', 0.7, 0.1);
+  const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.017, 8, 44), metal);
+  hoop.rotation.x = Math.PI / 2;
+  head.add(hoop);
+  // сетка: ромбическая ячея, между нитями — насквозь
+  netTex =
+    netTex ||
+    canvasTex(
+      128,
+      128,
+      (c, w, h) => {
+        c.clearRect(0, 0, w, h);
+        c.strokeStyle = '#e9f1ea';
+        c.lineWidth = 3.2;
+        for (let i = -h; i < w + h; i += 16) {
+          c.beginPath();
+          c.moveTo(i, 0);
+          c.lineTo(i + h, h);
+          c.moveTo(i + h, 0);
+          c.lineTo(i, h);
+          c.stroke();
+        }
+      },
+      { repeat: [9, 3] }
+    );
+  const bag = new THREE.Mesh(new THREE.SphereGeometry(0.5, 28, 9, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), new THREE.MeshStandardMaterial({ map: netTex, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.95, metalness: 0 }));
+  bag.scale.y = 0.62;
+  head.add(bag);
+  // развилка и ручка с резиновой рукоятью (в метрах, от края обруча)
+  for (const sx of [-1, 1]) {
+    const strut = new THREE.Mesh(G.cyl(8), metal);
+    strut.scale.set(0.011, 0.085, 0.011);
+    strut.position.set(sx * 0.03, 0, 0.03);
+    strut.rotation.set(Math.PI / 2, 0, sx * 0.72);
+    stem.add(strut);
+  }
+  const shaft = new THREE.Mesh(G.cyl(10), metal);
+  shaft.scale.set(0.018, 0.2, 0.018);
+  shaft.position.set(0, 0, 0.16);
+  shaft.rotation.x = Math.PI / 2;
+  const grip = new THREE.Mesh(G.cyl(12), dark);
+  grip.scale.set(0.026, 0.19, 0.026);
+  grip.position.set(0, 0, 0.33);
+  grip.rotation.x = Math.PI / 2;
+  const cap = new THREE.Mesh(G.cyl(12), mat('#ffd60a', 0.5, 0.1));
+  cap.scale.set(0.03, 0.014, 0.03);
+  cap.position.set(0, 0, 0.432);
+  cap.rotation.x = Math.PI / 2;
+  stem.add(shaft, grip, cap);
+  g.traverse((o) => {
+    if (o.isMesh) o.castShadow = o.receiveShadow = false;
+  });
+  let size = 0.45;
+  const net = {
+    group: g,
+    setSize(d) {
+      size = d;
+      head.scale.setScalar(d);
+      stem.position.z = d * 0.5 - 0.012;
+    },
+    grip: (d = size) => d * 0.5 + 0.31
+  };
+  net.setSize(size);
+  return net;
 }
 
 export function buildFloat(floatId = 'float1') {

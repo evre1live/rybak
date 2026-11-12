@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FISH, FISH_BY_ID, ITEMS, RODS, ZONES, CATS, clockHours, dayPart, fmtClock, DAY_REAL_SEC } from '../shared/data.js';
+import { FISH, FISH_BY_ID, FIGHT_STYLES, ITEMS, RODS, ZONES, CATS, clockHours, dayPart, fmtClock, DAY_REAL_SEC } from '../shared/data.js';
 import * as L from '../shared/logic.js';
 
 const rng = () => L.mulberry32(42);
@@ -88,6 +88,296 @@ test('вываживание: если держать кнопку не отпу
   const s2 = L.fightInit({ sp: 'kefal', w: 1.5 }, kit, r);
   for (let i = 0; i < 3000 && !s2.result; i++) L.fightStep(s2, { reel: false, steer: 0 }, 1 / 30, kit, r);
   assert.equal(s2.result, 'escape');
+});
+
+// снасть для проверок вываживания: стартовая — из нового профиля, остальные собираем
+const kitOf = (rod, line, reel, hook, net) => {
+  const p = L.newProfile();
+  Object.assign(p.equip, { rod, line, reel, hook });
+  if (net) p.owned.net = true;
+  return L.kitStats(p);
+};
+const MID = () => kitOf('rod3', 'line2', 'reel2', 'hook2', true);
+const TOP = () => kitOf('rod6', 'line4', 'reel4', 'hook4', true);
+const half = () => 0.5; // «случай», при котором всё происходит по среднему
+const DT = 1 / 30;
+
+test('манеры: у каждой рыбы своя, все семь в деле; у легенд два «вторых дыхания», у мусора — ничего', () => {
+  const used = new Set();
+  const kit = L.kitStats(L.newProfile());
+  for (const f of FISH) {
+    assert.ok(FIGHT_STYLES[f.style] && FIGHT_STYLES[f.style].name && FIGHT_STYLES[f.style].tip, f.id);
+    assert.ok(L.STYLE_K[f.style], f.id);
+    used.add(f.style);
+    const s = L.fightInit({ sp: f.id, w: f.w[0] }, kit, half);
+    assert.equal(s.style, f.style, f.id);
+    assert.equal(s.boss, f.rar >= 4 ? 2 : 0, f.id);
+  }
+  assert.deepEqual([...used].sort(), Object.keys(FIGHT_STYLES).sort());
+  assert.ok(FISH.filter((f) => f.rar >= 4).length >= 3);
+  const junk = L.fightInit({ sp: 'boot', w: 1, junk: true }, kit, half);
+  assert.equal(junk.style, 'plain');
+  assert.equal(junk.boss, 0);
+});
+
+test('свеча: опасная зона начинается раньше, подмотка рвёт леску, отпущенная леска успевает ослабнуть', () => {
+  const kit = L.kitStats(L.newProfile()); // щука на стартовой снасти — рыба в полную силу
+  const start = () => {
+    const s = L.fightInit({ sp: 'shuka', w: 4 }, kit, half);
+    assert.ok(s.rho >= 1, String(s.rho));
+    s.next = 'run';
+    s.warned = true; // всплеск-предупреждение уже был
+    s.phaseT = 0;
+    s.T = 0.6;
+    return s;
+  };
+  const a = start();
+  assert.deepEqual(L.fightStep(a, { reel: false, steer: 0 }, DT, kit, half), ['run', 'jump']);
+  assert.ok(a.jumpT > 0.7);
+  assert.equal(L.dangerAt(a), L.T_DANGER, 'первые доли секунды — время заметить');
+  for (let i = 0; i < 8; i++) L.fightStep(a, { reel: false, steer: 0 }, DT, kit, half);
+  assert.equal(L.dangerAt(a), L.T_JUMP);
+  for (let i = 0; i < 12; i++) L.fightStep(a, { reel: false, steer: 0 }, DT, kit, half);
+  assert.equal(a.result, null);
+  assert.ok(a.T < 0.45, 'отпустили — ослабла: ' + a.T.toFixed(2));
+  assert.equal(a.slack, 0, 'в прыжке слабина сходом не грозит');
+  for (let i = 0; i < 6; i++) L.fightStep(a, { reel: false, steer: 0 }, DT, kit, half);
+  assert.equal(L.dangerAt(a), L.T_DANGER, 'рыба в воде — зона прежняя');
+  // тот же прыжок, но кнопку не отпустили
+  const b = start();
+  let n = 0;
+  while (!b.result && n < 30) {
+    L.fightStep(b, { reel: true, steer: 0 }, DT, kit, half);
+    n++;
+  }
+  assert.equal(b.result, 'snap');
+  assert.ok(n * DT < 0.75, 'обрыв ещё в воздухе: ' + (n * DT).toFixed(2));
+  // без свечи та же отпущенная леска в рывке почти не слабнет
+  const c = start();
+  c.style = 'bulldog';
+  L.fightStep(c, { reel: false, steer: 0 }, DT, kit, () => 0.99);
+  assert.equal(c.jumpT, 0);
+  for (let i = 0; i < 20; i++) L.fightStep(c, { reel: false, steer: 0 }, DT, kit, half);
+  assert.ok(c.T > 0.55, c.T.toFixed(2));
+});
+
+test('присоска: залегла — ни с места, пока не оторвёшь натяжением у верхней границы нормы', () => {
+  const kit = L.kitStats(L.newProfile());
+  const s = L.fightInit({ sp: 'skat', w: 12 }, kit, half);
+  s.phase = 'run';
+  s.next = 'calm';
+  s.phaseT = 0;
+  s.p = 0.4;
+  s.T = 0.4;
+  const ev = L.fightStep(s, { reel: true, steer: 0 }, DT, kit, half);
+  assert.ok(ev.includes('stuck'), ev.join());
+  const p0 = s.p;
+  // мотаем на слабой леске — рыба не идёт
+  for (let i = 0; i < 6; i++) L.fightStep(s, { reel: s.T < 0.5, steer: 0 }, DT, kit, half);
+  assert.equal(s.p, p0);
+  assert.equal(s.lift, 0);
+  // держим у верхней границы нормы — отрывается
+  let got = null;
+  let n = 0;
+  while (!got && n < 300) {
+    const e = L.fightStep(s, { reel: s.T < 0.7, steer: 0 }, DT, kit, half);
+    assert.ok(!e.includes('stuck'), 'пока лежит, заново не залегает');
+    if (e.includes('unstuck')) got = n * DT;
+    n++;
+  }
+  assert.ok(got != null && got < 4, String(got));
+  assert.ok(s.p > p0, 'оторвали — подалась');
+  assert.equal(s.stuck, 0);
+  assert.ok(s.stickCd > 5, 'какое-то время больше не залегает');
+  // а если ничего не делать, снимется сама, но не скоро
+  const z = L.fightInit({ sp: 'skat', w: 12 }, kit, half);
+  Object.assign(z, { phase: 'run', next: 'calm', phaseT: 0, p: 0.4 });
+  L.fightStep(z, { reel: false, steer: 0 }, DT, kit, half);
+  assert.equal(z.stuck, 1);
+  z.slack = -100; // сход нас тут не интересует
+  let t = 0;
+  while (z.stuck && t < 20) {
+    L.fightStep(z, { reel: false, steer: 0 }, DT, kit, half);
+    z.slack = -100;
+    t += DT;
+  }
+  assert.ok(t > 8 && t < 10, t.toFixed(1));
+});
+
+test('хитрец: не увёл от укрытия — леска заходит за камни; увёл — нет', () => {
+  const kit = L.kitStats(L.newProfile());
+  const start = () => {
+    const s = L.fightInit({ sp: 'ugor', w: 2.5 }, kit, half);
+    s.next = 'run';
+    s.warned = true;
+    s.phaseT = 0;
+    s.T = 0.35;
+    return s;
+  };
+  const a = start();
+  assert.deepEqual(L.fightStep(a, { reel: false, steer: 0 }, DT, kit, half), ['run']);
+  assert.ok(a.dir === 1 || a.dir === -1);
+  let wraps = 0;
+  let at = 0;
+  let before = 0;
+  for (let i = 0; i < 45 && a.phase === 'run'; i++) {
+    const T0 = a.T;
+    if (L.fightStep(a, { reel: false, steer: 0 }, DT, kit, half).includes('wrap')) {
+      wraps++;
+      at = i * DT;
+      before = T0;
+      assert.ok(a.T - T0 > 0.1, 'натяжение подскочило');
+    }
+  }
+  assert.equal(wraps, 1);
+  assert.ok(at > 1 && at < 1.2, at.toFixed(2));
+  assert.ok(before < L.T_DANGER);
+  const b = start();
+  L.fightStep(b, { reel: false, steer: 0 }, DT, kit, half);
+  for (let i = 0; i < 45 && b.phase === 'run'; i++) assert.ok(!L.fightStep(b, { reel: false, steer: -b.dir }, DT, kit, half).includes('wrap'));
+  assert.equal(b.wrapT, 0);
+  assert.ok(b.T < a.T);
+});
+
+test('тяжеловес идёт к берегу, только пока леска внатяг; трясун дёргает стрелку', () => {
+  const kit = L.kitStats(L.newProfile());
+  const gain = (T, style) => {
+    const s = L.fightInit({ sp: 'som', w: 20 }, kit, half);
+    s.style = style;
+    s.T = T;
+    const p0 = s.p;
+    L.fightStep(s, { reel: true, steer: 0 }, DT, kit, half);
+    return s.p - p0;
+  };
+  assert.ok(gain(0.4, 'bulldog') < gain(0.6, 'bulldog') * 0.5);
+  assert.ok(Math.abs(gain(0.4, 'plain') - gain(0.6, 'plain')) < 1e-9);
+  assert.ok(Math.abs(gain(0.6, 'bulldog') - gain(0.6, 'plain')) < 1e-9);
+  // трясун: без кнопки стрелка у обычной рыбы идёт ровно вниз, у трясуна — с рывками вверх
+  const path = (style) => {
+    const s = L.fightInit({ sp: 'okun', w: 1.2 }, kit, half);
+    s.style = style;
+    s.rho = 1.2; // рыба в полную силу снасти: у слабой тряска вдвое меньше
+    s.phaseT = 9;
+    let ups = 0;
+    for (let i = 0; i < 30; i++) {
+      const T0 = s.T;
+      L.fightStep(s, { reel: false, steer: 0 }, DT, kit, half);
+      if (s.T > T0) ups++;
+    }
+    return ups;
+  };
+  assert.equal(path('plain'), 0);
+  assert.ok(path('thrash') >= 5);
+});
+
+test('легенда дважды собирается с силами: забирает часть пути и рвёт; время боя при этом не сбрасывается', () => {
+  const kit = TOP();
+  const f = FISH_BY_ID.mech;
+  const w = f.w[0] + (f.w[1] - f.w[0]) * 0.28;
+  const s = L.fightInit({ sp: 'mech', w }, kit, half);
+  s.p = 0.449;
+  s.fat = 20;
+  const t0 = s.t;
+  let ev = L.fightStep(s, { reel: true, steer: 0 }, DT, kit, half);
+  for (let i = 0; i < 8 && !ev.includes('rage'); i++) ev = L.fightStep(s, { reel: true, steer: 0 }, DT, kit, half);
+  assert.ok(ev.includes('rage'));
+  assert.equal(s.boss, 1);
+  assert.ok(s.p < 0.37 && s.p > 0.33, s.p.toFixed(3));
+  assert.ok(s.fat < 16 && s.fat > 14, 'усталость частью сброшена');
+  assert.ok(s.t > t0, 'часы боя идут вперёд');
+  assert.equal(s.warned, true);
+  // рывок приходит через полсекунды, он длиннее и сильнее обычного
+  let ran = false;
+  for (let i = 0; i < 25 && !ran; i++) ran = L.fightStep(s, { reel: false, steer: 0 }, DT, kit, half).includes('run');
+  assert.ok(ran);
+  assert.ok(s.t - t0 > 0.5 && s.t - t0 < 1);
+  // весь бой: у легенды два «вторых дыхания», у обычной рыбы — ни одного; сильный рыбак на лучшей снасти вытаскивает
+  const r = rng();
+  let ok = 0;
+  let long = 0;
+  for (let i = 0; i < 60; i++) {
+    const b = L.botFight({ sp: 'mech', w }, kit, r, 0.85);
+    if (b.result === 'landed') {
+      ok++;
+      assert.equal(b.seen.rage, 2);
+      assert.ok(b.seen.jump >= 1);
+    } else assert.ok((b.seen.rage || 0) <= 2);
+    long += b.t;
+  }
+  assert.ok(ok >= 57, 'меч-рыба ' + ok);
+  assert.ok(long / 60 > 25 && long / 60 < 50, (long / 60).toFixed(0));
+  const plain = L.botFight({ sp: 'shuka', w: 4 }, MID(), r, 0.85);
+  assert.equal(plain.result, 'landed');
+  assert.equal(plain.seen.rage, undefined);
+});
+
+test('баланс манер: мелочь ловится у всех, редкая рыба на своей снасти — у умелого, легенды на лучшей — тоже', () => {
+  const r = rng();
+  const rate = (sp, k, kit, skill, n = 80) => {
+    const f = FISH_BY_ID[sp];
+    const w = f.w[0] + (f.w[1] - f.w[0]) * k;
+    let ok = 0;
+    for (let i = 0; i < n; i++) if (L.botFight({ sp, w }, kit, r, skill, 900).result === 'landed') ok++;
+    return (100 * ok) / n;
+  };
+  const start = L.kitStats(L.newProfile());
+  for (const f of FISH.filter((x) => x.rar === 0)) assert.ok(rate(f.id, 0.28, start, 0.5, 40) >= 95, f.id);
+  const mid = MID();
+  for (const f of FISH.filter((x) => x.rar === 1 || x.rar === 2)) assert.ok(rate(f.id, 0.28, mid, 0.5, 40) >= 95, f.id);
+  for (const sp of ['som', 'tunec', 'losos', 'skat']) assert.ok(rate(sp, 0.28, mid, 0.85) >= 80, sp);
+  const top = TOP();
+  for (const f of FISH.filter((x) => x.rar >= 4)) {
+    assert.ok(rate(f.id, 0.28, top, 0.85) >= 96, f.id);
+    assert.ok(rate(f.id, 0.8, top, 0.85) >= 94, f.id + ' крупная');
+  }
+  // а новичку на лучшей снасти крупная меч-рыба и Старик даются не всегда
+  assert.ok(rate('mech', 0.8, top, 0.5, 120) < 50);
+  assert.ok(rate('starik', 0.8, top, 0.5, 120) < 60);
+});
+
+test('выслеженная рыба: наживка у крупной тени — клюёт скорее, не хлам и не мелочь; опыта за неё больше', () => {
+  const kit = L.kitStats(L.newProfile());
+  const spot = (big) => ({ zone: 'pier', depth: 3, pier: true, hot: false, big });
+  const r = rng();
+  const mean = (big) => {
+    let t = 0;
+    for (let i = 0; i < 4000; i++) t += L.biteDelay(spot(big), 'worm', 12, kit, r).t;
+    return t / 4000;
+  };
+  const plain = mean(0);
+  const seen = mean(0.5);
+  assert.ok(seen < plain * 0.62, `поклёвка скорее: ${seen.toFixed(1)} с против ${plain.toFixed(1)} с`);
+  const roll = (big, n = 3000) => {
+    const out = { junk: 0, u: 0, min: 1, trophy: 0, stalked: 0 };
+    for (let i = 0; i < n; i++) {
+      const c = L.rollFish(spot(big), 'worm', 12, r);
+      if (c.junk) { out.junk++; continue; }
+      const f = FISH_BY_ID[c.sp];
+      const u = (c.w - f.w[0]) / (f.w[1] - f.w[0]);
+      out.u += u / n;
+      out.min = Math.min(out.min, u);
+      if (c.trophy) out.trophy++;
+      if (c.stalked) out.stalked++;
+    }
+    return out;
+  };
+  const a = roll(0);
+  const small = roll(0.05);
+  const big = roll(1);
+  assert.ok(a.junk > 50 && a.stalked === 0, 'обычный заброс у причала: бывает и хлам — ' + a.junk);
+  assert.equal(small.junk + big.junk, 0, 'выслеженная рыба — не хлам');
+  assert.equal(small.stalked, 3000);
+  assert.ok(small.min > 0.34 && big.min > 0.74, `нижняя граница веса растёт с тенью: ${small.min.toFixed(2)} и ${big.min.toFixed(2)}`);
+  assert.ok(a.u < 0.3 && small.u > 0.4 && big.u > 0.78, `в среднем: ${a.u.toFixed(2)} → ${small.u.toFixed(2)} → ${big.u.toFixed(2)}`);
+  assert.ok(big.trophy > 1200 && big.trophy < 2700 && small.trophy < 400, `трофеи: у крупной тени — половина, у мелкой — редко (${big.trophy}, ${small.trophy})`);
+  // опыт и счёт в журнале
+  const c = { sp: 'okun', w: 0.6, len: 30, trophy: false, junk: false };
+  assert.ok(L.xpFor({ ...c, stalked: true }) > L.xpFor(c) * 1.15);
+  const p = L.newProfile();
+  L.recordCatch(p, { ...c, stalked: true }, false);
+  L.recordCatch(p, c, false);
+  assert.equal(p.stats.stalked, 1);
+  assert.equal(L.fixProfile({ ...L.newProfile(), stats: { casts: 3 } }).stats.stalked, 0, 'старым сохранениям счётчик добавляется');
 });
 
 test('цены: крупнее — дороже, трофей и спрос добавляют', () => {

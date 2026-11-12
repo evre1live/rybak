@@ -141,7 +141,8 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
       else if (f.state === 'bite') { i.pressed.add('Primary'); }
       else if (f.state === 'fight') {
         const s = f.fight; const run = s.phase === 'run';
-        i.primary = s.T < (run ? 0.5 : s.warned ? 0.42 : 0.64);
+        // в свече леску отпускаем, залёгшую рыбу отрываем натяжением у верхней границы нормы
+        i.primary = s.T < (s.jumpT > 0 ? 0.45 : s.stuck ? 0.72 : run ? 0.5 : s.warned ? 0.42 : 0.64);
         i.keys.delete('KeyA'); i.keys.delete('KeyD');
         if (run && s.dir) i.keys.add(s.dir > 0 ? 'KeyA' : 'KeyD');
       } else if (f.state === 'landed') { i.primary = false; if (f.landT > 1.2 && !window.__keep) i.pressed.add('Primary'); }
@@ -180,6 +181,298 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
   const st = await G(page, () => ({ cooler: RYBAK.profile.cooler.length, xp: RYBAK.profile.xp, journal: Object.keys(RYBAK.profile.journal).length, log: [...new Set(window.__log)] }));
   console.log('  улов:', JSON.stringify(st));
   assert.ok(st.cooler >= 3 && st.xp > 0);
+
+  // ── вываживание по манерам: подсказки на шкале, «второе дыхание» легенды, показ улова на леске и в подсаке ──
+  {
+    const fightOf = (sp, u = 0.5) => G(page, ([sp, u]) => {
+      const g = RYBAK, f = g.fishing;
+      if (f.state !== 'idle') f.toIdle();
+      g.ui.catchCard(null);
+      g.input.primary = false; g.input.keys.clear();
+      f.startFight(sp, u, 10);
+      // Бой для проверок «вечный»: пока смотрим на шкалу и на камеру, рыба не сходит, леска не рвётся, путь не идёт сам.
+      // Счётчики провиса и перегруза правила обнуляют сами, едва стрелка вернулась в рабочую зону, — разовой правки мало,
+      // поэтому чистим их перед каждым шагом боя (window.__eternal — пока идут эти проверки).
+      if (!f.__pinned) {
+        f.__pinned = true;
+        const up = f.update;
+        f.update = function (...a) {
+          const s = this.fight;
+          if (window.__eternal && this.state === 'fight' && s) { s.slack = 0; s.strain = 0; }
+          return up.apply(this, a);
+        };
+      }
+      window.__eternal = true;
+      f.fight.stamina = 1e12;
+      return { style: f.fight.style, boss: f.fight.boss };
+    }, [sp, u]);
+    // один кадр игры с остановленным боем: правила не идут, шкала перерисовывается
+    const hud = (set) => G(page, (set) => new Promise((ok) => {
+      const g = RYBAK, f = g.fishing.fight;
+      Object.assign(f, set);
+      const step = g.fishing.update;
+      g.fishing.update = () => {};
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        g.fishing.update = step;
+        const vis = (q) => getComputedStyle(document.querySelector(q)).display !== 'none';
+        const box = (q) => { const r = document.querySelector(q).getBoundingClientRect(), b = document.querySelector('#tbar').getBoundingClientRect(); return [(r.left - b.left) / b.width, (r.right - b.left) / b.width]; };
+        ok({ tip: document.querySelector('#ftip').textContent, bar: document.querySelector('#tbar').className.trim(), state: document.querySelector('#fstate').textContent, cls: document.querySelector('#fstate').className, jump: vis('#tzJump') && box('#tzJump'), lift: vis('#tzLift') && box('#tzLift'), slack: vis('.tz.slack') && box('.tz.slack'), liftK: document.querySelector('#tzLiftK').style.transform, ok: document.querySelector('#tok').textContent, pips: [...document.querySelectorAll('#fboss i')].map((e) => e.className || 'on'), marks: [...document.querySelectorAll('#pbar .pm')].map((e) => (getComputedStyle(e).display === 'none' ? '-' : e.className.includes('used') ? 'used' : 'on')), shake: document.querySelector('.fpanel').classList.contains('shake') });
+      }));
+    }), set);
+    const near = (a, b) => Math.abs(a - b) < 0.03;
+
+    // прыгун: пока рыба в воздухе, «опасно» начинается с 62 %
+    let f = await fightOf('shuka');
+    assert.equal(f.style, 'jumper');
+    let h = await hud({ jumpT: 0, stuck: 0, T: 0.5, phase: 'calm', warned: false });
+    assert.match(h.tip, /ПРЫГУН.*свеч/);
+    assert.ok(!h.jump && !h.lift && !h.slack && h.state === 'РОВНО' && h.ok === 'НОРМА', JSON.stringify(h));
+    h = await hud({ jumpT: 0.4, T: 0.5, phase: 'run' });
+    assert.ok(h.jump && near(h.jump[0], 0.62) && near(h.jump[1], 0.78), 'зона свечи на шкале: ' + JSON.stringify(h));
+    assert.ok(/СВЕЧА/.test(h.state) && h.cls === 'warn' && !h.shake, JSON.stringify(h));
+    h = await hud({ jumpT: 0.4, T: 0.7, phase: 'run' });
+    assert.ok(/ОТПУСТИ/.test(h.state) && h.cls === 'bad' && h.shake, 'в свече 70 % — уже опасно: ' + JSON.stringify(h));
+    h = await hud({ jumpT: 0, T: 0.7, phase: 'run' });
+    assert.ok(!h.jump && h.state === 'РЫВОК!' && !h.shake, JSON.stringify(h));
+
+    // присоска: залегла — рамка «держи» у верхней границы нормы и полоска отрыва
+    f = await fightOf('skat');
+    assert.equal(f.style, 'flat');
+    h = await hud({ stuck: 1, lift: 0, T: 0.4, phase: 'calm', warned: false });
+    assert.ok(h.lift && near(h.lift[0], 0.6) && near(h.lift[1], 0.78) && /ЗАЛЕГЛА/.test(h.state), JSON.stringify(h));
+    h = await hud({ stuck: 1, lift: 0.5 * (await G(page, () => RYBAK.fishing.fight.rho >= 1 ? 1.6 : (0.5 + 0.5 * RYBAK.fishing.fight.rho) * 1.6)), T: 0.7 });
+    assert.match(h.liftK, /scaleX\(0\.5\d*\)/, 'полоска отрыва — половина: ' + h.liftK);
+    h = await hud({ stuck: 0, T: 0.5 });
+    assert.ok(!h.lift, JSON.stringify(h));
+
+    // тяжеловес: норма делится на «вяло» и «внатяг»
+    f = await fightOf('som', 0.3);
+    assert.equal(f.style, 'bulldog');
+    h = await hud({ T: 0.4, phase: 'calm', warned: false });
+    assert.ok(h.slack && near(h.slack[0], 0.22) && near(h.slack[1], 0.5) && h.ok === 'ВНАТЯГ' && h.state === 'ТЯНИ ВНАТЯГ', JSON.stringify(h));
+    h = await hud({ T: 0.6 });
+    assert.equal(h.state, 'РОВНО');
+
+    // хитрец: в рывке — «уводи», завёл — «за камнями»
+    f = await fightOf('ugor');
+    assert.equal(f.style, 'snag');
+    h = await hud({ phase: 'run', dir: 1, T: 0.5, wrapped: false });
+    assert.match(h.state, /УВОДИ/);
+    h = await hud({ phase: 'run', dir: 1, T: 0.5, wrapped: true });
+    assert.match(h.state, /ЗА КАМНЯМИ/);
+
+    // легенда: два «дыхания», отметки на полосе; собралась — одно гаснет, путь уходит назад, на экране плашка
+    f = await fightOf('koi');
+    assert.equal(f.boss, 2);
+    h = await hud({ T: 0.5, phase: 'calm', warned: false });
+    assert.deepEqual(h.pips, ['on', 'on']);
+    assert.deepEqual(h.marks, ['on', 'on']);
+    const rage = await G(page, () => new Promise((ok) => {
+      const g = RYBAK, f = g.fishing, s = f.fight;
+      const emit = f.emit; const seen = [];
+      f.emit = (t, d) => { seen.push(t); emit(t, d); };
+      s.p = 0.46; s.T = 0.5;
+      requestAnimationFrame(() => requestAnimationFrame(() => { f.emit = emit; ok({ seen, p: s.p, boss: s.boss, banner: document.querySelector('#banner').textContent, hidden: document.querySelector('#banner').classList.contains('hidden') }); }));
+    }));
+    assert.ok(rage.seen.includes('rage') && rage.boss === 1 && rage.p < 0.4, JSON.stringify(rage));
+    assert.ok(/ВТОРОЕ ДЫХАНИЕ/.test(rage.banner) && !rage.hidden, JSON.stringify(rage));
+    h = await hud({ T: 0.5 });
+    assert.deepEqual(h.pips, ['on', 'used']);
+    assert.deepEqual(h.marks, ['used', 'on']);
+    f = await fightOf('okun');
+    h = await hud({ T: 0.5 });
+    assert.deepEqual(h.marks, ['-', '-'], 'у обычной рыбы отметок нет');
+
+    // взгляд сам держится на рыбе (она левее середины кадра), пока мышь не трогают; выключили в настройках — стоит
+    const view = () => G(page, () => { const g = RYBAK, f = g.fishing; const v = new g.camera.position.constructor(f.bx, 0, f.bz).project(g.camera); return { x: v.x, y: v.y, yaw: g.player.yaw }; });
+    assert.equal(await G(page, () => RYBAK.fishing.state), 'fight', 'бой для проверки камеры идёт');
+    // угол «после толчка» берём тем же вызовом, что и сам толчок: между двумя вызовами игра успевает прожить несколько кадров
+    // (в проверке кадры не рисуются и идут быстро), и взгляд уже возвращается — на загруженной машине почти целиком
+    const yawFar = await G(page, () => { RYBAK.player.yaw += 0.6; RYBAK.followT = 0; return RYBAK.player.yaw; });
+    await page.waitForFunction(() => { const g = RYBAK, f = g.fishing; if (f.state !== 'fight') return true; const v = new g.camera.position.constructor(f.bx, 0, f.bz).project(g.camera); return v.x > -0.5 && v.x < -0.05 && Math.abs(v.y) < 0.35; }, null, { timeout: 30000 });
+    const seen = await view();
+    assert.ok(await G(page, () => RYBAK.fishing.state === 'fight') && Math.abs(seen.yaw - yawFar) > 0.2, 'взгляд пришёл к рыбе: ' + JSON.stringify({ ...seen, yawFar }));
+    // выключили в настройках — взгляд остаётся где был
+    const follow = async (on) => {
+      await G(page, () => { const g = RYBAK; g.fishing.toIdle(); g.ui.catchCard(null); g.ui.openPanel('pause'); });
+      await page.click('[data-p="settings"]');
+      await page.waitForSelector('.set');
+      assert.equal(await page.locator('.tog.on[data-id="follow"]').count(), on ? 0 : 1);
+      await page.click('.tog[data-id="follow"]');
+      assert.equal(await G(page, () => JSON.parse(localStorage.getItem('rybak.settings.v1')).follow), on);
+      await page.click('.center [data-a="close"]');
+      await G(page, () => { const g = RYBAK; g.ui.closePanel(); g.input.locked = true; g.input.enabled = true; });
+    };
+    await follow(false);
+    await fightOf('okun');
+    const y0 = await G(page, () => { RYBAK.player.yaw += 0.6; RYBAK.followT = 0; return RYBAK.player.yaw; });
+    await G(page, () => new Promise((ok) => { let n = 0; const w = () => (++n < 20 ? requestAnimationFrame(w) : ok()); w(); }));
+    assert.equal(await G(page, () => RYBAK.fishing.state), 'fight');
+    assert.ok(Math.abs((await view()).yaw - y0) < 1e-6, 'с выключенной настройкой взгляд не ведёт');
+    await follow(true);
+    await G(page, () => { window.__eternal = false; });
+
+    // улов без подсака: рыба висит на леске под кончиком удилища, головой вверх
+    const shown = (sp, net) => G(page, ([sp, net]) => new Promise((ok) => {
+      const g = RYBAK, f = g.fishing, vm = g.vm;
+      if (f.state !== 'idle') f.toIdle();
+      g.ui.catchCard(null);
+      f.kit.net = net;
+      f.showCatch(sp, 0.5);
+      const t0 = f.t;
+      const wait = () => {
+        if (f.t - t0 < 1.6) return requestAnimationFrame(wait);
+        const tip = vm.rod.tip.getWorldPosition(new g.camera.position.constructor());
+        vm.root.worldToLocal(tip);
+        const fishW = f.fish.getWorldPosition(new g.camera.position.constructor());
+        vm.root.worldToLocal(fishW);
+        ok({ state: f.state, net: vm.show && vm.show.net, parent: f.fish.parent === vm.fishSlot ? 'line' : f.fish.parent === vm.netSlot ? 'net' : 'other', line: vm.hangLine.line.visible, waterLine: f.line.line.visible, netOn: vm.net.group.visible, netK: vm.netK, handK: vm.handK, tip: tip.toArray(), slot: vm.fishSlot.position.toArray(), fish: fishW.toArray(), s: f.shown.s, hoop: f.shown.hoop, rotZ: f.fish.rotation.z, rotX: f.fish.rotation.x, aura: vm.auraMesh.visible, card: !document.querySelector('#catch').classList.contains('hidden'), pitch: g.player.pitch, bend: vm.p.bend });
+      };
+      requestAnimationFrame(wait);
+    }), [sp, net]);
+    let c = await shown('shuka', false);
+    assert.ok(c.state === 'landed' && c.net === false && c.parent === 'line' && c.line && !c.waterLine && !c.netOn && c.card, JSON.stringify(c));
+    assert.ok(Math.abs(c.slot[0] - c.tip[0]) < 0.32 && Math.abs(c.slot[2] - c.tip[2]) < 0.01 && c.slot[1] < c.tip[1] - 0.15, 'рот рыбы — под кончиком удилища: ' + JSON.stringify(c));
+    assert.ok(Math.abs(c.rotZ + Math.PI / 2) < 0.01 && Math.abs(c.fish[1] - (c.slot[1] - c.s / 2)) < 0.02, 'висит головой вверх, на полдлины ниже рта: ' + JSON.stringify(c));
+    assert.ok(c.tip[2] < -1.5 && c.tip[1] > 0.5 && c.tip[1] < 1.15 && c.bend > 0.55 && c.aura, 'кончик согнутого удилища виден вверху кадра: ' + JSON.stringify(c));
+    assert.ok(c.pitch > -0.2, 'взгляд поднят к улову: ' + c.pitch);
+    await shot(page, '13b-catch-line');
+    // улов с подсаком: рыба лежит на боку в сетке, левая рука держит рукоять
+    c = await shown('shuka', true);
+    assert.ok(c.state === 'landed' && c.net === true && c.parent === 'net' && !c.line && !c.waterLine && c.netOn && c.netK > 0.97 && c.handK > 0.97, JSON.stringify(c));
+    assert.ok(Math.abs(c.rotX + Math.PI / 2) < 0.2 && c.hoop >= 0.38 && c.hoop <= 0.6 && c.fish[2] < -0.6 && c.fish[2] > -1.2 && Math.abs(c.fish[0]) < 0.3, 'рыба в сетке, перед глазами: ' + JSON.stringify(c));
+    const fist = await G(page, () => { const g = RYBAK, vm = g.vm; const h = vm.arms ? vm.arms.b.hL.getWorldPosition(new g.camera.position.constructor()) : vm.handL.getWorldPosition(new g.camera.position.constructor()); vm.root.worldToLocal(h); const n = vm.net.group; const grip = new g.camera.position.constructor(0, 0, vm.net.grip()).applyQuaternion(n.quaternion).add(n.position); return { d: h.distanceTo(grip), h: h.toArray(), grip: grip.toArray() }; });
+    assert.ok(fist.d < 0.12, 'левая кисть — на рукояти подсака: ' + JSON.stringify(fist));
+    await shot(page, '13c-catch-net');
+    const gone = await G(page, () => new Promise((ok) => {
+      const g = RYBAK, f = g.fishing, vm = g.vm;
+      f.toIdle(); g.ui.catchCard(null); f.refreshGear();
+      const t0 = f.t;
+      const wait = () => (f.t - t0 < 1 ? requestAnimationFrame(wait) : ok({ netOn: vm.net.group.visible, line: vm.hangLine.line.visible, show: vm.show, fish: f.fish, aura: vm.auraK }));
+      requestAnimationFrame(wait);
+    }));
+    assert.ok(!gone.netOn && !gone.line && !gone.show && !gone.fish && !gone.aura, 'отпустили — подсак и леска убраны: ' + JSON.stringify(gone));
+  }
+  // ── звук: записи вместо синтеза там, где они есть; трещотка фрикциона; музыка, которую сочиняет игра ──
+  {
+    await page.waitForFunction(() => { const a = RYBAK.audio; return a.ctx && Object.keys(a.buf).length === 4; }, null, { timeout: 15000 });
+    const snd = await G(page, () => { const a = RYBAK.audio; return { state: a.ctx.state, buf: Object.fromEntries(Object.entries(a.buf).map(([k, b]) => [k, b ? +b.duration.toFixed(2) : null])), music: !!a.music, mus: a.mus.gain.value }; });
+    console.log('  звук:', JSON.stringify(snd));
+    assert.ok(snd.music && Math.abs(snd.mus - 0.45) < 1e-6, 'музыка есть, громкость по умолчанию: ' + JSON.stringify(snd));
+    for (const [k, lo] of [['splash', 0.7], ['plop', 0.4], ['reel', 0.7], ['snap', 0.25]]) assert.ok(snd.buf[k] > lo, `запись «${k}» загружена и прочитана: ${JSON.stringify(snd.buf)}`);
+    const use = await G(page, () => {
+      const a = RYBAK.audio;
+      for (let i = 0; i < 300; i++) a.drag(0); // после прежних рывков трещотка могла ещё не убраться
+      const r = { splash: a.play('splash', { vol: 0.01 }), none: a.play('нет такой'), d0: !!a.dragN };
+      a.tick(); a.plop(); a.snap(); a.splash(1, 0.01);
+      a.drag(1); r.d1 = !!a.dragN && a.dragN.s.loop;
+      for (let i = 0; i < 300; i++) a.drag(0);
+      r.d2 = !!a.dragN;
+      const none = a.buf.splash; a.buf.splash = null; r.fallback = a.play('splash') === false; a.splash(0.3, 0.01); a.buf.splash = none; // без записи — синтез, без ошибок
+      return r;
+    });
+    assert.deepEqual(use, { splash: true, none: false, d0: false, d1: true, d2: false, fallback: true });
+    // музыка идёт вперёд сама; в бою ей сообщают про бой; громкость на нуле — расписание стоит
+    if (snd.state === 'running') {
+      const i0 = await G(page, () => RYBAK.audio.music.i);
+      await page.waitForFunction((i0) => RYBAK.audio.music.i > i0 + 2, i0, { timeout: 20000 });
+      await G(page, () => { const g = RYBAK; g.fishing.toIdle(); g.ui.catchCard(null); g.fishing.startFight('koi', 0.5, 10); });
+      await page.waitForFunction(() => RYBAK.audio.music.mood.fight === 1 && RYBAK.audio.music.mood.boss === 2, null, { timeout: 10000 });
+      await G(page, () => { RYBAK.fishing.toIdle(); });
+      await page.waitForFunction(() => RYBAK.audio.music.mood.fight === 0, null, { timeout: 10000 });
+      await G(page, () => { const g = RYBAK; g.ui.openPanel('pause'); });
+      await page.click('[data-p="settings"]');
+      await page.waitForSelector('[data-set="music"]');
+      await page.locator('[data-set="music"]').evaluate((e) => { e.value = 0; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); });
+      await page.waitForFunction(() => RYBAK.audio.mus.gain.value === 0, null, { timeout: 5000 });
+      await page.waitForTimeout(900);
+      const i1 = await G(page, () => RYBAK.audio.music.i);
+      await page.waitForTimeout(1500);
+      assert.equal(await G(page, () => RYBAK.audio.music.i), i1, 'на нуле музыка не расписывается');
+      await page.locator('[data-set="music"]').evaluate((e) => { e.value = 0.45; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); });
+      await page.waitForFunction((i1) => RYBAK.audio.music.i > i1, i1, { timeout: 20000 });
+      await page.click('.center [data-a="close"]');
+      await G(page, () => { const g = RYBAK; g.ui.closePanel(); g.input.locked = true; g.input.enabled = true; });
+    } else console.log('  (звуковой контекст не запущен в этом браузере — музыку по ходу не проверяю)');
+  }
+  // ── рыбалка по живой рыбе: наживка рядом с крупной тенью — клюёт она сама; плюхнули на неё или топали — уходит ──
+  {
+    // заброс «в точку»: снасть уже в воздухе и падает в (x, z)
+    const dropAt = (x, z) => G(page, ([x, z]) => new Promise((ok) => {
+      const g = RYBAK, f = g.fishing;
+      if (f.state !== 'idle') f.toIdle();
+      g.ui.catchCard(null);
+      window.__land = null;
+      const emit = f.emit;
+      f.emit = (t, d) => { if (t === 'land') window.__land = d; emit(t, d); };
+      f.target = { x, z };
+      f.spot = { zone: 'pier', depth: 3, pier: true, hot: false };
+      f.short = false; f.castDist = 6; f.flyT = 0.5; f.castT = 0.7; f.castK = 1; f.bob.visible = false;
+      f.state = 'cast';
+      const wait = () => (window.__land ? (f.emit = emit, ok({ land: window.__land, big: f.big, left: f.biteLeft, state: f.state, toast: [...document.querySelectorAll('#toasts > *')].map((e) => e.textContent).join(' | ') })) : requestAnimationFrame(wait));
+      requestAnimationFrame(wait);
+    }), [x, z]);
+    const loner = (i) => G(page, (i) => { const o = RYBAK.fauna.loners.filter((o) => o.ok)[i]; o.gone = 0; o.flee = 0; o.f.len = o.len; return { x: o.f.x, z: o.f.z, len: o.len, n: RYBAK.fauna.loners.filter((o) => o.ok).length }; }, i);
+    const state = (i) => G(page, (i) => { const fa = RYBAK.fauna, o = fa.loners.filter((o) => o.ok)[i], S = fa.suitor; return { gone: o.gone, flee: o.flee, shown: o.f.len, own: S.own === o, st: S.st, slen: S.f.len, big: RYBAK.fishing.big }; }, i);
+    await G(page, () => { const g = RYBAK; g.player.place(0.6, -22, 0); g.input.locked = true; g.input.enabled = true; });
+    let L0 = await loner(0);
+    assert.ok(L0.n >= 8, 'в бухте ходят одиночки: ' + L0.n);
+    // наживка в полутора метрах от рыбы: заметила
+    let d = await dropAt(L0.x + 1.5, L0.z);
+    assert.ok(d.land.big > 0 && !d.land.spooked && d.big > 0 && d.left <= 6.3, 'рыба заметила наживку, клюнет скоро: ' + JSON.stringify(d));
+    assert.match(d.toast, /заметила наживку/);
+    await page.waitForFunction(() => RYBAK.fauna.suitor.own, null, { timeout: 10000 });
+    let st = await state(0);
+    assert.ok(st.own && st.st === 'come' && st.shown === 0 && Math.abs(st.slen - L0.len) < 1e-6 && st.gone > 1000, 'к наживке идёт та самая рыба, на прежнем месте её нет: ' + JSON.stringify(st));
+    // клюёт, подсекаем: улов «выслежен», рыба с этого места пропадает надолго
+    await G(page, () => { RYBAK.fishing.biteLeft = 0.01; });
+    await page.waitForFunction(() => RYBAK.fishing.state === 'bite', null, { timeout: 20000 });
+    await G(page, () => RYBAK.input.pressed.add('Primary'));
+    await page.waitForFunction(() => RYBAK.fishing.state === 'fight', null, { timeout: 20000 });
+    const c = await G(page, () => { const f = RYBAK.fishing, fi = RYBAK.constructor; const c = f.catch; return { ...c, big: f.spot.big }; });
+    assert.ok(c.stalked && !c.junk, 'улов выслежен: ' + JSON.stringify(c));
+    st = await state(0);
+    assert.ok(!st.own && st.gone > 150 && st.gone < 250, 'пойманная рыба вернётся на своё место не скоро: ' + JSON.stringify(st));
+    await G(page, () => { const f = RYBAK.fishing; f.fight.p = 0.999; f.fight.T = 0.5; f.fight.boss = 0; RYBAK.input.primary = true; });
+    await page.waitForFunction(() => RYBAK.fishing.state === 'landed', null, { timeout: 30000 });
+    await G(page, () => { RYBAK.input.primary = false; });
+    assert.match(await page.textContent('#catch'), /ВЫСЛЕЖЕНА/);
+    await G(page, () => { RYBAK.fishing.toIdle(); RYBAK.ui.catchCard(null); });
+    // плюхнули прямо на рыбу: испугалась, уходит, бонуса нет
+    const L1 = await loner(1);
+    d = await dropAt(L1.x + 0.3, L1.z + 0.2);
+    assert.ok(d.land.spooked && !d.land.big && d.big === 0, JSON.stringify(d));
+    assert.match(d.toast, /прямо на рыбу/);
+    st = await state(1);
+    assert.ok(st.flee > 0 && st.shown > 0 && !st.own, 'рыба убегает: ' + JSON.stringify(st));
+    // пока она убегает, наживку не замечает
+    const again = await G(page, ([x, z]) => RYBAK.fauna.notice(x + 1.5, z), [L1.x, L1.z]);
+    assert.equal(again, null);
+    await G(page, () => { RYBAK.fishing.toIdle(); });
+    // далеко от рыбы — обычный заброс
+    d = await dropAt(L0.x + 30, L0.z + 30);
+    assert.ok(!d.land.big && !d.land.spooked && d.big === 0, JSON.stringify(d));
+    await G(page, () => { RYBAK.fishing.toIdle(); });
+    // топот у воды: бегом — рыба разбегается, шагом — нет
+    const L2 = await loner(2);
+    const steps = await G(page, ([x, z]) => {
+      const g = RYBAK, p = g.player, o = g.fauna.loners.filter((o) => o.ok)[2];
+      const keep = [p.x, p.z, p.run, p.wade];
+      p.x = x + 1.5; p.z = z; p.wade = 0;
+      p.run = 0; p.onStep(false); const walk = o.flee;
+      p.run = 1; p.onStep(false); const run = o.flee;
+      [p.x, p.z, p.run, p.wade] = keep;
+      o.flee = 0;
+      return { walk, run };
+    }, [L2.x, L2.z]);
+    assert.ok(steps.walk === 0 && steps.run > 0, 'шагом рыбу не пугаем, бегом — пугаем: ' + JSON.stringify(steps));
+    console.log('  живая рыба: наживку у тени заметили, улов выслежен, плюхнули на рыбу — ушла, топот распугивает');
+  }
+  if (process.env.UNTIL === 'fight') {
+    // быстрый прогон только до вываживания: UNTIL=fight node test/play.cjs
+    await browser.close();
+    return console.log('Остановлено после проверки вываживания (UNTIL=fight).');
+  }
 
   // рынок: подойти, продать, купить
   await G(page, () => { RYBAK.player.place(-5.4, 12.8, 1.4); });
