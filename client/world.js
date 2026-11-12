@@ -382,7 +382,8 @@ export class World {
     this.scenery = buildScenery(scene);
     shadeUnderTrees(this.terrain);
     this.grass = new GrassField(scene, grassTint, isTouch() ? { max: 3000, maxFlowers: 500 } : {});
-    if (FOAM_SPOTS.length) scene.add(createFoamRings(FOAM_SPOTS, this.water.uniforms));
+    this.rings = FOAM_SPOTS.length ? createFoamRings(FOAM_SPOTS, this.water.uniforms) : null;
+    if (this.rings) scene.add(this.rings);
     this.sunDir = new THREE.Vector3(0, 1, 0);
     this.night = 0;
     this.hours = 12;

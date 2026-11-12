@@ -545,6 +545,52 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     console.log(`  лодка: разгон ${run.d.toFixed(0)} м за 4 с, из бухты в море за ${(out1.t + sea.t).toFixed(0)} с, к маяку за ${toLight.t} с, домой за ${home.t} с`);
   }
 
+  // вода и свет на «высоком» качестве: мир отражается в воде, в углах лежит мягкая тень; на «среднем» ничего этого нет — и ничего не ломается
+  {
+    const hp = await open(browser, 'q=high&norender&h=13', 'light');
+    await hp.fill('#nm', 'Свет');
+    await hp.click('[data-a="solo"]');
+    await hp.waitForFunction(() => RYBAK.state === 'lobby');
+    await G(hp, () => RYBAK.enterWorld());
+    await hp.waitForFunction(() => RYBAK.state === 'world');
+    await G(hp, () => RYBAK.ui.closePanel());
+    await shot(hp, '29-light-high', 400);
+    await shot(hp, '29-light-high', 100); // второй кадр: отражение уже снято, вода берёт его из буфера
+    const lt = await G(hp, () => {
+      const g = RYBAK.gfx, p = g.post, r = g.renderer, W = RYBAK.world.water.uniforms;
+      const ao = new Uint8Array(p.aoB.width * p.aoB.height * 4);
+      r.readRenderTargetPixels(p.aoB, 0, 0, p.aoB.width, p.aoB.height, ao);
+      let dark = 0, lit = 0;
+      for (let i = 0; i < ao.length; i += 4) { if (ao[i] < 236) dark++; if (ao[i] > 250) lit++; }
+      const rf = new Uint16Array(p.refl.width * p.refl.height * 4);
+      r.readRenderTargetPixels(p.refl, 0, 0, p.refl.width, p.refl.height, rf);
+      let filled = 0;
+      for (let i = 0; i < rf.length; i += 4) if (rf[i] || rf[i + 1] || rf[i + 2]) filled++;
+      return { ok: g.reflOk, k: W.uReflK.value, same: W.uRefl.value === p.refl.texture, n: ao.length / 4, dark, lit, filled: filled / (rf.length / 4), half: p.refl.width * 2 - p.scene.width };
+    });
+    assert.ok(lt.ok && lt.k === 1 && lt.same, `вода берёт отражение из буфера: ${JSON.stringify(lt)}`);
+    assert.ok(lt.filled > 0.9 && Math.abs(lt.half) <= 1, `буфер отражения в половину кадра и заполнен: ${lt.filled.toFixed(2)}`);
+    assert.ok(lt.dark > lt.n * 0.002 && lt.lit > lt.n * 0.6, `тень лежит в углах, а не на всём кадре: тёмных точек ${lt.dark}, светлых ${lt.lit} из ${lt.n}`);
+    // резкий разворот: отражение снимается заново сразу, а не через кадр
+    const turn = await G(hp, () => {
+      const g = RYBAK;
+      const fresh = g.gfx.reflectionStale(g.camera);
+      g.camera.rotateY(0.5);
+      g.camera.updateMatrixWorld();
+      return { fresh, turned: g.gfx.reflectionStale(g.camera) };
+    });
+    assert.ok(!turn.fresh && turn.turned, `только что снятое отражение годится, после разворота — нет: ${JSON.stringify(turn)}`);
+    await G(hp, () => RYBAK.gfx.setQuality('medium'));
+    await shot(hp, '29b-light-medium', 100);
+    const md = await G(hp, () => ({ post: !!RYBAK.gfx.post, k: RYBAK.world.water.uniforms.uReflK.value, refl: RYBAK.world.water.uniforms.uRefl.value }));
+    assert.ok(!md.post && md.k === 0 && md.refl === null, `на «среднем» отражений и буферов нет: ${JSON.stringify(md)}`);
+    await G(hp, () => RYBAK.gfx.setQuality('high'));
+    await shot(hp, '29c-light-high-again', 100);
+    assert.ok(await G(hp, () => RYBAK.gfx.reflOk && RYBAK.world.water.uniforms.uReflK.value === 1), 'вернулись на «высокое» — отражения снова на месте');
+    assert.ok(!hp.__err, 'ошибки на странице (вода и свет)');
+    await hp.close();
+  }
+
   // старое сохранение с персонажем «из частей»: такого персонажа больше нет — игрок получает героя, остальное на месте
   {
     const old = await browser.newPage({ viewport: { width: W, height: H } });

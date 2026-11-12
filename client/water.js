@@ -1,6 +1,6 @@
 // Вода бухты: бирюзовая на мели, синяя на глубине, с бликами, сеткой света и пеной у берега.
 import * as THREE from 'three';
-import { groundH, BOUNDS, WORLD } from './terrain.js';
+import { groundH, BOUNDS, WORLD, BACKWATER } from './terrain.js';
 import { surfaceU } from './surface.js';
 
 // три волны: направление (x, z), частота, высота, скорость
@@ -173,6 +173,10 @@ uniform sampler2D uNormal, uCaustic, uDet;
 uniform float uCloudK;
 ${DEPTH_GLSL}
 uniform vec3 uShallow, uDeep, uSkyZen, uSkyHor, uSunDir, uSunCol, uFogCol;
+uniform sampler2D uRefl;
+uniform mat4 uReflM;
+uniform float uReflK;
+uniform vec3 uCalm;
 varying vec3 vWorld;
 varying float vAmp;
 float ss(float a, float b, float x) { float t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
@@ -206,16 +210,30 @@ void main() {
 
   vec3 R = reflect(-V, N);
   vec3 sky = mix(uSkyHor, uSkyZen, pow(max(R.y, 0.0), 0.55));
+  if (uReflK > 0.001) {
+    // отражение мира: точка воды → место в буфере, снятом зеркальной камерой; рябь сдвигает выборку
+    vec4 rc = uReflM * vec4(vWorld.x, 0.0, vWorld.z, 1.0);
+    vec2 ruv = rc.xy / max(rc.w, 1e-4) + N.xz * (0.05 * calm + 0.012);
+    sky = mix(sky, texture2D(uRefl, clamp(ruv, 0.003, 0.997)).rgb, uReflK);
+  }
   c = mix(c, sky, fres * 0.8);
   float rs = max(dot(R, uSunDir), 0.0);
   c += uSunCol * (pow(rs, 380.0) * 3.0 + pow(rs, 28.0) * 0.1) * uGlitter;
 
-  // пена: кромка берега и набегающие полосы
-  // пена: тонкая живая кромка у берега и редкие набегающие полосы — без молочной каши на мели
-  float lap = 0.1 + 0.07 * sin(uTime * 0.9 + p.x * 0.35 + n1.y * 2.0);
+  // Прибой. Кромка воды «дышит»: волна накатывает на берег и отходит (тем же ходом темнеет мокрый песок — surface.js).
+  // С глубины к берегу идут пенные валы: резкий передний край, за ним тающий след; на мели вал рассыпается в кружево.
+  float swash = sin(uTime * 0.9 + p.x * 0.35 + n1.y * 2.0);
+  float lap = 0.1 + 0.07 * swash;
   float edge = 1.0 - ss(0.0, lap + 0.1, depth + n1.x * 0.07);
-  float band = ss(0.8, 0.94, sin(depth * 9.0 - uTime * 1.3 + n2.x * 3.0) * 0.5 + 0.5) * (1.0 - ss(0.2, 0.95, depth)) * ss(0.35, 0.7, n1.z * 0.5 + c1);
-  float foam = clamp(edge + band * 0.4, 0.0, 1.0) * step(0.004, dv);
+  float ph = fract(depth * 0.95 + uTime * 0.17 + n2.x * 0.16 + n1.y * 0.1);
+  float crest = ss(0.0, 0.035, ph) * pow(1.0 - ph, 8.0);
+  float lace = ss(0.45, 0.85, n1.z * 0.45 + c1 * 0.8 + c2 * 0.35);
+  // в тихой заводи прибоя нет: туда волна с моря не доходит
+  float open = ss(uCalm.z, uCalm.z + 12.0, distance(p, uCalm.xy));
+  float band = crest * mix(1.0, lace, ss(0.03, 0.3, ph)) * ss(0.05, 0.2, depth) * (1.0 - ss(1.0, 2.3, depth)) * open;
+  // у самого берега после наката остаётся тонкое кружево пены — узкой полоской, без молочной каши на мели
+  float wash = lace * (1.0 - ss(0.0, 0.13, depth)) * (0.5 + 0.4 * swash) * open;
+  float foam = clamp(edge + band + wash * 0.35, 0.0, 1.0) * step(0.004, dv);
   vec3 foamCol = mix(vec3(1.0), uSkyHor, 0.25) * (0.35 + 0.65 * clamp(uGlitter + 0.25, 0.0, 1.0));
   c = mix(c, foamCol, foam * 0.85);
 
@@ -257,7 +275,10 @@ export function createWater() {
     uBounds: { value: boundsVec(BOUNDS) }, uBoundsFar: { value: boundsVec(FAR) },
     uShallow: { value: new THREE.Color('#35e0d4') }, uDeep: { value: new THREE.Color('#1273c4') },
     uSkyZen: { value: new THREE.Color('#1f7fe0') }, uSkyHor: { value: new THREE.Color('#a6dcff') },
-    uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uSunCol: { value: new THREE.Color('#fff4e0') }, uFogCol: { value: new THREE.Color('#a6dcff') }
+    uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uSunCol: { value: new THREE.Color('#fff4e0') }, uFogCol: { value: new THREE.Color('#a6dcff') },
+    // отражение мира (gfx.js): буфер, матрица «точка мира → место в буфере», сила (0 — отражается только небо)
+    uRefl: { value: null }, uReflM: { value: new THREE.Matrix4() }, uReflK: { value: 0 },
+    uCalm: { value: new THREE.Vector3(BACKWATER.x, BACKWATER.z, BACKWATER.r) } // тихая заводь: прибоя в ней нет
   };
   const material = new THREE.ShaderMaterial({ uniforms, vertexShader: VERT, fragmentShader: FRAG, transparent: true, depthWrite: false });
   const m = new THREE.Mesh(geo, material);

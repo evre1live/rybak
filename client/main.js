@@ -72,6 +72,8 @@ class Game {
     this.vm = new ViewModel(this.camera);
     this.vm.setLook(fpLook(this.profile.look));
     this.vm.setVisible(false);
+    // вода отражает мир; сама вода, пена у свай, руки с удочкой и трава в отражение не попадают
+    this.gfx.setReflection(this.world.water.uniforms, [this.world.water.mesh, this.world.rings, this.vm.root, this.world.grass.tufts, this.world.grass.flowers].filter(Boolean));
     this.fx = new Fx(this.scene);
     // лодка напрокат: стоит у пирса, пока её не возьмут
     this.boat = new Boat(this.scene, this.fx);
@@ -1266,7 +1268,11 @@ class Game {
     cam.aspect = 1.6;
     cam.updateProjectionMatrix();
     this.world.update(0, performance.now() / 1000, cam);
+    // снимок идёт мимо обычного конвейера: отражение снято для другой камеры — на этот кадр вода отражает только небо
+    const reflK = this.world.water.uniforms.uReflK.value;
+    this.world.water.uniforms.uReflK.value = 0;
     this.gfx.renderer.render(this.scene, cam);
+    this.world.water.uniforms.uReflK.value = reflK;
     try {
       const src = this.gfx.renderer.domElement;
       const k = Math.max(c.width / src.width, c.height / src.height);

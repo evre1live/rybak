@@ -1,9 +1,11 @@
 // Отрисовка: рендерер, пост-обработка (свечение, цветокоррекция), уровни качества.
 //
 // «Высокое» качество устроено так, чтобы встроенная графика ноутбука держала 60 кадров:
+//   0) через кадр — отражение мира в воде: сцена глазами зеркальной камеры в буфер половинного размера;
 //   1) сцена — один раз в буфер с запасом яркости и сглаживанием;
 //   2) свечение — цепочка маленьких буферов (от четверти экрана и мельче);
-//   3) один проход на экран: сцена + свечение, цвет, виньетка, тональная кривая.
+//   3) затенение в углах — два прохода в половину разрешения по глубине сцены;
+//   4) один проход на экран: сцена × затенение + свечение, цвет, виньетка, тональная кривая.
 // Каждый лишний проход во весь экран на таких видеокартах стоит дорого, поэтому он ровно один.
 import * as THREE from 'three';
 import { surfaceU, detail } from './surface.js';
@@ -59,9 +61,42 @@ const UP = `uniform sampler2D tSrc; uniform sampler2D tAdd; uniform vec2 uTexel;
     s += texture2D(tSrc, vUv + vec2(0.0, -2.0 * o.y)).rgb + texture2D(tSrc, vUv + vec2(0.0, 2.0 * o.y)).rgb;
     s += (texture2D(tSrc, vUv + vec2(-o.x, o.y)).rgb + texture2D(tSrc, vUv + o).rgb + texture2D(tSrc, vUv - o).rgb + texture2D(tSrc, vUv + vec2(o.x, -o.y)).rgb) * 2.0;
     gl_FragColor = vec4(texture2D(tAdd, vUv).rgb + s / 12.0, 1.0); }`;
-// итог: сцена + свечение → виньетка → тональная кривая (в ней же насыщенность и контраст) и цветовое пространство экрана
-const FINAL = `uniform sampler2D tScene; uniform sampler2D tBloom; uniform float uBloom, uVig; varying vec2 vUv;
-  void main(){ vec3 c = texture2D(tScene, vUv).rgb + texture2D(tBloom, vUv).rgb * uBloom;
+// Мягкое затенение в углах — по буферу глубины, в половину разрешения. Для каждой точки восемь проб вокруг (в радиусе
+// метра в мире): чем больше соседей «нависает» над поверхностью, тем темнее. Нормаль берётся из самой глубины.
+// uProj: tg половины угла обзора по x и по y, ближняя и дальняя плоскости.
+const AO = `uniform sampler2D tDepth; uniform vec2 uTexel; uniform vec4 uProj; uniform vec2 uRS; varying vec2 vUv;
+  float viewZ(vec2 uv){ float d = texture2D(tDepth, uv).x; return uProj.z * uProj.w / (uProj.w - d * (uProj.w - uProj.z)); }
+  vec3 posAt(vec2 uv){ float z = viewZ(uv); return vec3((uv * 2.0 - 1.0) * uProj.xy * z, -z); }
+  void main(){
+    float z0 = viewZ(vUv);
+    if (z0 > 80.0) { gl_FragColor = vec4(1.0, 1.0, 0.0, 1.0); return; }
+    vec3 p = vec3((vUv * 2.0 - 1.0) * uProj.xy * z0, -z0);
+    vec3 a1 = posAt(vUv + vec2(uTexel.x, 0.0)) - p; vec3 a2 = p - posAt(vUv - vec2(uTexel.x, 0.0));
+    vec3 b1 = posAt(vUv + vec2(0.0, uTexel.y)) - p; vec3 b2 = p - posAt(vUv - vec2(0.0, uTexel.y));
+    vec3 n = normalize(cross(abs(a1.z) < abs(a2.z) ? a1 : a2, abs(b1.z) < abs(b2.z) ? b1 : b2));
+    float R = uRS.x;
+    float rs = min(R / z0, 0.16);
+    float ang = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) * 6.2831853;
+    float occ = 0.0;
+    for (int i = 0; i < 8; i++) {
+      float fi = float(i);
+      float a = ang + fi * 2.39996;
+      vec3 q = posAt(vUv + vec2(cos(a), sin(a)) * ((fi + 0.5) / 8.0) * rs * 0.5 / uProj.xy) - p;
+      float d2 = dot(q, q);
+      occ += max(dot(n, q) * inversesqrt(d2 + 1e-5) - 0.14, 0.0) * (1.0 - smoothstep(R * R * 0.5, R * R * 2.2, d2));
+    }
+    float ao = 1.0 - occ * uRS.y;
+    gl_FragColor = vec4(mix(clamp(ao, 0.0, 1.0), 1.0, smoothstep(40.0, 80.0, z0)), z0 / 80.0, 0.0, 1.0); }`;
+// размытие затенения: соседи с другой глубины (за краем предмета) не подмешиваются
+const AOBLUR = `uniform sampler2D tSrc; uniform vec2 uTexel; varying vec2 vUv;
+  void main(){ vec2 c = texture2D(tSrc, vUv).rg; float s = c.r; float w = 1.0;
+    for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) { if (i == 0 && j == 0) continue;
+      vec2 t = texture2D(tSrc, vUv + uTexel * vec2(float(i), float(j)) * 1.5).rg;
+      float k = 1.0 - smoothstep(0.0, 0.012 + c.g * 0.06, abs(t.g - c.g)); s += t.r * k; w += k; }
+    gl_FragColor = vec4(s / w, c.g, 0.0, 1.0); }`;
+// итог: сцена (с затенением в углах) + свечение → виньетка → тональная кривая (в ней же насыщенность и контраст) и цветовое пространство экрана
+const FINAL = `uniform sampler2D tScene; uniform sampler2D tBloom; uniform sampler2D tAO; uniform float uBloom, uVig, uAO; varying vec2 vUv;
+  void main(){ vec3 c = texture2D(tScene, vUv).rgb * mix(1.0, texture2D(tAO, vUv).r, uAO) + texture2D(tBloom, vUv).rgb * uBloom;
     c *= 1.0 - uVig * smoothstep(0.42, 0.95, distance(vUv, vec2(0.5)));
     gl_FragColor = vec4(c, 1.0);
     #include <tonemapping_fragment>
@@ -70,6 +105,14 @@ const FINAL = `uniform sampler2D tScene; uniform sampler2D tBloom; uniform float
     float n = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
     gl_FragColor.rgb += (n - 0.5) / 255.0; }`;
 
+// для подбора и проверок: ?ao=0…1[,радиус,сила] — затенение в углах, ?refl=0 — без отражений в воде
+const urlQ = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new Map();
+const aoQ = (urlQ.get('ao') || '').split(',').map(Number);
+const AO_K = urlQ.get('ao') != null ? Math.max(0, Math.min(1, aoQ[0] || 0)) : 0.85;
+const AO_RS = [aoQ[1] || 1.0, aoQ[2] || 0.45]; // радиус проб в метрах и сила
+const REFLECT = urlQ.get('refl') !== '0';
+const REFL_WIDE = 1.12; // отражение снимается с обзором на 12% шире экрана (по тангенсу): запас около 3° на поворот между кадрами
+const REFL_TURN = Math.cos((6 * Math.PI) / 180); // развернулись сильнее — снимаем отражение заново, не дожидаясь очереди
 const LEVELS = 6; // слоёв свечения: 1/4, 1/8 … 1/128 экрана — самые мелкие дают широкий мягкий ореол
 const HIGH_PIXELS = 5.6e6; // на «высоком» рисуем не больше стольких точек: дальше глаз разницы не видит, а видеокарта — видит
 const mk = (frag, uniforms) => new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: frag, uniforms, depthTest: false, depthWrite: false });
@@ -85,6 +128,9 @@ export class Gfx {
     // буферы с запасом яркости умеют не все видеокарты; без них «высокое» рисуется напрямую, без свечения
     this.canPost = r.capabilities.isWebGL2 !== false && (r.extensions.has('EXT_color_buffer_float') || r.extensions.has('EXT_color_buffer_half_float'));
     this.post = null;
+    // затенение в углах и отражения в воде можно выключить на ходу — для замеров, во что они обходятся
+    this.aoK = AO_K;
+    this.reflect = REFLECT;
     this.quality = null;
     this.w = this.h = 0;
     this.ratio = 0;
@@ -129,32 +175,56 @@ export class Gfx {
   dropPost() {
     const p = this.post;
     if (!p) return;
-    for (const t of [p.scene, ...p.down, ...p.up]) t.dispose();
-    for (const m of [p.pre, p.downM, p.upM, p.final]) m.dispose();
+    for (const t of [p.scene, ...p.down, ...p.up, p.ao, p.aoB, p.refl]) t.dispose();
+    p.scene.depthTexture.dispose();
+    for (const m of [p.pre, p.downM, p.upM, p.final, p.aoM, p.aoBlurM]) m.dispose();
     p.quad.dispose();
     this.post = null;
+    this.reflOk = false;
+    if (this.water) {
+      this.water.uRefl.value = null;
+      this.water.uReflK.value = 0;
+    }
   }
   ensurePost() {
     if (this.post) return;
     const half = { type: THREE.HalfFloatType, depthBuffer: false };
+    const one = { format: THREE.RGBAFormat, type: THREE.UnsignedByteType, depthBuffer: false };
     const p = (this.post = {
-      scene: new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, samples: 4 }),
+      // сцена со сглаживанием; её глубина нужна затенению в углах
+      scene: new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, samples: 4, depthTexture: new THREE.DepthTexture(4, 4, THREE.UnsignedIntType) }),
+      ao: new THREE.WebGLRenderTarget(4, 4, one),
+      aoB: new THREE.WebGLRenderTarget(4, 4, one),
+      aoM: mk(AO, { tDepth: { value: null }, uTexel: { value: new THREE.Vector2() }, uProj: { value: new THREE.Vector4() }, uRS: { value: new THREE.Vector2(AO_RS[0], AO_RS[1]) } }),
+      aoBlurM: mk(AOBLUR, { tSrc: { value: null }, uTexel: { value: new THREE.Vector2() } }),
+      // отражение мира в воде: половина разрешения, без сглаживания
+      refl: new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType }),
       down: Array.from({ length: LEVELS }, () => new THREE.WebGLRenderTarget(4, 4, half)),
       up: Array.from({ length: LEVELS - 1 }, () => new THREE.WebGLRenderTarget(4, 4, half)),
       pre: mk(PRE, { tSrc: { value: null }, uTexel: { value: new THREE.Vector2() }, uThreshold: { value: 1.0 } }),
       downM: mk(DOWN, { tSrc: { value: null }, uTexel: { value: new THREE.Vector2() } }),
       upM: mk(UP, { tSrc: { value: null }, tAdd: { value: null }, uTexel: { value: new THREE.Vector2() } }),
-      final: mk(FINAL, { tScene: { value: null }, tBloom: { value: null }, uBloom: { value: 0.115 }, uVig: { value: 0.32 } }),
+      final: mk(FINAL, { tScene: { value: null }, tBloom: { value: null }, tAO: { value: null }, uBloom: { value: 0.115 }, uVig: { value: 0.32 }, uAO: { value: AO_K } }),
       quad: new FullScreenQuad(null)
     });
     p.final.uniforms.tScene.value = p.scene.texture;
     p.final.uniforms.tBloom.value = p.up[0].texture;
+    p.final.uniforms.tAO.value = p.aoB.texture;
+    p.aoM.uniforms.tDepth.value = p.scene.depthTexture;
+    p.aoBlurM.uniforms.tSrc.value = p.ao.texture;
+    for (const t of [p.ao, p.aoB]) t.texture.minFilter = t.texture.magFilter = THREE.LinearFilter;
     this.sizePost();
   }
   sizePost() {
     const p = this.post;
     const size = this.renderer.getDrawingBufferSize(new THREE.Vector2());
     p.scene.setSize(size.x, size.y);
+    const hw = Math.max(2, Math.round(size.x / 2));
+    const hh = Math.max(2, Math.round(size.y / 2));
+    for (const t of [p.ao, p.aoB, p.refl]) t.setSize(hw, hh);
+    this.reflOk = false; // буфер отражения очищен — в ближайшем кадре снимаем заново
+    p.aoM.uniforms.uTexel.value.set(1 / hw, 1 / hh);
+    p.aoBlurM.uniforms.uTexel.value.set(1 / hw, 1 / hh);
     let w = Math.max(2, Math.round(size.x / 4));
     let h = Math.max(2, Math.round(size.y / 4));
     for (let i = 0; i < LEVELS; i++) {
@@ -164,12 +234,98 @@ export class Gfx {
       h = Math.max(2, Math.round(h / 2));
     }
   }
+  /**
+   * Вода отражает мир: water — её униформы (uRefl, uReflM, uReflK), hide — что в отражении рисовать не надо
+   * (сама вода, пена, руки с удочкой, трава).
+   */
+  setReflection(water, hide = []) {
+    this.water = water;
+    this.reflHide = hide;
+  }
+  /**
+   * Отражение: сцена глазами камеры, отражённой в плоскости воды (y = 0), в буфер половинного размера.
+   * Математика — как у Reflector из three.js: зеркальная камера, матрица для выборки из буфера и «косая» ближняя
+   * плоскость по воде (всё, что под водой, в отражение не попадает). Тени берутся готовые, из основного кадра.
+   */
+  mirrorState() {
+    return (this.mirror ||= {
+      cam: new THREE.PerspectiveCamera(), n: new THREE.Vector3(0, 1, 0), v: new THREE.Vector3(), t: new THREE.Vector3(), cw: new THREE.Vector3(),
+      rot: new THREE.Matrix4(), plane: new THREE.Plane(), at: new THREE.Vector3(0, -0.06, 0), clip: new THREE.Vector4(), q: new THREE.Vector4(),
+      dir: new THREE.Vector3(), pos: new THREE.Vector3(), fwd: new THREE.Vector3(0, 0, -1)
+    });
+  }
+  /** Отражение снято из другого места или под другим углом (игрока перенесло, резкий разворот) — ждать своей очереди нельзя. */
+  reflectionStale(camera) {
+    const M = this.mirrorState();
+    M.cw.setFromMatrixPosition(camera.matrixWorld);
+    M.dir.set(0, 0, -1).transformDirection(camera.matrixWorld);
+    return M.dir.dot(M.fwd) < REFL_TURN || M.cw.distanceToSquared(M.pos) > 2.25;
+  }
+  renderReflection(scene, camera) {
+    const r = this.renderer;
+    const p = this.post;
+    const M = this.mirrorState();
+    const c = M.cam;
+    M.cw.setFromMatrixPosition(camera.matrixWorld);
+    if (M.cw.y < 0.05) return false; // камера у самой воды или под ней — отражать нечего
+    M.v.copy(M.cw).negate().reflect(M.n).negate(); // точка камеры, отражённая в плоскости y = 0
+    M.rot.extractRotation(camera.matrixWorld);
+    M.dir.set(0, 0, -1).applyMatrix4(M.rot);
+    M.t.copy(M.dir).add(M.cw).negate().reflect(M.n).negate();
+    M.pos.copy(M.cw); // откуда и куда смотрели, когда снимали отражение: по ним видно, не устарело ли оно
+    M.fwd.copy(M.dir);
+    c.position.copy(M.v);
+    c.up.set(0, 1, 0).applyMatrix4(M.rot).reflect(M.n);
+    c.lookAt(M.t);
+    c.near = camera.near;
+    c.far = camera.far;
+    c.updateMatrixWorld();
+    // обзор чуть шире, чем у игрока: отражение снимается через кадр, и при повороте головы у края экрана нужен запас
+    c.projectionMatrix.copy(camera.projectionMatrix);
+    for (const i of [0, 5, 8, 9]) c.projectionMatrix.elements[i] /= REFL_WIDE;
+    c.projectionMatrixInverse.copy(c.projectionMatrix).invert();
+    const tm = this.water.uReflM.value;
+    tm.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1).multiply(c.projectionMatrix).multiply(c.matrixWorldInverse);
+    // ближняя плоскость — по воде (чуть ниже, чтобы у кромки не было щели)
+    M.plane.setFromNormalAndCoplanarPoint(M.n, M.at).applyMatrix4(c.matrixWorldInverse);
+    M.clip.set(M.plane.normal.x, M.plane.normal.y, M.plane.normal.z, M.plane.constant);
+    const e = c.projectionMatrix.elements;
+    M.q.set((Math.sign(M.clip.x) + e[8]) / e[0], (Math.sign(M.clip.y) + e[9]) / e[5], -1, (1 + e[10]) / e[14]);
+    M.clip.multiplyScalar(2 / M.clip.dot(M.q));
+    e[2] = M.clip.x;
+    e[6] = M.clip.y;
+    e[10] = M.clip.z + 1 - 0.003;
+    e[14] = M.clip.w;
+    const was = this.reflHide.map((o) => o.visible);
+    for (const o of this.reflHide) o.visible = false;
+    const auto = r.shadowMap.autoUpdate;
+    r.shadowMap.autoUpdate = false;
+    r.setRenderTarget(p.refl);
+    r.render(scene, c);
+    r.shadowMap.autoUpdate = auto;
+    this.reflHide.forEach((o, i) => (o.visible = was[i]));
+    return true;
+  }
   render(scene, camera, exposure = 1) {
     const r = this.renderer;
     r.toneMappingExposure = exposure;
-    if (this.quality !== 'high' || !this.canPost) return r.render(scene, camera);
+    const W = this.water;
+    if (this.quality !== 'high' || !this.canPost) {
+      if (W) W.uReflK.value = 0;
+      return r.render(scene, camera);
+    }
     this.ensurePost();
     const p = this.post;
+    // 0) отражение в воде — через кадр: мир в нём почти не меняется, а рисовать сцену второй раз дорого.
+    // Выборка идёт по матрице того кадра, в котором отражение снято, так что при повороте камеры оно не «плывёт».
+    this.frame = (this.frame || 0) + 1;
+    camera.updateWorldMatrix(true, false);
+    if (W && !this.reflect) W.uReflK.value = 0;
+    else if (W && (this.frame & 1 || !this.reflOk || this.reflectionStale(camera))) {
+      this.reflOk = this.renderReflection(scene, camera);
+      W.uRefl.value = p.refl.texture;
+      W.uReflK.value = this.reflOk ? 1 : 0;
+    }
     const pass = (mat, target) => {
       p.quad.material = mat;
       r.setRenderTarget(target);
@@ -195,7 +351,15 @@ export class Gfx {
       pass(p.upM, p.up[i]);
       src = p.up[i];
     }
-    // 3) на экран
+    // 3) затенение в углах: глубина сцены → половинный буфер → размытие
+    p.final.uniforms.uAO.value = this.aoK;
+    if (this.aoK > 0) {
+      const e = camera.projectionMatrix.elements;
+      p.aoM.uniforms.uProj.value.set(1 / e[0], 1 / e[5], camera.near, camera.far);
+      pass(p.aoM, p.ao);
+      pass(p.aoBlurM, p.aoB);
+    }
+    // 4) на экран
     pass(p.final, null);
   }
 }

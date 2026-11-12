@@ -236,6 +236,12 @@ float nearK = 1.0 - smoothstep(7.0, 20.0, length(vViewPosition));
       // и так трава, граница с ней резкая и рваная
       col = mix(col, rc, wRock);
     }
+    // прибой: полоса мокрого песка у воды. Её край ходит вместе с накатом волны (тот же ход, что у кромки пены в water.js)
+    // и отстаёт на откате — песок «сохнет» не сразу
+    float swPh = uTimeS * 0.9 + vWp.x * 0.35;
+    float reach = 0.15 + 0.08 * max(sin(swPh), sin(swPh - 1.2) * 0.85);
+    float wet = (1.0 - smoothstep(reach - 0.04, reach + 0.05, vWp.y + (f.a - 0.5) * 0.06)) * smoothstep(-0.55, -0.12, vWp.y);
+    col = mix(col, col * vec3(0.64, 0.68, 0.73), wet * (1.0 - gEdge) * (1.0 - wRock) * 0.92);
     diffuseColor.rgb = col;
   } else {
     // «низкое» качество: без текстур, но границы и камень на склонах те же
@@ -351,7 +357,7 @@ export function patchSurface(material, { terrain = false } = {}) {
       .replace('#include <color_fragment>', '#include <color_fragment>\n' + DETAIL_F)
       .replace('#include <opaque_fragment>', UNDER_F + '\n#include <opaque_fragment>');
   };
-  material.customProgramCacheKey = () => 'surf12' + (terrain ? 'T' : 'B');
+  material.customProgramCacheKey = () => 'surf13' + (terrain ? 'T' : 'B');
   return material;
 }
 
