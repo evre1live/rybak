@@ -196,6 +196,38 @@ test('турнир в комнате: запускает хозяин, улов 
   }
 });
 
+test('комната без хозяина: кто пришёл первым, тот и хозяин — и может объявить турнир', async () => {
+  const srv = createServer();
+  await new Promise((r) => srv.server.listen(0, r));
+  const port = srv.server.address().port;
+  const a = client(port);
+  const b = client(port);
+  const a2 = client(port);
+  const all = [a, b, a2];
+  try {
+    await Promise.all(all.map((x) => x.open()));
+    a.send({ t: 'create', card: { name: 'Финн' } });
+    const ja = await a.wait('joined');
+    // хозяин теряет связь, пока в комнате никого нет: место за ним держится, но хозяина у комнаты нет
+    await a.close();
+    await new Promise((r) => setTimeout(r, 50));
+    b.send({ t: 'join', code: ja.code, card: { name: 'Нори' } });
+    const jb = await b.wait('joined');
+    assert.equal(jb.host, jb.id, 'гостья становится хозяйкой');
+    b.send({ t: 'tour', a: 'start', kind: 'count', len: 180 });
+    assert.equal((await b.wait('tour')).tour.by, jb.id);
+    // прежний хозяин вернулся на своё место — теперь он гость
+    a2.send({ t: 'join', code: ja.code, token: ja.token, card: { name: 'Финн' } });
+    const ja2 = await a2.wait('joined');
+    assert.deepEqual([ja2.id, ja2.host, ja2.tour.kind], [ja.id, jb.id, 'count']);
+    a2.send({ t: 'tour', a: 'stop' });
+    assert.equal((await a2.wait('error')).code, 'NOT_HOST');
+  } finally {
+    for (const x of all) x.ws.terminate();
+    srv.close();
+  }
+});
+
 test('в комнату помещается не больше восьми', async () => {
   const srv = createServer();
   await new Promise((r) => srv.server.listen(0, r));

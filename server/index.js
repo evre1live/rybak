@@ -187,6 +187,12 @@ export function createServer({ now = () => Date.now() } = {}) {
     p.ws = ws;
     p.lostAt = 0;
     room.lastActive = now();
+    // хозяин ушёл или потерял связь, когда в комнате больше никого не было, — она переходит тому, кто пришёл
+    const host = room.players.get(room.hostId);
+    if (!host || !host.ws) {
+      room.hostId = p.id;
+      broadcast(room, { t: 'host', id: p.id }, ws);
+    }
     send(ws, {
       t: 'joined', code: room.code, id: p.id, token: p.token, slot: p.slot, seed: room.seed, t0: room.t0, now: now(), host: room.hostId,
       players: [...room.players.values()].filter((o) => o.ws && o.id !== p.id).map(pub),
