@@ -581,9 +581,14 @@
         {
           "task": "c41e844c-c7b3-480d-99dd-b63e1b43ee9e",
           "file": "art/tripo/raw/env-birch-concept1.jpg"
+        },
+        {
+          "task": "6f6997ea-7c5f-4122-986e-7226f6cf3019",
+          "file": "art/tripo/raw/env-birch-concept2.jpg"
         }
       ],
-      "concept": "c41e844c-c7b3-480d-99dd-b63e1b43ee9e"
+      "concept": "6f6997ea-7c5f-4122-986e-7226f6cf3019",
+      "model": "8fe8464e-f1a4-4d0b-8e62-d82f9ede452f"
     },
     "env-pine": {
       "concepts": [
@@ -592,7 +597,8 @@
           "file": "art/tripo/raw/env-pine-concept1.jpg"
         }
       ],
-      "concept": "116e49ba-84f4-490d-ace9-7f46f773f424"
+      "concept": "116e49ba-84f4-490d-ace9-7f46f773f424",
+      "model": "847f3391-e27e-4706-8f09-e19fc4ebd954"
     },
     "env-bush": {
       "concepts": [
@@ -601,7 +607,8 @@
           "file": "art/tripo/raw/env-bush-concept1.jpg"
         }
       ],
-      "concept": "ebe9607e-524e-4703-9ec6-71c1604f6620"
+      "concept": "ebe9607e-524e-4703-9ec6-71c1604f6620",
+      "model": "eec9e25f-6da2-4b9d-87eb-b2f38925eb1d"
     },
     "env-oak": {
       "concepts": [
@@ -610,7 +617,8 @@
           "file": "art/tripo/raw/env-oak-concept1.jpg"
         }
       ],
-      "concept": "d84bfec9-1b4c-48b0-8c3d-35abb25335ed"
+      "concept": "d84bfec9-1b4c-48b0-8c3d-35abb25335ed",
+      "model": "eb673149-d556-4dc7-98d9-5c24350f405f"
     },
     "env-rock1": {
       "concepts": [
@@ -619,7 +627,8 @@
           "file": "art/tripo/raw/env-rock1-concept1.jpg"
         }
       ],
-      "concept": "28858e99-26ae-41f0-aaf5-23f3f2635440"
+      "concept": "28858e99-26ae-41f0-aaf5-23f3f2635440",
+      "model": "1ffd7a88-1711-425f-9f1c-0d3fd79996c6"
     },
     "env-rock2": {
       "concepts": [
@@ -628,7 +637,8 @@
           "file": "art/tripo/raw/env-rock2-concept1.jpg"
         }
       ],
-      "concept": "bec6e3dc-c1aa-43c3-a580-b9f6e273d511"
+      "concept": "bec6e3dc-c1aa-43c3-a580-b9f6e273d511",
+      "model": "f471cabe-a729-4bd2-bf79-c639f391b94c"
     },
     "env-palm": {
       "concepts": [
@@ -637,7 +647,8 @@
           "file": "art/tripo/raw/env-palm-concept1.jpg"
         }
       ],
-      "concept": "bebf369e-7349-4be9-9503-20c6b8ee03ca"
+      "concept": "bebf369e-7349-4be9-9503-20c6b8ee03ca",
+      "model": "c16faa52-2d25-4462-b45a-025e418dc569"
     },
     "env-rock3": {
       "concepts": [
@@ -646,7 +657,8 @@
           "file": "art/tripo/raw/env-rock3-concept1.jpg"
         }
       ],
-      "concept": "3ac887b9-dd47-4ed7-acf1-12d8d5550884"
+      "concept": "3ac887b9-dd47-4ed7-acf1-12d8d5550884",
+      "model": "4491bc87-fb1a-473b-90d8-516ab35d65d3"
     },
     "env-lighthouse": {
       "concepts": [
@@ -655,7 +667,8 @@
           "file": "art/tripo/raw/env-lighthouse-concept1.jpg"
         }
       ],
-      "concept": "53be67d1-206a-4aa2-be58-2bba419f2071"
+      "concept": "53be67d1-206a-4aa2-be58-2bba419f2071",
+      "model": "792b1cff-8426-494f-a85e-fb786441fb3c"
     },
     "env-wreck": {
       "concepts": [
@@ -664,7 +677,8 @@
           "file": "art/tripo/raw/env-wreck-concept1.jpg"
         }
       ],
-      "concept": "54071f7c-f5d7-4c80-9a61-8d5385d65b8f"
+      "concept": "54071f7c-f5d7-4c80-9a61-8d5385d65b8f",
+      "model": "4fd4a9df-bdb7-4adf-9bc5-e8c69d8bfd2a"
     },
     "env-hut": {
       "concepts": [
@@ -673,7 +687,8 @@
           "file": "art/tripo/raw/env-hut-concept1.jpg"
         }
       ],
-      "concept": "b671a043-b6e7-4df2-81da-ad9a9fa26d8a"
+      "concept": "b671a043-b6e7-4df2-81da-ad9a9fa26d8a",
+      "model": "498477c9-5ad9-4fbb-87a9-1a829039b499"
     },
     "env-rental": {
       "concepts": [
@@ -682,7 +697,8 @@
           "file": "art/tripo/raw/env-rental-concept1.jpg"
         }
       ],
-      "concept": "8a5dbc7e-828c-456a-abb7-26033cf6998e"
+      "concept": "8a5dbc7e-828c-456a-abb7-26033cf6998e",
+      "model": "fb00b1b6-f328-4f6e-9295-63f3f3442f17"
     },
     "env-motorboat": {
       "concepts": [
@@ -691,7 +707,8 @@
           "file": "art/tripo/raw/env-motorboat-concept1.jpg"
         }
       ],
-      "concept": "072603fe-6248-4251-8a6b-e4916ce6e045"
+      "concept": "072603fe-6248-4251-8a6b-e4916ce6e045",
+      "model": "7a956144-1b49-47f6-8e1d-9162d7a8a881"
     },
     "env-lamppost": {
       "concepts": [
@@ -700,7 +717,8 @@
           "file": "art/tripo/raw/env-lamppost-concept1.jpg"
         }
       ],
-      "concept": "1eb1f792-274e-4ceb-b917-8fd7fe675e91"
+      "concept": "1eb1f792-274e-4ceb-b917-8fd7fe675e91",
+      "model": "b421ab63-e81f-40b2-8cf5-e13db52f3e7c"
     },
     "env-bench": {
       "concepts": [
@@ -709,7 +727,8 @@
           "file": "art/tripo/raw/env-bench-concept1.jpg"
         }
       ],
-      "concept": "bb48cbb0-1ef6-4703-93e8-d82d4f43b346"
+      "concept": "bb48cbb0-1ef6-4703-93e8-d82d4f43b346",
+      "model": "4ea5e954-b39a-4683-acdc-7c6138c2545f"
     },
     "env-fender": {
       "concepts": [
@@ -718,7 +737,8 @@
           "file": "art/tripo/raw/env-fender-concept1.jpg"
         }
       ],
-      "concept": "7e89c0cb-9662-4d33-8695-fe8941dc204d"
+      "concept": "7e89c0cb-9662-4d33-8695-fe8941dc204d",
+      "model": "7d7c9505-0f66-48a5-be34-e905706b4463"
     },
     "env-signpost": {
       "concepts": [
@@ -727,7 +747,8 @@
           "file": "art/tripo/raw/env-signpost-concept1.jpg"
         }
       ],
-      "concept": "0b4fb648-5d40-437d-b896-b2c280c60e50"
+      "concept": "0b4fb648-5d40-437d-b896-b2c280c60e50",
+      "model": "5e4474aa-2dd2-4c02-bed6-5d2d0aaf6baa"
     },
     "env-seagull": {
       "concepts": [
@@ -736,7 +757,8 @@
           "file": "art/tripo/raw/env-seagull-concept1.jpg"
         }
       ],
-      "concept": "858c3a51-fa48-4ca3-ae54-8e3324869386"
+      "concept": "858c3a51-fa48-4ca3-ae54-8e3324869386",
+      "model": "ca27f1a4-816f-4e92-84e9-4364f38c8d60"
     },
     "env-campfire": {
       "concepts": [
@@ -745,7 +767,8 @@
           "file": "art/tripo/raw/env-campfire-concept1.jpg"
         }
       ],
-      "concept": "8eaeb6c8-a4b9-460f-b386-d5c665bbcf03"
+      "concept": "8eaeb6c8-a4b9-460f-b386-d5c665bbcf03",
+      "model": "9c0dca4e-7857-4fca-ab68-d3d012a4d441"
     }
   },
   "ledger": [
@@ -1896,6 +1919,146 @@
       "type": "animate_retarget",
       "task": "194af2f9-3986-4604-b945-d8fb15dfe884",
       "credits": 10
+    },
+    {
+      "at": "2026-11-12T03:05:31.600Z",
+      "label": "env-birch образец",
+      "type": "text_to_image",
+      "task": "6f6997ea-7c5f-4122-986e-7226f6cf3019",
+      "credits": 5
+    },
+    {
+      "at": "2026-11-12T03:07:33.114Z",
+      "label": "env-birch модель",
+      "type": "image_to_model",
+      "task": "8fe8464e-f1a4-4d0b-8e62-d82f9ede452f",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-12T03:07:37.461Z",
+      "label": "env-pine модель",
+      "type": "image_to_model",
+      "task": "847f3391-e27e-4706-8f09-e19fc4ebd954",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-12T03:07:41.097Z",
+      "label": "env-palm модель",
+      "type": "image_to_model",
+      "task": "c16faa52-2d25-4462-b45a-025e418dc569",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-12T03:07:49.077Z",
+      "label": "env-oak модель",
+      "type": "image_to_model",
+      "task": "eb673149-d556-4dc7-98d9-5c24350f405f",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-12T03:08:38.786Z",
+      "label": "env-bush модель",
+      "type": "image_to_model",
+      "task": "eec9e25f-6da2-4b9d-87eb-b2f38925eb1d",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-12T03:09:31.475Z",
+      "label": "env-rock3 модель",
+      "type": "image_to_model",
+      "task": "4491bc87-fb1a-473b-90d8-516ab35d65d3",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-12T03:09:36.023Z",
+      "label": "env-lighthouse модель",
+      "type": "image_to_model",
+      "task": "792b1cff-8426-494f-a85e-fb786441fb3c",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-12T03:09:40.712Z",
+      "label": "env-rock2 модель",
+      "type": "image_to_model",
+      "task": "f471cabe-a729-4bd2-bf79-c639f391b94c",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-12T03:09:44.706Z",
+      "label": "env-rock1 модель",
+      "type": "image_to_model",
+      "task": "1ffd7a88-1711-425f-9f1c-0d3fd79996c6",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-12T03:10:34.158Z",
+      "label": "env-wreck модель",
+      "type": "image_to_model",
+      "task": "4fd4a9df-bdb7-4adf-9bc5-e8c69d8bfd2a",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-12T03:11:06.163Z",
+      "label": "env-lamppost модель",
+      "type": "image_to_model",
+      "task": "b421ab63-e81f-40b2-8cf5-e13db52f3e7c",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-12T03:11:52.337Z",
+      "label": "env-motorboat модель",
+      "type": "image_to_model",
+      "task": "7a956144-1b49-47f6-8e1d-9162d7a8a881",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-12T03:12:20.412Z",
+      "label": "env-hut модель",
+      "type": "image_to_model",
+      "task": "498477c9-5ad9-4fbb-87a9-1a829039b499",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-12T03:12:20.916Z",
+      "label": "env-rental модель",
+      "type": "image_to_model",
+      "task": "fb00b1b6-f328-4f6e-9295-63f3f3442f17",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-12T03:12:25.528Z",
+      "label": "env-bench модель",
+      "type": "image_to_model",
+      "task": "4ea5e954-b39a-4683-acdc-7c6138c2545f",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-12T03:12:53.528Z",
+      "label": "env-fender модель",
+      "type": "image_to_model",
+      "task": "7d7c9505-0f66-48a5-be34-e905706b4463",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-12T03:13:16.186Z",
+      "label": "env-signpost модель",
+      "type": "image_to_model",
+      "task": "5e4474aa-2dd2-4c02-bed6-5d2d0aaf6baa",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-12T03:13:59.055Z",
+      "label": "env-seagull модель",
+      "type": "image_to_model",
+      "task": "ca27f1a4-816f-4e92-84e9-4364f38c8d60",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-12T03:15:14.662Z",
+      "label": "env-campfire модель",
+      "type": "image_to_model",
+      "task": "9c0dca4e-7857-4fca-ab68-d3d012a4d441",
+      "credits": 30
     }
   ]
 }

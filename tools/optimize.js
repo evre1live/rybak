@@ -2,13 +2,14 @@
 // Герой: модель со скелетом + все его анимации в одном файле, сетка упрощена, текстуры в WebP, геометрия сжата.
 //   node tools/optimize.js            — всё из art/tripo/raw, что есть в art/models.json
 //   node tools/optimize.js hero-yellow
+// Модель локации (деревья, камни, постройки): как предмет — наибольший размер 1, стоит на y = 0; плюс дальняя копия.
 // Результат: public/models/<id>.glb и public/models/manifest.json
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
-import { dedup, prune, weld, simplify, textureCompress, resample, meshopt, mergeDocuments, unpartition, transformMesh } from '@gltf-transform/functions';
+import { dedup, prune, weld, simplify, textureCompress, resample, meshopt, mergeDocuments, unpartition, transformMesh, compactPrimitive } from '@gltf-transform/functions';
 import { MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 import sharp from 'sharp';
 
@@ -21,7 +22,11 @@ const manPath = path.join(OUT, 'manifest.json');
 const manifest = fs.existsSync(manPath) ? JSON.parse(fs.readFileSync(manPath, 'utf8')) : { heroes: [], props: {} };
 
 // сколько треугольников оставить и какого размера текстуры: [цвет, нормали и блеск]
-const BUDGET = { hero: { tris: 30000, tex: [2048, 2048] }, prop: { tris: 7000, tex: [1024, 512] }, fish: { tris: 8000, tex: [1024, 512] }, junk: { tris: 4000, tex: [512, 512] } };
+const BUDGET = { hero: { tris: 30000, tex: [2048, 2048] }, prop: { tris: 7000, tex: [1024, 512] }, fish: { tris: 8000, tex: [1024, 512] }, junk: { tris: 4000, tex: [512, 512] }, env: { tris: 6000, tex: [1024, 512] } };
+// У модели локации в art/models.json можно задать: tris — сколько треугольников оставить, tex — размеры текстур,
+// flat — без карты нормалей (деревья и кусты: их много, а рельеф листвы и так в сетке), lod — сколько треугольников
+// в дальней копии (<id>.lod.glb: вместо текстуры — цвет вершин), gamma — высветлить тёмную текстуру (меньше 1),
+// repaint — в какой цвет перекрасить чёрные детали.
 
 await MeshoptEncoder.ready;
 await MeshoptSimplifier.ready;
@@ -155,12 +160,113 @@ function normalize(doc, m) {
   return q.size.map((v) => +(v * k).toFixed(3));
 }
 
+/**
+ * Правка текстуры цвета под свет игры. В игре нет отражений, а итоговая цветокоррекция тёмное делает ещё темнее,
+ * поэтому тёмные модели Tripo выходят чёрными пятнами без формы.
+ * gamma < 1 — высветлить тени и середину (заодно чуть гаснет чрезмерная насыщенность тёмных красок);
+ * repaint — тёмные бесцветные места (чёрный пластик, резина) перекрасить в оттенки этого цвета; цветное
+ * (дерево, краска) и светлое при этом не трогается.
+ */
+async function tuneTexture(doc, { gamma = 1, repaint = null }) {
+  const c = repaint ? [1, 3, 5].map((i) => parseInt(repaint.slice(i, i + 2), 16) / 255) : null;
+  const ss = (a, b, x) => {
+    const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+    return t * t * (3 - 2 * t);
+  };
+  const lut = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) lut[i] = Math.round(255 * Math.pow(i / 255, gamma));
+  for (const mat of doc.getRoot().listMaterials()) {
+    const tex = mat.getBaseColorTexture();
+    if (!tex) continue;
+    const { data, info } = await sharp(Buffer.from(tex.getImage())).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    for (let i = 0; i < data.length; i += 3) {
+      if (c) {
+        const r = data[i] / 255;
+        const g = data[i + 1] / 255;
+        const b = data[i + 2] / 255;
+        const v = Math.max(r, g, b);
+        const sat = v > 0 ? (v - Math.min(r, g, b)) / v : 0;
+        const k = (1 - ss(0.18, 0.42, sat)) * (1 - ss(0.28, 0.5, v));
+        if (k > 0) {
+          // рисунок сохраняется: чем светлее было место, тем светлее оттенок
+          const shade = Math.min(2.2, Math.max(0.45, v / 0.16));
+          data[i] = Math.round(255 * Math.min(1, r + (c[0] * shade - r) * k));
+          data[i + 1] = Math.round(255 * Math.min(1, g + (c[1] * shade - g) * k));
+          data[i + 2] = Math.round(255 * Math.min(1, b + (c[2] * shade - b) * k));
+          continue;
+        }
+      }
+      if (gamma !== 1) {
+        data[i] = lut[data[i]];
+        data[i + 1] = lut[data[i + 1]];
+        data[i + 2] = lut[data[i + 2]];
+      }
+    }
+    tex.setImage(await sharp(data, { raw: { width: info.width, height: info.height, channels: 3 } }).png().toBuffer()).setMimeType('image/png');
+  }
+}
+
+/** Цвет текстуры — в цвет вершин (усреднённый по соседству), развёртка убирается: дальней копии текстура не нужна. */
+async function bakeVertexColors(doc) {
+  const buffer = doc.getRoot().listBuffers()[0];
+  const cache = new Map();
+  for (const mesh of doc.getRoot().listMeshes())
+    for (const prim of mesh.listPrimitives()) {
+      const mat = prim.getMaterial();
+      const tex = mat && mat.getBaseColorTexture();
+      const uv = prim.getAttribute('TEXCOORD_0');
+      if (!tex || !uv) continue;
+      const N = 192;
+      if (!cache.has(tex)) cache.set(tex, (await sharp(Buffer.from(tex.getImage())).resize(N, N, { fit: 'fill' }).removeAlpha().raw().toBuffer()));
+      const px = cache.get(tex);
+      const n = uv.getCount();
+      const col = new Float32Array(n * 3);
+      const t = [0, 0];
+      const lin = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+      for (let i = 0; i < n; i++) {
+        uv.getElement(i, t);
+        const x = Math.min(N - 1, Math.max(0, Math.floor((t[0] - Math.floor(t[0])) * N)));
+        const y = Math.min(N - 1, Math.max(0, Math.floor((t[1] - Math.floor(t[1])) * N)));
+        for (let k = 0; k < 3; k++) col[i * 3 + k] = lin(px[(y * N + x) * 3 + k] / 255);
+      }
+      prim.setAttribute('COLOR_0', doc.createAccessor().setType('VEC3').setArray(col).setBuffer(buffer));
+      prim.setAttribute('TEXCOORD_0', null);
+    }
+  for (const mat of doc.getRoot().listMaterials()) {
+    mat.setBaseColorTexture(null);
+    mat.setNormalTexture(null);
+    mat.setEmissiveTexture(null);
+  }
+}
+/** Грубое упрощение для дальней копии: схлопывает и через швы, мелкие обрывки выбрасывает. */
+function hardSimplify(doc, target, error) {
+  const buffer = doc.getRoot().listBuffers()[0];
+  const prims = doc.getRoot().listMeshes().flatMap((m) => m.listPrimitives());
+  const total = prims.reduce((s, p) => s + p.getIndices().getCount() / 3, 0);
+  for (const prim of prims) {
+    const pos = prim.getAttribute('POSITION');
+    const positions = new Float32Array(pos.getCount() * 3);
+    const v = [0, 0, 0];
+    for (let i = 0; i < pos.getCount(); i++) {
+      pos.getElement(i, v);
+      positions.set(v, i * 3);
+    }
+    const idx = prim.getIndices();
+    const indices = new Uint32Array(idx.getCount());
+    for (let i = 0; i < indices.length; i++) indices[i] = idx.getScalar(i);
+    const want = Math.max(12, Math.round((target * (indices.length / 3)) / total)) * 3;
+    const [res] = MeshoptSimplifier.simplify(indices, positions, 3, want, error, ['Permissive', 'Prune']);
+    prim.setIndices(doc.createAccessor().setType('SCALAR').setArray(res).setBuffer(buffer));
+    compactPrimitive(prim);
+  }
+}
+
 const want = process.argv.slice(2);
 for (const m of spec.models) {
   if (want.length && !want.includes(m.id)) continue;
   const base = path.join(RAW, m.group === 'hero' ? `${m.id}-rig.glb` : `${m.id}.glb`);
   if (!fs.existsSync(base)) continue;
-  const budget = BUDGET[m.group] || BUDGET.prop;
+  const budget = { ...(BUDGET[m.group] || BUDGET.prop), ...(m.tex ? { tex: m.tex } : {}) };
   const doc = await io.read(base);
   const before = triCount(doc);
   const clips = {};
@@ -172,22 +278,24 @@ for (const m of spec.models) {
     }
   }
   const size = m.group === 'hero' ? null : normalize(doc, m);
-  if (m.group === 'prop' || m.group === 'junk') {
+  if (m.group === 'prop' || m.group === 'junk' || m.group === 'env') {
     // предметы в игре матовые: карта блеска им не нужна — минус файл и выборка из текстуры
     for (const mat of doc.getRoot().listMaterials()) {
       mat.setMetallicRoughnessTexture(null);
       mat.setOcclusionTexture(null);
       mat.setMetallicFactor(0);
       mat.setRoughnessFactor(0.9);
+      if (m.flat) mat.setNormalTexture(null);
     }
   }
+  if (m.repaint || m.gamma) await tuneTexture(doc, { gamma: m.gamma || 1, repaint: m.repaint || null });
   const ratio = Math.min(1, (m.tris || budget.tris) / Math.max(1, before));
   await doc.transform(
     unpartition(),
     dedup(),
     prune(),
     weld(),
-    ...(ratio < 0.98 ? [simplify({ simplifier: MeshoptSimplifier, ratio, error: m.err || (m.group === 'hero' ? 0.0015 : m.group === 'fish' ? 0.003 : 0.008), lockBorder: false })] : []),
+    ...(ratio < 0.98 ? [simplify({ simplifier: MeshoptSimplifier, ratio, error: m.err || (m.group === 'hero' ? 0.0015 : m.group === 'fish' ? 0.003 : m.group === 'env' ? 0.05 : 0.008), lockBorder: false })] : []),
     resample(),
     prune(),
     textureCompress({ encoder: sharp, targetFormat: 'webp', slots: /^baseColorTexture$/, resize: [budget.tex[0], budget.tex[0]], quality: 86 }),
@@ -211,6 +319,18 @@ for (const m of spec.models) {
     await io.write(lo, doc);
     lite = { file: `models/${m.id}.lite.glb`, tris: triCount(doc), kb: Math.round(fs.statSync(lo).size / 1024) };
   }
+  // дальняя копия модели локации: грубая сетка без текстур
+  let lod = null;
+  if (m.group === 'env' && m.lod) {
+    // текстуру — в цвет вершин: без развёртки сетку можно упрощать смело, цвета при этом не «плывут»
+    await bakeVertexColors(doc);
+    await doc.transform(weld());
+    hardSimplify(doc, m.lod, 0.3);
+    await doc.transform(prune(), meshopt({ encoder: MeshoptEncoder, level: 'medium' }));
+    const lo = path.join(OUT, `${m.id}.lod.glb`);
+    await io.write(lo, doc);
+    lod = { file: `models/${m.id}.lod.glb`, tris: triCount(doc), kb: Math.round(fs.statSync(lo).size / 1024) };
+  }
   if (m.group === 'hero') {
     const entry = { id: m.id, name: m.name, file: `models/${m.id}.glb`, lite: lite.file, tris, kb, clips: Object.keys(clips), ...(m.fp ? { fp: m.fp } : {}), ...(m.tint ? { tint: m.tint } : {}), ...(m.npc ? { npc: true } : {}), ...(m.hands ? { hands: m.hands } : {}) };
     const i = manifest.heroes.findIndex((h) => h.id === m.id);
@@ -218,9 +338,9 @@ for (const m of spec.models) {
     else manifest.heroes.push(entry);
   } else {
     const prev = manifest.props[m.id] || {};
-    manifest.props[m.id] = { file: `models/${m.id}.glb`, group: m.group, tris, kb, size, ...(m.view ? { view: m.view } : {}), ...(prev.icon ? { icon: prev.icon } : {}) };
+    manifest.props[m.id] = { file: `models/${m.id}.glb`, group: m.group, tris, kb, size, ...(m.view ? { view: m.view } : {}), ...(prev.icon ? { icon: prev.icon } : {}), ...(lod ? { lod } : {}) };
   }
-  console.log(`${m.id}: ${before} → ${tris} треуг., ${kb} КБ${lite ? ` (для телефонов: ${lite.tris} треуг., ${lite.kb} КБ)` : ''}${Object.keys(clips).length ? ', анимации: ' + Object.entries(clips).map(([k, v]) => `${k} ${v.dur} с (${v.tracks} дорожек)`).join(', ') : ''}`);
+  console.log(`${m.id}: ${before} → ${tris} треуг., ${kb} КБ${lod ? ` (вдали: ${lod.tris} треуг., ${lod.kb} КБ)` : ''}${lite ? ` (для телефонов: ${lite.tris} треуг., ${lite.kb} КБ)` : ''}${Object.keys(clips).length ? ', анимации: ' + Object.entries(clips).map(([k, v]) => `${k} ${v.dur} с (${v.tracks} дорожек)`).join(', ') : ''}`);
 }
 fs.writeFileSync(manPath, JSON.stringify(manifest, null, 2));
 console.log('manifest:', manifest.heroes.length, 'героев,', Object.keys(manifest.props).length, 'предметов');

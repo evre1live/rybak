@@ -28,7 +28,10 @@ export const DECKS = [
   { id: 'light', x0: -20, x1: -15, z0: -78.5, z1: -70, along: 'x' },
   // Пальмовый остров: мостки с пляжа и площадка на конце
   { id: 'palmwalk', x0: 214, x1: 245, z0: -191.3, z1: -188.7, along: 'x' },
-  { id: 'palm', x0: 209, x1: 214, z0: -194.5, z1: -185.5, along: 'x' }
+  { id: 'palm', x0: 209, x1: 214, z0: -194.5, z1: -185.5, along: 'x' },
+  // площадка проката у главного пирса: на ней стоит будка. late — доски кладутся отдельным проходом,
+  // чтобы случайная расстановка остального мира (она идёт следом за настилами) не сдвинулась
+  { id: 'rental', x0: 1.6, x1: 5.6, z0: -8.6, z1: -4.2, along: 'z', late: true }
 ];
 // препятствия: лавка, ящики, бочки (круги и прямоугольники)
 export const BOXES = [{ x0: -13.4, x1: -6.9, z0: 10.0, z1: 15.7 }];
@@ -39,7 +42,7 @@ export const CIRCLES = [
   { x: -5.0, z: -22.9, r: 0.5 }, { x: -29.8, z: 5.8, r: 0.5 }, { x: 4.9, z: 7.5, r: 0.55 }, { x: 7.7, z: 12.6, r: 0.5 },
   // причал у маяка и Пальмовый остров
   { x: -19.2, z: -71.2, r: 0.42 }, { x: -16.2, z: -77.6, r: 0.5 }, { x: -19.3, z: -77.4, r: 0.5 },
-  { x: 213.2, z: -193.6, r: 0.42 }, { x: 209.9, z: -186.6, r: 0.5 }, { x: 262.5, z: -176.5, r: 0.5 }, { x: 256.6, z: -182.2, r: 0.5 }, { x: 253.6, z: -182.4, r: 0.45 }
+  { x: 213.2, z: -193.6, r: 0.42 }, { x: 209.9, z: -186.6, r: 0.5 }, { x: 262.5, z: -176.5, r: 0.5 }, { x: 257.9, z: -181.2, r: 0.5 }, { x: 252.9, z: -180.4, r: 0.45 }
 ];
 
 export function shoreZ(x) {
@@ -173,9 +176,17 @@ export const WADE = 0.62; // на такую глубину можно зайт�
 function onDecks(x, z) {
   return !!(deckAt(x - EDGE, z - EDGE) && deckAt(x + EDGE, z - EDGE) && deckAt(x - EDGE, z + EDGE) && deckAt(x + EDGE, z + EDGE));
 }
-export function canStand(x, z) {
-  for (const b of BOXES) if (x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1) return false;
-  for (const c of CIRCLES) if ((x - c.x) ** 2 + (z - c.z) ** 2 < c.r * c.r) return false;
+/** Преграды (прямоугольники и круги), внутри которых оказалась точка. Обычно ни одной — тогда null. */
+export function blocksAt(x, z) {
+  let out = null;
+  for (const b of BOXES) if (x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1) (out ||= []).push(b);
+  for (const c of CIRCLES) if ((x - c.x) ** 2 + (z - c.z) ** 2 < c.r * c.r) (out ||= []).push(c);
+  return out;
+}
+/** Можно ли стоять в точке. skip — преграды, которые не считаются (из них игрок как раз выходит). */
+export function canStand(x, z, skip = null) {
+  for (const b of BOXES) if (x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1 && !(skip && skip.includes(b))) return false;
+  for (const c of CIRCLES) if ((x - c.x) ** 2 + (z - c.z) ** 2 < c.r * c.r && !(skip && skip.includes(c))) return false;
   if (onDecks(x, z)) return true;
   // Пальмовый остров: весь песок и вода по колено вокруг
   if (palmR(x, z) < 1.5) return groundH(x, z) >= -WADE;
@@ -189,9 +200,11 @@ export function canStand(x, z) {
 // Домашняя лодка стоит носом от пирса, на северо-восток: прямо по курсу — проход между головой пирса и рифом.
 export const MOORINGS = [
   { id: 'home', name: 'Солнечная бухта', rent: true, x: 4.0, z: -12, yaw: -0.6, sx: 0.95, sz: -12, syaw: -Math.PI / 2 },
-  { id: 'light', name: 'Причал у маяка', x: -17.5, z: -68.4, yaw: Math.PI / 2, sx: -17.5, sz: -70.7, syaw: Math.PI },
-  { id: 'palm', name: 'Пальмовый остров', x: 211.5, z: -183.9, yaw: Math.PI / 2, sx: 211.5, sz: -186.2, syaw: Math.PI }
+  { id: 'light', name: 'Причал у маяка', x: -17.5, z: -68.2, yaw: Math.PI / 2, sx: -17.5, sz: -70.7, syaw: Math.PI },
+  { id: 'palm', name: 'Пальмовый остров', x: 211.5, z: -183.7, yaw: Math.PI / 2, sx: 211.5, sz: -186.2, syaw: Math.PI }
 ];
+/** Прилавок будки проката на площадке у главного пирса: стоя перед ним, лодку тоже можно взять. */
+export const RENT_DESK = { x: 2.3, z: -6.4, r: 2.0 };
 // во что лодка упирается помимо берега и причалов: риф, опоры арки, скалы в море, корабль, буйки
 const SAIL_BLOCKS = [
   { x: REEF.x, z: REEF.z, r: 7.6 },

@@ -411,7 +411,10 @@
       "name": "Сосна",
       "prompt": "a stylized pine tree: straight brown trunk and four tiers of thick dark green conical branches that get smaller toward the pointed top",
       "lead": "A single tree, 3D video game environment asset concept, straight side view at eye level, the whole tree visible from the base of the trunk to the top.",
-      "tris": 2600
+      "tris": 2600,
+      "flat": true,
+      "lod": 500,
+      "gamma": 0.7
     },
     {
       "id": "env-oak",
@@ -419,15 +422,20 @@
       "name": "Дуб",
       "prompt": "a stylized broadleaf tree: thick short brown trunk with two big branches and a large round fluffy bright green crown made of several rounded leaf clumps",
       "lead": "A single tree, 3D video game environment asset concept, straight side view at eye level, the whole tree visible from the base of the trunk to the top.",
-      "tris": 3000
+      "tris": 2800,
+      "flat": true,
+      "lod": 600,
+      "gamma": 0.8
     },
     {
       "id": "env-birch",
       "group": "env",
       "name": "Берёза",
-      "prompt": "a stylized birch tree: slender white trunk with black marks, a light yellow-green oval crown made of rounded leaf clumps",
+      "prompt": "a stylized birch tree in summer: slender white trunk with black marks, a tall oval crown made of rounded leaf clumps in fresh saturated lime green (not yellow, not beige, not autumn)",
       "lead": "A single tree, 3D video game environment asset concept, straight side view at eye level, the whole tree visible from the base of the trunk to the top.",
-      "tris": 2600
+      "tris": 2400,
+      "flat": true,
+      "lod": 500
     },
     {
       "id": "env-palm",
@@ -435,35 +443,48 @@
       "name": "Пальма",
       "prompt": "a stylized coconut palm tree: tall gently curved ringed brown trunk, a crown of eight big thick green fronds, a few coconuts under the fronds",
       "lead": "A single tree, 3D video game environment asset concept, straight side view at eye level, the whole tree visible from the base of the trunk to the top.",
-      "tris": 3000
+      "tris": 2600,
+      "flat": true,
+      "lod": 900,
+      "gamma": 0.85
     },
     {
       "id": "env-bush",
       "group": "env",
       "name": "Куст",
       "prompt": "a stylized round leafy green bush made of rounded leaf clumps with a few small pink flowers",
-      "tris": 1200
+      "tris": 1000,
+      "err": 0.12,
+      "flat": true,
+      "lod": 220,
+      "gamma": 0.75
     },
     {
       "id": "env-rock1",
       "group": "env",
       "name": "Валун",
       "prompt": "a big rounded granite boulder: grey stone with darker cracks and chiselled flat facets, a patch of green moss on top",
-      "tris": 1400
+      "tris": 1400,
+      "lod": 300,
+      "gamma": 0.88
     },
     {
       "id": "env-rock2",
       "group": "env",
       "name": "Плита",
       "prompt": "a wide flat layered rock slab: grey stone with horizontal strata lines and chipped edges, a little green moss on top",
-      "tris": 1400
+      "tris": 1400,
+      "lod": 300,
+      "gamma": 0.72
     },
     {
       "id": "env-rock3",
       "group": "env",
       "name": "Скала",
       "prompt": "a tall sharp sea stack rock spire: grey layered stone with cracks, wider at the base, barnacles and dark wet band at the bottom",
-      "tris": 1800
+      "tris": 1800,
+      "lod": 340,
+      "gamma": 0.72
     },
     {
       "id": "env-lighthouse",
@@ -477,7 +498,8 @@
       "group": "env",
       "name": "Затонувший корабль",
       "prompt": "an old wooden shipwreck: the broken hull of a small sailing ship lying tilted on its side, a broken mast with torn rigging, holes between dark weathered planks, green seaweed and barnacles on it",
-      "tris": 10000
+      "tris": 10000,
+      "gamma": 0.72
     },
     {
       "id": "env-hut",
@@ -500,6 +522,7 @@
       "prompt": "a small open fishing motorboat: white hull with a wide teal stripe and a wooden gunwale, a pointed bow, a flat stern with a black outboard motor, two wooden bench seats, wooden floorboards, seen from the side and slightly from above so the inside of the boat is visible",
       "tris": 9000,
       "textureQuality": "detailed",
+      "repaint": "#35597f",
       "tex": [
         2048,
         1024
@@ -510,42 +533,66 @@
       "group": "env",
       "name": "Фонарный столб",
       "prompt": "a wooden dock lamp post: a thick wooden post with an iron bracket arm at the top and a hanging lantern with glass panes, rope wrapped around the base",
-      "tris": 2500
+      "tris": 2500,
+      "tex": [
+        512,
+        512
+      ]
     },
     {
       "id": "env-bench",
       "group": "env",
       "name": "Скамейка",
       "prompt": "a rustic wooden bench with a backrest made of thick weathered planks, with iron bolts",
-      "tris": 2200
+      "tris": 2200,
+      "tex": [
+        512,
+        512
+      ]
     },
     {
       "id": "env-fender",
       "group": "env",
       "name": "Кранец",
       "prompt": "an old black car tyre used as a boat dock fender, hanging on two thick ropes tied at the top",
-      "tris": 1600
+      "tris": 1600,
+      "tex": [
+        512,
+        512
+      ]
     },
     {
       "id": "env-signpost",
       "group": "env",
       "name": "Указатель",
       "prompt": "a wooden signpost: a thick wooden pole with three blank wooden arrow boards pointing in different directions, a little rope wrapped around it",
-      "tris": 2000
+      "tris": 2000,
+      "tex": [
+        512,
+        512
+      ]
     },
     {
       "id": "env-seagull",
       "group": "env",
       "name": "Чайка",
       "prompt": "a seagull standing on its two legs with wings folded: white body, grey wings with black tips, yellow beak and yellow legs",
-      "tris": 1600
+      "tris": 1600,
+      "tex": [
+        512,
+        512
+      ]
     },
     {
       "id": "env-campfire",
       "group": "env",
       "name": "Костёр",
       "prompt": "a campfire: a ring of round stones with stacked logs and bright orange stylized flames, a black cooking pot hanging over it on a wooden tripod",
-      "tris": 3500
+      "tris": 3500,
+      "tex": [
+        512,
+        512
+      ]
     }
   ],
   "leads": {

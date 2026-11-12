@@ -8,6 +8,8 @@ import * as THREE from 'three';
 export const MAT = { PLAIN: 0, WOOD: 1, ROCK: 2, LEAF: 3, RINGS: 4, CLOTH: 5 };
 
 /** Общие для всех материалов значения; обновляет мир раз в кадр. */
+/** Насколько далеко рисовать подробные модели леса и камней: 1 — «высокое» качество, меньше — ближе (см. gfx.js). */
+export const detail = { lod: 1 };
 export const surfaceU = {
   uDet: { value: null },
   uCaust: { value: null },
@@ -185,3 +187,57 @@ export function patchSurface(material, { terrain = false } = {}) {
   material.customProgramCacheKey = () => 'surf' + (terrain ? 'T' : 'B');
   return material;
 }
+
+// ───── готовые модели (деревья, камни, постройки) ─────
+// У них своя текстура, фактура из шума им не нужна. Но жить они должны в том же мире:
+// по ним плывут тени облаков, под водой они уходят в бирюзу, а кроны покачиваются на ветру.
+const MODEL_PARS_V = /* glsl */ `
+uniform float uTimeS;
+varying vec3 vWp;
+`;
+const MODEL_PARS_F = /* glsl */ `
+uniform sampler2D uDet, uCaust;
+uniform float uTimeS, uCaustK, uCloudK;
+uniform vec3 uSunC, uWaterS, uWaterD;
+varying vec3 vWp;
+`;
+const MODEL_WP_V = /* glsl */ `
+{
+  vec4 wp = vec4(transformed, 1.0);
+  #ifdef USE_INSTANCING
+    wp = instanceMatrix * wp;
+  #endif
+  vWp = (modelMatrix * wp).xyz;
+}
+`;
+// качание: чем выше над землёй, тем сильнее; у каждого дерева своя фаза (по месту, где оно стоит)
+const sway = (k) => /* glsl */ `
+{
+  vec4 o = vec4(0.0, 0.0, 0.0, 1.0);
+  #ifdef USE_INSTANCING
+    o = instanceMatrix * o;
+  #endif
+  o = modelMatrix * o;
+  float ph = o.x * 0.35 + o.z * 0.27;
+  float h = max(transformed.y - 0.2, 0.0);
+  float a = (sin(uTimeS * 1.15 + ph) + 0.45 * sin(uTimeS * 2.7 + ph * 1.7)) * ${k.toFixed(4)} * h * h;
+  transformed.x += a;
+  transformed.z += a * 0.6;
+}
+`;
+/** Готовой модели — тени облаков и подводный цвет; sway > 0 — качание на ветру (доля высоты модели). */
+export function patchModel(material, { sway: k = 0 } = {}) {
+  material.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, surfaceU);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\n' + MODEL_PARS_V)
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + (k ? sway(k) : ''))
+      .replace('#include <project_vertex>', '#include <project_vertex>\n' + MODEL_WP_V);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\n' + MODEL_PARS_F)
+      .replace('#include <opaque_fragment>', 'vec3 nGeo = normalize(cross(dFdx(vWp), dFdy(vWp)));\n' + UNDER_F + '\n#include <opaque_fragment>');
+  };
+  material.customProgramCacheKey = () => 'model' + k;
+  return material;
+}
+

@@ -21,7 +21,7 @@ import { Audio2 } from './audio.js';
 import { UI } from './ui.js';
 import { loadProfile, saveProfile, settings, session } from './profile.js';
 import { S, FLAG } from './proto.js';
-import { DECK_Y, MARKET, MOORINGS, MAP_VIEW, WRECK, SEA, ISLAND, palmR } from './terrain.js';
+import { DECK_Y, MARKET, MOORINGS, RENT_DESK, MAP_VIEW, WRECK, SEA, ISLAND, palmR } from './terrain.js';
 import { ITEMS, FISH_BY_ID, JUNK_BY_ID, RARITY, ZONES, BAITS, LURES, clockHours, dayPart, fmtW, fmtCoins, isLure } from '../shared/data.js';
 import { marketState, hashStr, buy, equip, sell, kitStats, levelInfo, tackleCount, fishValue, newProfile } from '../shared/logic.js';
 import { $, esc, clamp, damp, isTouch } from './util.js';
@@ -899,7 +899,8 @@ class Game {
           act.run = () => this.dock(mi);
         }
       } else if (Math.hypot(pl.x - MARKET.x, pl.z - MARKET.z) < MARKET.r) act = { text: 'РЫНОК — ПРОДАТЬ УЛОВ, КУПИТЬ СНАСТИ', short: 'РЫНОК', run: () => ui.openPanel('sell') };
-      else if (Math.hypot(pl.x - boat.x, pl.z - boat.z) < 3.6 || Math.hypot(pl.x - MOORINGS[boat.moor].sx, pl.z - MOORINGS[boat.moor].sz) < 2.6) {
+      // к лодке можно подойти самой, а дома — ещё и к прилавку будки проката
+      else if (Math.hypot(pl.x - boat.x, pl.z - boat.z) < 3.6 || Math.hypot(pl.x - MOORINGS[boat.moor].sx, pl.z - MOORINGS[boat.moor].sz) < 2.6 || (boat.moor === 0 && Math.hypot(pl.x - RENT_DESK.x, pl.z - RENT_DESK.z) < RENT_DESK.r)) {
         const price = this.boatPrice();
         act = boat.rented ? { text: 'СЕСТЬ В ЛОДКУ', short: 'В ЛОДКУ', run: () => this.boardBoat() } : { text: `ЛОДКА НАПРОКАТ — ${price ? `${price} МОНЕТ` : 'ПЕРВЫЙ ВЫХОД БЕСПЛАТНО'}`, short: 'ЛОДКА', run: () => this.rentBoat() };
       }

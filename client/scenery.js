@@ -4,23 +4,28 @@ import { Batch, M, G, BATCH_MAT, BATCH_MAT_2S } from './batch.js';
 import { loadManifest } from './hero.js';
 import { modelInfo, loadModels, spawn } from './models.js';
 import { buildPlaces } from './places.js';
+import { ENV, upgradeEnv, envNight, envState } from './envmodels.js';
+import { spot01 } from './scatter.js';
 import { rng, rockGeo, blobGeo, canvasTex, shade, sstep, TAU, fbm2 } from './util.js';
-import { DECKS, DECK_Y, groundH, shoreZ, islandR, ISLAND, ARCH, REEF, CAPE, capeDist, FALLS, LIGHTHOUSE, BACKWATER, deckAt, SCHOOL_HOMES } from './terrain.js';
+import { DECKS, CIRCLES, DECK_Y, groundH, shoreZ, islandR, ISLAND, ARCH, REEF, CAPE, capeDist, FALLS, LIGHTHOUSE, BACKWATER, deckAt, SCHOOL_HOMES } from './terrain.js';
 import { waveH } from './water.js';
 
 const WOODS = ['#c58a4e', '#b97c42', '#d39a5d', '#a86f3a', '#c9945a'];
 const DARK_WOOD = '#7a5230';
 const ROPE = '#ead9a7';
+// Столбы стоят на настиле у самого края (раньше — снаружи, у сваи: тонкому столбу это шло, а у готового
+// с тумбой основание висело в воздухе). x, z, в какую сторону вынос с фонарём, без источника света.
 export const LAMP_POSTS = [
-  [1.92, -9, -1], [-6.18, -22.3, 1], [6.18, 4.3, -1], [-29.25, 12.7, -1], [-6.5, 9.7, 1],
+  [1.32, -9, -1], [-5.72, -22.28, 1], [5.72, 4.28, -1], [-29.28, 12.22, -1], [-6.5, 9.7, 1],
   // на дальних причалах фонари только светятся сами: лишние источники света дорого стоят всей сцене
-  [-20.2, -78.2, 1, true], [208.8, -194.2, 1, true]
+  [-19.72, -78.22, 1, true], [209.28, -194.22, 1, true]
 ];
 
 /** Сваи, стоящие в воде: вокруг них пена и круги (water.js). */
 export const FOAM_SPOTS = [];
-function buildDocks(B, r) {
+function buildDocks(B, r, late = false) {
   for (const d of DECKS) {
+    if (!!d.late !== late) continue;
     const across = d.along === 'z';
     const L = across ? d.z1 - d.z0 : d.x1 - d.x0;
     const W = across ? d.x1 - d.x0 : d.z1 - d.z0;
@@ -86,6 +91,7 @@ function buildDocks(B, r) {
       const top = DECK_Y + (tall ? 0.62 + r() * 0.3 : 0.1);
       const bot = Math.min(gh - 0.6, -1.2);
       if (gh < -0.25) FOAM_SPOTS.push([px, pz, 0.17]);
+      if (tall) ENV.piles.push([px, top + 0.03, pz]);
       B.add(G.cyl(9), shade('#8a5f3a', (r() - 0.5) * 0.14), M(px, (top + bot) / 2, pz, 0.34, top - bot, 0.34, 0, r() * 3, (r() - 0.5) * 0.03), { grad: [0.5, 1.05] });
       B.add(G.cyl(9), '#c79d6c', M(px, top + 0.012, pz, 0.3, 0.03, 0.3), { mat: 4 });
       if (tall && r() < 0.5) for (let k = 0; k < 3; k++) B.add(G.torus(0.2, 12), ROPE, M(px, DECK_Y + 0.3 + k * 0.066, pz, 0.46, 0.46, 0.46, Math.PI / 2, r() * 3, 0));
@@ -287,7 +293,7 @@ function buildShack(B, P, scene, r) {
   return { setBoard, glow };
 }
 
-function buildProps(B, P, r) {
+function buildProps(B, P, r, X) {
   const y = DECK_Y;
   // ящики, бочки, холодильники, канаты, вёдра: процедурные — в запасной меш, на их места — готовые модели
   const crateAt = (x, yy, z, sz, ry, color, on) => {
@@ -341,16 +347,19 @@ function buildProps(B, P, r) {
   place('prop-netpile', 209.9, y, -186.6, 0.95, 2.1);
   place('prop-lantern', 213.5, y, -186.0, 0.44, 0.9);
   place('prop-anchor', 262.5, groundH(262.5, -176.5) - 0.05, -176.5, 1.4, 0.9, false, { rz: 0.2 });
-  place('prop-barrel', 256.6, groundH(256.6, -182.2), -182.2, 0.95, 0.5);
-  place('prop-crate', 253.6, groundH(253.6, -182.4), -182.4, 0.7, 0.9);
-  place('prop-tacklebox', 255, groundH(255, -183.9) + 0.5, -183.9, 0.44, 0.3);
+  // у хижины: бочка и ящик со снастями сверху — в стороне от стен и крыльца
+  place('prop-barrel', 257.9, groundH(257.9, -181.2), -181.2, 0.95, 0.5);
+  const pc = place('prop-crate', 252.9, groundH(252.9, -180.4), -180.4, 0.7, 0.9);
+  place('prop-tacklebox', 252.9, groundH(252.9, -180.4) + 0.62, -180.4, 0.44, 0.3, false, { on: pc });
   place('prop-buoy', 249.5, groundH(249.5, -198) - 0.1, -198, 1.5, 0.4, false, { rz: 0.5 });
   // скамейка у берега
   const bx = 1.4;
   const bz = 15.35;
-  B.add(G.box(), '#c58a4e', M(bx, y + 0.46, bz, 1.9, 0.07, 0.42));
-  B.add(G.box(), '#c58a4e', M(bx, y + 0.86, bz + 0.2, 1.9, 0.4, 0.06, -0.15, 0, 0));
-  for (const s of [-0.8, 0.8]) B.add(G.box(), DARK_WOOD, M(bx + s, y + 0.23, bz + 0.02, 0.08, 0.46, 0.4));
+  X.bench.add(G.box(), '#c58a4e', M(bx, y + 0.46, bz, 1.9, 0.07, 0.42));
+  X.bench.add(G.box(), '#c58a4e', M(bx, y + 0.86, bz + 0.2, 1.9, 0.4, 0.06, -0.15, 0, 0));
+  for (const s of [-0.8, 0.8]) X.bench.add(G.box(), DARK_WOOD, M(bx + s, y + 0.23, bz + 0.02, 0.08, 0.46, 0.4));
+  // масштаб такой, чтобы сиденье готовой скамейки было на высоте нарисованной (0,5 м): на нём стоит ящик со снастями
+  ENV.singles.push({ id: 'env-bench', key: 'bench', x: bx, y, z: bz + 0.02, s: 1.62, ry: 0 });
   // кнехты
   for (const [cx2, cz2] of [[-1.3, -14], [1.3, -4], [-5.4, -26.6], [-34.6, 8.5], [5.6, 9]]) {
     B.add(G.cyl(8), '#3b424c', M(cx2, y + 0.08, cz2, 0.12, 0.16, 0.12));
@@ -405,7 +414,10 @@ function buildLamps(B, scene) {
   const glassMat = new THREE.MeshStandardMaterial({ color: '#ffe2a8', emissive: '#ffb347', emissiveIntensity: 0, roughness: 0.4 });
   for (const [x, z, side, dim] of LAMP_POSTS) {
     const y = DECK_Y;
-    B.add(G.cyl(8, 0.8, 1), '#5b3a1e', M(x, y + 1.35, z, 0.16, 2.9, 0.16), { grad: [0.8, 1.05] });
+    const rec = { x, y, z, side, glass: null, light: null };
+    ENV.lamps.push(rec);
+    CIRCLES.push({ x, z, r: 0.2 });
+    B.add(G.cyl(8, 0.8, 1), '#5b3a1e', M(x, y + 1.55, z, 0.16, 3.3, 0.16), { grad: [0.8, 1.05] }); // высотой с готовый столб (3,3 м)
     B.add(G.box(), '#5b3a1e', M(x + side * 0.32, y + 2.7, z, 0.72, 0.07, 0.07));
     B.add(G.box(), '#5b3a1e', M(x + side * 0.2, y + 2.48, z, 0.5, 0.05, 0.05, 0, 0, side * 0.75));
     const lx = x + side * 0.6;
@@ -417,17 +429,20 @@ function buildLamps(B, scene) {
     glass.position.set(lx, y + 2.32, z);
     glass.scale.set(0.16, 0.24, 0.16);
     scene.add(glass);
+    rec.glass = glass;
     if (dim) continue;
     const light = new THREE.PointLight('#ffc58a', 0, 14, 1.5);
     light.position.set(lx, y + 2.3, z);
     scene.add(light);
     lamps.push(light);
+    rec.light = light;
   }
-  // гирлянда флажков от лавки к фонарю
+  // гирлянда флажков от лавки к фонарю на пирсе. У пирса она привязана к самой макушке столба и провисает
+  // несильно: иначе флажки закрывают вывеску будки проката тому, кто идёт по пирсу
   const fb = new Batch();
   const a = new THREE.Vector3(-7.2, DECK_Y + 2.75, 10.4);
   const b = new THREE.Vector3(-6.5, DECK_Y + 2.72, 9.7);
-  const c = new THREE.Vector3(1.9, DECK_Y + 2.75, -9);
+  const c = new THREE.Vector3(LAMP_POSTS[0][0], DECK_Y + 3.2, LAMP_POSTS[0][1]);
   const flags = ['#fbbf24', '#22d3ee', '#ef4444', '#f8fafc', '#a3e635', '#f97316'];
   const tri = new THREE.BufferGeometry();
   tri.setAttribute('position', new THREE.Float32BufferAttribute([-0.5, 0, 0, 0.5, 0, 0, 0, -1, 0], 3));
@@ -451,7 +466,7 @@ function buildLamps(B, scene) {
     }
   };
   span(a, b, 3, 0.05);
-  span(b, c, 34, 0.9);
+  span(b, c, 34, 0.7);
   scene.add(fb.build(BATCH_MAT_2S, false));
   return { lamps, glassMat };
 }
@@ -459,9 +474,11 @@ function buildLamps(B, scene) {
 const BLOBS = [blobGeo(3, 2), blobGeo(8, 2), blobGeo(15, 2), blobGeo(22, 2)];
 const BLOBS_FAR = [blobGeo(3, 1, 0.16), blobGeo(15, 1, 0.16)]; // вдали хватит и грубой кроны
 const blobOf = (B, r) => (B.far ? BLOBS_FAR[Math.floor(r() * BLOBS_FAR.length)] : BLOBS[Math.floor(r() * BLOBS.length)]);
+// Каждое дерево, кроме процедурной сетки, оставляет запись «где и какого роста»: по ним потом встают готовые модели.
 function pine(B, x, y, z, s, r) {
   B.add(G.cyl(6, 0.6, 1), '#7a5230', M(x, y + 0.7 * s, z, 0.34 * s, 1.5 * s, 0.34 * s), { grad: [0.7, 1], mat: 1 });
   const tiers = 3 + (r() < 0.5 ? 1 : 0);
+  ENV.flora['env-pine'].push({ x, y, z, s: (1.1 + 1.02 * tiers) * s * 1.06, ry: spot01(x, z, 3) * TAU });
   const base = ['#2f8f4e', '#2a8246', '#37a058'][Math.floor(r() * 3)];
   for (let i = 0; i < tiers; i++) {
     const k = i / tiers;
@@ -471,6 +488,9 @@ function pine(B, x, y, z, s, r) {
 }
 function roundTree(B, x, y, z, s, r) {
   B.add(G.cyl(6, 0.7, 1), '#8a5f3a', M(x, y + 0.9 * s, z, 0.36 * s, 1.9 * s, 0.36 * s, 0, 0, (r() - 0.5) * 0.12), { grad: [0.7, 1], mat: 1 });
+  // лиственное дерево — дуб, каждое третье — берёза (она выше и уже)
+  const birch = spot01(x, z, 5) < 0.3;
+  ENV.flora[birch ? 'env-birch' : 'env-oak'].push({ x, y, z, s: (birch ? 5.0 : 4.4) * s, ry: spot01(x, z, 3) * TAU });
   const base = ['#62b84e', '#74c75a', '#57a947', '#86cf63'][Math.floor(r() * 4)];
   const n = 3 + Math.floor(r() * 2);
   for (let i = 0; i < n; i++) {
@@ -481,12 +501,14 @@ function roundTree(B, x, y, z, s, r) {
   }
 }
 function bush(B, x, y, z, s, r) {
+  ENV.flora['env-bush'].push({ x, y: y - 0.04, z, s: 1.5 * s, ry: spot01(x, z, 3) * TAU });
   const base = ['#58b848', '#4aa63f', '#6cc956'][Math.floor(r() * 3)];
   for (let i = 0; i < 2; i++) B.add(blobOf(B, r), shade(base, (r() - 0.5) * 0.1), M(x + (r() - 0.5) * s, y + 0.3 * s, z + (r() - 0.5) * s, (0.52 + r() * 0.26) * s, 0.42 * s, (0.52 + r() * 0.26) * s, 0, r() * 3, 0), { grad: [0.55, 1.14], mat: 3 });
 }
 
 function buildVegetation(scene, r) {
-  const near = new Batch();
+  const near = new Batch(); // цветы, забор, камыш — остаются процедурными
+  const nearT = new Batch(); // деревья и кусты: запасные, пока не загрузились готовые модели
   const far = new Batch();
   const isl = new Batch();
   far.far = isl.far = true;
@@ -526,7 +548,7 @@ function buildVegetation(scene, r) {
     const y = groundH(x, z);
     if (y < 1) continue;
     const s = (0.9 + r() * 0.9) * (d > 30 ? 1.25 : 1);
-    const B = d < 40 ? near : far;
+    const B = d < 40 ? nearT : far;
     if (r() < 0.5) pine(B, x, y - 0.2, z, s, r);
     else roundTree(B, x, y - 0.2, z, s, r);
     placed++;
@@ -537,7 +559,7 @@ function buildVegetation(scene, r) {
     const z = shoreZ(x) + d;
     if (d < 14 && r() < 0.8) continue;
     if (deckAt(x, z, -1.5)) continue;
-    bush(near, x, groundH(x, z), z, 0.5 + r() * 0.6, r);
+    bush(nearT, x, groundH(x, z), z, 0.5 + r() * 0.6, r);
   }
   // цветы и трава у тропинки
   for (let i = 0; i < 260; i++) {
@@ -603,14 +625,19 @@ function buildVegetation(scene, r) {
     more++;
   }
   const mNear = near.build();
+  const mNearT = nearT.build();
   const mFar = far.build(BATCH_MAT, false);
   const mIsl = isl.build();
-  scene.add(mNear, mFar, mIsl);
+  scene.add(mNear, mNearT, mFar, mIsl);
+  ENV.fallback.trees.push(mNearT, mFar, mIsl);
 }
 
 function buildRocks(scene, r) {
   const B = new Batch();
   B.mat = 2;
+  const S = new Batch(); // отдельные камни и скалы, которые заменяются готовыми моделями
+  S.mat = 2;
+  let as = null; // какой моделью заменить следующие камни (null — остаются процедурными)
   const geos = [rockGeo(11), rockGeo(23), rockGeo(37), rockGeo(51), rockGeo(64, 2, 0.3)];
   const small = [rockGeo(11, 1), rockGeo(23, 1), rockGeo(37, 1)]; // мелким камням хватит и грубой сетки
   const GREYS = ['#8d95a1', '#7f8793', '#9aa2ad', '#868f9c', '#a3a9b3'];
@@ -618,9 +645,12 @@ function buildRocks(scene, r) {
   const rock = (x, y, z, sx, sy, sz, grass = false, tone = 0) => {
     const c = shade(GREYS[Math.floor(r() * GREYS.length)], tone + (r() - 0.5) * 0.1);
     const set = Math.max(sx, sy, sz) < 2.4 ? small : geos;
-    B.add(set[Math.floor(r() * set.length)], c, M(x, y, z, sx, sy, sz, (r() - 0.5) * 0.5, r() * TAU, (r() - 0.5) * 0.5), grass ? { top: [shade(GRASS, (r() - 0.5) * 0.12), 0.72], grad: [0.72, 1.05] } : { grad: [0.72, 1.05] });
+    (as ? S : B).add(set[Math.floor(r() * set.length)], c, M(x, y, z, sx, sy, sz, (r() - 0.5) * 0.5, r() * TAU, (r() - 0.5) * 0.5), grass ? { top: [shade(GRASS, (r() - 0.5) * 0.12), 0.72], grad: [0.72, 1.05] } : { grad: [0.72, 1.05] });
+    // процедурный камень — приплюснутый шар радиуса 1: по его размерам и встанет готовая модель
+    if (as) ENV.rocks[as].push({ x, y: y - 0.72 * sy, z, w: 2 * sx, h: 1.52 * sy, d: 2 * sz, ry: spot01(x, z, 4) * TAU, tilt: Math.max(sx, sz) < 4 });
   };
   // риф у причала
+  as = 'env-rock1';
   for (let i = 0; i < 11; i++) {
     const a = r() * TAU;
     const d = r() * 6.5;
@@ -628,6 +658,7 @@ function buildRocks(scene, r) {
     rock(REEF.x + Math.cos(a) * d, -0.35 + r() * 0.5 - d * 0.05, REEF.z + Math.sin(a) * d * 0.8, s * 1.2, s * 0.8, s);
   }
   // остров: кромка воды и уступы обрыва
+  as = null;
   for (let i = 0; i < 56; i++) {
     const a = r() * TAU;
     const R = islandR(a) + 0.5 + r() * 4.5;
@@ -644,6 +675,7 @@ function buildRocks(scene, r) {
     rock(x, h - s * 0.3, z, s, s * (0.8 + r() * 0.5), s, h > 7);
   }
   // мыс
+  as = 'env-rock1';
   for (let i = 0; i < 34; i++) {
     const t = r();
     const x = CAPE.ax + (CAPE.bx - CAPE.ax) * t + (r() - 0.5) * 9.5;
@@ -655,6 +687,7 @@ function buildRocks(scene, r) {
   }
   for (let i = 0; i < 5; i++) rock(CAPE.bx + (r() - 0.5) * 6, -0.2, CAPE.bz - 3 - r() * 4, 1.4 + r(), 1 + r(), 1.4 + r());
   // берег
+  as = 'env-rock1';
   for (let i = 0; i < 70; i++) {
     const x = -60 + r() * 115;
     const z = shoreZ(x) - 1.5 + r() * 3.4;
@@ -663,16 +696,22 @@ function buildRocks(scene, r) {
     rock(x, groundH(x, z) + s * 0.12, z, s * 1.3, s * 0.75, s, false, 0.05);
   }
   // западный мыс и скалы в море
+  as = null;
   for (let i = 0; i < 46; i++) {
     const x = -62 - r() * 80;
     const z = shoreZ(x) - 2 + r() * 5;
     const s = 2 + r() * 3.4;
     rock(x, groundH(x, z) + r() * 2, z, s * 1.2, s, s, r() < 0.5);
   }
+  let stack = 0;
   for (const [x, z, s, tall] of [[98, -72, 7, 2.6], [112, -40, 5, 2.2], [90, -104, 6, 3], [126, -98, 9, 2], [-58, -96, 5, 2.4], [-76, -122, 7, 2.2], [140, -20, 5, 2.4]]) {
+    // высокие — островерхие скалы, приземистые — столбы с травой наверху
+    as = tall > 2.3 && stack++ % 2 === 0 ? 'env-rock3' : 'env-rock2';
     rock(x, s * tall * 0.3, z, s, s * tall, s, true);
+    as = 'env-rock1';
     for (let k = 0; k < 4; k++) rock(x + (r() - 0.5) * s * 2.2, -0.2, z + (r() - 0.5) * s * 2.2, 1.5 + r() * 2, 1 + r(), 1.5 + r() * 2);
   }
+  as = null;
   // арка: половина тора, помятая шумом
   const ag = new THREE.TorusGeometry(8.6, 2.7, 7, 13, Math.PI).toNonIndexed();
   const p = ag.attributes.position;
@@ -686,15 +725,21 @@ function buildRocks(scene, r) {
   }
   ag.computeVertexNormals();
   B.add(ag, '#8d95a1', M(ARCH.x, -1.4, ARCH.z, 1, 1, 1, 0, 1.92, 0), { top: [GRASS, 0.8], grad: [0.72, 1.05] });
+  as = 'env-rock1';
   for (let i = 0; i < 9; i++) {
     const s = i < 5 ? -1 : 1;
     rock(ARCH.x + Math.cos(1.92) * s * (8.6 + (r() - 0.5) * 4) + (r() - 0.5) * 3, -0.2, ARCH.z - Math.sin(1.92) * s * (8.6 + (r() - 0.5) * 4) + (r() - 0.5) * 3, 1.6 + r() * 2.2, 1.2 + r() * 1.6, 1.6 + r() * 2.2, r() < 0.3);
   }
+  as = null;
   const tb = new Batch();
   roundTree(tb, ARCH.x + 0.4, 9.6, ARCH.z - 0.2, 0.8, r);
   pine(tb, ARCH.x - 1.6, 9.2, ARCH.z + 0.9, 0.7, r);
   bush(tb, ARCH.x + 1.8, 9.2, ARCH.z + 0.4, 0.8, r);
-  scene.add(B.build(), tb.build());
+  const mS = S.build();
+  const mT = tb.build();
+  scene.add(B.build(), mS, mT);
+  ENV.fallback.rocks.push(mS);
+  ENV.fallback.trees.push(mT);
   // дальние острова на горизонте
   const fb = new Batch();
   for (const [x, z, sx, sy, sz] of [[-420, -560, 130, 46, 90], [260, -720, 170, 60, 110], [640, -330, 120, 40, 150], [-700, -150, 150, 70, 180], [40, -980, 220, 50, 120]]) {
@@ -704,7 +749,8 @@ function buildRocks(scene, r) {
 }
 
 function buildLighthouse(scene, r) {
-  const B = new Batch();
+  const H = new Batch(); // домик смотрителя и заборчик — остаются
+  const B = new Batch(); // башня: запасная, пока не загрузилась готовая модель
   const { x, z } = LIGHTHOUSE;
   const y = groundH(x, z) - 0.3;
   B.add(G.cyl(16), '#a3a9b3', M(x, y + 0.5, z, 5.6, 1.2, 5.6), { grad: [0.8, 1.05] });
@@ -731,10 +777,10 @@ function buildLighthouse(scene, r) {
   const hx = x - 7.5;
   const hz = z + 2;
   const hy = groundH(hx, hz) - 0.2;
-  B.add(G.box(), '#f6f2ea', M(hx, hy + 1.5, hz, 5.2, 3.0, 4.0), { grad: [0.88, 1.04] });
-  B.add(G.prism(), '#d8402f', M(hx, hy + 3.0, hz, 5.9, 1.9, 4.6), { grad: [0.9, 1.06] });
-  B.add(G.box(), '#a3a9b3', M(hx + 1.4, hy + 4.3, hz - 0.8, 0.6, 1.4, 0.6));
-  B.add(G.box(), '#7a4a26', M(hx - 0.2, hy + 1.0, hz + 2.02, 0.9, 1.9, 0.1));
+  H.add(G.box(), '#f6f2ea', M(hx, hy + 1.5, hz, 5.2, 3.0, 4.0), { grad: [0.88, 1.04] });
+  H.add(G.prism(), '#d8402f', M(hx, hy + 3.0, hz, 5.9, 1.9, 4.6), { grad: [0.9, 1.06] });
+  H.add(G.box(), '#a3a9b3', M(hx + 1.4, hy + 4.3, hz - 0.8, 0.6, 1.4, 0.6));
+  H.add(G.box(), '#7a4a26', M(hx - 0.2, hy + 1.0, hz + 2.02, 0.9, 1.9, 0.1));
   const winMat = new THREE.MeshStandardMaterial({ color: '#25405f', emissive: '#ffc56b', emissiveIntensity: 0, roughness: 0.4 });
   for (const wx of [-1.7, 1.4]) {
     const w = new THREE.Mesh(G.box(), winMat);
@@ -749,9 +795,11 @@ function buildLighthouse(scene, r) {
     const pz = z + 1 + Math.sin(a) * 8.5;
     const py = groundH(px, pz);
     if (py < 9) continue;
-    B.add(G.box(), '#f6f2ea', M(px, py + 0.4, pz, 0.12, 0.9, 0.12));
+    H.add(G.box(), '#f6f2ea', M(px, py + 0.4, pz, 0.12, 0.9, 0.12));
   }
-  scene.add(B.build());
+  const tower = B.build();
+  scene.add(H.build(), tower);
+  ENV.fallback.lighthouse.push(tower);
   // фонарь маяка и луч
   const lampMat = new THREE.MeshStandardMaterial({ color: '#fff3c4', emissive: '#ffd36b', emissiveIntensity: 0.25, roughness: 0.3, transparent: true, opacity: 0.92 });
   const lamp = new THREE.Mesh(G.cyl(14), lampMat);
@@ -774,6 +822,8 @@ function buildLighthouse(scene, r) {
     beam.add(cone);
   }
   scene.add(beam);
+  ENV.fallback.lighthouse.push(lamp);
+  ENV.lighthouse = { x, y, z, beam, face };
   return { lampMat, beamMat, beam, winMat };
 }
 
@@ -990,11 +1040,20 @@ export function buildScenery(scene) {
   B.auto = true;
   const P = new Batch(); // процедурные двойники предметов, у которых есть готовые модели
   P.auto = true;
+  // то, что заменяется готовыми моделями локации, собирается в отдельные меши — их можно спрятать
+  const X = { bench: new Batch(), lamps: new Batch() };
+  X.bench.auto = X.lamps.auto = true;
   buildDocks(B, r);
   const shack = buildShack(B, P, scene, r);
-  buildProps(B, P, r);
-  const lamps = buildLamps(B, scene);
+  buildProps(B, P, r, X);
+  const lamps = buildLamps(X.lamps, scene);
+  buildDocks(B, rng(20261113), true);
   scene.add(B.build());
+  for (const k of ['bench', 'lamps']) {
+    const m = X[k].build();
+    scene.add(m);
+    ENV.fallback[k].push(m);
+  }
   const fallback = P.build();
   scene.add(fallback);
   buildVegetation(scene, r);
@@ -1006,7 +1065,11 @@ export function buildScenery(scene) {
   const schools = buildSchools(scene);
   buildPlaces(scene);
   upgradeProps(scene, fallback, floaters);
+  const env = upgradeEnv(scene);
   return {
+    /** Для проверок: какие готовые модели локации уже стоят и сколько в них треугольников. */
+    envState: () => ({ ...envState(), ...env.scatter.stats() }),
+    env,
     setBoard: shack.setBoard,
     schools,
     /** Для проверок: спрятан ли запасной меш и сколько готовых моделей расставлено. */
@@ -1020,8 +1083,10 @@ export function buildScenery(scene) {
       lh.beamMat.uniforms.opacity.value = Math.max(0, night - 0.4) * 0.9;
       lh.winMat.emissiveIntensity = night * 1.6;
       falls.uLight.value = 0.14 + 0.86 * light;
+      envNight(night);
     },
-    update(dt, t) {
+    update(dt, t, camera) {
+      if (camera) env.update(camera, t);
       falls.uTime.value = t;
       lh.beam.rotation.y = t * 0.45;
       for (const f of floaters) {

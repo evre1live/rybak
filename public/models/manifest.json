@@ -614,6 +614,255 @@
         0.69
       ],
       "icon": "models/icons/junk-chest.webp"
+    },
+    "env-pine": {
+      "file": "models/env-pine.glb",
+      "group": "env",
+      "tris": 2600,
+      "kb": 120,
+      "size": [
+        0.58,
+        1,
+        0.531
+      ],
+      "lod": {
+        "file": "models/env-pine.lod.glb",
+        "tris": 500,
+        "kb": 10
+      }
+    },
+    "env-oak": {
+      "file": "models/env-oak.glb",
+      "group": "env",
+      "tris": 2800,
+      "kb": 140,
+      "size": [
+        0.88,
+        1,
+        0.877
+      ],
+      "lod": {
+        "file": "models/env-oak.lod.glb",
+        "tris": 594,
+        "kb": 12
+      }
+    },
+    "env-birch": {
+      "file": "models/env-birch.glb",
+      "group": "env",
+      "tris": 2399,
+      "kb": 138,
+      "size": [
+        0.442,
+        1,
+        0.426
+      ],
+      "lod": {
+        "file": "models/env-birch.lod.glb",
+        "tris": 500,
+        "kb": 10
+      }
+    },
+    "env-palm": {
+      "file": "models/env-palm.glb",
+      "group": "env",
+      "tris": 2598,
+      "kb": 182,
+      "size": [
+        0.799,
+        1,
+        0.724
+      ],
+      "lod": {
+        "file": "models/env-palm.lod.glb",
+        "tris": 898,
+        "kb": 18
+      }
+    },
+    "env-bush": {
+      "file": "models/env-bush.glb",
+      "group": "env",
+      "tris": 2141,
+      "kb": 135,
+      "size": [
+        1,
+        0.788,
+        0.988
+      ],
+      "lod": {
+        "file": "models/env-bush.lod.glb",
+        "tris": 218,
+        "kb": 6
+      }
+    },
+    "env-rock1": {
+      "file": "models/env-rock1.glb",
+      "group": "env",
+      "tris": 1399,
+      "kb": 62,
+      "size": [
+        1,
+        0.869,
+        0.903
+      ],
+      "lod": {
+        "file": "models/env-rock1.lod.glb",
+        "tris": 300,
+        "kb": 6
+      }
+    },
+    "env-rock2": {
+      "file": "models/env-rock2.glb",
+      "group": "env",
+      "tris": 1400,
+      "kb": 109,
+      "size": [
+        0.599,
+        1,
+        0.525
+      ],
+      "lod": {
+        "file": "models/env-rock2.lod.glb",
+        "tris": 300,
+        "kb": 7
+      }
+    },
+    "env-rock3": {
+      "file": "models/env-rock3.glb",
+      "group": "env",
+      "tris": 1800,
+      "kb": 137,
+      "size": [
+        0.687,
+        1,
+        0.651
+      ],
+      "lod": {
+        "file": "models/env-rock3.lod.glb",
+        "tris": 340,
+        "kb": 8
+      }
+    },
+    "env-lighthouse": {
+      "file": "models/env-lighthouse.glb",
+      "group": "env",
+      "tris": 8987,
+      "kb": 183,
+      "size": [
+        0.493,
+        1,
+        0.469
+      ]
+    },
+    "env-wreck": {
+      "file": "models/env-wreck.glb",
+      "group": "env",
+      "tris": 10000,
+      "kb": 287,
+      "size": [
+        1,
+        0.812,
+        0.454
+      ]
+    },
+    "env-hut": {
+      "file": "models/env-hut.glb",
+      "group": "env",
+      "tris": 7998,
+      "kb": 248,
+      "size": [
+        1,
+        0.923,
+        0.985
+      ]
+    },
+    "env-rental": {
+      "file": "models/env-rental.glb",
+      "group": "env",
+      "tris": 7998,
+      "kb": 190,
+      "size": [
+        1,
+        0.977,
+        0.865
+      ]
+    },
+    "env-motorboat": {
+      "file": "models/env-motorboat.glb",
+      "group": "env",
+      "tris": 8998,
+      "kb": 456,
+      "size": [
+        1,
+        0.417,
+        0.46
+      ]
+    },
+    "env-lamppost": {
+      "file": "models/env-lamppost.glb",
+      "group": "env",
+      "tris": 2498,
+      "kb": 105,
+      "size": [
+        0.39,
+        1,
+        0.169
+      ]
+    },
+    "env-bench": {
+      "file": "models/env-bench.glb",
+      "group": "env",
+      "tris": 2200,
+      "kb": 86,
+      "size": [
+        1,
+        0.6,
+        0.443
+      ]
+    },
+    "env-fender": {
+      "file": "models/env-fender.glb",
+      "group": "env",
+      "tris": 1600,
+      "kb": 76,
+      "size": [
+        0.663,
+        1,
+        0.317
+      ]
+    },
+    "env-signpost": {
+      "file": "models/env-signpost.glb",
+      "group": "env",
+      "tris": 2000,
+      "kb": 105,
+      "size": [
+        0.644,
+        1,
+        0.3
+      ]
+    },
+    "env-seagull": {
+      "file": "models/env-seagull.glb",
+      "group": "env",
+      "tris": 1597,
+      "kb": 62,
+      "size": [
+        1,
+        0.932,
+        0.562
+      ]
+    },
+    "env-campfire": {
+      "file": "models/env-campfire.glb",
+      "group": "env",
+      "tris": 3496,
+      "kb": 96,
+      "size": [
+        0.845,
+        1,
+        0.749
+      ]
     }
   }
 }

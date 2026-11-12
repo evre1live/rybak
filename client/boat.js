@@ -1,6 +1,6 @@
 // Лодка напрокат: модель с мотором, ход по воде, качка, след за кормой.
 //
-// Нос лодки смотрит туда же, куда «вперёд» у игрока (при yaw = 0 — на север, −Z). Рыбак сидит на средней банке.
+// Нос лодки смотрит туда же, куда «вперёд» у игрока (при yaw = 0 — на север, −Z). Рыбак сидит на банке у мотора.
 // Лодка у каждого своя: её берут у домашнего пирса, она остаётся за игроком, пока тот не вернёт её обратно.
 import * as THREE from 'three';
 import { canSail, MOORINGS, WORLD } from './terrain.js';
@@ -9,6 +9,7 @@ import { loadManifest } from './hero.js';
 import { loadModel, spawn, modelInfo } from './models.js';
 import { Batch, M, G, BATCH_MAT } from './batch.js';
 import { GLOSS_MAT, METAL_MAT } from './env.js';
+import { patchModel } from './surface.js';
 import { clamp, damp } from './util.js';
 
 export const BOAT_PRICE = 30; // монет за выход; первый выход бесплатный
@@ -16,9 +17,18 @@ const LEN = 4.3; // длина корпуса, м
 const DRAFT = 0.5; // осадка: настолько киль ниже воды
 const BENCH = 1.14; // высота средней банки над килем
 const SEAT_Z = 0.17; // банка чуть ближе к корме от середины
-export const SEAT_BACK = SEAT_Z;
 const RIM = 1.31; // высота борта над килем
 const STERN = 1.5; // верх транца над килем
+// Корпуса. Моторка — готовая модель локации: мотор у неё свой. Сидеть на её кормовой банке нельзя — колпак мотора
+// оказывается у самого лица и закрывает вид назад, — поэтому посреди кокпита кладём свою доску-банку (thwart —
+// её ширина), как на прежней лодке. Вёсельная лодка с приставным мотором — прежняя модель; она же (и корпус
+// из кода) — запасные, пока моторка грузится.
+// len — длина, draft — осадка, bench — высота банки над килем, seatX/seatZ — где сидит рыбак (вправо и к корме
+// от середины), rot — как повернуть модель носом к −Z, motor — нужен ли приставной мотор.
+const HULLS = {
+  'env-motorboat': { len: 4.6, draft: 0.34, bench: 1.0, seatX: 0, seatZ: 0.25, rot: Math.PI / 2, motor: false, thwart: 1.7 },
+  'prop-boat': { len: LEN, draft: DRAFT, bench: BENCH, seatX: 0, seatZ: SEAT_Z, rot: -Math.PI / 2, motor: true }
+};
 export const VMAX = 12.5; // полный ход, м/с
 const VREV = 3.2; // задний ход
 
@@ -107,21 +117,40 @@ export class BoatVisual {
     this.y = 0;
     this.spin = 0;
     this.model = false;
-    loadManifest().then(() => {
-      if (this.gone || !modelInfo('prop-boat')) return;
-      loadModel('prop-boat').then((tpl) => {
-        if (this.gone) return;
-        const o = spawn(tpl);
-        // у модели длинная сторона вдоль X, нос — в сторону −X: разворачиваем носом к −Z
-        o.rotation.y = -Math.PI / 2;
-        o.scale.setScalar(LEN);
-        g.remove(this.hull);
-        this.hull = o;
-        g.add(o);
-        this.motor.position.set(0, STERN - 0.02, LEN / 2 - 0.1);
-        this.model = true;
-      }, () => {});
-    });
+    this.spec = HULLS['prop-boat'];
+    // берём лучшую модель из тех, что есть; не загрузилась — следующую
+    const tryHull = (ids) => {
+      const id = ids.find((k) => modelInfo(k));
+      if (!id || this.gone) return;
+      loadModel(id).then(
+        (tpl) => {
+          if (this.gone) return;
+          const spec = HULLS[id];
+          if (!tpl.patched) {
+            tpl.patched = true;
+            tpl.scene.traverse((c) => c.isMesh && patchModel(c.material));
+          }
+          const o = spawn(tpl);
+          o.rotation.y = spec.rot;
+          o.scale.setScalar(spec.len);
+          g.remove(this.hull);
+          this.hull = o;
+          g.add(o);
+          if (spec.thwart) {
+            const B = new Batch();
+            B.add(G.box(), '#b5722f', M(0, spec.bench - 0.035, spec.seatZ, spec.thwart, 0.07, 0.36), { mat: 1 });
+            o.userData.thwart = B.build(BATCH_MAT, true);
+            g.add(o.userData.thwart);
+          }
+          this.spec = spec;
+          this.motor.visible = spec.motor;
+          if (spec.motor) this.motor.position.set(0, STERN - 0.02, LEN / 2 - 0.1);
+          this.model = id;
+        },
+        () => tryHull(ids.filter((k) => k !== id))
+      );
+    };
+    loadManifest().then(() => tryHull(['env-motorboat', 'prop-boat']));
   }
   /** Ставит лодку: x, z — середина, yaw — куда смотрит нос; k — ход от −1 до 1, lean — руль от −1 до 1. */
   pose(x, z, yaw, t, k = 0, lean = 0, dt = 0.016) {
@@ -139,7 +168,7 @@ export class BoatVisual {
     // на ходу нос приподнят и лодку слегка потряхивает; в повороте она кренится внутрь
     this.pitch += ((hb - hs) / 3.2 + 0.06 * Math.max(0, k) + Math.sin(t * 9) * 0.01 * sp - this.pitch) * kk;
     this.roll += ((hr - hl) / 1.6 - lean * 0.15 + Math.sin(t * 1.3 + x) * 0.012 - this.roll) * kk;
-    g.position.set(x, this.y - DRAFT + sp * 0.07, z);
+    g.position.set(x, this.y - this.spec.draft + sp * 0.07, z);
     g.rotation.set(this.pitch, yaw, this.roll);
     this.motor.rotation.y = lean * 0.45;
     this.spin += dt * (6 + sp * 70) * (k < 0 ? -1 : 1);
@@ -147,12 +176,27 @@ export class BoatVisual {
   }
   /** Точка на банке, где сидит рыбак (в мире). */
   seat(out) {
-    return out.set(0, BENCH, SEAT_Z).applyQuaternion(this.group.quaternion).add(this.group.position);
+    const s = this.spec;
+    return out.set(s.seatX, s.bench, s.seatZ).applyQuaternion(this.group.quaternion).add(this.group.position);
+  }
+  /** Середина лодки по месту рыбака: друг присылает, где сидит, а лодку под ним ставим мы. */
+  centre(x, z, yaw, out) {
+    const s = this.spec;
+    out.x = x - Math.cos(yaw) * s.seatX - Math.sin(yaw) * s.seatZ;
+    out.z = z + Math.sin(yaw) * s.seatX - Math.cos(yaw) * s.seatZ;
+    return out;
   }
   dispose() {
     this.gone = true;
     this.scene.remove(this.group);
   }
+}
+
+/** Корпус лодки (моторка 4,6 × 2,1 м) помещается: нос, середина, корма и оба борта на воде. */
+export function hullFits(x, z, yaw) {
+  const sn = Math.sin(yaw);
+  const cs = Math.cos(yaw);
+  return canSail(x, z) && canSail(x - sn * 2.1, z - cs * 2.1) && canSail(x + sn * 2.1, z + cs * 2.1) && canSail(x - cs * 0.9, z + sn * 0.9) && canSail(x + cs * 0.9, z - sn * 0.9);
 }
 
 /** Куда встаёт у причала чужая лодка: рядом со своей, борт к борту, дальше от настила. n — место игрока в комнате. */
@@ -221,9 +265,7 @@ export class Boat {
   }
   /** Корпус помещается: нос, середина, корма и оба борта на воде. */
   fits(x, z, yaw) {
-    const sn = Math.sin(yaw);
-    const cs = Math.cos(yaw);
-    return canSail(x, z) && canSail(x - sn * 1.9, z - cs * 1.9) && canSail(x + sn * 1.8, z + cs * 1.8) && canSail(x - cs * 0.8, z + sn * 0.8) && canSail(x + cs * 0.8, z - sn * 0.8);
+    return hullFits(x, z, yaw);
   }
   /** Шаг управления. throttle: 1 — вперёд, −1 — назад; steer: 1 — вправо; brake — леска в воде, глушим ход. */
   drive(dt, throttle, steer, brake = false) {

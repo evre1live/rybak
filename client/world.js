@@ -371,7 +371,7 @@ export class World {
     const tz = Math.round((camera.position.z - 8) / 2) * 2;
     this.sun.target.position.set(tx, 0, tz);
     this.sun.position.set(tx + this.lightDir.x * 120, this.lightDir.y * 120, tz + this.lightDir.z * 120);
-    this.scenery.update(dt, t);
+    this.scenery.update(dt, t, camera);
   }
 }
 

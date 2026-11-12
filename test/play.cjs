@@ -235,9 +235,30 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
       await G(mp, () => RYBAK.ui.openPanel('journal'));
       await mp.waitForFunction(() => { const im = [...document.querySelectorAll('.tile img')]; return im.length >= 25 && im.every((i) => /models\/icons\/fish-.*\.webp$/.test(i.getAttribute('src')) && i.complete && i.naturalWidth > 0); }, null, { timeout: 60000 });
       await shot(mp, '23-model-journal', 300);
+      // модели локации: лес, пальмы, камни, маяк, будка проката, фонари, чайки — встали на место нарисованных кодом
+      await G(mp, () => RYBAK.ui.closePanel());
+      await mp.waitForFunction(() => { const e = RYBAK.world.scenery.envState(); return e.trees && e.palms && e.rocks && e.lighthouse && e.kiosk && e.lamps >= 5 && e.gulls >= 4 && e.singles >= 10; }, null, { timeout: 180000 });
+      const env = await G(mp, () => RYBAK.world.scenery.envState());
+      assert.ok(env.nHi + env.nLo > 600, `деревья, кусты и камни расставлены: ${env.nHi + env.nLo}`);
+      assert.ok(env.nLo > env.nHi * 2, `вдали — грубые копии: подробных ${env.nHi}, дальних ${env.nLo}`);
+      assert.ok(env.hi < 400000, `подробных треугольников в лесу немного: ${env.hi}`);
+      // у будки проката можно встать перед прилавком, а сквозь неё не пройти
+      await G(mp, () => { const g = RYBAK; g.input.locked = true; g.input.enabled = true; g.player.place(2.0, -6.4, -Math.PI / 2); g.input.keys.add('KeyW'); });
+      await mp.waitForTimeout(1600);
+      const kx = await G(mp, () => { RYBAK.input.keys.delete('KeyW'); return RYBAK.player.x; });
+      assert.ok(kx > 2.2 && kx < 2.7, `будка не пускает сквозь себя и вплотную к прилавку: x = ${kx.toFixed(2)}`);
+      // у прилавка лодку предлагают так же, как у самой лодки
+      await mp.waitForFunction(() => /ЛОДКА НАПРОКАТ — ПЕРВЫЙ ВЫХОД БЕСПЛАТНО/.test(document.querySelector('#prompt').textContent), null, { timeout: 20000 });
+      await G(mp, () => { RYBAK.player.yaw = -Math.PI / 2; RYBAK.player.pitch = 0.12; });
+      await shot(mp, '23b-rental-kiosk', 300);
+      // если модель догрузилась вокруг игрока (он стоял на её месте) — он не заперт: наружу выйти можно
+      await G(mp, () => { const g = RYBAK; g.player.place(4.0, -6.4, Math.PI / 2); g.input.keys.add('KeyW'); });
+      await mp.waitForTimeout(1500);
+      const ox = await G(mp, () => { RYBAK.input.keys.delete('KeyW'); return RYBAK.player.x; });
+      assert.ok(ox < 2.6, `из будки можно выйти: x = ${ox.toFixed(2)}`);
       assert.equal(mp.__err || 0, 0, 'ошибок на странице с моделями нет');
       await mp.close();
-      console.log('  модели: предметы расставлены, рыба и сундук в руках, значки в журнале');
+      console.log(`  модели: предметы расставлены, рыба и сундук в руках, значки в журнале; локация — ${env.nHi + env.nLo} деревьев и камней (подробных ${env.nHi}), будка проката на месте`);
     }
     const walker = await open(browser, 'q=low&norender&h=13', 'walk');
     await walker.fill('#nm', 'Ходок');

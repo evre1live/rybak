@@ -4,7 +4,7 @@ import { Character } from './character.js';
 import { buildRod, buildFloat, buildLure } from './gear3d.js';
 import { buildFish, wiggleFish } from './fish3d.js';
 import { FishLine } from './line.js';
-import { BoatVisual, moorSpot, wake, VMAX, SEAT_BACK } from './boat.js';
+import { BoatVisual, moorSpot, wake, VMAX } from './boat.js';
 import { S, FS_NAME, FLAG } from './proto.js';
 import { ITEMS, FISH_BY_ID, isLure } from '../shared/data.js';
 import { angDiff, lerp, clamp } from './util.js';
@@ -143,9 +143,8 @@ export class Remote {
         const y0 = a[S.BYAW] ?? b[S.BYAW] ?? 0;
         const byaw = y0 + angDiff(y0, b[S.BYAW] ?? y0) * Math.min(1, u);
         const v = (a[S.BOAT] | 0) === 1 ? L(S.SPEED) : 0;
-        // друг присылает, где сидит; середина лодки чуть впереди банки
-        const cx = x - Math.sin(byaw) * SEAT_BACK;
-        const cz = z - Math.cos(byaw) * SEAT_BACK;
+        // друг присылает, где сидит; середину лодки считаем от банки
+        const { x: cx, z: cz } = this.boat.centre(x, z, byaw, spot);
         this.boat.pose(cx, cz, byaw, t, clamp(v / VMAX, -1, 1), (b[S.STEER] || 0) * Math.min(1, Math.abs(v) / 6), dt);
         wake(this, fx, cx, cz, byaw, v, dt);
         g.position.copy(this.boat.seat(seat));

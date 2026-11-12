@@ -1,8 +1,9 @@
-// Готовые модели рыбы и предметов (Tripo): загрузка по требованию и раздача копий.
+// Готовые модели рыбы, предметов и локации (Tripo): загрузка по требованию и раздача копий.
 // Модели заранее приведены к общему виду (tools/optimize.js): рыба — длина 1, голова к −X, спина к +Y;
 // предмет — наибольший размер 1, стоит на y = 0, длинная сторона вдоль X.
 import * as THREE from 'three';
 import { heroes, loadManifest, gltfLoader } from './hero.js';
+import { isTouch } from './util.js';
 
 const ready = new Map();
 const pending = new Map();
@@ -32,6 +33,21 @@ function tune(scene, info) {
   });
 }
 
+/** На телефонах текстуры моделей локации уменьшаем вдвое-вчетверо: их два десятка, а видеопамяти мало. */
+function shrink(tex, max) {
+  const im = tex && tex.image;
+  if (!im || Math.max(im.width, im.height) <= max) return;
+  const k = max / Math.max(im.width, im.height);
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(im.width * k));
+  c.height = Math.max(1, Math.round(im.height * k));
+  c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+  if (im.close) im.close();
+  tex.image = c;
+  tex.needsUpdate = true;
+}
+const LITE_TEX = { 'env-motorboat': 1024 }; // лодка всегда перед глазами — ей побольше
+
 export function loadModel(id) {
   if (ready.has(id)) return Promise.resolve(ready.get(id));
   if (pending.has(id)) return pending.get(id);
@@ -45,6 +61,12 @@ export function loadModel(id) {
             info.file,
             (g) => {
               tune(g.scene, info);
+              if (info.group === 'env' && isTouch())
+                g.scene.traverse((o) => {
+                  if (!o.isMesh) return;
+                  shrink(o.material.map, LITE_TEX[id] || 512);
+                  shrink(o.material.normalMap, 256);
+                });
               const tpl = { id, info, scene: g.scene };
               ready.set(id, tpl);
               res(tpl);
@@ -57,6 +79,37 @@ export function loadModel(id) {
   });
   pending.set(id, p);
   p.catch(() => pending.delete(id));
+  return p;
+}
+
+const lods = new Map();
+/** Дальняя (грубая) копия модели локации: вместо текстуры — цвет вершин. */
+export function loadLod(id) {
+  if (lods.has(id)) return lods.get(id);
+  const p = loadManifest().then(() => {
+    const info = modelInfo(id);
+    if (!info || !info.lod) throw new Error('нет дальней копии ' + id);
+    return gltfLoader().then(
+      (loader) =>
+        new Promise((res, rej) =>
+          loader.load(
+            info.lod.file,
+            (g) => {
+              g.scene.traverse((o) => {
+                if (!o.isMesh) return;
+                o.material.metalness = 0;
+                o.material.roughness = 0.92;
+              });
+              res({ id, info, scene: g.scene });
+            },
+            undefined,
+            rej
+          )
+        )
+    );
+  });
+  lods.set(id, p);
+  p.catch(() => lods.delete(id));
   return p;
 }
 

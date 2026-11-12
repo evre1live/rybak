@@ -1,6 +1,6 @@
 // Игрок от первого лица: ввод (клавиатура, мышь, геймпад, сенсор), ходьба по причалу и берегу, место в лодке, камера.
 import * as THREE from 'three';
-import { canStand, standY, deckAt, groundH, SPAWN } from './terrain.js';
+import { canStand, blocksAt, standY, deckAt, groundH, SPAWN } from './terrain.js';
 import { clamp, damp } from './util.js';
 import { settings } from './profile.js';
 
@@ -267,6 +267,15 @@ export class Player {
       const z0 = this.z;
       const step = (ax, az) => {
         if (canStand(this.x + ax, this.z + az)) {
+          this.x += ax;
+          this.z += az;
+          return 1;
+        }
+        // Стоим внутри преграды: она появилась уже после нас — догрузилась модель будки, скамейки, указателя.
+        // Пока не вышли, эта преграда не считается (иначе игрок застрял бы на месте); вышли — обратно не войти.
+        const inside = blocksAt(this.x, this.z);
+        if (inside) {
+          if (!canStand(this.x + ax, this.z + az, inside)) return 0;
           this.x += ax;
           this.z += az;
           return 1;

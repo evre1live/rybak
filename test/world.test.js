@@ -5,12 +5,49 @@ import * as T from '../client/terrain.js';
 import { ZONES, FISH } from '../shared/data.js';
 import { newProfile, fixProfile } from '../shared/logic.js';
 
-// как в client/boat.js: нос, середина, корма и оба борта на воде
+// как hullFits в client/boat.js (моторка 4,6 × 2,1 м): нос, середина, корма и оба борта на воде
 const fits = (x, z, yaw) => {
   const sn = Math.sin(yaw);
   const cs = Math.cos(yaw);
-  return T.canSail(x, z) && T.canSail(x - sn * 1.9, z - cs * 1.9) && T.canSail(x + sn * 1.8, z + cs * 1.8) && T.canSail(x - cs * 0.8, z + sn * 0.8) && T.canSail(x + cs * 0.8, z - sn * 0.8);
+  return T.canSail(x, z) && T.canSail(x - sn * 2.1, z - cs * 2.1) && T.canSail(x + sn * 2.1, z + cs * 2.1) && T.canSail(x - cs * 0.9, z + sn * 0.9) && T.canSail(x + cs * 0.9, z - sn * 0.9);
 };
+
+test('площадка проката: на ней можно стоять, и она не мешает лодке у пирса', () => {
+  const d = T.DECKS.find((k) => k.id === 'rental');
+  assert.ok(d, 'площадка есть');
+  assert.ok(T.canStand(2.2, -6.4) && T.deckAt(2.2, -6.4), 'перед прилавком будки можно стоять');
+  assert.ok(T.canStand(1.6, -6.4), 'с пирса на площадку — без щели');
+  const m = T.MOORINGS[0];
+  assert.ok(m.z + 2.3 < d.z0, 'лодка стоит севернее площадки');
+});
+
+test('преграда, выросшая вокруг игрока, не запирает: её можно не считать, пока выходишь', () => {
+  const c = { x: 2.6, z: 9, r: 0.8 };
+  assert.ok(T.canStand(2.6, 9) && !T.blocksAt(2.6, 9), 'место свободно');
+  T.CIRCLES.push(c);
+  try {
+    assert.equal(T.canStand(2.6, 9), false, 'теперь тут преграда');
+    const inside = T.blocksAt(2.7, 9);
+    assert.deepEqual(inside, [c]);
+    assert.ok(T.canStand(3.0, 9, inside), 'шаг наружу разрешён');
+    assert.equal(T.blocksAt(3.5, 9), null, 'снаружи преграды нет');
+  } finally {
+    T.CIRCLES.pop();
+  }
+  // то же с прямоугольником: так встаёт будка проката на своей площадке
+  const b = { x0: 2.5, x1: 5.8, z0: -8.8, z1: -4.0 };
+  T.BOXES.push(b);
+  try {
+    assert.equal(T.canStand(4, -6.4), false, 'в будке стоять нельзя');
+    const inside = T.blocksAt(4, -6.4);
+    assert.deepEqual(inside, [b]);
+    assert.ok(T.canStand(3, -6.4, inside), 'внутри будки идти к выходу можно');
+    assert.ok(T.canStand(2.2, -6.4, inside) && T.canStand(2.2, -6.4), 'перед прилавком — свободно');
+    assert.equal(T.canStand(5.7, -6.4, inside), false, 'за край площадки из будки не шагнуть');
+  } finally {
+    T.BOXES.pop();
+  }
+});
 
 test('причалы: лодка помещается, под килем глубоко, рыбак выходит на настил', () => {
   assert.equal(T.MOORINGS.filter((m) => m.rent).length, 1, 'лодку берут и сдают в одном месте');
