@@ -1279,12 +1279,10 @@ export function buildScenery(scene) {
     propsState: () => ({ fallback: fallback.visible, ...propsDone }),
     /** night: 0 днём … 1 ночью; light — общая яркость дня */
     setNight(night, light) {
-      // днём фонари не просто не светят — их нет среди источников света: каждый источник считается в каждой точке
-      // каждой освещённой поверхности, даже погашенный. Шейдеры на оба случая собраны при загрузке (main.js, boot).
-      for (const l of lamps.lamps) {
-        l.intensity = night * 9;
-        l.visible = night > 0.004;
-      }
+      // Днём фонари горят «нулём», но остаются среди источников света: число источников зашито в шейдеры всей сцены,
+      // и смена набора — это не только сборка новых шейдеров, но и первый показ с ними; на Apple M4 кадр с новым
+      // набором шёл 0,7–0,85 с. Пять погашенных фонарей стоят там же 0,8 мс на кадр (6 %) — это дешевле рывка.
+      for (const l of lamps.lamps) l.intensity = night * 9;
       shack.glow.intensity = 6 + night * 6;
       lamps.glassMat.emissiveIntensity = 0.05 + night * 1.9;
       lh.lampMat.emissiveIntensity = 0.25 + night * 2.4;

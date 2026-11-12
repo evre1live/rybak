@@ -75,7 +75,6 @@ class Game {
     setWarmer((root) => this.gfx.warm(root)); // текстуры загруженных моделей — видеокарте заранее и по одной (gfx.warm)
     this.perf = new Perf(this.gfx.renderer);
     this.tuner = newTuner();
-    this.litSets = new Set(); // какие наборы света уже собраны: «ступень|фонари|подсветка» (prelight, lightSets)
     this.perfOn = false; // окошко со счётчиком кадров (F3)
     this.calib = null; // чем кончился подбор качества при загрузке
     this.world = new World();
@@ -115,8 +114,8 @@ class Game {
       if (edge) this.ui.toast('Дальше — только океан. Поворачиваем назад', '', 2600);
     };
     // мягкий свет от камеры на экране команды и в редакторе: лица не должны тонуть в тени, когда солнце сзади
+    // Погашенная, она остаётся среди источников света: набор источников у сцены один на всю игру (см. setNight в scenery.js)
     this.fill = new THREE.DirectionalLight('#fff1dc', 0);
-    this.fill.visible = false; // погашена — значит, её нет: иначе она считалась бы в шейдерах всей сцены
     this.scene.add(this.fill, this.fill.target);
     this.audio = new Audio2();
     // шаги: доски причала, земля, вода по колено
@@ -888,6 +887,7 @@ class Game {
     this.camera.updateProjectionMatrix();
     this.audio.applyVolume();
     const auto = settings.quality === 'auto';
+    const tierWas = this.gfx.quality;
     if (!this.params.get('q')) {
       if (!auto) {
         this.gfx.setQuality(settings.quality);
@@ -903,7 +903,7 @@ class Game {
     }
     this.auto = auto;
     this.tuner = newTuner();
-    if (!this.booting && this.prepared) this.lightSets(); // сменили ступень — её шейдеры для ночи и лобби соберутся в фоне
+    if (this.gfx.quality !== tierWas && this.prepared) this.rewarm(); // новая ступень — новые шейдеры: показываем всё сразу, пока открыто меню
     if (this.perfOn !== !!settings.fps) this.togglePerf(!!settings.fps);
     this.ui.hintKey = '';
   }
@@ -1591,7 +1591,6 @@ class Game {
     // свой персонаж: в лобби и в редакторе
     const showMe = this.state === 'lobby' || !!this.editing;
     this.fill.intensity = damp(this.fill.intensity, showMe ? (this.world.night > 0.5 ? 0.55 : 1.0) : 0, 6, dt);
-    this.fill.visible = this.fill.intensity > 0.01; // погашенная подсветка не должна считаться в шейдерах всей сцены
     if (this.fill.intensity > 0.01) {
       this.fill.position.copy(this.camera.position);
       this.camera.getWorldDirection(this.fill.target.position).multiplyScalar(6).add(this.camera.position);
@@ -1769,17 +1768,26 @@ class Game {
             this.calib = { from: 'skipped' };
           }
         }
-        say(0.94, 'Зажигаем фонари…');
-        await this.prelight();
-        // Два кадра за заставкой: соберётся то, что собирается только при отрисовке, и уйдут буферы. Кадров два, потому что
-        // шейдеры теней three.js различает по набору источников света, а в проходе теней этот набор ещё прежний —
-        // от предыдущего кадра (или от сборки шейдеров лобби): первый кадр его обновит, второй соберёт тени уже под день.
+        say(0.94, 'Последние штрихи…');
+        // Кадры за заставкой: обычный (всё встаёт на места) → «первый показ» всей сцены → снова обычный
+        // (шейдеры теней, буферы) → снимок бухты для карточки места (он рисует мир с другой точки) → обычный.
         this.manual = true;
-        for (let k = 0; k < 2; k++) {
+        const one = async () => {
           if (this.noRender) window.__render = true;
           this.frame(performance.now());
           await yieldNow();
+        };
+        await one();
+        this.warmShown = this.warmDraw();
+        await yieldNow();
+        await one();
+        if (!this.noRender && !this.shot) {
+          this.takeShot();
+          await one();
         }
+        // ждём видеокарту: всё начатое должно закончиться за заставкой, а не в первых кадрах игры
+        const gl = this.gfx.renderer.getContext();
+        gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
       } else if (this.auto && !this.params.get('q') && settings.autoQ && settings.autoQ.gpu === this.perf.gpu) {
         this.gfx.setScale(settings.autoQ.scale || 1);
         if (settings.autoQ.refl != null && settings.autoQ.v === CALIB_V) this.gfx.setRefl(+settings.autoQ.refl);
@@ -1799,53 +1807,47 @@ class Game {
     this.last = performance.now();
     requestAnimationFrame((t) => this.frame(t));
   }
-  /** Выполнить fn при заданном наборе света (L — горят фонари, F — подсветка героя) и вернуть всё как было. */
-  withLights(L, F, fn) {
-    const lamps = this.world.scenery.lampLights;
-    const keep = [lamps.map((l) => l.visible), this.fill.visible];
-    lamps.forEach((l) => (l.visible = L));
-    this.fill.visible = F;
-    try {
-      return fn();
-    } finally {
-      lamps.forEach((l, i) => (l.visible = keep[0][i]));
-      this.fill.visible = keep[1];
-    }
-  }
   /**
-   * Ночью горят фонари, в лобби и в редакторе героя подсвечивает лампа у камеры — а число источников света зашито
-   * в шейдеры всей сцены. Наборов четыре (день/ночь × с подсветкой/без), у каждого шейдеры свои, и у каждой ступени
-   * качества тоже. Несобранный набор собрался бы в тот кадр, когда понадобился: вход в лобби ночью — и игра замирает.
-   * Дневное лобби понадобится через несколько секунд — ждём его за заставкой; остальное собирается в фоне (lightSets).
+   * Первый показ — за заставкой. Собранный шейдер видеокарта доводит до дела только при первой отрисовке с ним
+   * (на Маке собирается «конвейер» Metal, на Windows — окончательный код под формат вершин), и предмет, впервые
+   * попавший в кадр, давал рывок. Поэтому один кадр рисуем так, чтобы в него попало всё, что есть в сцене:
+   * без отсечения по полю зрения и с показом спрятанного — героя, рук с удочкой, поплавка и лески, брызг и кругов,
+   * лодки, дальних копий леса, заготовок рыбы и хлама. Источники света не трогаем: их набор у сцены один.
+   * Картинку за заставкой никто не видит; следом идут обычные кадры.
    */
-  async prelight() {
-    const tier = this.gfx.quality;
-    this.litSets.add(tier + '|false|false'); // день без подсветки собран за заставкой (prepare, calibrate)
-    await this.withLights(false, true, () => this.gfx.shaders(this.scene, this.camera));
-    this.litSets.add(tier + '|false|true');
-    this.lightSets(2500);
-  }
-  /**
-   * В фоне собрать шейдеры остальных наборов света для нынешней ступени качества (после загрузки и после смены ступени).
-   * Шейдеры теней three.js собирает только при отрисовке и различает по набору света, который видел в прошлый раз
-   * (в сборке или в кадре). Поэтому после сборки набора ближайший кадр рисуем без отражения в воде — его проход
-   * подменил бы набор — и тени под этот набор собираются в нём же, а не на закате посреди рыбалки.
-   */
-  lightSets(delay = 1500) {
-    clearTimeout(this.lightT);
-    const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
-    this.lightT = setTimeout(async () => {
-      const tier = this.gfx.quality;
-      for (const [L, F] of [[true, false], [true, true], [false, true], [false, false]]) {
-        const key = tier + '|' + L + '|' + F;
-        if (this.litSets.has(key)) continue;
-        if (this.gfx.quality !== tier) return; // ступень сменилась — её наборы соберёт свой вызов
-        await this.withLights(L, F, () => this.gfx.shaders(this.scene, this.camera));
-        this.litSets.add(key);
-        this.gfx.holdRefl = true;
-        await wait(500);
+  warmDraw() {
+    const uncull = [];
+    const show = [];
+    this.scene.traverse((o) => {
+      if (o.isLight) return;
+      if (!o.visible) {
+        o.visible = true;
+        show.push(o);
       }
-    }, delay);
+      if (o.frustumCulled) {
+        o.frustumCulled = false;
+        uncull.push(o);
+      }
+    });
+    try {
+      this.gfx.render(this.scene, this.camera, this.world.exposure);
+    } catch (e) {
+      console.warn('первый показ', e);
+    } finally {
+      for (const o of uncull) o.frustumCulled = true;
+      for (const o of show) o.visible = false;
+    }
+    return show.length;
+  }
+  /**
+   * После смены ступени качества: у неё свои шейдеры и свои буферы, а значит — снова «первый показ» всего спрятанного
+   * (иначе рыба, которой сейчас нет в кадре, собирала бы свой шейдер в момент подсечки). Следом сразу рисуем
+   * обычный кадр: на экран должен попасть он, а не показ.
+   */
+  rewarm() {
+    if (this.noRender || this.booting) return;
+    this.warmDraw();
+    this.gfx.render(this.scene, this.camera, this.world.exposure);
   }
   /** Цена кадра, мс: рисуем кадр и ждём, пока видеокарта его закончит, — так видно настоящее время, а не частоту экрана. */
   async frameCost(n = 8, warm = 3) {
@@ -1936,9 +1938,9 @@ class Game {
         if (!this.auto || this.params.get('q')) return;
         g.setQuality(next);
         g.setScale(0.85);
+        this.rewarm();
         this.tuner = newTuner();
         this.saveAuto();
-        this.lightSets(); // у новой ступени шейдеры свои: остальные наборы света — в фоне
       });
       return;
     }
@@ -1962,7 +1964,7 @@ class Game {
     this.camOverride = { p: [0.5, 3, -26], t: [-6, 2.5, 30] };
     try {
       await this.calibrate(true);
-      this.lightSets(); // ступень могла смениться: её шейдеры для ночи и лобби — в фоне
+      this.rewarm();
     } finally {
       this.camOverride = null;
       [this.fixedHour, this.forceWx] = keep;
@@ -2076,11 +2078,9 @@ class Game {
     cam.aspect = 1.6;
     cam.updateProjectionMatrix();
     this.world.update(0, performance.now() / 1000, cam);
-    // снимок идёт мимо обычного конвейера: отражение снято для другой камеры — на этот кадр вода отражает только небо
-    const reflK = this.world.water.uniforms.uReflK.value;
-    this.world.water.uniforms.uReflK.value = 0;
-    this.gfx.renderer.render(this.scene, cam);
-    this.world.water.uniforms.uReflK.value = reflK;
+    // Рисуем тем же путём, что и игру (gfx.render): у прямой отрисовки на экран на «высоком» свои шейдеры — весь набор
+    // пришлось бы собирать ради одной картинки. Отражение для новой точки gfx снимет сам (камера повернулась).
+    this.gfx.render(this.scene, cam, this.world.exposure);
     try {
       const src = this.gfx.renderer.domElement;
       const k = Math.max(c.width / src.width, c.height / src.height);

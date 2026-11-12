@@ -1,5 +1,5 @@
 // Проверка «прогрева»: после заставки игра не должна собирать шейдеры на ходу — каждая сборка посреди игры это рывок.
-// Идём по игре (лобби днём и ночью, бухта, заброс, подсечка, вываживание, рыба в руках, ночь, дождь, туман, лодка)
+// Идём по игре (заставка, лобби днём и ночью, бухта, заброс, подсечка, вываживание, рыба в руках, ночь, дождь, туман)
 // и считаем, сколько шейдеров собрано и сколько текстур отправлено видеокарте на каждом шаге.
 // Запуск: PORT=3111 node test/warm.cjs [low|medium|high]   (по умолчанию medium)
 const { chromium } = require(process.env.PLAYWRIGHT || '/opt/npm-tools/node_modules/playwright');
@@ -56,14 +56,14 @@ const tier = process.argv[2] || 'medium';
   await frame(2);
   await mark('заставка, два кадра');
 
-  // фоновая сборка остальных наборов света: ей нужны настоящие кадры (шейдеры теней собираются при отрисовке)
-  await p.evaluate(() => { RYBAK.noRender = false; });
-  await p.waitForFunction(() => RYBAK.litSets.size >= 4, null, { timeout: 600000 });
-  await p.waitForFunction((f) => (window.__rendered || 0) > f + 2, await p.evaluate(() => window.__rendered || 0), { timeout: 600000 });
-  await p.evaluate(() => { RYBAK.noRender = true; });
-  const sets = await p.evaluate(() => [...RYBAK.litSets].join(' '));
-  await mark('фоновая сборка наборов света');
-  assert.ok(['|false|false', '|false|true', '|true|false', '|true|true'].every((k) => sets.includes(tier + k)), `собраны все четыре набора света: ${sets}`);
+  // Набор источников света у сцены один на всю игру: день, ночь, лобби и редактор рисуются одними шейдерами.
+  // (Раньше погашенные фонари и подсветку героя убирали из набора — и каждая смена набора давала рывок.)
+  const boot = await p.evaluate(() => { const L = []; RYBAK.scene.traverse((o) => { if (o.isLight) L.push(o.visible); }); return { lights: L.length, on: L.filter(Boolean).length, shown: RYBAK.warmShown, warm: RYBAK.warmBox.children.length }; });
+  assert.ok(boot.lights >= 8 && boot.on === boot.lights, `все источники света всегда в наборе: ${JSON.stringify(boot)}`);
+  assert.ok(boot.shown > 50 && boot.warm >= 3, `за заставкой был «первый показ» спрятанного, заготовки рыбы и хлама на месте: ${JSON.stringify(boot)}`);
+  await p.waitForTimeout(3000);
+  await frame(2);
+  await mark('заставка, три секунды спустя');
 
   // лобби: днём и ночью
   await p.fill('#nm', 'Прогрев');
@@ -102,6 +102,10 @@ const tier = process.argv[2] || 'medium';
         // в миг подсечки: готовая модель уже на месте или пока процедурная рыба?
         if (!window.__hook) window.__hook = { sp: f.catch.sp, junk: !!f.catch.junk, model: f.fish.userData.model || null, pre: (g.preIds || []).slice(), left: g.preQ ? g.preQ.length : -1 };
         if (window.__hold) s.p = Math.min(s.p, 0.5);
+        // проверяем прогрев, а не умение вываживать: кадры здесь идут по секунде, и леска рвалась бы сама
+        s.strain = 0;
+        s.slack = 0;
+        s.T = Math.min(0.7, Math.max(0.3, s.T));
         i.primary = s.T < 0.55;
       } else if (f.state !== 'wait') i.primary = false;
     }, 30);
@@ -127,7 +131,7 @@ const tier = process.argv[2] || 'medium';
     await p.waitForTimeout(2000);
     await frame(3);
     await mark(`${n}: вываживание`);
-    await p.evaluate(() => { window.__hold = false; RYBAK.fishing.fight.p = 0.97; });
+    await p.evaluate(() => { window.__hold = false; if (RYBAK.fishing.fight) RYBAK.fishing.fight.p = 0.97; });
     await p.waitForFunction(() => RYBAK.fishing.state === 'landed', null, { timeout: 120000 });
     await frame(2);
     await mark(`${n}: рыба летит к рукам`);
@@ -173,7 +177,7 @@ const tier = process.argv[2] || 'medium';
   await browser.close();
 
   // ── что должно быть правдой ──
-  const after = rows.slice(rows.findIndex((x) => x.label === 'лобби днём'));
+  const after = rows.slice(rows.findIndex((x) => x.label === 'заставка, два кадра'));
   const made = after.filter((x) => x.made > 0);
   assert.equal(made.length, 0, `после заставки шейдеры не собираются: ${made.map((x) => `${x.label} — ${x.made} (${x.fresh.join('; ')})`).join(' | ')}`);
   for (const n of [1, 2]) {

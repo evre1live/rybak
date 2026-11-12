@@ -473,7 +473,6 @@ export class Gfx {
     const W = this.water;
     if (this.quality !== 'high' || !this.canPost) {
       if (W) W.uReflK.value = 0;
-      this.holdRefl = false;
       return r.render(scene, camera);
     }
     this.ensurePost();
@@ -483,7 +482,6 @@ export class Gfx {
     this.frame = (this.frame || 0) + 1;
     camera.updateWorldMatrix(true, false);
     if (W && !this.reflect) W.uReflK.value = 0;
-    else if (this.holdRefl) this.holdRefl = false; // этот кадр — без нового отражения (см. lightSets в main.js): вода покажет прошлое
     else if (W && (this.frame & 1 || !this.reflOk || this.reflectionStale(camera))) {
       this.reflOk = this.renderReflection(scene, camera);
       W.uRefl.value = p.refl.texture;
