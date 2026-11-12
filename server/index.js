@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { Voice, bucket } from './voice.js';
 import { MAX_PLAYERS } from '../shared/data.js';
+import { TOURS, TOUR_LENS, TOUR_COUNTDOWN, tourBlank, tourAdd, tourTable } from '../shared/logic.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -188,10 +189,21 @@ export function createServer({ now = () => Date.now() } = {}) {
     room.lastActive = now();
     send(ws, {
       t: 'joined', code: room.code, id: p.id, token: p.token, slot: p.slot, seed: room.seed, t0: room.t0, now: now(), host: room.hostId,
-      players: [...room.players.values()].filter((o) => o.ws && o.id !== p.id).map(pub)
+      players: [...room.players.values()].filter((o) => o.ws && o.id !== p.id).map(pub),
+      tour: room.tour ? pubTour(room.tour) : null // турнир уже идёт — опоздавший сразу видит таблицу
     });
     send(ws, { t: 'vroster', list: voice.roster(room.code) });
     broadcast(room, { t: 'in', p: pub(p), back }, ws);
+  }
+  // ───── турнир: запускает хозяин комнаты, очки считаются здесь же по событиям улова ─────
+  const pubTour = (t) => ({ id: t.id, kind: t.kind, len: t.len, start: t.start, end: t.end, by: t.by, scores: [...t.scores.values()] });
+  function finishTour(room, early = false) {
+    const t = room.tour;
+    if (!t) return;
+    room.tour = null;
+    const table = tourTable(t.kind, [...t.scores.values()]);
+    // n — сколько рыбаков было в комнате: от этого зависит призовой фонд
+    broadcast(room, { t: 'tend', id: t.id, kind: t.kind, len: t.len, early, table, n: [...room.players.values()].filter((p) => p.ws).length });
   }
   function dropPlayer(room, p, why) {
     room.players.delete(p.id);
@@ -261,7 +273,30 @@ export function createServer({ now = () => Date.now() } = {}) {
         } catch {
           d = null;
         }
-        return broadcast(room, { t: 'ev', id: p.id, k: msg.k, d }, ws);
+        broadcast(room, { t: 'ev', id: p.id, k: msg.k, d }, ws);
+        // улов во время турнира идёт в зачёт
+        const tr = room.tour;
+        if (msg.k === 'catch' && d && tr && now() >= tr.start && now() < tr.end) {
+          let row = tr.scores.get(p.id);
+          if (!row) row = { id: p.id, name: p.card.name, slot: p.slot, s: tourBlank() };
+          if (tourAdd(row.s, { sp: String(d.sp || ''), w: Number(d.w) }, now() - tr.start)) {
+            row.name = p.card.name;
+            tr.scores.set(p.id, row);
+            broadcast(room, { t: 'tscore', id: tr.id, row });
+          }
+        }
+        return;
+      }
+      case 'tour': {
+        if (room.hostId !== p.id) throw new GameError('NOT_HOST', 'Турнир запускает и останавливает хозяин комнаты');
+        if (msg.a === 'stop') return finishTour(room, true);
+        if (room.tour) throw new GameError('TOUR_ON', 'Турнир уже идёт');
+        const kind = TOURS[msg.kind] ? msg.kind : 'big';
+        const len = TOUR_LENS.includes(Number(msg.len)) ? Number(msg.len) : TOUR_LENS[1];
+        const start = now() + TOUR_COUNTDOWN * 1000;
+        room.tourN = (room.tourN || 0) + 1;
+        room.tour = { id: room.tourN, kind, len, start, end: start + len * 1000, by: p.id, scores: new Map() };
+        return broadcast(room, { t: 'tour', tour: pubTour(room.tour) });
       }
       case 'chat': {
         const text = String(msg.text || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 200);
@@ -343,6 +378,7 @@ export function createServer({ now = () => Date.now() } = {}) {
   // рассылка положений: 12 раз в секунду, только изменившиеся
   const tick = setInterval(() => {
     for (const room of rooms.values()) {
+      if (room.tour && now() >= room.tour.end) finishTour(room);
       const moved = [];
       for (const p of room.players.values()) {
         if (p.dirty && p.ws && p.mode === 'world') moved.push([p.id, p.st]);

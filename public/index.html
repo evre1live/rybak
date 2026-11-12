@@ -16,11 +16,12 @@
 <div id="ui">
   <div id="hud" class="hidden">
     <div class="hud-tl">
-      <div class="chip loc"><span class="ic" data-ic="pin"></span><b id="locName">СОЛНЕЧНАЯ БУХТА</b><i class="sep"></i><span class="ic" data-ic="sun" id="clockIc"></span><b id="clock">08:00</b></div>
+      <div class="chip loc wx-off"><span class="ic" data-ic="pin"></span><b id="locName">СОЛНЕЧНАЯ БУХТА</b><i class="sep"></i><span class="ic" data-ic="sun" id="clockIc"></span><b id="clock">08:00</b><i class="sep" id="wxSep"></i><span class="ic" id="wxIc"></span><b id="wxName"></b></div>
       <div id="crew"></div>
+      <div id="quests" class="hidden"></div>
       <div id="feed"></div>
     </div>
-    <div class="hud-tc"><canvas id="compass" width="760" height="64"></canvas><div id="banner" class="hidden"></div></div>
+    <div class="hud-tc"><canvas id="compass" width="760" height="64"></canvas><div id="banner" class="hidden"></div><div id="tour" class="hidden"></div></div>
     <div class="hud-tr">
       <div class="mapbox"><canvas id="minimap" width="256" height="256"></canvas><span class="north">С<i></i></span></div>
       <div class="chip online"><span class="ic" data-ic="users"></span><b id="onlineN">1 РЫБАК</b></div>

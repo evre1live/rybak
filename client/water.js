@@ -177,9 +177,25 @@ uniform sampler2D uRefl;
 uniform mat4 uReflM;
 uniform float uReflK;
 uniform vec3 uCalm;
+uniform float uRain, uLight;
 varying vec3 vWorld;
 varying float vAmp;
 float ss(float a, float b, float x) { float t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+// Дождь на воде: круги от капель. Вода разбита на ячейки двух размеров; в каждой капля падает в своё место
+// и в свой момент, от неё расходится и тает кольцо.
+float rainRings(vec2 p, float t) {
+  float s = 0.0;
+  for (int i = 0; i < 2; i++) {
+    float sc = i == 0 ? 1.9 : 3.3;
+    vec2 q = p * sc + float(i) * 17.3;
+    vec2 c = floor(q);
+    vec2 hh = fract(sin(vec2(dot(c, vec2(127.1, 311.7)), dot(c, vec2(269.5, 183.3)))) * 43758.5453);
+    float ph = fract(t * (0.85 + hh.x * 0.5) + hh.y * 7.0);
+    float r = length(fract(q) - 0.5 - (hh - 0.5) * 0.44);
+    s += (1.0 - smoothstep(0.0, 0.045, abs(r - ph * 0.4))) * (1.0 - ph) * (1.0 - ph);
+  }
+  return s;
+}
 void main() {
   vec2 p = vWorld.xz; float h = 0.0; vec2 g = vec2(0.0);
   ${waveGLSL}
@@ -217,6 +233,11 @@ void main() {
     sky = mix(sky, texture2D(uRefl, clamp(ruv, 0.003, 0.997)).rgb, uReflK);
   }
   c = mix(c, sky, fres * 0.8);
+  if (uRain > 0.02) {
+    // круги светлые, как небо; вдали сливаются в рябь и гаснут
+    float rr = rainRings(p, uTime) * uRain * (1.0 - ss(22.0, 55.0, dist));
+    c = mix(c, uSkyHor * 1.15, min(1.0, rr * 0.5));
+  }
   float rs = max(dot(R, uSunDir), 0.0);
   c += uSunCol * (pow(rs, 380.0) * 3.0 + pow(rs, 28.0) * 0.1) * uGlitter;
 
@@ -234,7 +255,8 @@ void main() {
   // у самого берега после наката остаётся тонкое кружево пены — узкой полоской, без молочной каши на мели
   float wash = lace * (1.0 - ss(0.0, 0.13, depth)) * (0.5 + 0.4 * swash) * open;
   float foam = clamp(edge + band + wash * 0.35, 0.0, 1.0) * step(0.004, dv);
-  vec3 foamCol = mix(vec3(1.0), uSkyHor, 0.25) * (0.35 + 0.65 * clamp(uGlitter + 0.25, 0.0, 1.0));
+  // пена не светится сама: в сумерках, под тучами и в тумане она сереет вместе со всем миром
+  vec3 foamCol = mix(vec3(1.0), uSkyHor, 0.25) * (0.35 + 0.65 * clamp(uGlitter + 0.25, 0.0, 1.0)) * mix(0.5, 1.0, uLight);
   c = mix(c, foamCol, foam * 0.85);
 
   float alpha = max(max(body, 0.1), max(fres * 0.92, foam));
@@ -278,7 +300,9 @@ export function createWater() {
     uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uSunCol: { value: new THREE.Color('#fff4e0') }, uFogCol: { value: new THREE.Color('#a6dcff') },
     // отражение мира (gfx.js): буфер, матрица «точка мира → место в буфере», сила (0 — отражается только небо)
     uRefl: { value: null }, uReflM: { value: new THREE.Matrix4() }, uReflK: { value: 0 },
-    uCalm: { value: new THREE.Vector3(BACKWATER.x, BACKWATER.z, BACKWATER.r) } // тихая заводь: прибоя в ней нет
+    uCalm: { value: new THREE.Vector3(BACKWATER.x, BACKWATER.z, BACKWATER.r) }, // тихая заводь: прибоя в ней нет
+    uRain: { value: 0 }, // дождь: круги на воде
+    uLight: { value: 1 } // сколько света от солнца: 1 — ясный день
   };
   const material = new THREE.ShaderMaterial({ uniforms, vertexShader: VERT, fragmentShader: FRAG, transparent: true, depthWrite: false });
   const m = new THREE.Mesh(geo, material);

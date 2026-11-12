@@ -1,6 +1,7 @@
 // Что игрок рассылает о себе 12 раз в секунду: индексы в массиве состояния.
-export const S = { X: 0, Y: 1, Z: 2, YAW: 3, PITCH: 4, SPEED: 5, FS: 6, BX: 7, BY: 8, BZ: 9, T: 10, FLAGS: 11, K: 12, STEER: 13, TALK: 14, BYAW: 15, BOAT: 16 };
+export const S = { X: 0, Y: 1, Z: 2, YAW: 3, PITCH: 4, SPEED: 5, FS: 6, BX: 7, BY: 8, BZ: 9, T: 10, FLAGS: 11, K: 12, STEER: 13, TALK: 14, BYAW: 15, BOAT: 16, RIDE: 17, SEAT: 18 };
 // BOAT: 0 — лодки нет, 1 — игрок идёт на ней (BYAW — куда смотрит нос, SPEED — её ход), 2 + i — стоит у причала i
+// RIDE: в чьей лодке игрок сидит пассажиром (номер игрока-хозяина; 0 — ни в чьей), SEAT — на каком месте (1 или 2)
 export const FS = { idle: 0, charge: 1, cast: 2, wait: 3, bite: 4, fight: 5, landed: 6 };
 export const FS_NAME = ['hold', 'charge', 'cast', 'wait', 'wait', 'fight', 'landed'];
 export const FLAG = { sit: 1, reel: 2, dangle: 4, lure: 8 };

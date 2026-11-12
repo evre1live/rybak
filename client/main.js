@@ -13,7 +13,7 @@ import { ViewModel } from './viewmodel.js';
 import { Input, Player } from './player.js';
 import { Fishing } from './fishing.js';
 import { Fx } from './fx.js';
-import { Boat, BOAT_PRICE } from './boat.js';
+import { Boat, BOAT_PRICE, Ride, BOAT_SEATS } from './boat.js';
 import { Remote } from './remote.js';
 import { Net } from './net.js';
 import { createVoice } from './voice.js';
@@ -21,9 +21,13 @@ import { Audio2 } from './audio.js';
 import { UI } from './ui.js';
 import { loadProfile, saveProfile, settings, session } from './profile.js';
 import { S, FLAG } from './proto.js';
-import { DECK_Y, MARKET, MOORINGS, RENT_DESK, MAP_VIEW, WRECK, SEA, ISLAND, palmR } from './terrain.js';
+import { DECK_Y, MARKET, MOORINGS, RENT_DESK, MAP_VIEW, WRECK, SEA, ISLAND, palmR, canStand } from './terrain.js';
 import { ITEMS, FISH_BY_ID, JUNK_BY_ID, RARITY, ZONES, BAITS, LURES, clockHours, dayPart, fmtW, fmtCoins, isLure } from '../shared/data.js';
-import { marketState, hashStr, buy, equip, sell, kitStats, levelInfo, tackleCount, fishValue, newProfile } from '../shared/logic.js';
+import {
+  marketState, hashStr, buy, equip, sell, kitStats, levelInfo, tackleCount, fishValue, newProfile,
+  weatherAt, WEATHER, syncQuests, questEvent, questText, questDay,
+  TOURS, TOUR_COUNTDOWN, tourBlank, tourAdd, tourTable, tourPrize, tourMedal, medalPrize, tourScoreText, MEDALS
+} from '../shared/logic.js';
 import { $, esc, clamp, damp, isTouch } from './util.js';
 
 const SPAWNS = [[-2, 9], [0.6, 9.4], [-4, 8.2], [2.6, 8.6], [-1, 11], [1.6, 11.4], [-3.6, 11], [3.6, 10.4]];
@@ -73,7 +77,14 @@ class Game {
     this.vm.setLook(fpLook(this.profile.look));
     this.vm.setVisible(false);
     // вода отражает мир; сама вода, пена у свай, руки с удочкой и трава в отражение не попадают
-    this.gfx.setReflection(this.world.water.uniforms, [this.world.water.mesh, this.world.rings, this.vm.root, this.world.grass.tufts, this.world.grass.flowers].filter(Boolean));
+    this.gfx.setReflection(this.world.water.uniforms, [this.world.water.mesh, this.world.rings, this.vm.root, this.world.grass.tufts, this.world.grass.flowers, this.world.rain.mesh].filter(Boolean));
+    // погода: общая для комнаты, считается из её зерна и часов; ?w=rain|fog|cloudy|clear — насильно (для проверок)
+    this.forceWx = WEATHER[q.get('w')] ? q.get('w') : null;
+    this.weather = weatherAt('title', 0);
+    this.tour = null; // идущий турнир
+    this.lastTour = null; // итоги прошлого
+    this.ride = null; // сидим пассажиром в лодке друга (Ride)
+    this.frameNo = 0;
     this.fx = new Fx(this.scene);
     // лодка напрокат: стоит у пирса, пока её не возьмут
     this.boat = new Boat(this.scene, this.fx);
@@ -113,7 +124,7 @@ class Game {
     // для автопроверок: ускорение времени и игра без отрисовки
     this.timeScale = Number(q.get('ts')) || 1;
     this.noRender = q.has('norender');
-    this.fishing = new Fishing({ scene: this.scene, camera: this.camera, vm: this.vm, fx: this.fx, schools: this.world.scenery.schools, profile: this.profile, hour: () => this.hours, emit: (t, d) => this.onFish(t, d) });
+    this.fishing = new Fishing({ scene: this.scene, camera: this.camera, vm: this.vm, fx: this.fx, schools: this.world.scenery.schools, profile: this.profile, hour: () => this.hours, wx: () => this.weather.bite, emit: (t, d) => this.onFish(t, d) });
     this.fishing.makeJunk = (id) => {
       // готовая модель стоит на «полу» (y = 0) — опускаем на половину высоты, чтобы в руках она была по центру, как процедурная
       const g = new THREE.Group();
@@ -266,6 +277,8 @@ class Game {
         for (const p of this.players.values()) p.remote.dispose();
         this.players.clear();
         for (const p of m.players) this.addPlayer(p);
+        this.tour = null;
+        if (m.tour) this.setTour(m.tour, true);
         setUrl('?room=' + m.code);
         this.urlCode = m.code;
         if (back) {
@@ -322,6 +335,13 @@ class Game {
         }
       },
       ev: (m) => this.onRemoteEvent(m),
+      tour: (m) => this.setTour(m.tour),
+      tscore: (m) => {
+        if (!this.tour || this.tour.id !== m.id) return;
+        this.tour.scores.set(m.row.id, m.row);
+        this.tourKey = '';
+      },
+      tend: (m) => this.endTour(m),
       chat: (m) => {
         const mine = m.id === this.me.id;
         const p = this.players.get(m.id);
@@ -339,7 +359,10 @@ class Game {
           for (const p of this.players.values()) p.remote.dispose();
           this.players.clear();
           this.backToTitle(was && m.code === 'NO_ROOM' ? 'Комната закрылась — создайте новую. Улов и снасти сохранены.' : m.message);
-        } else this.ui.toast(m.message, 'bad', 4000);
+        } else {
+          this.ui.toast(m.message, 'bad', 4000);
+          if (m.req === 'tour') this.ui.rerender();
+        }
       },
       down: () => this.ui.toast('Связь пропала — возвращаюсь…', 'bad', 4000),
       voice: (m) => this.voice.handle(m),
@@ -434,6 +457,7 @@ class Game {
     this.ui.showLobby();
     this.voiceChanged();
     this.market();
+    this.syncQuests();
     if (!this.solo) this.net.send({ t: 'mode', m: 'lobby' });
   }
   toLobby() {
@@ -457,6 +481,9 @@ class Game {
     this.vm.setVisible(true);
     this.fishing.refreshGear();
     this.rosterChanged();
+    this.syncQuests();
+    this.ui.questTracker();
+    this.wxKind = null;
     if (!this.solo) this.net.send({ t: 'mode', m: 'world' });
     if (!this.profile.seenIntro) {
       this.profile.seenIntro = true;
@@ -473,6 +500,8 @@ class Game {
     for (const p of this.players.values()) p.remote.dispose();
     this.players.clear();
     this.solo = false;
+    this.tour = null;
+    this.ui.tourHud(null);
     setUrl(location.pathname);
     this.urlCode = '';
     this.backToTitle('');
@@ -480,6 +509,8 @@ class Game {
   backToTitle(err) {
     this.state = 'title';
     this.inWorld = false;
+    this.tour = null;
+    this.ui.tourHud(null);
     this.resetBoat();
     this.fishing.reelIn(true);
     this.vm.setVisible(false);
@@ -609,18 +640,121 @@ class Game {
   resetBoat() {
     this.boat.toMooring(0);
     this.boat.rented = false;
+    this.ride = null;
     this.player.boat = null;
     this.audio.motor(-1);
+  }
+
+  // ───── общая лодка: друг берёт пассажиров ─────
+  /** Чья лодка: своя (если она в прокате) или друга — её картинка (BoatVisual), пока она видна. */
+  rideBoat(id) {
+    if (id === this.me.id) return this.boat.rented ? this.boat.vis : null;
+    const p = this.players.get(id);
+    return p ? p.remote.boat : null;
+  }
+  /**
+   * Лодка друга, в которую сейчас можно сесть: стоит рядом (или у причала, на который мы вышли) и не на ходу.
+   * aboard: true — только лодки, в которых сидит хозяин. Возвращает { p, seat }; seat = 0 — свободных мест нет.
+   */
+  rideTarget(aboard = false) {
+    const pl = this.player;
+    let best = null;
+    let bd = 1e9;
+    for (const p of this.players.values()) {
+      const r = p.remote;
+      if (p.mode !== 'world' || !p.st || !r.boat) continue;
+      const bs = p.st[S.BOAT] | 0;
+      if (!bs || (aboard && bs !== 1) || (bs === 1 && Math.abs(r.bv) > 2.5)) continue; // на ходу в лодку не запрыгнуть
+      const g = r.boat.group.position;
+      let d = Math.hypot(pl.x - g.x, pl.z - g.z);
+      // у причала чужая лодка стоит борт к борту со своей, дальше от настила — садятся в неё с того же места
+      if (bs >= 2 && MOORINGS[bs - 2] && Math.hypot(pl.x - MOORINGS[bs - 2].sx, pl.z - MOORINGS[bs - 2].sz) < 2.6) d = Math.min(d, 2);
+      if (d < 4.6 && d < bd) {
+        bd = d;
+        best = p;
+      }
+    }
+    if (!best) return null;
+    const taken = new Set();
+    for (const o of this.players.values()) if (o.mode === 'world' && o.st && (o.st[S.RIDE] | 0) === best.id) taken.add(o.st[S.SEAT] | 0);
+    let seat = 0;
+    for (let k = BOAT_SEATS; k >= 1; k--) if (!taken.has(k)) seat = k;
+    return { p: best, seat };
+  }
+  boardRide(p, seat) {
+    if (!p.remote.boat) return;
+    this.fishing.reelIn(true);
+    const ride = (this.ride = new Ride(p.id, p.remote.boat, seat));
+    this.player.boat = ride;
+    this.player.yaw = ride.yaw;
+    this.player.pitch = -0.1;
+    this.audio.step(true, true);
+    this.ev('boat', { k: 'ride', to: p.id });
+    this.ui.toast(`Вы в лодке у ${p.card.name}. Забрасывать можно, когда лодка стоит`, 'good', 4200);
+  }
+  nearMooring(x, z) {
+    let best = 0;
+    let bd = 1e9;
+    MOORINGS.forEach((m, k) => {
+      const d = Math.hypot(m.x - x, m.z - z);
+      if (d < bd) {
+        bd = d;
+        best = k;
+      }
+    });
+    return best;
+  }
+  /** Сойти с лодки друга на причал mi. forced — лодки больше нет: хозяин сдал её, ушёл в лобби или потерял связь. */
+  leaveRide(mi, forced = false) {
+    const ride = this.ride;
+    if (!ride) return;
+    this.ride = null;
+    this.player.boat = null;
+    this.fishing.reelIn(true);
+    const m = MOORINGS[mi] || MOORINGS[0];
+    // на шаг в сторону от места, куда выходит хозяин, — чтобы не встать друг в друга
+    const side = ride.seatI === 1 ? 1 : -1;
+    let x = m.sx + Math.cos(m.syaw) * 0.9 * side;
+    let z = m.sz - Math.sin(m.syaw) * 0.9 * side;
+    if (!canStand(x, z)) {
+      x = m.sx;
+      z = m.sz;
+    }
+    this.player.place(x, z, m.syaw);
+    this.audio.motor(-1);
+    this.audio.step(true, true);
+    this.ev('boat', { k: 'off' });
+    this.ui.toast(forced ? `Лодка ушла из-под вас — вы на причале: ${m.name}` : `${m.name}. Вы на причале`, forced ? '' : 'good', 3200);
+  }
+  /** Каждый кадр, пока мы пассажир: лодку хозяина ставим раньше своей камеры, чтобы сидеть в ней без отставания. */
+  rideStep(dt, pnow, tw) {
+    const ride = this.ride;
+    const o = this.players.get(ride.id);
+    const bs = o && o.mode === 'world' && o.st ? o.st[S.BOAT] | 0 : 0;
+    if (bs) {
+      o.remote.update(dt, pnow, tw, this.fx, true);
+      o.remote.stamp = this.frameNo;
+    }
+    if (!bs || !o.remote.boat) return this.leaveRide(this.nearMooring(this.player.x, this.player.z), true);
+    ride.sync(o.remote.boat, o.remote.bv);
+    ride.moored = bs >= 2 ? bs - 2 : -1;
+    const f = this.fishing;
+    if (Math.abs(ride.v) > 4 && f.lineOut && f.state !== 'fight' && f.state !== 'landed') {
+      f.reelIn(true);
+      this.ui.toast('Лодка пошла — леска смотана', '', 2200);
+    }
   }
   /** Из меню: сразу домой, откуда бы ни было. Лодка при этом сдаётся. */
   goHome() {
     if (this.fishing.state === 'fight' || this.fishing.state === 'landed') return this.ui.toast('Сначала вытащите рыбу', 'bad');
     this.fishing.reelIn(true);
+    const rode = !!this.ride;
+    if (rode) this.ev('boat', { k: 'off' });
     this.resetBoat();
     const m = MOORINGS[0];
     this.player.place(m.sx, m.sz, m.syaw);
     this.ui.closePanel();
-    this.ui.toast('Вы снова в Солнечной бухте. Лодка сдана', 'good', 3000);
+    this.ui.toast(rode ? 'Вы снова в Солнечной бухте' : 'Вы снова в Солнечной бухте. Лодка сдана', 'good', 3000);
   }
   /** В какой части мира точка. */
   areaAt(x, z) {
@@ -666,6 +800,7 @@ class Game {
     this.audio.coin(index == null ? 4 : 1);
     this.ui.toast(`+${fmtCoins(r.total)} монет`, 'gold');
     if (!this.solo && r.total >= 50) this.net.send({ t: 'ev', k: 'sold', d: { n: r.n, total: r.total } });
+    this.questEv({ t: 'sell', total: r.total });
     saveProfile(this.profile);
     this.ui.refreshHud();
     this.ui.rerender();
@@ -683,6 +818,8 @@ class Game {
     const name = this.profile.name;
     const look = this.profile.look;
     Object.assign(this.profile, newProfile(), { name, look, seenIntro: true });
+    this.syncQuests();
+    this.ui.questTracker();
     saveProfile(this.profile);
     this.fishing.reelIn(true);
     this.fishing.refreshGear();
@@ -783,6 +920,7 @@ class Game {
           this.player.shake = Math.max(this.player.shake, 0.35 + rar * 0.28);
           if (rar >= 2) ui.flash(RARITY[rar].color);
         }
+        this.tourCatch(c);
         return this.ev('catch', { sp: c.sp, w: c.w, len: c.len, trophy: c.trophy });
       }
       case 'kept': {
@@ -798,6 +936,7 @@ class Game {
           ui.toast(`Уровень ${d.levelUp} — ${levelInfo(p.xp).title}!`, 'gold', 4000);
           this.sendCard();
         }
+        this.questEv({ t: 'catch', c, zone: d.zone, boat: d.boat, released: d.released, wx: this.weather.kind });
         ui.refreshHud();
         return saveProfile(p);
       }
@@ -830,6 +969,120 @@ class Game {
     else if (m.k === 'sold') this.ui.feed(`${name} продал улов на <b class="y">${fmtCoins(Number(d.total) || 0)}</b> монет`);
     else if (m.k === 'buy' && ITEMS[d.id]) this.ui.feed(`${name} купил: <b>${esc(ITEMS[d.id].name)}</b>`);
     else if (m.k === 'boat' && d.k === 'rent') this.ui.feed(`${name} берёт лодку и выходит в море`);
+    else if (m.k === 'boat' && d.k === 'ride') {
+      const to = Number(d.to);
+      const host = this.players.get(to);
+      if (to === this.me.id) {
+        this.ui.feed(`${name} садится к вам в лодку`);
+        this.audio.step(true, true);
+      } else if (host) this.ui.feed(`${name} садится в лодку к <b>${esc(host.card.name)}</b>`);
+    } else if (m.k === 'boat' && d.k === 'off') this.ui.feed(`${name} сходит на причал`);
+  }
+
+  // ───── задания на день ─────
+  /** Задания на сегодня (день — по часам игрока). Возвращает true, если выданы новые. */
+  syncQuests() {
+    const d = new Date();
+    if (!syncQuests(this.profile, questDay(d.getTime(), d.getTimezoneOffset()))) return false;
+    saveProfile(this.profile);
+    this.ui.questTracker();
+    return true;
+  }
+  /** Событие игры (улов, продажа, турнир) → задания: счёт, награды, сообщения. */
+  questEv(ev) {
+    const p = this.profile;
+    const r = questEvent(p, ev);
+    if (r.done.length) {
+      for (const q of r.done) this.ui.toast(`Задание выполнено: ${questText(q)}`, 'gold', 4200);
+      this.ui.toast(`Награда: +${fmtCoins(r.coins)} монет, опыт +${r.xp}`, 'good', 4200);
+      if (r.bonus) this.ui.toast(`Все задания дня выполнены! Премия +${fmtCoins(r.bonus)} монет`, 'gold', 5200);
+      this.audio.coin(3);
+      if (r.levelUp) {
+        this.audio.level();
+        this.ui.toast(`Уровень ${r.levelUp} — ${levelInfo(p.xp).title}!`, 'gold', 4000);
+        this.sendCard();
+      }
+      saveProfile(p);
+      this.ui.refreshHud();
+      if (this.ui.panel === 'quests') this.ui.rerender();
+    }
+    this.ui.questTracker();
+    return r;
+  }
+
+  // ───── турнир ─────
+  tourNow() {
+    return this.solo || !this.net.room ? Date.now() : this.net.now();
+  }
+  /** Хозяин комнаты (или игрок в одиночку) запускает турнир. */
+  startTour(kind, len) {
+    if (this.tour) return this.ui.toast('Турнир уже идёт', 'bad');
+    if (this.state !== 'world') return this.ui.toast('Сначала выйдите на рыбалку', 'bad');
+    this.ui.closePanel();
+    if (!this.solo) return this.net.send({ t: 'tour', a: 'start', kind, len });
+    const now = Date.now();
+    this.setTour({ id: now, kind, len, start: now + TOUR_COUNTDOWN * 1000, end: now + (TOUR_COUNTDOWN + len) * 1000, by: this.me.id, scores: [], solo: true });
+  }
+  stopTour() {
+    if (!this.tour) return;
+    this.ui.closePanel();
+    if (this.tour.solo) this.endTour(null, true);
+    else this.net.send({ t: 'tour', a: 'stop' });
+  }
+  /** Турнир объявлен (или мы вошли в комнату, где он уже идёт). */
+  setTour(t, late = false) {
+    this.tour = { ...t, scores: new Map((t.scores || []).map((r) => [r.id, r])), begun: late && this.tourNow() >= t.start };
+    this.tourKey = '';
+    const by = t.by === this.me.id ? '' : (this.players.get(t.by) || { card: { name: '' } }).card.name;
+    const name = TOURS[t.kind].name;
+    if (late) return this.ui.feed(`Идёт турнир: <b>${name}</b>`);
+    this.ui.feed(t.solo ? `Заплыв на время: <b>${name}</b>` : `${by ? `<b>${esc(by)}</b> объявляет турнир` : 'Турнир объявлен'}: <b>${name}</b>, ${Math.round(t.len / 60)} мин`);
+    this.audio.tone(523, 0.12, 'triangle', 0.14);
+    this.audio.tone(784, 0.2, 'triangle', 0.14, null, 0.14);
+    if (this.ui.panel === 'tour') this.ui.rerender();
+  }
+  /** Свой улов во время заплыва в одиночку (в комнате очки считает сервер). */
+  tourCatch(c) {
+    const t = this.tour;
+    if (!t || !t.solo) return;
+    const now = this.tourNow();
+    if (now < t.start || now >= t.end) return;
+    const row = t.scores.get(this.me.id) || { id: this.me.id, name: this.profile.name || 'Рыбак', slot: this.me.slot, s: tourBlank() };
+    if (tourAdd(row.s, c, now - t.start)) t.scores.set(this.me.id, row);
+    this.tourKey = '';
+  }
+  /** Турнир кончился: m — итоги от сервера; в одиночку считаем сами. */
+  endTour(m, early = false) {
+    const t = this.tour;
+    if (!t || (m && m.id !== t.id)) return;
+    this.tour = null;
+    this.ui.tourHud(null);
+    const p = this.profile;
+    const table = m ? m.table : tourTable(t.kind, [...t.scores.values()]);
+    const players = m ? Math.max(m.n || 0, table.length) : 1;
+    const mine = table.find((r) => r.id === this.me.id);
+    const res = { kind: t.kind, len: t.len, solo: !!t.solo, early: !!(m ? m.early : early), table, players, me: this.me.id, place: mine ? mine.place : 0, score: mine ? tourScoreText(t.kind, mine.s) : '', prize: 0, medal: 0 };
+    if (mine && mine.place) {
+      if (t.solo) {
+        res.medal = tourMedal(t.kind, t.len, this.fishing.kit, mine.s);
+        res.prize = medalPrize(res.medal, t.len);
+      } else res.prize = tourPrize(mine.place, players, t.len);
+      p.stats.tours = (p.stats.tours || 0) + 1;
+      if (res.medal || (!t.solo && players >= 2 && mine.place <= 3)) p.stats.medals = (p.stats.medals || 0) + 1;
+      p.coins += res.prize;
+    }
+    this.lastTour = res;
+    const head = t.solo ? (res.medal ? `Заплыв окончен — ${MEDALS[res.medal]}!` : 'Заплыв окончен') : res.place === 1 && players >= 2 ? 'Турнир окончен — вы победили!' : res.place ? `Турнир окончен — ваше место: ${res.place}` : 'Турнир окончен';
+    this.ui.toast(`${head}${res.score ? ` · ${res.score}` : ''}${res.prize ? ` · +${fmtCoins(res.prize)} монет` : ''}`, res.prize ? 'gold' : '', 6000);
+    if (res.prize) this.audio.coin(4);
+    if (res.medal === 3 || (res.place === 1 && players >= 2)) this.audio.level();
+    if (mine && mine.place) this.questEv({ t: 'tour' });
+    saveProfile(p);
+    this.ui.refreshHud();
+    // итоги — на весь экран, если руки свободны; иначе они ждут в меню «Турнир»
+    const f = this.fishing;
+    if (this.state === 'world' && (!this.ui.panel || this.ui.panel === 'tour') && !this.ui.chatOpen && (f.state === 'idle' || f.state === 'wait')) this.ui.openPanel('tour', { result: true });
+    else if (this.ui.panel === 'tour') this.ui.rerender();
   }
 
   // ───── клавиши вне игрового цикла ─────
@@ -867,6 +1120,7 @@ class Game {
         ui.openPanel('tackle');
       } else if (e.code === 'KeyC') ui.openPanel('editor');
       else if (e.code === 'KeyJ') ui.openPanel('journal');
+      else if (e.code === 'KeyK') ui.openPanel('quests');
     }
   }
   worldKeys() {
@@ -879,10 +1133,13 @@ class Game {
     const busy = f.state === 'fight' || f.state === 'landed';
     if (i.hit('Tab')) return busy ? ui.toast('Сначала вытащите рыбу') : ui.openPanel('tackle');
     if (i.hit('KeyJ') && !busy) return ui.openPanel('journal');
+    if (i.hit('KeyK') && !busy) return ui.openPanel('quests');
+    if (i.hit('KeyT') && !busy) return ui.openPanel('tour');
     const boat = this.boat;
-    if (i.hit('KeyC') && !busy) return boat.active ? ui.toast('В лодке не переодеться — сначала причальте') : ui.openPanel('editor');
+    const ride = this.ride;
+    if (i.hit('KeyC') && !busy) return boat.active || ride ? ui.toast('В лодке не переодеться — сначала причальте') : ui.openPanel('editor');
     if (i.hit('KeyQ') && !busy) this.cycleTackle();
-    if (i.hit('KeyX') && !f.lineOut && !boat.active) this.player.toggleSit();
+    if (i.hit('KeyX') && !f.lineOut && !boat.active && !ride) this.player.toggleSit();
     for (const [k, em] of [['Digit1', 'wave'], ['Digit2', 'thumb'], ['Digit3', 'cheer'], ['Digit4', 'dance']]) {
       if (i.hit(k)) {
         this.emote = em;
@@ -899,7 +1156,20 @@ class Game {
     const pl = this.player;
     let act = null;
     if (!f.lineOut && f.state !== 'charge') {
-      if (boat.active) {
+      // друг сидит в своей лодке у настила и ждёт — садимся к нему (свою лодку берут у прилавка будки или когда он отойдёт)
+      const rt = ride || boat.active ? null : this.rideTarget(true);
+      if (ride) {
+        // пассажир: сойти можно у любого причала — когда лодка стоит у него или подошла и не спешит
+        let mi = ride.moored;
+        if (mi < 0 && Math.abs(ride.v) < 6) {
+          const g = ride.vis.group.position;
+          MOORINGS.forEach((m, k) => {
+            if (Math.hypot(m.x - g.x, m.z - g.z) < 9) mi = k;
+          });
+        }
+        if (mi >= 0) act = { text: `СОЙТИ НА ПРИЧАЛ — ${MOORINGS[mi].name.toUpperCase()}`, short: 'СОЙТИ', run: () => this.leaveRide(mi) };
+      } else if (rt && rt.seat) act = { text: `СЕСТЬ В ЛОДКУ — ${rt.p.card.name.toUpperCase()}`, short: 'К ДРУГУ', run: () => this.boardRide(rt.p, rt.seat) };
+      else if (boat.active) {
         const mi = boat.mooringNear();
         if (mi >= 0) {
           const m = MOORINGS[mi];
@@ -911,6 +1181,10 @@ class Game {
       else if (Math.hypot(pl.x - boat.x, pl.z - boat.z) < 3.6 || Math.hypot(pl.x - MOORINGS[boat.moor].sx, pl.z - MOORINGS[boat.moor].sz) < 2.6 || (boat.moor === 0 && Math.hypot(pl.x - RENT_DESK.x, pl.z - RENT_DESK.z) < RENT_DESK.r)) {
         const price = this.boatPrice();
         act = boat.rented ? { text: 'СЕСТЬ В ЛОДКУ', short: 'В ЛОДКУ', run: () => this.boardBoat() } : { text: `ЛОДКА НАПРОКАТ — ${price ? `${price} МОНЕТ` : 'ПЕРВЫЙ ВЫХОД БЕСПЛАТНО'}`, short: 'ЛОДКА', run: () => this.rentBoat() };
+      } else {
+        // лодка друга, оставленная у причала (или стоящая у берега): можно сесть и подождать хозяина
+        const any = this.rideTarget();
+        if (any) act = any.seat ? { text: `СЕСТЬ В ЛОДКУ — ${any.p.card.name.toUpperCase()}`, short: 'К ДРУГУ', run: () => this.boardRide(any.p, any.seat) } : { text: `В ЛОДКЕ НЕТ МЕСТА — ${any.p.card.name.toUpperCase()}`, short: '', run: () => {} };
       }
     }
     const noMouse = !i.grab && !i.touch.on && i.device !== 'pad';
@@ -925,6 +1199,7 @@ class Game {
     const sep = '<i class="sep"></i>';
     switch (f.state) {
       case 'idle':
+        if (this.ride) return `<span>ВЫ ПАССАЖИР</span>${sep}<span>${k('primary')} УДЕРЖИВАЙ — ЗАБРОС, КОГДА ЛОДКА СТОИТ</span>`;
         if (this.boat.active) return this.input.device === 'pad' ? `<span>${k('left')} ХОД И РУЛЬ</span>${sep}<span>${k('primary')} УДЕРЖИВАЙ — ЗАБРОС</span>` : `<span><kbd class="g">W</kbd><kbd class="g">S</kbd> ХОД</span>${sep}<span><kbd class="g">A</kbd><kbd class="g">D</kbd> РУЛЬ</span>${sep}<span>${k('primary')} УДЕРЖИВАЙ — ЗАБРОС</span>`;
         return `<span>${k('primary')} УДЕРЖИВАЙ — ЗАБРОС</span>${sep}<span>${k('tackle')} СНАСТИ</span>${sep}<span>${k('run')} БЕГ</span>`;
       case 'charge': return `<span>ОТПУСТИ — ЗАБРОС</span>${sep}<span>ДО БЕЛОЙ РИСКИ — ТОЧНО В МЕТКУ</span>`;
@@ -1042,7 +1317,7 @@ class Game {
     const show = this.state === 'world' && !ui.panel && !ui.chatOpen;
     const st = show ? f.state : 'off';
     const act = show && this.useAct ? this.useAct.short : '';
-    const inBoat = this.boat.active;
+    const inBoat = this.boat.active || !!this.ride;
     const key = `${st}|${f.lure ? 1 : 0}|${act}|${this.solo ? 1 : 0}|${this.player.sit ? 1 : 0}|${inBoat ? 1 : 0}`;
     if (key === this.touchKey) return;
     this.touchKey = key;
@@ -1075,8 +1350,16 @@ class Game {
     }
     const i = this.input;
     i.poll();
+    this.frameNo++;
+    const pnow = performance.now() / 1000;
     const T = this.nowSec();
     this.hours = this.fixedHour != null ? this.fixedHour : this.state === 'title' ? 10.5 + Math.sin(T * 0.01) : clockHours(T, 8);
+    // погода: на заставке всегда ясно; при входе в бухту ставится сразу, дальше меняется плавно
+    const wx = (this.weather = this.state === 'title' ? weatherAt('title', 0) : weatherAt(this.seed, Math.max(0, T), this.forceWx));
+    this.world.setWeather(wx, this.wxSeed === this.seed ? dt : 0);
+    this.wxSeed = this.seed;
+    this.audio.rain(wx.rain, wx.wind);
+    this.audio.wet = wx.rain;
     this.world.setClock(this.hours);
     this.fx.setLight(1 - this.world.night); // ночью брызги и пена не светятся белым
     setEnvLight(0.22 + 0.78 * (1 - this.world.night));
@@ -1096,7 +1379,9 @@ class Game {
         if (!boat.away && Math.hypot(boat.x - MOORINGS[0].x, boat.z - MOORINGS[0].z) > 14) boat.away = true;
       }
       boat.update(dt, tw);
-      this.audio.motor(boat.active ? Math.abs(boat.k) : -1);
+      if (this.ride) this.rideStep(dt, pnow, tw);
+      // мотор слышно и пассажиру — пока хозяин в лодке
+      this.audio.motor(boat.active ? Math.abs(boat.k) : this.ride && this.ride.moored < 0 ? Math.abs(this.ride.k) : -1);
       if (!ui.panel || !this.editing) {
         const noLook = !!ui.panel;
         if (noLook) i.lookDX = i.lookDY = 0;
@@ -1154,7 +1439,8 @@ class Game {
         const n = f.net(this.netOut || (this.netOut = {}));
         const pl = this.player;
         const flags = n.flags | (pl.sit ? FLAG.sit : 0) | (pl.dangle && pl.sit ? FLAG.dangle : 0);
-        this.net.send({ t: 'st', s: [pl.x, pl.y + pl.jump, pl.z, pl.yaw, pl.pitch, boat.active ? boat.v : pl.speed, n.fs, n.bx, n.by, n.bz, n.t, flags, n.k, i.steer, 0, boat.yaw, boat.net] });
+        const rd = this.ride;
+        this.net.send({ t: 'st', s: [pl.x, pl.y + pl.jump, pl.z, pl.yaw, pl.pitch, boat.active ? boat.v : pl.speed, n.fs, n.bx, n.by, n.bz, n.t, flags, n.k, i.steer, 0, boat.yaw, boat.net, rd ? rd.id : 0, rd ? rd.seatI : 0] });
       }
     } else {
       boat.update(dt, tw);
@@ -1162,17 +1448,21 @@ class Game {
     }
     if (this.editing) this.editCamera(dt);
 
-    // друзья
-    const pnow = performance.now() / 1000;
+    // друзья: сначала те, кто сам по себе, потом пассажиры — их сажают в уже поставленную лодку хозяина
     const tags = [];
     const plates = [];
     const showPlates = this.state === 'lobby' && !ui.panel;
-    for (const p of this.players.values()) {
+    const rideOf = (p) => (p.mode === 'world' && p.st ? p.st[S.RIDE] | 0 : 0);
+    const crew = [...this.players.values()];
+    if (crew.some(rideOf)) crew.sort((a, b) => (rideOf(a) ? 1 : 0) - (rideOf(b) ? 1 : 0));
+    for (const p of crew) {
       const r = p.remote;
       const vid = this.voice.vidOf(p.id);
       r.talk = vid != null ? this.voice.level(vid) : 0;
-      if (p.mode === 'world') r.update(dt, pnow, tw, this.fx, !!p.st);
-      else r.lobbyPose(dt, lineX(p.slot), DECK_Y, LINE_Z, (p.slot % 3) + 1);
+      if (p.mode === 'world') {
+        const rid = rideOf(p);
+        if (r.stamp !== this.frameNo) r.update(dt, pnow, tw, this.fx, !!p.st, rid ? this.rideBoat(rid) : null);
+      } else r.lobbyPose(dt, lineX(p.slot), DECK_Y, LINE_Z, (p.slot % 3) + 1);
       if (this.state === 'world' && r.char.group.visible) {
         r.head(v3);
         const d = v3.distanceTo(cam.position);
@@ -1206,10 +1496,39 @@ class Game {
       }
     }
     ui.setPlates(showPlates ? plates : []);
+    // турнир: отсчёт, табло, конец заплыва в одиночку
+    if (this.tour) {
+      const t = this.tour;
+      const tn = this.tourNow();
+      if (!t.begun && tn >= t.start) {
+        t.begun = true;
+        if (this.state === 'world') {
+          ui.banner('ТУРНИР НАЧАЛСЯ!', 'cy', 1800);
+          this.audio.tone(880, 0.3, 'triangle', 0.16);
+        }
+      }
+      if (t.solo && tn >= t.end) this.endTour(null);
+      else if (this.state === 'world') {
+        const left = Math.ceil((tn < t.start ? t.start - tn : t.end - tn) / 1000);
+        const key = `${t.id}|${tn < t.start ? 'pre' : 'on'}|${left}`;
+        if (key !== this.tourKey) {
+          this.tourKey = key;
+          ui.tourHud(t, tn, this.me.id);
+        }
+      }
+    }
     if (this.state === 'world' && (this.crewT = (this.crewT || 0) - dt) <= 0) {
       this.crewT = 0.25;
       ui.setCrew(this.roster());
       this.market();
+      // погода в углу экрана и в ленте; новые задания, если наступила полночь
+      ui.weather(wx);
+      if (wx.kind !== this.wxKind) {
+        const add = Math.round((WEATHER[wx.kind].bite - 1) * 100);
+        if (this.wxKind) ui.feed({ clear: 'Распогодилось — снова солнце', cloudy: `Небо затянуло. Рыба берёт охотнее: клёв <b class="y">+${add}%</b>`, rain: `Пошёл дождь. В дождь клюёт лучше всего: <b class="y">+${add}%</b>`, fog: `На бухту лёг туман. Клёв <b class="y">+${add}%</b>` }[wx.kind]);
+        this.wxKind = wx.kind;
+      }
+      if ((this.questT = (this.questT || 0) + 1) % 120 === 0 && this.syncQuests()) ui.toast('Новый день — новые задания (клавиша K)', 'gold', 4000);
       // где мы: подпись в углу и подсказка, чем место интересно (один раз)
       const area = this.areaAt(this.player.x, this.player.z);
       if (area !== this.area) {
@@ -1248,8 +1567,12 @@ class Game {
       this.slowT = this.frameMs > 30 ? this.slowT + dt : Math.max(0, this.slowT - dt);
       if (this.slowT > 4) {
         this.slowT = 0;
-        const q = this.gfx.quality === 'high' ? 'medium' : this.gfx.quality === 'medium' ? 'low' : null;
-        if (q) this.gfx.setQuality(q);
+        // сначала отказываемся от самого дорогого — отражений в воде (ради них сцена рисуется второй раз); не помогло — качество ниже
+        if (this.gfx.quality === 'high' && this.gfx.canPost && this.gfx.reflect) this.gfx.reflect = false;
+        else {
+          const q = this.gfx.quality === 'high' ? 'medium' : this.gfx.quality === 'medium' ? 'low' : null;
+          if (q) this.gfx.setQuality(q);
+        }
       }
     }
   }

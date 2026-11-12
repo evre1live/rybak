@@ -112,8 +112,10 @@ export class Remote {
     this.say = text;
     this.sayT = sec;
   }
-  update(dt, now, t, fx, visible) {
+  /** ride — лодка, в которой друг сидит пассажиром (BoatVisual хозяина), если она сейчас видна. */
+  update(dt, now, t, fx, visible, ride = null) {
     const g = this.char.group;
+    this.bv = 0;
     if (!this.b || !visible) {
       g.visible = false;
       this.dropBoat();
@@ -148,11 +150,15 @@ export class Remote {
         this.boat.pose(cx, cz, byaw, t, clamp(v / VMAX, -1, 1), (b[S.STEER] || 0) * Math.min(1, Math.abs(v) / 6), dt);
         wake(this, fx, cx, cz, byaw, v, dt);
         g.position.copy(this.boat.seat(seat));
+        this.bv = v;
       } else {
         moorSpot(bs - 2, this.slot, spot);
         this.boat.pose(spot.x, spot.z, spot.yaw, t, 0, 0, dt);
       }
     } else this.dropBoat();
+    // пассажир: сидит на своём месте в лодке хозяина, а не там, откуда прислал положение (иначе его трясло бы на волне)
+    const seatI = b[S.SEAT] | 0;
+    if ((b[S.RIDE] | 0) > 0 && ride) g.position.copy(ride.seatAt(seatI || 1, seat));
     if (this.emoteT > 0) this.emoteT -= dt;
     if (this.sayT > 0) this.sayT -= dt;
     if (this.held) {
@@ -164,7 +170,7 @@ export class Remote {
       }
     }
     this.char.update(dt, {
-      speed: bs === 1 ? 0 : L(S.SPEED), mode: this.held ? 'landed' : FS_NAME[fs] || 'hold', castK: L(S.K), reel: !!(flags & FLAG.reel), steer: b[S.STEER] || 0,
+      speed: bs === 1 || (b[S.RIDE] | 0) > 0 ? 0 : L(S.SPEED), mode: this.held ? 'landed' : FS_NAME[fs] || 'hold', castK: L(S.K), reel: !!(flags & FLAG.reel), steer: b[S.STEER] || 0,
       sit: !!(flags & FLAG.sit), dangle: !!(flags & FLAG.dangle), emote: this.emoteT > 0 ? this.emote : null, talk: this.talk, pitch: L(S.PITCH)
     });
     const rod = this.char.rod;

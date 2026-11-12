@@ -545,6 +545,94 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     console.log(`  лодка: разгон ${run.d.toFixed(0)} м за 4 с, из бухты в море за ${(out1.t + sea.t).toFixed(0)} с, к маяку за ${toLight.t} с, домой за ${home.t} с`);
   }
 
+  // погода, задания дня и заплыв на время
+  {
+    const wp = await open(browser, 'q=low&norender&h=13&w=rain', 'weather');
+    await wp.fill('#nm', 'Погода');
+    await G(wp, () => { RYBAK.profile.seenIntro = true; });
+    await wp.click('[data-a="solo"]');
+    await wp.waitForFunction(() => RYBAK.state === 'lobby');
+    // в лобби есть вкладка «Задания», в ней три задания на сегодня
+    assert.match(await wp.textContent('.nav'), /ЗАДАНИЯ/);
+    await wp.click('.nav [data-p="quests"]');
+    assert.equal(await wp.locator('.qcard').count(), 3);
+    await wp.keyboard.press('Escape');
+    await G(wp, () => RYBAK.enterWorld());
+    await wp.waitForFunction(() => RYBAK.state === 'world');
+    await G(wp, () => { const g = RYBAK; g.ui.closePanel(); g.input.locked = true; g.input.enabled = true; });
+    // дождь: струи идут, на воде круги, даль съедена, небо затянуто, клёв выше — и это написано рядом с часами
+    await wp.waitForFunction(() => /дождь/i.test(document.querySelector('#wxName').textContent), null, { timeout: 10000 });
+    const rain = await G(wp, () => { const g = RYBAK, w = g.world; return { kind: g.weather.kind, mesh: w.rain.mesh.visible, rings: w.water.uniforms.uRain.value, far: w.scene.fog.far, cover: w.skyU.uCover.value, bite: g.fishing.wx(), chip: document.querySelector('.chip.loc').textContent, off: document.querySelector('.chip.loc').classList.contains('wx-off') }; });
+    assert.ok(rain.kind === 'rain' && rain.mesh && rain.rings > 0.95 && rain.far < 700 && rain.cover > 0.95 && !rain.off, JSON.stringify(rain));
+    assert.equal(rain.bite, 1.3);
+    assert.match(rain.chip, /дождь.*клёв \+30%/i);
+    await shot(wp, '30-rain', 300);
+    // туман ложится плавно; распогодилось — надпись у часов пропадает
+    await G(wp, () => { RYBAK.forceWx = 'fog'; });
+    await wp.waitForFunction(() => RYBAK.world.wx.fog > 0.9 && RYBAK.world.wx.rain < 0.1 && RYBAK.world.scene.fog.far < 260 && !RYBAK.world.rain.mesh.visible, null, { timeout: 30000 });
+    await wp.waitForFunction(() => /туман/i.test(document.querySelector('#wxName').textContent));
+    await shot(wp, '31-fog', 200);
+    await G(wp, () => { RYBAK.forceWx = 'clear'; });
+    await wp.waitForFunction(() => RYBAK.world.wx.fog < 0.05 && RYBAK.world.scene.fog.far > 1500 && document.querySelector('.chip.loc').classList.contains('wx-off'), null, { timeout: 30000 });
+
+    // задания: улов и продажа двигают счёт, награда приходит сразу, в углу экрана видно, что осталось
+    const q0 = await G(wp, () => {
+      const g = RYBAK;
+      g.profile.quests.list = [{ k: 'fish', n: 1, c: 0, tier: 0, done: false }, { k: 'sell', n: 5, c: 0, tier: 1, done: false }, { k: 'tour', n: 1, c: 0, tier: 2, done: false }];
+      g.profile.quests.bonus = false;
+      g.ui.questTracker();
+      return { coins: g.profile.coins, rows: document.querySelectorAll('#quests .q').length };
+    });
+    assert.equal(q0.rows, 3);
+    await G(wp, () => RYBAK.fishing.showCatch('okun', 0.5));
+    await wp.waitForFunction(() => RYBAK.fishing.state === 'landed' && RYBAK.fishing.landT > 0.5);
+    await G(wp, () => RYBAK.fishing.finish(false));
+    await wp.waitForFunction(() => RYBAK.profile.quests.list[0].done && document.querySelectorAll('#quests .q').length === 2 && /Задание выполнено: Поймать 1 рыбу/.test(document.querySelector('#toasts').textContent));
+    assert.equal(await G(wp, () => RYBAK.profile.coins), q0.coins + 25);
+    await G(wp, () => RYBAK.sell(null));
+    await wp.waitForFunction(() => RYBAK.profile.quests.list[1].done && document.querySelectorAll('#quests .q').length === 1);
+    await G(wp, () => RYBAK.input.pressed.add('KeyK'));
+    await wp.waitForSelector('.qcard.done');
+    assert.equal(await wp.locator('.qcard.done').count(), 2);
+    await shot(wp, '32-quests', 200);
+    await wp.keyboard.press('Escape');
+
+    // заплыв на время: выбираем «больше всех рыб» на три минуты, ловим, получаем медаль и приз — и закрываем третье задание
+    await G(wp, () => RYBAK.input.pressed.add('KeyT'));
+    await wp.waitForSelector('[data-a="tstart"]');
+    await wp.click('[data-a="tkind"][data-id="count"]');
+    await wp.click('[data-a="tlen"][data-id="180"]');
+    assert.match(await wp.textContent('.tourp'), /бронза — 2, серебро — 3, золото — 4/);
+    await wp.click('[data-a="tstart"]');
+    await wp.waitForFunction(() => RYBAK.tour && !document.querySelector('#tour').classList.contains('hidden') && /СТАРТ ЧЕРЕЗ/.test(document.querySelector('#tour').textContent));
+    // до старта улов не считается
+    await G(wp, () => RYBAK.tourCatch({ sp: 'okun', w: 0.4 }));
+    assert.equal(await G(wp, () => RYBAK.tour.scores.size), 0);
+    await wp.waitForFunction(() => RYBAK.tour.begun && /0[0-2]:\d\d/.test(document.querySelector('#tour .t').textContent), null, { timeout: 15000 });
+    const coins1 = await G(wp, () => RYBAK.profile.coins);
+    for (let k = 0; k < 3; k++) {
+      await G(wp, () => RYBAK.fishing.showCatch('okun', 0.4));
+      await wp.waitForFunction(() => RYBAK.fishing.state === 'landed' && RYBAK.fishing.landT > 0.5);
+      await G(wp, () => RYBAK.fishing.finish(true));
+    }
+    await wp.waitForFunction(() => /Вы/.test(document.querySelector('#tour').textContent) && /3 рыбы/.test(document.querySelector('#tour').textContent));
+    await G(wp, () => RYBAK.tourCatch({ sp: 'boot', w: 0.5, junk: true }));
+    assert.equal(await G(wp, () => RYBAK.tour.scores.get(RYBAK.me.id).s.n), 3, 'хлам в зачёт не идёт');
+    await shot(wp, '33-tour', 200);
+    await G(wp, () => { RYBAK.tour.end = Date.now() - 1; });
+    await wp.waitForFunction(() => !RYBAK.tour && RYBAK.lastTour && document.querySelector('.tres'));
+    const res = await G(wp, () => ({ ...RYBAK.lastTour, table: RYBAK.lastTour.table.length, coins: RYBAK.profile.coins, stats: RYBAK.profile.stats, quests: RYBAK.profile.quests.list.map((q) => q.done), bonus: RYBAK.profile.quests.bonus, hud: document.querySelector('#tour').classList.contains('hidden'), text: document.querySelector('.tres').textContent }));
+    assert.deepEqual([res.medal, res.prize, res.place, res.solo, res.hud], [2, 20, 1, true, true], JSON.stringify(res));
+    assert.match(res.text, /СЕРЕБРО/);
+    assert.ok(res.coins >= coins1 + 20 + 130 + 50, `приз, награда за третье задание и премия за все три: ${res.coins - coins1}`);
+    assert.deepEqual([res.quests, res.bonus, res.stats.tours, res.stats.medals], [[true, true, true], true, 1, 1]);
+    await shot(wp, '34-tour-result', 200);
+    await wp.keyboard.press('Escape');
+    await wp.waitForFunction(() => /ВСЕ ВЫПОЛНЕНЫ/.test(document.querySelector('#quests').textContent));
+    assert.ok(!wp.__err, 'ошибки на странице (погода, задания, заплыв)');
+    await wp.close();
+  }
+
   // вода и свет на «высоком» качестве: мир отражается в воде, в углах лежит мягкая тень; на «среднем» ничего этого нет — и ничего не ломается
   {
     const hp = await open(browser, 'q=high&norender&h=13', 'light');

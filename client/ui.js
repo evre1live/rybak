@@ -1,6 +1,9 @@
 // Интерфейс: HUD как на макетах, лобби, снасти и магазин, рынок, журнал, выбор героя, настройки.
 import { CATS, ITEMS, FISH, FISH_BY_ID, JUNK_BY_ID, RARITY, ZONES, DAY_PARTS, RODS, MAX_PLAYERS, fmtW, fmtCoins, fmtClock, dayPart, isLure } from '../shared/data.js';
-import { kitStats, rodBars, owns, tackleCount, priceOf, fishValue, coolerValue, levelInfo, fightGrade, T_LOW, T_DANGER } from '../shared/logic.js';
+import {
+  kitStats, rodBars, owns, tackleCount, priceOf, fishValue, coolerValue, levelInfo, fightGrade, T_LOW, T_DANGER,
+  WEATHER, questText, questCount, questReward, QUEST_BONUS, TOURS, TOUR_LENS, tourTable, tourScoreText, tourTargets, tourPrize, medalPrize, MEDALS
+} from '../shared/logic.js';
 import { itemIcon, fishIcon, faceIcon } from './icons.js';
 import { heroes, heroOf, heroTemplate } from './hero.js';
 import { MARKS, markSvg } from './proto.js';
@@ -22,8 +25,16 @@ const SVG = {
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg>',
   crown: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 8l5 4 5-7 5 7 5-4-2 11H4z"/></svg>',
   link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>',
-  rod: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 21L20 4M20 4v9"/><circle cx="8" cy="16" r="2.4" fill="currentColor"/></svg>'
+  rod: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 21L20 4M20 4v9"/><circle cx="8" cy="16" r="2.4" fill="currentColor"/></svg>',
+  cloud: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 19a5 5 0 0 1-.6-9.96A6.5 6.5 0 0 1 19 10.2 4.4 4.4 0 0 1 18.5 19z"/></svg>',
+  rain: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 15a4.5 4.5 0 0 1-.5-8.97A6 6 0 0 1 18 7.2 4 4 0 0 1 17.6 15z"/><path d="M8 18l-1.2 3M12.5 18l-1.2 3M17 18l-1.2 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>',
+  fog: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 8h12M8 12h13M3 16h14M9 20h9"/></svg>',
+  cup: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 3h10v2h4v3a5 5 0 0 1-4.4 4.96A5.5 5.5 0 0 1 13 15.9V18h3.5v3h-9v-3H11v-2.1a5.5 5.5 0 0 1-3.6-2.94A5 5 0 0 1 3 8V5h4zm10 4v3.7A3 3 0 0 0 19 8V7zM5 7v1a3 3 0 0 0 2 2.7V7z"/></svg>',
+  list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6.5l1.6 1.6L8 5M3.5 12.5l1.6 1.6L8 11M3.5 18.5l1.6 1.6L8 17M11.5 7h9M11.5 13h9M11.5 19h9"/></svg>'
 };
+const WX_ICON = { clear: 'sun', cloudy: 'cloud', rain: 'rain', fog: 'fog' };
+const TIER = ['ЛЁГКОЕ', 'СРЕДНЕЕ', 'ТРУДНОЕ'];
+const mmss = (sec) => `${String(Math.floor(Math.max(0, sec) / 60)).padStart(2, '0')}:${String(Math.max(0, sec) % 60).padStart(2, '0')}`;
 const ic = (n, cls = '') => `<span class="ic ${cls}">${SVG[n] || ''}</span>`;
 const coin = (n) => `${ic('coin')}${fmtCoins(n)}`;
 const PART_ICON = { dawn: 'sun', day: 'sun', dusk: 'sun', night: 'moon' };
@@ -137,6 +148,51 @@ export class UI {
     this.promptKey = html;
     p.classList.toggle('hidden', !html);
     p.innerHTML = html ? `<div class="chip">${html}</div>` : '';
+  }
+  /** Погода рядом с часами: в ясную погоду там пусто, в непогоду — значок, название и прибавка к клёву. */
+  weather(wx) {
+    const add = Math.round((wx.bite - 1) * 100);
+    const key = wx.kind + '|' + add;
+    if (key === this.wxKey) return;
+    this.wxKey = key;
+    $('.chip.loc').classList.toggle('wx-off', wx.kind === 'clear');
+    $('#wxIc').innerHTML = SVG[WX_ICON[wx.kind]] || '';
+    $('#wxName').innerHTML = `${WEATHER[wx.kind].name}${add > 0 ? `<em>КЛЁВ +${add}%</em>` : ''}`;
+  }
+  /** Задания дня в углу экрана: что осталось и сколько сделано. */
+  questTracker() {
+    const qs = this.g.profile.quests;
+    const box = $('#quests');
+    const left = qs ? qs.list.filter((q) => !q.done).length : 0;
+    box.classList.toggle('hidden', !qs);
+    if (!qs) return;
+    const html = `<div class="qh">${ic('list')}ЗАДАНИЯ ДНЯ<kbd class="g">K</kbd>${left ? '' : '<span class="y">ВСЕ ВЫПОЛНЕНЫ</span>'}</div>` +
+      qs.list.filter((q) => !q.done).map((q) => `<div class="q"><span>${esc(questText(q))}</span><b>${esc(questCount(q))}</b></div>`).join('');
+    if (html !== this.questKey) {
+      this.questKey = html;
+      box.innerHTML = html;
+    }
+  }
+  /** Табло турнира под компасом: отсчёт до старта, время, первые места и своя строка. t = null — убрать. */
+  tourHud(t, now = 0, me = 0) {
+    const box = $('#tour');
+    box.classList.toggle('hidden', !t);
+    if (!t) return;
+    const name = TOURS[t.kind].name;
+    if (now < t.start) {
+      box.innerHTML = `<div class="th">${ic('cup')}${t.solo ? 'ЗАПЛЫВ' : 'ТУРНИР'} · ${name}<span class="t">СТАРТ ЧЕРЕЗ ${Math.ceil((t.start - now) / 1000)}</span></div><div class="tn">${esc(TOURS[t.kind].hint)}</div>`;
+      return;
+    }
+    const table = tourTable(t.kind, [...t.scores.values()]);
+    const rows = table.filter((r, i) => r.place && (i < 3 || r.id === me));
+    let foot = '';
+    if (t.solo) {
+      const tg = tourTargets(t.kind, t.len, this.g.fishing.kit);
+      const unit = t.kind === 'count' ? '' : ' кг';
+      foot = `<div class="tn">бронза ${String(tg[0]).replace('.', ',')} · серебро ${String(tg[1]).replace('.', ',')} · золото ${String(tg[2]).replace('.', ',')}${unit}</div>`;
+    } else if (!rows.length) foot = '<div class="tn">Пока никто ничего не поймал</div>';
+    box.innerHTML = `<div class="th">${ic('cup')}${t.solo ? 'ЗАПЛЫВ' : 'ТУРНИР'} · ${name}<span class="t">${mmss(Math.ceil((t.end - now) / 1000))}</span></div>` +
+      rows.map((r) => `<div class="tr ${r.id === me ? 'me' : ''}"><i>${r.place}</i><span>${esc(r.id === me ? 'Вы' : r.name)}</span><b>${tourScoreText(t.kind, r.s)}</b></div>`).join('') + foot;
   }
   chat(open) {
     $('#chat').classList.toggle('hidden', !open);
@@ -473,7 +529,7 @@ export class UI {
     this.screen.innerHTML = `
       <div class="lob-tl"><div class="chip">${ic('users')}<b>ТВОЯ КОМАНДА</b><i class="sep"></i><small>${g.solo ? 'ОДИНОЧНАЯ РЫБАЛКА' : `${ic('lock')}КОД · <span class="y">${esc(g.code)}</span> · ${n}/${MAX_PLAYERS}`}</small></div>
         ${g.solo ? '' : `<button class="btn sm cy" data-a="copy"><span>${ic('link')} ССЫЛКА ДЛЯ ДРУЗЕЙ</span></button>`}</div>
-      <div class="nav"><button class="tab on" data-a="lobby">ИГРА</button><button class="tab" data-a="open" data-p="tackle">СНАСТИ</button><button class="tab" data-a="open" data-p="editor">ПЕРСОНАЖ</button><button class="tab" data-a="open" data-p="journal">ЖУРНАЛ</button></div>
+      <div class="nav"><button class="tab on" data-a="lobby">ИГРА</button><button class="tab" data-a="open" data-p="tackle">СНАСТИ</button><button class="tab" data-a="open" data-p="editor">ПЕРСОНАЖ</button><button class="tab" data-a="open" data-p="journal">ЖУРНАЛ</button><button class="tab" data-a="open" data-p="quests">ЗАДАНИЯ${(() => { const qs = g.profile.quests; const n = qs ? qs.list.filter((q) => !q.done).length : 0; return n ? `<em class="dot">${n}</em>` : ''; })()}</button></div>
       <div class="lcard">
         <h2>${ic('pin')}СОЛНЕЧНАЯ БУХТА</h2>
         <div class="mode">СВОБОДНАЯ РЫБАЛКА</div>
@@ -499,6 +555,8 @@ export class UI {
     else if (name === 'settings') this.renderSettings();
     else if (name === 'pause') this.renderPause();
     else if (name === 'help') this.renderHelp();
+    else if (name === 'quests') this.renderQuests();
+    else if (name === 'tour') this.renderTour();
     this.g.onPanel(name);
   }
   closePanel() {
@@ -691,12 +749,72 @@ export class UI {
       <button class="btn pri" data-a="close"><span>ВЕРНУТЬСЯ К РЫБАЛКЕ</span></button>
       <button class="btn" data-a="open" data-p="tackle"><span>СНАСТИ</span></button>
       <button class="btn" data-a="open" data-p="journal"><span>ЖУРНАЛ РЫБ</span></button>
+      <div class="row2"><button class="btn" data-a="open" data-p="quests"><span>${ic('list')} ЗАДАНИЯ ДНЯ</span></button><button class="btn" data-a="open" data-p="tour"><span>${ic('cup')} ТУРНИР</span></button></div>
       <button class="btn" data-a="open" data-p="editor"><span>ПЕРСОНАЖ</span></button>
       <button class="btn" data-a="open" data-p="help"><span>КАК ИГРАТЬ</span></button>
       <button class="btn" data-a="open" data-p="settings"><span>НАСТРОЙКИ</span></button>
       ${g.solo ? '' : `<button class="btn cy" data-a="copy"><span>${ic('link')} ССЫЛКА ДЛЯ ДРУЗЕЙ · ${esc(g.code)}</span></button>`}
-      ${g.boat.rented ? '<button class="btn" data-a="home"><span>ВЕРНУТЬСЯ В БУХТУ · СДАТЬ ЛОДКУ</span></button>' : ''}
+      ${g.ride ? '<button class="btn" data-a="home"><span>СОЙТИ И ВЕРНУТЬСЯ В БУХТУ</span></button>' : g.boat.rented ? '<button class="btn" data-a="home"><span>ВЕРНУТЬСЯ В БУХТУ · СДАТЬ ЛОДКУ</span></button>' : ''}
       <button class="btn ghost" data-a="tolobby"><span>${g.solo ? 'В ЛОББИ' : 'В ЛОББИ К КОМАНДЕ'}</span></button></div>`;
+  }
+  renderQuests() {
+    const g = this.g;
+    const p = g.profile;
+    const lv = levelInfo(p.xp).lvl;
+    const qs = p.quests;
+    const cards = (qs ? qs.list : []).map((q) => {
+      const r = questReward(q, lv);
+      const k = q.done ? 1 : clamp(q.c / q.n, 0, 1);
+      return `<div class="qcard ${q.done ? 'done' : ''}"><div class="qt"><span class="tier t${q.tier}">${TIER[q.tier] || ''}</span><b>${esc(questText(q))}</b>${q.done ? ic('check') : ''}</div>
+        <div class="pbar"><i style="width:${Math.round(k * 100)}%"></i></div>
+        <div class="qr"><span>${esc(questCount(q)) || (q.done ? 'готово' : 'ещё не сделано')}</span><span class="rw">${coin(r.coins)}<i class="sep"></i>ОПЫТ +${r.xp}</span></div></div>`;
+    }).join('');
+    const all = qs && qs.list.every((q) => q.done);
+    this.screen.innerHTML = `<div class="dim"></div><div class="center" style="width:min(41em,94vw)">
+      <h1>ЗАДАНИЯ ДНЯ</h1>
+      ${cards || '<p>Задания появятся, как только вы выйдете на рыбалку.</p>'}
+      <p>${all ? 'Все три выполнены — премия получена. ' : `За все три — премия: <b class="y">${fmtCoins(Math.round((QUEST_BONUS * Math.min(6, 1 + 0.15 * (lv - 1))) / 5) * 5)} монет</b>. `}Задания у всех рыбаков в этот день одинаковые — их удобно делать вместе. Новые появятся в полночь.</p>
+      <button class="btn pri" data-a="close"><span>ПОНЯТНО</span></button></div>`;
+  }
+  renderTour() {
+    const g = this.g;
+    const t = g.tour;
+    const sel = (this.tr = this.tr || { kind: 'big', len: 300 });
+    const res = g.lastTour;
+    const unit = (kind) => (kind === 'count' ? '' : ' кг');
+    const n1 = (v) => String(v).replace('.', ',');
+    const rowsOf = (kind, table, me) => table.map((r) => `<div class="tr ${r.id === me ? 'me' : ''}"><i>${r.place || '—'}</i><span>${esc(r.name)}${r.id === me ? ' (вы)' : ''}</span><b>${r.place ? tourScoreText(kind, r.s) : 'без улова'}</b></div>`).join('');
+    let body = '';
+    if (res && (this.popts.result || !t)) {
+      body += `<div class="tres"><h2>${res.solo ? 'ИТОГИ ЗАПЛЫВА' : 'ИТОГИ ТУРНИРА'} · ${TOURS[res.kind].name}</h2>
+        ${rowsOf(res.kind, res.table, res.me) || '<p>Никто ничего не поймал.</p>'}
+        ${res.place ? `<div class="tprize">${res.solo ? (res.medal ? `МЕДАЛЬ: ${MEDALS[res.medal].toUpperCase()}` : 'БЕЗ МЕДАЛИ') : `ВАШЕ МЕСТО: ${res.place}`}${res.prize ? `<i class="sep"></i>ПРИЗ ${coin(res.prize)}` : ''}</div>` : ''}</div>`;
+    }
+    if (t) {
+      const now = g.tourNow();
+      const table = tourTable(t.kind, [...t.scores.values()]);
+      const mine = t.solo || t.by === g.me.id;
+      body += `<h3>${now < t.start ? 'СТАРТ ЧЕРЕЗ НЕСКОЛЬКО СЕКУНД' : `ИДЁТ · ОСТАЛОСЬ ${mmss(Math.ceil((t.end - now) / 1000))}`}</h3>
+        <p><b>${TOURS[t.kind].name}.</b> ${TOURS[t.kind].hint}.</p>
+        ${rowsOf(t.kind, table, g.me.id) || '<p>Пока никто ничего не поймал.</p>'}
+        ${mine ? '<button class="btn" data-a="tstop"><span>ЗАВЕРШИТЬ ДОСРОЧНО</span></button>' : ''}`;
+    } else if (!this.popts.result) {
+      const host = g.solo || g.me.id === g.hostId;
+      const hostName = host ? '' : (g.players.get(g.hostId) || { card: { name: 'хозяин комнаты' } }).card.name;
+      const tg = tourTargets(sel.kind, sel.len, g.fishing.kit);
+      const n = Math.max(2, g.roster().length);
+      body += `<p>${g.solo ? 'Заплыв на время: наловите на медаль, пока идут часы. Пороги зависят от вашей снасти.' : 'Соревнование для всей комнаты: кто больше наловит за отведённое время. Очки считаются сами, по улову.'}</p>
+        <h3>ВО ЧТО ИГРАЕМ</h3>
+        <div class="opt3">${Object.keys(TOURS).map((k) => `<button class="btn sm ${k === sel.kind ? 'pri' : 'ghost'}" data-a="tkind" data-id="${k}"><span>${TOURS[k].name}</span></button>`).join('')}</div>
+        <p>${TOURS[sel.kind].hint}. Хлам не считается.</p>
+        <h3>СКОЛЬКО ВРЕМЕНИ</h3>
+        <div class="opt3">${TOUR_LENS.map((l) => `<button class="btn sm ${l === sel.len ? 'pri' : 'ghost'}" data-a="tlen" data-id="${l}"><span>${l / 60} МИН</span></button>`).join('')}</div>
+        <p>${g.solo ? `Медали: бронза — ${n1(tg[0])}${unit(sel.kind)}, серебро — ${n1(tg[1])}${unit(sel.kind)}, золото — ${n1(tg[2])}${unit(sel.kind)}. Призы: ${[1, 2, 3].map((m) => medalPrize(m, sel.len)).join(', ')} монет.` : `Призы на ${n} рыбаков: первое место — ${tourPrize(1, n, sel.len)} монет, второе — ${tourPrize(2, n, sel.len)}${n > 2 ? `, третье — ${tourPrize(3, n, sel.len)}` : ''}. Остальным, кто что-то поймал, — по 10.`}</p>
+        ${g.state !== 'world' ? '<p class="y">Турнир запускается на рыбалке: начните её и откройте это меню клавишей T.</p>' : host ? `<button class="btn pri" data-a="tstart"><span>${ic('cup')} ${g.solo ? 'НАЧАТЬ ЗАПЛЫВ' : 'ОБЪЯВИТЬ ТУРНИР'}</span></button>` : `<p class="y">Турнир запускает хозяин комнаты — ${esc(hostName)}.</p>`}`;
+    }
+    this.screen.innerHTML = `<div class="dim"></div><div class="center tourp" style="width:min(43em,94vw)">
+      <h1>${g.solo ? 'ЗАПЛЫВ НА ВРЕМЯ' : 'ТУРНИР'}</h1>${body}
+      <button class="btn ${t || this.popts.result ? 'pri' : 'ghost'}" data-a="close"><span>${t ? 'К РЫБАЛКЕ' : this.popts.result ? 'ПОНЯТНО' : 'НАЗАД'}</span></button></div>`;
   }
   renderHelp() {
     const k = (s, c = '') => `<kbd class="${c}">${s}</kbd>`;
@@ -710,9 +828,9 @@ export class UI {
         <span>${k('МОТАЙ')}</span><span><b>Вываживание:</b> держите кнопку — мотаете, отпускаете — леска слабеет. Стрелка натяжения должна быть в голубой зоне. Рыба рванула вбок — ведите джойстик в другую сторону.</span>
         <span>${k('СМОТАТЬ', 'g')}</span><span>Вернуть снасть. После улова рядом появится «ОТПУСТИТЬ» — за это дают больше опыта.</span>
         <span>${k('РЫНОК')}</span><span>Кнопка появляется у лавки на берегу: продать улов, купить удочки, леску, наживку.</span>
-        <span>${k('ЛОДКА')}</span><span>Подойдите к лодке у пирса — её дают напрокат. Джойстик вперёд — ход, в стороны — руль. Рыбачить можно прямо с борта: в открытом море, у затонувшего корабля, в лагуне Пальмового острова.</span>
+        <span>${k('ЛОДКА')}</span><span>Подойдите к лодке у пирса — её дают напрокат. Джойстик вперёд — ход, в стороны — руль. Рыбачить можно прямо с борта: в открытом море, у затонувшего корабля, в лагуне Пальмового острова. К другу в лодку можно сесть пассажиром.</span>
         <span>${k('СНАСТИ', 'x')}</span><span>Панель внизу экрана: нажмите на наживку — сменить её, на удочку — открыть все снасти.</span>
-        <span>${k('☰', 'g')}</span><span>Меню: журнал рыб, персонаж, настройки. Плашка «ГОЛОС» справа сверху включает и выключает микрофон.</span>
+        <span>${k('☰', 'g')}</span><span>Меню: журнал рыб, задания дня, турнир, персонаж, настройки. Плашка «ГОЛОС» справа сверху включает и выключает микрофон.</span>
       </div>
       <p>Чем лучше удочка — тем дальше заброс: до рифа, водопада и арки стартовой не достать. Тёмные тени под водой — косяки, там клюёт чаще и крупнее.</p>
       <button class="btn pri" data-a="${this.popts && this.popts.first ? 'close' : 'back'}"><span>ПОНЯТНО</span></button></div>`;
@@ -727,13 +845,13 @@ export class UI {
         <span>${k('ЛКМ')}${k('A', 'g')}${k('D', 'g')}</span><span><b>Вываживание:</b> держите кнопку — мотаете, отпускаете — леска слабеет. Стрелка натяжения должна быть в голубой зоне. В красной леска рвётся, в жёлтой рыба сходит. Рванула вбок — ведите удочку в другую сторону.</span>
         <span>${k('ПКМ', 'x')} / ${k('R', 'b')}</span><span>Смотать леску. После улова ${k('R', 'b')} — отпустить рыбу (за это дают больше опыта).</span>
         <span>${k('E')}</span><span>Говорить с торговцем у лавки «Рынок»: продать улов, купить удочки, леску, наживку.</span>
-        <span>${k('E')}</span><span><b>Лодка:</b> подойдите к лодке у пирса — её дают напрокат. ${k('W', 'g')}${k('S', 'g')} — ход, ${k('A', 'g')}${k('D', 'g')} — руль. Рыбачить можно прямо с борта: в открытом море, у затонувшего корабля, в лагуне Пальмового острова. Причалить можно у маяка и на острове.</span>
+        <span>${k('E')}</span><span><b>Лодка:</b> подойдите к лодке у пирса — её дают напрокат. ${k('W', 'g')}${k('S', 'g')} — ход, ${k('A', 'g')}${k('D', 'g')} — руль. Рыбачить можно прямо с борта: в открытом море, у затонувшего корабля, в лагуне Пальмового острова. Причалить можно у маяка и на острове. В лодку друга тоже можно сесть — в ней два места для пассажиров.</span>
         <span>${k('TAB', 'x')} ${k('Q', 'x')}</span><span>Снасти и набор. ${k('Q', 'x')} — быстро сменить наживку.</span>
-        <span>${k('J', 'g')} ${k('C', 'g')}</span><span>Журнал рыб и выбор героя.</span>
+        <span>${k('J', 'g')} ${k('C', 'g')} ${k('K', 'g')} ${k('T', 'g')}</span><span>Журнал рыб, выбор героя, задания дня (за них дают монеты и опыт) и турнир — в одиночку это заплыв на медаль.</span>
         <span>${k('M', 'g')} ${k('V', 'g')} ${k('ENTER', 'g')}</span><span>Микрофон вкл/выкл, говорить по кнопке, написать в чат.</span>
         <span>${k('1', 'g')}${k('2', 'g')}${k('3', 'g')}${k('4', 'g')}</span><span>Жесты: привет, класс, ура, танец.</span>
       </div>
-      <p>Чем лучше удочка — тем дальше заброс: до рифа, водопада и арки стартовой не достать. Тёмные тени под водой — косяки, там клюёт чаще и крупнее.</p>
+      <p>Чем лучше удочка — тем дальше заброс: до рифа, водопада и арки стартовой не достать. Тёмные тени под водой — косяки, там клюёт чаще и крупнее. В непогоду, особенно в дождь, рыба берёт охотнее.</p>
       <button class="btn pri" data-a="${this.popts && this.popts.first ? 'close' : 'back'}"><span>ПОНЯТНО</span></button></div>`;
   }
 
@@ -792,6 +910,14 @@ export class UI {
       case 'jpick':
         this.js = id;
         return this.renderJournal();
+      case 'tkind':
+        this.tr.kind = id;
+        return this.renderTour();
+      case 'tlen':
+        this.tr.len = Number(id);
+        return this.renderTour();
+      case 'tstart': return g.startTour(this.tr.kind, this.tr.len);
+      case 'tstop': return g.stopTour();
       case 'hero':
         this.ed.look = { hero: id };
         g.editLook(this.ed.look);
@@ -834,7 +960,11 @@ export class UI {
     else if (this.panel === 'editor') {
       g.saveLook({ hero: this.ed.look.hero });
       this.closePanel();
-    } else if (this.panel === 'help' || this.panel === 'settings') this.closePanel();
+    } else if (this.panel === 'help' || this.panel === 'settings' || this.panel === 'quests') this.closePanel();
+    else if (this.panel === 'tour') {
+      if (!this.g.tour && !this.popts.result && this.g.state === 'world' && (this.g.solo || this.g.me.id === this.g.hostId)) this.g.startTour(this.tr.kind, this.tr.len);
+      else this.closePanel();
+    }
   }
   /** Перерисовать открытую панель после покупки, продажи и т. п. */
   /** Короткая цветная вспышка по экрану — редкий улов. */
@@ -850,6 +980,8 @@ export class UI {
     else if (this.panel === 'sell') this.renderSell();
     else if (this.panel === 'journal') this.renderJournal();
     else if (this.panel === 'editor') this.renderEditor();
+    else if (this.panel === 'quests') this.renderQuests();
+    else if (this.panel === 'tour') this.renderTour();
     else if (this.view === 'lobby' && !this.panel) this.showLobby();
   }
 }

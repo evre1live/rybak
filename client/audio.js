@@ -74,7 +74,7 @@ export class Audio2 {
     const loop = () => {
       if (!this.ctx) return;
       const t = c.currentTime;
-      if (this.night < 0.5 && Math.random() < 0.5) this.gull(t);
+      if (this.night < 0.5 && Math.random() < 0.5 * (1 - (this.wet || 0))) this.gull(t);
       if (this.night > 0.4) this.cricket(t);
       setTimeout(loop, this.night > 0.4 ? 700 + Math.random() * 900 : 3500 + Math.random() * 7000);
     };
@@ -300,6 +300,35 @@ export class Audio2 {
     e.g.gain.setTargetAtTime(0.045 + k * 0.07, t, 0.1);
     e.lg.gain.setTargetAtTime(0.022 + k * 0.012, t, 0.1);
     e.ng.gain.setTargetAtTime(k * k * 0.1, t, 0.15);
+  }
+  /** Шум дождя: k — сила от 0 до 1 (0 — тихо). Шелест капель и глухой гул под ним; ветер добавляет свист. */
+  rain(k, wind = 0) {
+    if (!this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime;
+    if (!this.rainN) {
+      if (k < 0.02) return;
+      const mk = (type, freq, q) => {
+        const s = this.src(true);
+        const f = c.createBiquadFilter();
+        f.type = type;
+        f.frequency.value = freq;
+        f.Q.value = q;
+        const g = c.createGain();
+        g.gain.value = 0;
+        s.connect(f);
+        f.connect(g);
+        g.connect(this.amb);
+        s.start(0, Math.random() * 1.5);
+        return g;
+      };
+      this.rainN = { hi: mk('highpass', 2600, 0.4), mid: mk('bandpass', 900, 0.5), low: mk('lowpass', 220, 0.6), wind: mk('bandpass', 520, 2.2) };
+    }
+    const r = this.rainN;
+    r.hi.gain.setTargetAtTime(k * 0.085, t, 0.5);
+    r.mid.gain.setTargetAtTime(k * 0.11, t, 0.5);
+    r.low.gain.setTargetAtTime(k * 0.14, t, 0.5);
+    r.wind.gain.setTargetAtTime(Math.max(0, wind - 0.3) * 0.05, t, 1.2);
   }
   /** Скрип лески: громче и выше с натяжением. T < 0 — выключить. */
   strain(T) {

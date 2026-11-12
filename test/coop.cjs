@@ -157,6 +157,106 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
   await a.waitForFunction(() => { const p = [...RYBAK.players.values()][0]; return p.st && p.st[16] === 0 && !p.remote.boat; }, null, { timeout: 20000 });
   console.log('  лодка друга: видна на ходу и у причала, после возврата исчезает');
 
+  // общая лодка: Жамшид берёт лодку, Нори садится к нему пассажиром, едет, ловит с борта и сходит у маяка
+  const [aId, bId] = [await G(a, () => RYBAK.me.id), await G(b, () => RYBAK.me.id)];
+  await G(a, () => { const g = RYBAK; g.player.place(0.9, -12, -Math.PI / 2); });
+  await a.waitForFunction(() => /ЛОДКА НАПРОКАТ/.test(document.querySelector('#prompt').textContent), null, { timeout: 20000 });
+  await G(a, () => RYBAK.input.pressed.add('KeyE'));
+  await a.waitForFunction(() => RYBAK.boat.active);
+  await G(b, () => { const g = RYBAK; g.player.place(0.9, -12, -Math.PI / 2); });
+  await b.waitForFunction(() => /СЕСТЬ В ЛОДКУ — ЖАМШИД/.test(document.querySelector('#prompt').textContent), null, { timeout: 20000 });
+  await G(b, () => RYBAK.input.pressed.add('KeyE'));
+  await b.waitForFunction(() => RYBAK.ride && RYBAK.player.boat === RYBAK.ride);
+  assert.deepEqual(await G(b, () => [RYBAK.ride.id, RYBAK.ride.seatI, RYBAK.boat.active]), [aId, 1, false]);
+  await a.waitForFunction(() => /Нори.*садится к вам в лодку/.test(document.querySelector('#feed').textContent), null, { timeout: 20000 });
+  // хозяин видит пассажирку на передней банке своей лодки
+  await a.waitForFunction((id) => { const g = RYBAK; const p = g.players.get(id); if (!p || !p.st || p.st[17] !== g.me.id) return false; const c = p.remote.char.group.position; const o = g.boat.vis.group.position; return Math.hypot(c.x - o.x, c.z - o.z) < 1.6 && (p.st[11] & 1); }, bId, { timeout: 20000 });
+  await G(a, () => { RYBAK.player.pitch = -0.35; });
+  await shot(a, 'c07-passenger', 400);
+  // хозяин даёт ход: пассажирка едет вместе с лодкой, на ходу забросить нельзя
+  const stopBoat = async () => {
+    // тормозим задним ходом, чтобы лодка не докатилась до острова
+    await G(a, () => { const k = RYBAK.input.keys; k.delete('KeyW'); k.add('KeyS'); });
+    await a.waitForFunction(() => RYBAK.boat.v < 1.2, null, { timeout: 40000 });
+    await G(a, () => RYBAK.input.keys.delete('KeyS'));
+    await b.waitForFunction(() => Math.abs(RYBAK.ride.v) < 1, null, { timeout: 40000 });
+  };
+  // (время в проверке идёт втрое быстрее — лодка за секунду проходит под сорок метров, поэтому всё делаем сразу)
+  await G(b, () => { RYBAK.player.pitch = -0.25; });
+  await G(a, () => RYBAK.input.keys.add('KeyW'));
+  await b.waitForFunction(() => { const g = RYBAK; if (Math.abs(g.ride.v) < 5) return false; g.input.pressed.add('Primary'); return true; }, null, { timeout: 40000 });
+  const close = await G(b, (id) => { const g = RYBAK; const o = g.players.get(id).remote.boat.group.position; return Math.hypot(g.player.x - o.x, g.player.z - o.z); }, aId);
+  await b.waitForFunction(() => /На ходу не забросить/.test(document.querySelector('#toasts').textContent), null, { timeout: 10000 });
+  assert.equal(await G(b, () => RYBAK.fishing.state), 'idle');
+  // лодка встала — заброс с борта работает; пошла снова — леска сматывается сама
+  await stopBoat();
+  assert.ok(close < 1.6 && (await G(b, () => Math.hypot(RYBAK.player.x - 4, RYBAK.player.z + 12))) > 3, `пассажирка едет в лодке, а не отстаёт от неё: ${close.toFixed(2)} м от середины`);
+  await shot(b, 'c08-riding', 300);
+  for (const turn of [Math.PI / 2, -Math.PI / 2, Math.PI, 0]) {
+    await G(b, (t) => { const g = RYBAK; g.player.yaw = g.ride.yaw + t; g.player.pitch = -0.2; }, turn);
+    await b.waitForTimeout(250);
+    if (await G(b, () => RYBAK.fishing.aim.ok)) break;
+  }
+  assert.ok(await G(b, () => RYBAK.fishing.aim.ok), 'с борта есть куда забросить');
+  await G(b, () => { const i = RYBAK.input; i.primary = true; i.pressed.add('Primary'); });
+  await b.waitForFunction(() => RYBAK.fishing.state === 'charge' && RYBAK.fishing.power > 0.8, null, { timeout: 10000 });
+  await G(b, () => { RYBAK.input.primary = false; });
+  await b.waitForFunction(() => RYBAK.fishing.state === 'wait', null, { timeout: 20000 });
+  assert.ok(await G(b, () => RYBAK.fishing.inBoat), 'улов с чужой лодки считается уловом с лодки');
+  await G(a, () => RYBAK.input.keys.add('KeyW'));
+  await b.waitForFunction(() => RYBAK.fishing.state === 'idle' && /Лодка пошла — леска смотана/.test(document.querySelector('#toasts').textContent), null, { timeout: 40000 });
+  await stopBoat();
+  // хозяин причаливает у маяка: пассажирка может сойти на тот же причал
+  await G(a, () => RYBAK.dock(1));
+  await b.waitForFunction(() => RYBAK.ride && RYBAK.ride.moored === 1 && /СОЙТИ НА ПРИЧАЛ — ПРИЧАЛ У МАЯКА/.test(document.querySelector('#prompt').textContent), null, { timeout: 20000 });
+  await G(b, () => RYBAK.input.pressed.add('KeyE'));
+  await b.waitForFunction(() => !RYBAK.ride && !RYBAK.player.boat && RYBAK.player.onDeck);
+  assert.ok(await G(b, () => Math.hypot(RYBAK.player.x + 17.5, RYBAK.player.z + 70.7) < 2), 'пассажирка на причале у маяка');
+  await a.waitForFunction((id) => { const p = RYBAK.players.get(id); return p.st && p.st[17] === 0 && /Нори.*сходит на причал/.test(document.querySelector('#feed').textContent); }, bId, { timeout: 20000 });
+  // в лодку, оставленную у причала, можно сесть и без хозяина; хозяин сдал лодку — пассажирку высаживает на ближайший причал
+  await b.waitForFunction(() => /СЕСТЬ В ЛОДКУ — ЖАМШИД/.test(document.querySelector('#prompt').textContent), null, { timeout: 20000 });
+  await G(b, () => RYBAK.input.pressed.add('KeyE'));
+  await b.waitForFunction(() => RYBAK.ride && RYBAK.ride.moored === 1);
+  await G(a, () => RYBAK.goHome());
+  await b.waitForFunction(() => !RYBAK.ride && RYBAK.player.onDeck && /Лодка ушла из-под вас/.test(document.querySelector('#toasts').textContent), null, { timeout: 20000 });
+  assert.ok(await G(b, () => Math.hypot(RYBAK.player.x + 17.5, RYBAK.player.z + 70.7) < 2));
+  console.log('  общая лодка: посадка, ход, заброс с борта, высадка у маяка, сдача лодки хозяином');
+
+  // турнир: объявляет хозяин комнаты, улов гостьи идёт в зачёт у обоих, по итогам — приз
+  await G(b, () => RYBAK.input.pressed.add('KeyT'));
+  await b.waitForSelector('.tourp');
+  assert.match(await b.textContent('.tourp'), /Турнир запускает хозяин комнаты — Жамшид/);
+  assert.equal(await b.locator('[data-a="tstart"]').count(), 0);
+  await b.keyboard.press('Escape');
+  await G(a, () => RYBAK.input.pressed.add('KeyT'));
+  await a.waitForSelector('[data-a="tstart"]');
+  await a.click('[data-a="tkind"][data-id="sum"]');
+  await a.click('[data-a="tlen"][data-id="180"]');
+  await a.click('[data-a="tstart"]');
+  await b.waitForFunction(() => RYBAK.tour && RYBAK.tour.kind === 'sum' && RYBAK.tour.len === 180 && /Жамшид.*объявляет турнир/.test(document.querySelector('#feed').textContent), null, { timeout: 20000 });
+  await a.waitForFunction(() => RYBAK.tour && !document.querySelector('#tour').classList.contains('hidden'));
+  await b.waitForFunction(() => RYBAK.tour.begun, null, { timeout: 20000 });
+  const bCoins = await G(b, () => RYBAK.profile.coins);
+  await G(b, () => RYBAK.fishing.showCatch('okun', 0.5));
+  await a.waitForFunction((id) => { const r = RYBAK.tour.scores.get(id); return r && r.s.n === 1 && /Нори/.test(document.querySelector('#tour').textContent); }, bId, { timeout: 20000 });
+  await b.waitForFunction(() => /Вы/.test(document.querySelector('#tour').textContent), null, { timeout: 20000 });
+  await shot(a, 'c09-tournament', 300);
+  // улов гостья кладёт в садок (или он уже лёг туда сам — карточка улова закрывается через несколько секунд)
+  await b.waitForFunction(() => RYBAK.fishing.state === 'idle' || (RYBAK.fishing.state === 'landed' && RYBAK.fishing.landT > 0.5));
+  await G(b, () => RYBAK.fishing.finish(false));
+  await G(a, () => RYBAK.stopTour());
+  await b.waitForFunction(() => !RYBAK.tour && RYBAK.lastTour, null, { timeout: 20000 });
+  await a.waitForFunction(() => !RYBAK.tour && RYBAK.lastTour && document.querySelector('#tour').classList.contains('hidden'), null, { timeout: 20000 });
+  const tb = await G(b, () => ({ place: RYBAK.lastTour.place, prize: RYBAK.lastTour.prize, players: RYBAK.lastTour.players, early: RYBAK.lastTour.early, coins: RYBAK.profile.coins }));
+  const ta = await G(a, () => ({ place: RYBAK.lastTour.place, prize: RYBAK.lastTour.prize, table: RYBAK.lastTour.table.map((r) => [r.name, r.place]) }));
+  assert.deepEqual([tb.place, tb.prize, tb.players, tb.early], [1, 45, 2, true], JSON.stringify(tb));
+  assert.ok(tb.coins >= bCoins + 45);
+  assert.deepEqual(ta, { place: 0, prize: 0, table: [['Нори', 1]] });
+  await shot(b, 'c10-tournament-result', 400);
+  await G(b, () => RYBAK.ui.closePanel());
+  await G(a, () => RYBAK.ui.closePanel());
+  console.log('  турнир: объявлен хозяином, улов в зачёте, итоги и приз');
+
   // обрыв связи у друга: он пропадает и возвращается на своё место
   const slot = await G(b, () => RYBAK.me.slot);
   await G(b, () => RYBAK.net.ws.close());

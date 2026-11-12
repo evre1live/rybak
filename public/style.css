@@ -41,6 +41,26 @@ kbd.g{background:#1b3566;color:#fff;box-shadow:0 .14em 0 #0a1a33}
 #hud>div,#hud>form{position:absolute}
 .hud-tl{left:1.3em;top:1.2em;display:flex;flex-direction:column;align-items:flex-start;gap:.5em}
 .hud-tl .loc #clockIc{color:var(--ye)}
+.hud-tl .loc #wxIc{color:#cfe3ff}
+.hud-tl .loc.wx-off #wxSep,.hud-tl .loc.wx-off #wxIc,.hud-tl .loc.wx-off #wxName{display:none}
+#wxName em{font-style:italic;color:var(--ye);margin-left:.5em}
+#quests{display:flex;flex-direction:column;gap:.24em;margin:.55em 0 0 .3em;min-width:15em;max-width:23em}
+#quests .qh{font-family:var(--disp);font-weight:900;font-style:italic;font-size:1.05em;letter-spacing:.04em;display:flex;gap:.45em;align-items:center;text-shadow:0 1px 3px rgba(0,10,30,.8)}
+#quests .qh .ic{width:1.15em;height:1.15em;color:var(--ye)}
+#quests .qh kbd{font-size:.72em;min-width:1.6em;height:1.5em;padding:0 .35em}
+#quests .q{display:flex;align-items:center;gap:.7em;background:rgba(10,24,48,.72);border-left:.22em solid var(--ye);border-radius:.2em .5em .5em .2em;padding:.32em .7em .28em .55em;font-size:.92em;line-height:1.2}
+#quests .q span{flex:1}
+#quests .q b{font-family:var(--body);font-style:normal;font-weight:700;text-transform:none;letter-spacing:0;color:var(--ye);white-space:nowrap}
+#tour{align-self:center;background:linear-gradient(180deg,rgba(21,48,92,.95),rgba(10,24,48,.95));border-left:.3em solid var(--ye);border-radius:.3em .8em .8em .3em;padding:.5em 1em .55em .8em;min-width:21em;box-shadow:0 .24em 0 rgba(4,12,28,.5),0 .7em 1.6em rgba(0,0,0,.28)}
+#tour .th{display:flex;align-items:center;gap:.5em;font-family:var(--disp);font-weight:900;font-style:italic;text-transform:uppercase;font-size:1.2em;white-space:nowrap}
+#tour .th .ic{width:1.1em;height:1.1em;color:var(--ye)}
+#tour .th .t{margin-left:auto;padding-left:1em;color:var(--ye);font-size:1.2em}
+#tour .tn{font-size:.86em;opacity:.85;margin-top:.15em}
+.tr{display:flex;align-items:center;gap:.6em;font-size:1em;padding:.14em 0}
+.tr i{font-family:var(--disp);font-style:italic;font-weight:900;width:1.3em;text-align:center;color:var(--cy)}
+.tr span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tr b{font-family:var(--body);font-style:normal;font-weight:700;text-transform:none;letter-spacing:0}
+.tr.me,.tr.me i{color:var(--ye)}
 #crew{display:flex;flex-direction:column;gap:.38em;margin-top:.5em}
 .crow{display:flex;align-items:center;gap:.7em;height:3.1em;padding:0 1.1em 0 0;margin-left:.3em;background:linear-gradient(90deg,rgba(14,33,64,.94),rgba(14,33,64,.86));border-radius:1.6em .6em .6em 1.6em;transform:skewX(-9deg);box-shadow:0 .2em 0 rgba(4,12,28,.45);min-width:13.5em}
 .crow>*{transform:skewX(9deg)}
@@ -318,6 +338,26 @@ input.code{text-transform:uppercase;letter-spacing:.3em;text-align:center;font-f
 .tog::after{content:"";position:absolute;left:.15em;top:.14em;width:1.25em;height:1.25em;border-radius:50%;background:#94a3b8;transition:.15s}
 .tog.on{background:rgba(52,211,153,.3);border-color:var(--gr)}.tog.on::after{left:1.72em;background:var(--gr)}
 .help{display:grid;grid-template-columns:auto 1fr;gap:.55em 1em;align-items:center;font-size:1.08em}
+.center h3{margin:.3em 0 -.2em;font-size:1.3em;color:var(--cy)}
+.center .row2{display:flex;gap:.7em}.center .row2 .btn{flex:1;padding:0 .6em}.center .btn .ic{width:1.1em;height:1.1em}
+.center .opt3{display:flex;gap:.6em}.center .opt3 .btn{flex:1;width:auto;padding:0 .5em;font-size:1.05em;white-space:normal;line-height:1.05;height:3em}
+.qcard{background:rgba(8,21,41,.72);border-left:.3em solid var(--ye);border-radius:.3em .9em .9em .3em;padding:.7em 1em .65em .9em;display:flex;flex-direction:column;gap:.45em}
+.qcard.done{border-left-color:var(--gr);opacity:.78}
+.qcard .qt{display:flex;align-items:center;gap:.7em}
+.qcard .qt b{font-family:var(--body);font-style:normal;font-weight:700;text-transform:none;letter-spacing:0;font-size:1.22em;line-height:1.25;flex:1}
+.qcard .qt .ic{width:1.4em;height:1.4em;color:var(--gr)}
+.qcard .tier{font-family:var(--disp);font-weight:900;font-style:italic;font-size:.9em;padding:.14em .6em .06em;border-radius:.3em;transform:skewX(-9deg);background:#1b3566;white-space:nowrap}
+.qcard .tier.t0{background:var(--gr);color:var(--ink)}.qcard .tier.t1{background:var(--cy);color:var(--ink)}.qcard .tier.t2{background:var(--ye);color:var(--ink)}
+.qcard .pbar{flex:none;height:.7em}.qcard .pbar i{background:var(--ye)}.qcard.done .pbar i{background:var(--gr)}
+.qcard .qr{display:flex;align-items:center;justify-content:space-between;font-size:.98em;color:#cfe3ff}
+.qcard .rw{display:inline-flex;align-items:center;gap:.45em;font-family:var(--disp);font-weight:900;font-style:italic;font-size:1.15em;color:var(--ye)}
+.qcard .rw .ic{width:1em;height:1em}.qcard .rw .sep{width:2px;height:1em;background:rgba(255,255,255,.35)}
+.tres{background:rgba(8,21,41,.72);border-left:.3em solid var(--ye);border-radius:.3em .9em .9em .3em;padding:.7em 1em .75em .9em}
+.tres h2{margin:0 0 .25em;font-size:1.55em;line-height:1.1}
+.tres .tr{font-size:1.12em}
+.tprize{display:flex;align-items:center;gap:.7em;margin-top:.5em;padding-top:.5em;border-top:2px solid var(--line);font-family:var(--disp);font-weight:900;font-style:italic;font-size:1.45em;color:var(--ye)}
+.tprize .ic{width:1em;height:1em}.tprize .sep{width:2px;height:1em;background:rgba(255,255,255,.35)}
+.tab .dot{display:inline-block;margin-left:.35em;min-width:1.3em;padding:.06em .3em 0;border-radius:.7em;background:var(--red);color:#fff;font-size:.62em;font-style:normal;text-align:center;vertical-align:.3em}
 .help span:nth-child(odd){display:flex;gap:.3em;justify-content:flex-end}
 .jstats{grid-column:1/-1;display:flex;gap:.8em;flex-wrap:wrap}
 .jstats div{background:rgba(10,24,48,.86);border-radius:.8em;padding:.4em 1em;border-left:.26em solid var(--cy);font-size:.95em}
@@ -360,7 +400,7 @@ input.code{text-transform:uppercase;letter-spacing:.3em;text-align:center;font-f
 #tChat svg{width:1.25em;height:1.25em}
 body.touch .hud-tr{right:calc(1.3em + clamp(46px,13.4vmin,70px))}
 body.touch .mapbox{width:11.5em;height:11.5em}
-body.touch .hud-br kbd,body.touch #hints,body.touch .hud-bl,body.touch #steer kbd,body.touch #catch .acts{display:none}
+body.touch .hud-br kbd,body.touch #hints,body.touch .hud-bl,body.touch #steer kbd,body.touch #catch .acts,body.touch #quests,body.touch #wxName em{display:none}
 body.touch .hud-br{right:auto;left:50%;bottom:.9em;transform:translateX(-50%);font-size:1.3em;pointer-events:auto}
 body.touch .hud-bc{bottom:1em}
 body.touch #catch{right:auto;left:50%;top:47%;transform:translate(-50%,-50%)}

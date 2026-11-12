@@ -16,8 +16,8 @@ const dir = new THREE.Vector3();
 const CHARGE_TIME = 0.85;
 
 export class Fishing {
-  constructor({ scene, camera, vm, fx, schools, profile, hour, emit }) {
-    Object.assign(this, { scene, camera, vm, fx, schools, profile, hour, emit });
+  constructor({ scene, camera, vm, fx, schools, profile, hour, emit, wx = () => 1 }) {
+    Object.assign(this, { scene, camera, vm, fx, schools, profile, hour, emit, wx });
     this.state = 'idle';
     this.kit = kitStats(profile);
     this.line = new FishLine(scene);
@@ -95,12 +95,14 @@ export class Fishing {
     a.spot = spot;
     if (spot) {
       spot.hot = this.schools.isHot(a.x, a.z);
+      spot.wx = this.wx();
       a.act = this.kit.sonar ? activity(spot, this.profile.equip.tackle, this.hour(), this.kit) : 0;
     }
     return a;
   }
 
   startBite() {
+    this.spot.wx = this.wx(); // погода: в дождь и туман ждать поклёвку меньше
     const d = biteDelay(this.spot, this.profile.equip.tackle, this.hour(), this.kit, Math.random);
     this.biteLeft = d.t;
     this.nibbles = [];
@@ -137,6 +139,7 @@ export class Fishing {
     this.t += dt;
     this.reeling = false;
     this.minD = player.boat ? 3.4 : 2.2;
+    this.inBoat = !!player.boat;
     const st = this.state;
     if (st === 'idle' || st === 'charge') this.updateAim(player);
 
@@ -144,6 +147,7 @@ export class Fishing {
       if (input.hit('Primary') && input.enabled) {
         if (!this.aim.ok) this.emit('toast', 'Отсюда до воды не добросить — подойдите к краю');
         else if (player.sit && !player.dangle) this.emit('toast', 'Сидя на земле не забросить — встаньте или сядьте на край причала');
+        else if (player.boat && player.boat.rider && Math.abs(player.boat.v) > 2.5) this.emit('toast', 'На ходу не забросить — попросите остановить лодку');
         else {
           this.state = 'charge';
           this.power = 0;
@@ -388,6 +392,7 @@ export class Fishing {
       this.emit('bait', r);
     }
     this.catch = c;
+    this.catchAt = { zone: this.spot.zone, boat: !!this.inBoat }; // где поймано — для заданий
     this.fight = fightInit(c, this.kit, Math.random);
     this.state = 'fight';
     this.startDist = Math.max(this.minD + 0.8, dist);
@@ -441,7 +446,7 @@ export class Fishing {
       if (!r.ok) released = true;
     }
     const rec = recordCatch(p, c, released);
-    this.emit('kept', { c, released, forced: released && !release, ...rec });
+    this.emit('kept', { c, released, forced: released && !release, ...(this.catchAt || {}), ...rec });
     this.toIdle();
     if (this.pendingGear) {
       this.pendingGear = false;

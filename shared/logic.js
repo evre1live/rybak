@@ -107,6 +107,7 @@ export function biteDelay(spot, tackleId, hour, kit, rng) {
   const partMult = { dawn: 1.2, day: 1, dusk: 1.2, night: 0.85 }[part];
   let rate = (1 / 10.5) * (ZONES[spot.zone] ? ZONES[spot.zone].act : 1) * tk.attract * kit.biteMult * partMult;
   if (spot.hot) rate *= 1.8;
+  if (spot.wx) rate *= spot.wx; // погода: в дождь и туман рыба берёт охотнее
   if (part === 'night') rate *= kit.nightMult;
   const t = clamp(-Math.log(1 - rng() * 0.999) / rate, 2.5, 28);
   return { t: tk.lure ? t * 0.5 : t, nibbles: tk.lure ? 0 : Math.floor(rng() * 3) };
@@ -117,6 +118,7 @@ export function activity(spot, tackleId, hour, kit) {
   const part = dayPart(hour);
   let a = (ZONES[spot.zone] ? ZONES[spot.zone].act : 1) * tk.attract * kit.biteMult * { dawn: 1.2, day: 1, dusk: 1.2, night: 0.85 }[part];
   if (spot.hot) a *= 1.8;
+  if (spot.wx) a *= spot.wx;
   return clamp(a / 2.4, 0.05, 1);
 }
 
@@ -276,9 +278,10 @@ export function newProfile() {
     tackle: { worm: 20 },
     cooler: [],
     journal: {},
-    stats: { casts: 0, caught: 0, sold: 0, earned: 0, snaps: 0, escapes: 0, best: null, legends: 0 },
+    stats: { casts: 0, caught: 0, sold: 0, earned: 0, snaps: 0, escapes: 0, best: null, legends: 0, quests: 0, tours: 0, medals: 0 },
     seenIntro: false,
-    boatTrips: 0
+    boatTrips: 0,
+    quests: null // задания на день: появляются при первом входе (syncQuests)
   };
 }
 // подлатать сохранение из старой версии или с повреждениями
@@ -295,6 +298,8 @@ export function fixProfile(p) {
   p.coins = Math.max(0, Math.round(Number(p.coins) || 0));
   p.xp = Math.max(0, Math.round(Number(p.xp) || 0));
   p.boatTrips = Math.max(0, Math.round(Number(p.boatTrips) || 0));
+  for (const k of ['quests', 'tours', 'medals']) p.stats[k] = Math.max(0, Math.round(Number(p.stats[k]) || 0));
+  if (!validQuests(p.quests)) p.quests = null;
   if (tackleCount(p, p.equip.tackle) <= 0) p.equip.tackle = 'bread';
   p.v = PROFILE_VERSION;
   return p;
@@ -389,6 +394,246 @@ export function coolerValue(p, market) {
   for (const c of p.cooler) t += fishValue(c, market);
   return t;
 }
+
+// ───── погода ─────
+// Погода общая для всех в комнате: считается из зерна комнаты и часов бухты, сервер её не рассылает.
+// cover — насколько небо затянуто, rain и fog — дождь и туман (0…1), wind — ветер, bite — множитель клёва.
+export const WEATHER = {
+  clear: { name: 'Ясно', bite: 1, cover: 0, rain: 0, fog: 0, wind: 0.2 },
+  cloudy: { name: 'Пасмурно', bite: 1.12, cover: 0.8, rain: 0, fog: 0.1, wind: 0.5 },
+  rain: { name: 'Дождь', bite: 1.3, cover: 1, rain: 1, fog: 0.3, wind: 0.8 },
+  fog: { name: 'Туман', bite: 1.15, cover: 0.5, rain: 0, fog: 1, wind: 0.05 }
+};
+export const WEATHER_PERIOD = 300; // погода держится пять минут…
+export const WEATHER_FADE = 50; // …и за последние 50 секунд плавно переходит в следующую
+const WEATHER_ODDS = [['clear', 0.46], ['cloudy', 0.26], ['rain', 0.17], ['fog', 0.11]];
+export function weatherKind(seed, period) {
+  if (period <= 0) return 'clear'; // бухта встречает солнцем
+  let r = mulberry32(hashStr(seed + ':w:' + period))();
+  for (const [k, w] of WEATHER_ODDS) {
+    r -= w;
+    if (r < 0) return k;
+  }
+  return 'clear';
+}
+/** Погода в момент tSec от начала комнаты. force — вид погоды насильно (для проверок и снимков). */
+export function weatherAt(seed, tSec, force = null) {
+  const t = Math.max(0, tSec);
+  const period = Math.floor(t / WEATHER_PERIOD);
+  const into = t - period * WEATHER_PERIOD;
+  const a = WEATHER[force] ? force : weatherKind(seed, period);
+  const b = WEATHER[force] ? force : weatherKind(seed, period + 1);
+  let k = clamp((into - (WEATHER_PERIOD - WEATHER_FADE)) / WEATHER_FADE, 0, 1);
+  k = k * k * (3 - 2 * k);
+  const A = WEATHER[a];
+  const B = WEATHER[b];
+  const mix = (key) => A[key] + (B[key] - A[key]) * k;
+  return { kind: k < 0.5 ? a : b, from: a, to: b, k, cover: mix('cover'), rain: mix('rain'), fog: mix('fog'), wind: mix('wind'), bite: mix('bite'), nextIn: WEATHER_PERIOD - into };
+}
+
+// ───── задания на день ─────
+// Три задания: лёгкое, среднее и трудное. Виды заданий у всех игроков в этот день одинаковые (зерно — номер дня),
+// числа подстраиваются под уровень. За каждое — монеты и опыт, за все три — премия.
+const plural = (n, a, b, c) => (n % 10 === 1 && n % 100 !== 11 ? a : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? b : c);
+const num = (v) => String(Math.round(v * 10) / 10).replace('.', ',');
+const fishWord = (n) => plural(n, 'рыбу', 'рыбы', 'рыб');
+const Q_ZONE = {
+  pier: 'у свай причала', shallow: 'на мелководье', backwater: 'в заводи', reef: 'у рифа', falls: 'у водопада',
+  sea: 'в открытом море', lagoon: 'в лагуне Пальмового острова', wreck: 'у затонувшего корабля'
+};
+const Q_SPECIES = [
+  ['bychok', 'plotva', 'okun', 'kefal', 'karas', 'stavrida'],
+  ['kambala', 'skumbria', 'lesh', 'morokun', 'sargan', 'karp']
+];
+// что бывает на каждом уровне трудности: [вид задания, сколько нужно (или список на выбор)]
+const Q_POOL = [
+  [['fish', 5], ['kinds', 3], ['sp', 0], ['zone', ['pier', 'shallow', 'backwater']], ['sell', 60], ['free', 2], ['tour', 1]],
+  [['fish', 8], ['kinds', 4], ['sp', 1], ['zone', ['backwater', 'reef', 'sea', 'falls']], ['sell', 150], ['free', 4], ['kg', 3], ['big', 1], ['rare', 1], ['trophy', 1], ['boat', 3], ['wx', 3]],
+  [['fish', 12], ['kinds', 5], ['zone', ['sea', 'lagoon', 'wreck', 'reef']], ['sell', 350], ['kg', 7], ['big', 2.5], ['rare', 2], ['trophy', 2], ['boat', 6]]
+];
+const Q_REWARD = [{ coins: 25, xp: 20 }, { coins: 60, xp: 45 }, { coins: 130, xp: 90 }];
+export const QUEST_BONUS = 50; // премия за все три задания дня (растёт с уровнем, как и награды)
+const lvlK = (lvl, step, max) => Math.min(max, 1 + step * (Math.max(1, lvl) - 1));
+/** Номер дня по местному времени игрока — задания меняются в полночь. */
+export const questDay = (ms, tzOffsetMin = 0) => Math.floor((ms - tzOffsetMin * 60000) / 86400000);
+export function makeQuests(day, lvl = 1) {
+  const rng = mulberry32(hashStr('quests:' + day));
+  const used = new Set();
+  const list = [];
+  for (let tier = 0; tier < 3; tier++) {
+    const pool = Q_POOL[tier].filter(([k]) => !used.has(k));
+    const [k, spec] = pool[Math.floor(rng() * pool.length)];
+    used.add(k);
+    const q = { k, tier, n: 1, c: 0, done: false };
+    const pick = rng();
+    if (k === 'sp') {
+      const ids = Q_SPECIES[spec];
+      q.a = ids[Math.floor(pick * ids.length)];
+      q.n = spec === 0 ? 3 : 2;
+    } else if (k === 'zone') {
+      q.a = spec[Math.floor(pick * spec.length)];
+      q.n = 3 + tier;
+    } else if (k === 'rare') {
+      q.a = spec; // редкость не ниже этой: 1 — необычная, 2 — редкая
+    } else if (k === 'big') q.n = Math.round(spec * lvlK(lvl, 0.25, 6) * 10) / 10;
+    else if (k === 'kg') q.n = Math.round(spec * lvlK(lvl, 0.2, 5));
+    else if (k === 'sell') q.n = Math.round((spec * lvlK(lvl, 0.35, 12)) / 10) * 10;
+    else q.n = spec;
+    if (k === 'kinds') q.s = [];
+    list.push(q);
+  }
+  return list;
+}
+export function questText(q) {
+  const n = q.n;
+  switch (q.k) {
+    case 'fish': return `Поймать ${n} ${fishWord(n)}`;
+    case 'kinds': return `Поймать рыбу ${n} разных видов`;
+    case 'sp': return `Поймать: ${(FISH_BY_ID[q.a] || { name: '?' }).name.toLowerCase()} — ${n} шт.`;
+    case 'zone': return `Поймать ${n} ${fishWord(n)} ${Q_ZONE[q.a] || ''}`;
+    case 'sell': return `Продать улов на ${n} монет`;
+    case 'free': return `Отпустить ${n} ${fishWord(n)}`;
+    case 'kg': return `Наловить ${num(n)} кг рыбы`;
+    case 'big': return `Поймать рыбу тяжелее ${num(n)} кг`;
+    case 'rare': return q.a >= 2 ? 'Поймать редкую рыбу (или ещё реже)' : 'Поймать необычную рыбу (или реже)';
+    case 'trophy': return n > 1 ? `Поймать ${n} трофейные рыбы` : 'Поймать трофейную рыбу';
+    case 'boat': return `Поймать ${n} ${fishWord(n)} с лодки`;
+    case 'wx': return `Поймать ${n} ${fishWord(n)} в непогоду: пасмурно, дождь или туман`;
+    case 'tour': return 'Сыграть в турнир';
+    default: return '';
+  }
+}
+/** Сколько сделано — строкой: «3 / 5», «1,2 / 3 кг», «40 / 60». */
+export function questCount(q) {
+  if (q.done) return 'готово';
+  if (q.k === 'kg') return `${num(q.c)} / ${num(q.n)} кг`;
+  if (q.k === 'big') return q.c ? `пока ${num(q.c)} кг` : '';
+  if (q.n === 1) return '';
+  return `${Math.floor(q.c)} / ${q.n}`;
+}
+export function questReward(q, lvl = 1) {
+  const r = Q_REWARD[q.tier] || Q_REWARD[0];
+  return { coins: Math.round((r.coins * lvlK(lvl, 0.15, 6)) / 5) * 5, xp: Math.round(r.xp * lvlK(lvl, 0.1, 4)) };
+}
+function validQuests(qs) {
+  return !!qs && typeof qs === 'object' && Number.isFinite(qs.day) && Array.isArray(qs.list) && qs.list.length === 3 &&
+    qs.list.every((q) => q && typeof q.k === 'string' && Number.isFinite(q.n) && Number.isFinite(q.c) && (q.k !== 'kinds' || Array.isArray(q.s)));
+}
+/** Задания на сегодня: если день сменился (или заданий ещё нет) — выдаём новые. Возвращает true, если выдали. */
+export function syncQuests(p, day) {
+  if (validQuests(p.quests) && p.quests.day === day) return false;
+  p.quests = { day, list: makeQuests(day, levelInfo(p.xp).lvl), bonus: false };
+  return true;
+}
+/**
+ * Событие игры → продвижение заданий. ev: { t: 'catch', c, zone, boat, released, wx } | { t: 'sell', total } | { t: 'tour' }.
+ * Награды начисляются сразу. Возвращает { done: [задания, закрытые этим событием], coins, xp, bonus, levelUp }.
+ */
+export function questEvent(p, ev) {
+  const out = { done: [], coins: 0, xp: 0, bonus: 0, levelUp: 0 };
+  const qs = p.quests;
+  if (!validQuests(qs)) return out;
+  const c = ev.c;
+  const f = c && !c.junk ? FISH_BY_ID[c.sp] : null;
+  const before = levelInfo(p.xp).lvl;
+  for (const q of qs.list) {
+    if (q.done) continue;
+    if (ev.t === 'catch' && f) {
+      if (q.k === 'fish') q.c++;
+      else if (q.k === 'kinds') {
+        if (!q.s.includes(c.sp)) q.s.push(c.sp);
+        q.c = q.s.length;
+      } else if (q.k === 'sp') q.c += c.sp === q.a ? 1 : 0;
+      else if (q.k === 'zone') q.c += ev.zone === q.a ? 1 : 0;
+      else if (q.k === 'free') q.c += ev.released ? 1 : 0;
+      else if (q.k === 'kg') q.c = Math.round((q.c + c.w) * 1000) / 1000;
+      else if (q.k === 'big') q.c = Math.max(q.c, c.w);
+      else if (q.k === 'rare') q.c += f.rar >= q.a ? 1 : 0;
+      else if (q.k === 'trophy') q.c += c.trophy ? 1 : 0;
+      else if (q.k === 'boat') q.c += ev.boat ? 1 : 0;
+      else if (q.k === 'wx') q.c += ev.wx && ev.wx !== 'clear' ? 1 : 0;
+    } else if (ev.t === 'sell' && q.k === 'sell') q.c += Math.max(0, Math.round(ev.total) || 0);
+    else if (ev.t === 'tour' && q.k === 'tour') q.c++;
+    if (q.c >= q.n) {
+      q.done = true;
+      const r = questReward(q, levelInfo(p.xp).lvl);
+      p.coins += r.coins;
+      p.xp += r.xp;
+      p.stats.quests = (p.stats.quests || 0) + 1;
+      out.coins += r.coins;
+      out.xp += r.xp;
+      out.done.push(q);
+    }
+  }
+  if (out.done.length && !qs.bonus && qs.list.every((q) => q.done)) {
+    qs.bonus = true;
+    out.bonus = Math.round((QUEST_BONUS * lvlK(levelInfo(p.xp).lvl, 0.15, 6)) / 5) * 5;
+    p.coins += out.bonus;
+  }
+  const after = levelInfo(p.xp).lvl;
+  if (after > before) out.levelUp = after;
+  return out;
+}
+
+// ───── турнир ─────
+// В комнате турнир запускает хозяин, очки считает сервер по событиям улова. В одиночку — заплыв на время за медаль.
+export const TOURS = {
+  big: { name: 'Самая тяжёлая рыба', hint: 'Побеждает тот, кто вытащит самую тяжёлую рыбу' },
+  sum: { name: 'Общий вес улова', hint: 'В зачёт идёт вес всей пойманной рыбы' },
+  count: { name: 'Больше всех рыб', hint: 'В зачёт идёт число пойманных рыб' }
+};
+export const TOUR_LENS = [180, 300, 600]; // сколько длится, сек
+export const TOUR_COUNTDOWN = 5; // от объявления до старта, сек
+export const tourBlank = () => ({ n: 0, sum: 0, best: 0, sp: '', at: 0 });
+/** Улов в зачёт: хлам не считается, вес — не больше, чем бывает у вида. at — когда поймано (при равенстве выше тот, кто раньше). */
+export function tourAdd(s, c, at = 0) {
+  const f = c && !c.junk ? FISH_BY_ID[c.sp] : null;
+  const w = f ? Math.round(clamp(Number(c.w) || 0, 0, f.w[1] * 1.02) * 1000) / 1000 : 0;
+  if (!f || w <= 0) return false;
+  s.n++;
+  s.sum = Math.round((s.sum + w) * 1000) / 1000;
+  if (w > s.best) {
+    s.best = w;
+    s.sp = c.sp;
+  }
+  s.at = at;
+  return true;
+}
+export const tourScore = (kind, s) => (kind === 'count' ? s.n : kind === 'sum' ? s.sum : s.best);
+export const tourScoreText = (kind, s) => (kind === 'count' ? `${s.n} ${plural(s.n, 'рыба', 'рыбы', 'рыб')}` : `${num(Math.round(tourScore(kind, s) * 100) / 100)} кг`);
+/** Таблица: rows — [{ id, name, slot, s }] → по убыванию очков; без улова — в конце, без места. */
+export function tourTable(kind, rows) {
+  const list = rows.map((r) => ({ id: r.id, name: r.name, slot: r.slot, s: r.s, score: tourScore(kind, r.s) }));
+  list.sort((a, b) => b.score - a.score || a.s.at - b.s.at || a.id - b.id);
+  let place = 0;
+  for (const r of list) r.place = r.score > 0 ? ++place : 0;
+  return list;
+}
+/** Приз за место в комнате: призовой фонд растёт с числом рыбаков и длиной турнира. Без улова приза нет. */
+export function tourPrize(place, players, len) {
+  if (!place || players < 2) return 0;
+  const pool = 20 * players + 10 * (len / 60);
+  const share = players === 2 ? [0.65, 0.25] : [0.5, 0.3, 0.2];
+  const k = share[place - 1];
+  return k ? Math.max(10, Math.round((pool * k) / 5) * 5) : 10; // остальным, кто что-то поймал, — утешительные 10 монет
+}
+/** Заплыв в одиночку: пороги медалей зависят от снасти (lineKg — какую рыбу она держит) и длины заплыва. */
+export function tourTargets(kind, len, kit) {
+  const m = len / 60;
+  const line = kit ? kit.lineKg : 3;
+  if (kind === 'count') return [Math.max(1, Math.round(m * 0.5)), Math.max(2, Math.round(m * 0.9)), Math.max(3, Math.round(m * 1.3))];
+  const r1 = (v) => Math.max(0.1, Math.round(v * 10) / 10);
+  if (kind === 'sum') return [r1(m * line * 0.035), r1(m * line * 0.07), r1(m * line * 0.12)];
+  const t = 0.8 + 0.04 * m;
+  return [r1(line * 0.12 * t), r1(line * 0.22 * t), r1(line * 0.38 * t)];
+}
+export const MEDALS = ['', 'бронза', 'серебро', 'золото'];
+export function tourMedal(kind, len, kit, s) {
+  const sc = tourScore(kind, s);
+  const t = tourTargets(kind, len, kit);
+  return sc >= t[2] ? 3 : sc >= t[1] ? 2 : sc >= t[0] ? 1 : 0;
+}
+export const medalPrize = (medal, len) => Math.round(([0, 15, 35, 70][medal] * Math.max(0.6, len / 300)) / 5) * 5;
 
 // ───── бот для проверки баланса (и для тестов) ─────
 export function botFight(c, kit, rng, skill = 0.85) {

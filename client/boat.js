@@ -25,10 +25,13 @@ const STERN = 1.5; // верх транца над килем
 // из кода) — запасные, пока моторка грузится.
 // len — длина, draft — осадка, bench — высота банки над килем, seatX/seatZ — где сидит рыбак (вправо и к корме
 // от середины), rot — как повернуть модель носом к −Z, motor — нужен ли приставной мотор.
+// pass — места пассажиров (друзья садятся в чужую лодку): [вправо, к корме] от середины; оба — на передней банке,
+// по бортам, так что хозяину между ними виден нос. passZ, passW — где лежит передняя банка и её ширина.
 const HULLS = {
-  'env-motorboat': { len: 4.6, draft: 0.34, bench: 1.0, seatX: 0, seatZ: 0.25, rot: Math.PI / 2, motor: false, thwart: 1.7 },
-  'prop-boat': { len: LEN, draft: DRAFT, bench: BENCH, seatX: 0, seatZ: SEAT_Z, rot: -Math.PI / 2, motor: true }
+  'env-motorboat': { len: 4.6, draft: 0.34, bench: 1.0, seatX: 0, seatZ: 0.25, rot: Math.PI / 2, motor: false, thwart: 1.7, pass: [[-0.56, -0.9], [0.56, -0.9]], passZ: -0.9, passW: 1.56 },
+  'prop-boat': { len: LEN, draft: DRAFT, bench: BENCH, seatX: 0, seatZ: SEAT_Z, rot: -Math.PI / 2, motor: true, pass: [[-0.46, -1.05], [0.46, -1.05]] }
 };
+export const BOAT_SEATS = 2; // сколько пассажиров берёт лодка
 export const VMAX = 12.5; // полный ход, м/с
 const VREV = 3.2; // задний ход
 
@@ -139,6 +142,7 @@ export class BoatVisual {
           if (spec.thwart) {
             const B = new Batch();
             B.add(G.box(), '#b5722f', M(0, spec.bench - 0.035, spec.seatZ, spec.thwart, 0.07, 0.36), { mat: 1 });
+            if (spec.passW) B.add(G.box(), '#b5722f', M(0, spec.bench - 0.035, spec.passZ, spec.passW, 0.07, 0.34), { mat: 1 }); // банка для пассажиров
             o.userData.thwart = B.build(BATCH_MAT, true);
             g.add(o.userData.thwart);
           }
@@ -179,6 +183,13 @@ export class BoatVisual {
     const s = this.spec;
     return out.set(s.seatX, s.bench, s.seatZ).applyQuaternion(this.group.quaternion).add(this.group.position);
   }
+  /** Место в лодке: 0 — рыбак-хозяин, 1 и 2 — пассажиры. */
+  seatAt(i, out) {
+    if (!i) return this.seat(out);
+    const s = this.spec;
+    const p = s.pass[(i - 1) % s.pass.length];
+    return out.set(p[0], s.bench, p[1]).applyQuaternion(this.group.quaternion).add(this.group.position);
+  }
   /** Середина лодки по месту рыбака: друг присылает, где сидит, а лодку под ним ставим мы. */
   centre(x, z, yaw, out) {
     const s = this.spec;
@@ -210,6 +221,37 @@ export function moorSpot(i, n, out) {
   out.z = m.z + (dz / l) * k;
   out.yaw = m.yaw;
   return out;
+}
+
+/**
+ * Место пассажира в лодке друга. Для игрока (player.js) это «лодка, в которой сидим»: где сиденье, куда смотрит нос,
+ * насколько она повернула за кадр, её ход и качка. Саму лодку ведёт хозяин — мы видим её с задержкой сети.
+ */
+export class Ride {
+  constructor(id, vis, seat) {
+    this.id = id; // чья лодка (номер игрока)
+    this.vis = vis;
+    this.seatI = seat;
+    this.rider = true;
+    this.yaw = vis.group.rotation.y;
+    this.dyaw = 0;
+    this.v = 0;
+    this.k = 0;
+  }
+  /** После того как лодку хозяина поставили в этом кадре: v — её ход. */
+  sync(vis, v) {
+    this.vis = vis;
+    const y = vis.group.rotation.y;
+    let d = y - this.yaw;
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    this.dyaw = d;
+    this.yaw = y;
+    this.v = v;
+    this.k = clamp(v / VMAX, -1, 1);
+  }
+  seat(out) {
+    return this.vis.seatAt(this.seatI, out);
+  }
 }
 
 /** Своя лодка: управление и состояние проката. */

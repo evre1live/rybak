@@ -126,6 +126,76 @@ test('комната: вход по коду, положения, события
   srv.close();
 });
 
+test('турнир в комнате: запускает хозяин, улов идёт в зачёт, опоздавший видит таблицу, по времени — итоги', async () => {
+  let clock = 1_000_000;
+  const srv = createServer({ now: () => clock });
+  await new Promise((r) => srv.server.listen(0, r));
+  const port = srv.server.address().port;
+  const a = client(port);
+  const b = client(port);
+  const c = client(port);
+  const all = [a, b, c];
+  try {
+  await Promise.all(all.map((x) => x.open()));
+  a.send({ t: 'create', card: { name: 'Финн' } });
+  const ja = await a.wait('joined');
+  assert.equal(ja.tour, null);
+  b.send({ t: 'join', code: ja.code, card: { name: 'Нори' } });
+  const jb = await b.wait('joined');
+  await a.wait('in');
+  // гость запустить турнир не может
+  b.send({ t: 'tour', a: 'start', kind: 'sum', len: 180 });
+  assert.equal((await b.wait('error')).code, 'NOT_HOST');
+  // хозяин запускает; неизвестный вид и длина заменяются обычными
+  a.send({ t: 'tour', a: 'start', kind: 'ерунда', len: 7 });
+  const t0 = await b.wait('tour');
+  assert.deepEqual([t0.tour.kind, t0.tour.len, t0.tour.by, t0.tour.scores.length], ['big', 300, ja.id, 0]);
+  assert.equal(t0.tour.start, clock + 5000);
+  assert.equal(t0.tour.end, t0.tour.start + 300000);
+  await a.wait('tour');
+  a.send({ t: 'tour', a: 'start', kind: 'big', len: 180 });
+  assert.equal((await a.wait('error')).code, 'TOUR_ON');
+  // до старта улов не считается
+  b.send({ t: 'ev', k: 'catch', d: { sp: 'okun', w: 0.9 } });
+  await a.wait('ev');
+  clock += 6000;
+  b.send({ t: 'ev', k: 'catch', d: { sp: 'okun', w: 0.5 } });
+  const s1 = await a.wait('tscore');
+  assert.deepEqual([s1.row.id, s1.row.name, s1.row.s.n, s1.row.s.best], [jb.id, 'Нори', 1, 0.5]);
+  await b.wait('tscore'); // тот, кто поймал, тоже получает свой счёт
+  clock += 1000;
+  a.send({ t: 'ev', k: 'catch', d: { sp: 'karp', w: 3.5 } });
+  await b.wait('tscore', (m) => m.row.id === ja.id);
+  a.send({ t: 'ev', k: 'catch', d: { sp: 'boot', w: 0.5 } }); // хлам
+  a.send({ t: 'ev', k: 'catch', d: { sp: 'bychok', w: 50 } }); // вес не по виду — срезается
+  const s2 = await b.wait('tscore', (m) => m.row.id === ja.id && m.row.s.n === 2);
+  assert.equal(s2.row.s.best, 3.5);
+  assert.ok(s2.row.s.sum < 3.5 + 0.3);
+  // опоздавший получает таблицу сразу при входе
+  c.send({ t: 'join', code: ja.code, card: { name: 'Пип' } });
+  const jc = await c.wait('joined');
+  assert.equal(jc.tour.kind, 'big');
+  assert.equal(jc.tour.scores.length, 2);
+  // время вышло — всем приходят итоги, турнир закрыт
+  clock += 300000;
+  const end = await c.wait('tend');
+  assert.deepEqual(end.table.map((r) => [r.id, r.place]), [[ja.id, 1], [jb.id, 2]]);
+  assert.deepEqual([end.early, end.n], [false, 3]);
+  await a.wait('tend');
+  // следующий турнир можно остановить досрочно
+  a.send({ t: 'tour', a: 'start', kind: 'count', len: 600 });
+  const t1 = await c.wait('tour');
+  assert.deepEqual([t1.tour.kind, t1.tour.len], ['count', 600]);
+  assert.ok(t1.tour.id > t0.tour.id);
+  a.send({ t: 'tour', a: 'stop' });
+  const end2 = await c.wait('tend', (m) => m.id === t1.tour.id);
+  assert.deepEqual([end2.early, end2.table.length], [true, 0]);
+  } finally {
+    for (const x of all) x.ws.terminate();
+    srv.close();
+  }
+});
+
 test('в комнату помещается не больше восьми', async () => {
   const srv = createServer();
   await new Promise((r) => srv.server.listen(0, r));

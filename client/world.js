@@ -1,12 +1,13 @@
 // Мир «Солнечной бухты»: рельеф, небо, облака, свет по времени суток — и сборка всего остального.
 import * as THREE from 'three';
-import { clamp, lerp, sstep, fbm2, canvasTex, rng, TAU, isTouch } from './util.js';
+import { clamp, lerp, sstep, damp, fbm2, canvasTex, rng, TAU, isTouch } from './util.js';
 import { groundH, shoreZ, BOUNDS, WORLD, PALM, WRECK, palmR, capeDist, CAPE, ISLAND, islandR, MAP_VIEW, DECKS, LIGHTHOUSE, ARCH, MOORINGS } from './terrain.js';
 import { createWater, createFoamRings } from './water.js';
 import { buildScenery, FOAM_SPOTS } from './scenery.js';
 import { patchSurface, surfaceU, detailTexture, loadPaint, detail } from './surface.js';
 import { ENV } from './envmodels.js';
 import { GrassField } from './grass.js';
+import { Rain } from './weather.js';
 
 // ключевые часы суток: цвета неба, солнца, воды
 const K = (h, zen, hor, sun, sunI, hemiS, hemiG, hemiI, fog, wS, wD, cloud, stars, glit, exp) => ({
@@ -26,6 +27,8 @@ const KEYS = [
   K(24, '#070d24', '#14244a', '#8fa8ff', 0.9, '#33477f', '#141a28', 0.8, '#14244a', '#16506e', '#071b33', '#2b3a5e', 1, 0.3, 1.0)
 ];
 const cur = K(0, '#000', '#000', '#000', 0, '#000', '#000', 0, '#000', '#000', '#000', '#000', 0, 0, 1);
+const _ov = new THREE.Color();
+const _c1 = new THREE.Color();
 function sampleKeys(h) {
   h = ((h % 24) + 24) % 24;
   let i = 0;
@@ -220,7 +223,7 @@ function buildTerrain() {
 
 const SKY_VERT = /* glsl */ `varying vec3 vDir; void main(){ vDir = position; vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position = p.xyww; }`;
 const SKY_FRAG = /* glsl */ `
-uniform vec3 uZen, uHor, uSunDir, uSunCol, uMoonDir; uniform float uStars, uTime; uniform sampler2D uDet; varying vec3 vDir;
+uniform vec3 uZen, uHor, uSunDir, uSunCol, uMoonDir, uFogC; uniform float uStars, uTime, uCover, uFogK; uniform sampler2D uDet; varying vec3 vDir;
 float hash(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
 void main(){
   vec3 d = normalize(vDir);
@@ -229,7 +232,8 @@ void main(){
   c = mix(c, uHor * 1.06, exp(-y * 11.0) * 0.6);
   float sd = max(dot(d, uSunDir), 0.0);
   float up = smoothstep(-0.06, 0.03, uSunDir.y);
-  c += uSunCol * (smoothstep(0.9994, 0.9997, sd) * 9.0 + pow(sd, 220.0) * 0.9 + pow(sd, 9.0) * 0.16) * up;
+  // за сплошными облаками диска не видно — только светлое пятно там, где солнце
+  c += uSunCol * ((smoothstep(0.9994, 0.9997, sd) * 9.0 + pow(sd, 220.0) * 0.9) * (1.0 - uCover) * (1.0 - uCover) + pow(sd, 9.0) * 0.16 * (1.0 - 0.6 * uCover)) * up;
   // перистые облака высоко в небе: тонкие вытянутые полосы, подсвеченные у солнца
   if (d.y > 0.02) {
     vec2 cu = d.xz / (d.y + 0.18);
@@ -237,14 +241,23 @@ void main(){
     float w2 = texture2D(uDet, cu * vec2(0.13, 0.31) - uTime * vec2(0.0007, 0.0002)).a;
     float cir = smoothstep(0.5, 0.78, w1 * 0.62 + w2 * 0.5) * smoothstep(0.02, 0.3, d.y) * (0.5 + 0.5 * w2);
     vec3 cc = mix(uHor, vec3(1.0), 0.75) + uSunCol * pow(sd, 6.0) * 0.5 * up;
-    c = mix(c, cc, cir * 0.42 * (1.0 - 0.75 * uStars));
+    c = mix(c, cc, cir * 0.42 * (1.0 - 0.75 * uStars) * (1.0 - uCover));
+    // пасмурно: небо затянуто — серый слой с тёмными и светлыми разводами, которые медленно плывут
+    if (uCover > 0.002) {
+      float l1 = texture2D(uDet, cu * 0.021 + uTime * vec2(0.0019, 0.0008)).r;
+      float l2 = texture2D(uDet, cu * 0.058 - uTime * vec2(0.0013, 0.0005)).a;
+      float lay = 0.74 + 0.5 * (l1 * 0.62 + l2 * 0.38);
+      c *= mix(1.0, lay, uCover * smoothstep(0.02, 0.22, d.y));
+    }
   }
   float md = max(dot(d, uMoonDir), 0.0);
-  c += vec3(0.85, 0.9, 1.0) * (smoothstep(0.9990, 0.9993, md) * 1.6 + pow(md, 60.0) * 0.12) * uStars;
+  c += vec3(0.85, 0.9, 1.0) * (smoothstep(0.9990, 0.9993, md) * 1.6 + pow(md, 60.0) * 0.12) * uStars * (1.0 - uCover);
   vec3 gp = d * 330.0; vec3 g = floor(gp);
   float st = step(0.9965, hash(g)) * smoothstep(0.42, 0.08, length(fract(gp) - 0.5)) * (0.65 + 0.35 * sin(uTime * 2.0 + hash(g + 3.0) * 30.0)) * 1.6;
-  c += vec3(st) * uStars * smoothstep(0.02, 0.25, d.y);
+  c += vec3(st) * uStars * smoothstep(0.02, 0.25, d.y) * (1.0 - uCover);
   if (d.y < 0.0) c = mix(c, uHor * 0.9, min(1.0, -d.y * 6.0));
+  // туман: у горизонта небо тонет в нём целиком, над головой — наполовину
+  c = mix(c, uFogC, uFogK * mix(0.96, 0.5, smoothstep(0.0, 0.75, max(d.y, 0.0))));
   gl_FragColor = vec4(c, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -330,7 +343,8 @@ export class World {
 
     this.skyU = {
       uZen: { value: new THREE.Color() }, uHor: { value: new THREE.Color() }, uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uSunCol: { value: new THREE.Color() },
-      uMoonDir: { value: MOON.clone() }, uStars: { value: 0 }, uTime: { value: 0 }, uDet: surfaceU.uDet
+      uMoonDir: { value: MOON.clone() }, uStars: { value: 0 }, uTime: { value: 0 }, uDet: surfaceU.uDet,
+      uCover: { value: 0 }, uFogK: { value: 0 }, uFogC: { value: new THREE.Color() }
     };
     const sky = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16), new THREE.ShaderMaterial({ uniforms: this.skyU, vertexShader: SKY_VERT, fragmentShader: SKY_FRAG, side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false }));
     sky.frustumCulled = false;
@@ -352,6 +366,7 @@ export class World {
       const map = texs[i % texs.length].clone(); // у каждого облака свой разворот рисунка: свет — со стороны солнца
       map.needsUpdate = true;
       const mat = new THREE.MeshBasicMaterial({ map, transparent: true, depthWrite: false, fog: false, opacity: far ? 0.9 : 0.97 });
+      mat.userData.op = mat.opacity;
       const a = (i / (far ? N2 : N1)) * TAU + cr() * 0.4;
       const dist = far ? 1500 + cr() * 300 : 820 + cr() * 420;
       const w = far ? 300 + cr() * 260 : 400 + cr() * 380;
@@ -388,17 +403,52 @@ export class World {
     this.night = 0;
     this.hours = 12;
     this.exposure = 1;
+    // погода: насколько затянуто небо, дождь, туман, ветер (0…1) — меняются плавно
+    this.wx = { cover: 0, rain: 0, fog: 0, wind: 0.2 };
+    this.rain = new Rain(scene);
     this.setClock(12);
+  }
+
+  /** Погода: w — { cover, rain, fog, wind } от 0 до 1. Значения подтягиваются плавно; dt = 0 — поставить сразу. */
+  setWeather(w, dt = 0) {
+    const c = this.wx;
+    for (const k of ['cover', 'rain', 'fog', 'wind']) c[k] = dt > 0 ? damp(c[k], w[k] || 0, 0.9, dt) : w[k] || 0;
   }
 
   /** Освещение на заданный час суток. */
   setClock(h) {
     this.hours = h;
     const k = sampleKeys(h);
+    const kStars = k.stars; // «ночь» — по часам, а не по тому, видны ли звёзды сквозь облака
     const dayLight = h >= 5 && h < 21;
     sunDirection(h, this.sunDir);
     const dir = dayLight ? this.sunDir : MOON;
     const fadeLow = dayLight ? sstep(0.0, 0.12, this.sunDir.y) : 1;
+    // Погода. Пасмурное небо — серое с синевой, яркость берём от неба этого часа; солнце за облаками светит вполсилы,
+    // блики на воде и сетка света на дне гаснут; туман и дождь съедают даль.
+    const W = this.wx;
+    const cov = W.cover;
+    const fogK = W.fog;
+    const lum = k.hor.r * 0.3 + k.hor.g * 0.5 + k.hor.b * 0.2;
+    _ov.setRGB(lum * 0.72, lum * 0.77, lum * 0.84);
+    if (cov > 0.001 || fogK > 0.001) {
+      k.zen.lerp(_c1.copy(_ov).multiplyScalar(0.66), cov * 0.93);
+      k.hor.lerp(_ov, cov * 0.88);
+      k.fog.lerp(_c1.copy(_ov).multiplyScalar(1 + 0.12 * fogK), Math.max(cov * 0.88, fogK));
+      k.sun.lerp(_c1.copy(_ov).multiplyScalar(1.25), cov * 0.55);
+      k.hemiS.lerp(_ov, cov * 0.6);
+      k.cloud.lerp(_c1.copy(_ov).multiplyScalar(0.92), cov * 0.85);
+      _c1.setRGB(lum * 0.42, lum * 0.52, lum * 0.56);
+      // вода под серым небом и в тумане теряет бирюзу
+      const wk = Math.min(0.78, cov * 0.62 + fogK * 0.3);
+      k.wS.lerp(_c1, wk);
+      k.wD.lerp(_c1.multiplyScalar(0.62), wk * 0.9);
+      k.sunI *= 1 - 0.62 * cov;
+      k.hemiI *= 1 - 0.1 * cov + 0.06 * fogK;
+      k.glit *= 1 - 0.86 * cov;
+      k.stars *= 1 - 0.95 * Math.max(cov, fogK);
+      k.exp *= 1 - 0.07 * W.rain;
+    }
     this.sun.color.copy(k.sun);
     this.sun.intensity = k.sunI * (0.25 + 0.75 * fadeLow);
     this.lightDir = dir;
@@ -406,13 +456,22 @@ export class World {
     this.hemi.groundColor.copy(k.hemiG);
     this.hemi.intensity = k.hemiI;
     this.scene.fog.color.copy(k.fog);
+    // даль: ясно — 1,7 км; пасмурно чуть ближе; дождь — полкилометра; туман — полторы сотни метров
+    const fk = fogK * fogK * (3 - 2 * fogK);
+    this.scene.fog.near = lerp(lerp(170, 30, W.rain), 3, fk);
+    this.scene.fog.far = lerp(lerp(1700 - 350 * cov, 560, W.rain), 150, fk);
     const s = this.skyU;
     s.uZen.value.copy(k.zen);
     s.uHor.value.copy(k.hor);
     s.uSunDir.value.copy(this.sunDir);
     s.uSunCol.value.copy(k.sun);
     s.uStars.value = k.stars;
+    s.uCover.value = cov;
+    s.uFogK.value = fogK;
+    s.uFogC.value.copy(k.fog);
     const w = this.water.uniforms;
+    w.uRain.value = W.rain;
+    w.uLight.value = clamp(k.sunI / 2.7, 0, 1);
     w.uShallow.value.copy(k.wS);
     w.uDeep.value.copy(k.wD);
     w.uSkyZen.value.copy(k.zen);
@@ -427,7 +486,10 @@ export class World {
     surfaceU.uCaustK.value = k.glit * (dayLight ? 1 : 0.35);
     w.uFogNear.value = this.scene.fog.near;
     w.uFogFar.value = this.scene.fog.far;
-    for (const m of this.cloudMat) m.color.copy(k.cloud);
+    for (const m of this.cloudMat) {
+      m.color.copy(k.cloud);
+      m.opacity = m.userData.op * (1 - 0.45 * cov) * (1 - fogK);
+    }
     // рисунок облака отражаем так, чтобы светлый бок смотрел на солнце (или луну)
     for (const c of this.cloudList) {
       c.updateWorldMatrix(true, false);
@@ -437,8 +499,8 @@ export class World {
       map.repeat.x = flip ? -1 : 1;
       map.offset.x = flip ? 1 : 0;
     }
-    surfaceU.uCloudK.value = dayLight ? 1 : 0.35;
-    this.night = clamp(k.stars * 1.15, 0, 1);
+    surfaceU.uCloudK.value = (dayLight ? 1 : 0.35) * (1 - cov); // под сплошными облаками отдельных теней нет
+    this.night = clamp(kStars * 1.15, 0, 1);
     this.exposure = k.exp;
     this.scenery.setNight(this.night, 1 - this.night);
   }
@@ -462,6 +524,7 @@ export class World {
     this.sun.target.position.set(tx, 0, tz);
     this.sun.position.set(tx + this.lightDir.x * 120, this.lightDir.y * 120, tz + this.lightDir.z * 120);
     this.scenery.update(dt, t, camera);
+    this.rain.update(t, camera, this.wx.rain, this.wx.wind, 1 - this.night);
   }
 }
 

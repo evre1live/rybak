@@ -153,3 +153,185 @@ test('уровни растут, часы идут по кругу', () => {
   assert.equal(dayPart(23), 'night');
   assert.ok(RODS.every((r, i) => !i || r.cast > RODS[i - 1].cast));
 });
+
+test('погода: одна на всех по зерну комнаты, меняется плавно, в непогоду клюёт чаще', () => {
+  // первые пять минут — всегда ясно; дальше по зерну, у двух игроков с одним зерном — одно и то же
+  assert.equal(L.weatherAt('room1', 0).kind, 'clear');
+  assert.equal(L.weatherAt('room1', 250).rain, 0);
+  const kinds = new Set();
+  for (let t = 0; t < 400 * L.WEATHER_PERIOD; t += 97) {
+    const a = L.weatherAt('room1', t);
+    assert.deepEqual(a, L.weatherAt('room1', t));
+    assert.ok(L.WEATHER[a.kind] && a.bite >= 1 && a.bite <= 1.3 + 1e-9 && a.cover >= 0 && a.cover <= 1 && a.rain >= 0 && a.rain <= 1 && a.fog >= 0 && a.fog <= 1);
+    kinds.add(a.kind);
+  }
+  assert.deepEqual([...kinds].sort(), ['clear', 'cloudy', 'fog', 'rain']);
+  // переход без скачков: за секунду ни одна величина не меняется заметно
+  let prev = L.weatherAt('room1', 0);
+  for (let t = 1; t < 30 * L.WEATHER_PERIOD; t++) {
+    const w = L.weatherAt('room1', t);
+    for (const k of ['cover', 'rain', 'fog', 'bite']) assert.ok(Math.abs(w[k] - prev[k]) < 0.04, `${k} скачет на ${t}-й секунде`);
+    prev = w;
+  }
+  // насильно заданная погода (для проверок) держится всё время
+  assert.equal(L.weatherAt('room1', 12345, 'rain').rain, 1);
+  assert.equal(L.weatherAt('room1', 12345, 'fog').kind, 'fog');
+  // клёв: в дождь ждать меньше, эхолот показывает больше
+  const kit = L.kitStats(L.newProfile());
+  const mean = (wx) => {
+    const r = rng();
+    let s = 0;
+    for (let i = 0; i < 3000; i++) s += L.biteDelay({ zone: 'mid', depth: 4, wx }, 'worm', 12, kit, r).t;
+    return s / 3000;
+  };
+  const dry = mean(1);
+  const wet = mean(L.WEATHER.rain.bite);
+  assert.ok(wet < dry * 0.9 && wet > dry * 0.7, `в дождь ${wet.toFixed(1)} с против ${dry.toFixed(1)} с`);
+  assert.ok(L.activity({ zone: 'mid', depth: 4, wx: 1.3 }, 'worm', 12, kit) > L.activity({ zone: 'mid', depth: 4 }, 'worm', 12, kit));
+});
+
+test('задания на день: три разной трудности, у всех одинаковые, числа и награды растут с уровнем', () => {
+  const kindsSeen = new Set();
+  for (let day = 20000; day < 20400; day++) {
+    const a = L.makeQuests(day, 1);
+    assert.deepEqual(a, L.makeQuests(day, 1));
+    assert.equal(a.length, 3);
+    assert.deepEqual(a.map((q) => q.tier), [0, 1, 2]);
+    assert.equal(new Set(a.map((q) => q.k)).size, 3, 'виды заданий в один день не повторяются');
+    for (const q of a) {
+      kindsSeen.add(q.k);
+      assert.ok(q.n > 0 && q.c === 0 && !q.done);
+      const text = L.questText(q);
+      assert.ok(text.length > 8 && !/undefined|NaN|\?/.test(text), text);
+      if (q.k === 'sp') assert.ok(FISH_BY_ID[q.a] && FISH_BY_ID[q.a].rar <= 1);
+      if (q.k === 'zone') assert.ok(ZONES[q.a], q.a);
+      const r = L.questReward(q, 1);
+      assert.ok(r.coins >= 25 && r.xp >= 20);
+    }
+    // у опытного игрока те же виды заданий, но числа и награды крупнее
+    const b = L.makeQuests(day, 15);
+    assert.deepEqual(b.map((q) => [q.k, q.a]), a.map((q) => [q.k, q.a]));
+    for (let i = 0; i < 3; i++) {
+      assert.ok(b[i].n >= a[i].n);
+      assert.ok(L.questReward(b[i], 15).coins > L.questReward(a[i], 1).coins);
+    }
+    assert.ok(L.questReward(a[2], 1).coins > L.questReward(a[1], 1).coins && L.questReward(a[1], 1).coins > L.questReward(a[0], 1).coins);
+  }
+  assert.ok(kindsSeen.size >= 12, [...kindsSeen].join());
+  // день считается по местному времени: в полночь по Москве (UTC+3) номер меняется
+  const msk = -180;
+  assert.equal(L.questDay(Date.UTC(2026, 10, 12, 20, 59), msk) + 1, L.questDay(Date.UTC(2026, 10, 12, 21, 1), msk));
+});
+
+test('задания: улов, продажа и турнир двигают счёт; награда приходит один раз, за все три — премия', () => {
+  const p = L.newProfile();
+  assert.equal(L.syncQuests(p, 20000), true);
+  assert.equal(L.syncQuests(p, 20000), false, 'в тот же день задания не перевыдаются');
+  // собираем свой набор — по одному заданию каждого вида счёта
+  const set = (list) => (p.quests = { day: 20000, bonus: false, list: list.map(([k, n, a], tier) => ({ k, n, a, c: 0, tier, done: false, ...(k === 'kinds' ? { s: [] } : {}) })) });
+  const okun = (w, extra = {}) => ({ t: 'catch', c: { sp: 'okun', w, junk: false, trophy: false }, zone: 'pier', boat: false, released: false, wx: 'clear', ...extra });
+  set([['fish', 2], ['sp', 1, 'plotva'], ['kg', 1]]);
+  const coins0 = p.coins;
+  let r = L.questEvent(p, { t: 'catch', c: { sp: 'boot', w: 0.5, junk: true } });
+  assert.equal(r.done.length, 0, 'хлам в зачёт не идёт');
+  assert.equal(p.quests.list[0].c, 0);
+  r = L.questEvent(p, okun(0.4));
+  assert.deepEqual(p.quests.list.map((q) => q.c), [1, 0, 0.4]);
+  assert.equal(L.questCount(p.quests.list[0]), '1 / 2');
+  assert.equal(L.questCount(p.quests.list[2]), '0,4 / 1 кг');
+  r = L.questEvent(p, okun(0.7));
+  assert.deepEqual(r.done.map((q) => q.k), ['fish', 'kg']);
+  assert.equal(r.coins, 25 + 130);
+  assert.equal(p.coins, coins0 + 155);
+  assert.equal(r.bonus, 0);
+  r = L.questEvent(p, okun(0.7));
+  assert.equal(r.done.length, 0, 'закрытое задание второй раз не платит');
+  r = L.questEvent(p, { t: 'catch', c: { sp: 'plotva', w: 0.2 }, zone: 'backwater' });
+  assert.deepEqual(r.done.map((q) => q.k), ['sp']);
+  assert.ok(r.bonus >= L.QUEST_BONUS && r.coins >= 60, 'все три — премия (награды растут с уровнем, а он от опыта за задания вырос)');
+  assert.equal(p.coins, coins0 + 155 + r.coins + r.bonus);
+  assert.equal(p.stats.quests, 3);
+  assert.equal(L.questEvent(p, okun(1)).bonus, 0, 'премия одна');
+  // остальные виды счёта
+  set([['kinds', 2], ['zone', 2, 'sea'], ['free', 1]]);
+  L.questEvent(p, okun(0.3, { zone: 'sea', released: true }));
+  L.questEvent(p, okun(0.3, { zone: 'sea' }));
+  assert.deepEqual(p.quests.list.map((q) => [q.c, q.done]), [[1, false], [2, true], [1, true]]);
+  L.questEvent(p, { t: 'catch', c: { sp: 'bychok', w: 0.1 }, zone: 'pier' });
+  assert.equal(p.quests.list[0].done, true);
+  set([['big', 1.2], ['rare', 1, 2], ['trophy', 1]]);
+  L.questEvent(p, okun(1.1));
+  assert.equal(L.questCount(p.quests.list[0]), 'пока 1,1 кг');
+  L.questEvent(p, { t: 'catch', c: { sp: 'karp', w: 3, trophy: true }, zone: 'backwater' });
+  assert.deepEqual(p.quests.list.map((q) => q.done), [true, false, true], 'карп — необычная рыба, редкой не считается');
+  L.questEvent(p, { t: 'catch', c: { sp: 'shuka', w: 2 }, zone: 'backwater' });
+  assert.equal(p.quests.list[1].done, true);
+  set([['boat', 1], ['wx', 1], ['sell', 100]]);
+  L.questEvent(p, okun(0.3));
+  assert.deepEqual(p.quests.list.map((q) => q.c), [0, 0, 0]);
+  L.questEvent(p, okun(0.3, { boat: true, wx: 'rain' }));
+  L.questEvent(p, { t: 'sell', total: 60 });
+  assert.equal(L.questCount(p.quests.list[2]), '60 / 100');
+  L.questEvent(p, { t: 'sell', total: 60 });
+  assert.deepEqual(p.quests.list.map((q) => q.done), [true, true, true]);
+  set([['tour', 1], ['fish', 99], ['fish', 99]]);
+  assert.equal(L.questEvent(p, { t: 'tour' }).done.length, 1);
+  // новый день — новые задания; сломанное сохранение чинится
+  assert.equal(L.syncQuests(p, 20001), true);
+  assert.equal(p.quests.list.every((q) => !q.done && q.c === 0), true);
+  p.quests = { day: 'x', list: 5 };
+  p.stats.quests = 'много';
+  L.fixProfile(p);
+  assert.equal(p.quests, null);
+  assert.equal(p.stats.quests, 0);
+  assert.equal(L.questEvent(p, okun(1)).done.length, 0, 'без заданий событие ничего не ломает');
+  const old = L.fixProfile({ name: 'Старожил', coins: 5, stats: { caught: 9 } });
+  assert.equal(old.stats.caught, 9);
+  assert.equal(old.stats.tours, 0);
+  assert.equal(old.quests, null);
+});
+
+test('турнир: зачёт, таблица, призы и медали', () => {
+  const a = L.tourBlank();
+  assert.equal(L.tourAdd(a, { sp: 'boot', w: 0.5, junk: true }, 1), false, 'хлам не считается');
+  assert.equal(L.tourAdd(a, { sp: 'нет такой', w: 3 }, 1), false);
+  assert.equal(L.tourAdd(a, { sp: 'okun', w: 0.4 }, 10), true);
+  assert.equal(L.tourAdd(a, { sp: 'okun', w: 999 }, 20), true);
+  assert.ok(a.best <= FISH_BY_ID.okun.w[1] * 1.02 + 1e-9, 'вес не больше, чем бывает у вида');
+  assert.equal(a.n, 2);
+  const b = L.tourBlank();
+  L.tourAdd(b, { sp: 'karp', w: 4.2 }, 30);
+  const c = L.tourBlank();
+  const rows = [{ id: 1, name: 'А', slot: 0, s: a }, { id: 2, name: 'Б', slot: 1, s: b }, { id: 3, name: 'В', slot: 2, s: c }];
+  assert.deepEqual(L.tourTable('big', rows).map((r) => [r.id, r.place]), [[2, 1], [1, 2], [3, 0]]);
+  assert.deepEqual(L.tourTable('count', rows).map((r) => [r.id, r.place]), [[1, 1], [2, 2], [3, 0]]);
+  assert.deepEqual(L.tourTable('sum', rows).map((r) => r.id), [2, 1, 3]);
+  assert.equal(L.tourScoreText('count', a), '2 рыбы');
+  assert.equal(L.tourScoreText('big', b), '4,2 кг');
+  // при равном счёте выше тот, кто набрал его раньше
+  const d = L.tourBlank();
+  L.tourAdd(d, { sp: 'karp', w: 4.2 }, 5);
+  assert.deepEqual(L.tourTable('big', [...rows, { id: 4, name: 'Г', slot: 3, s: d }]).map((r) => r.id).slice(0, 2), [4, 2]);
+  // призы: в комнате от двух человек; первое место больше второго; без улова — ничего
+  assert.equal(L.tourPrize(1, 1, 300), 0);
+  assert.equal(L.tourPrize(0, 4, 300), 0);
+  for (const n of [2, 3, 5, 8]) for (const len of L.TOUR_LENS) {
+    assert.ok(L.tourPrize(1, n, len) > L.tourPrize(2, n, len) && L.tourPrize(2, n, len) >= 10);
+    assert.ok(L.tourPrize(1, n, len) <= 250);
+  }
+  assert.ok(L.tourPrize(1, 8, 600) > L.tourPrize(1, 2, 180));
+  // медали в одиночку: пороги растут от бронзы к золоту, с длиной заплыва и со снастью
+  const starter = L.kitStats(L.newProfile());
+  for (const kind of Object.keys(L.TOURS)) for (const len of L.TOUR_LENS) {
+    const t = L.tourTargets(kind, len, starter);
+    assert.ok(t[0] > 0 && t[1] > t[0] && t[2] > t[1], `${kind} ${len}: ${t}`);
+    assert.equal(L.tourMedal(kind, len, starter, L.tourBlank()), 0);
+  }
+  assert.ok(L.tourTargets('sum', 600, starter)[2] > L.tourTargets('sum', 180, starter)[2]);
+  assert.ok(L.tourTargets('big', 300, { lineKg: 15 })[2] > L.tourTargets('big', 300, starter)[2]);
+  const s = L.tourBlank();
+  for (let i = 0; i < 7; i++) L.tourAdd(s, { sp: 'okun', w: 0.3 }, i);
+  assert.equal(L.tourMedal('count', 300, starter, s), 3);
+  assert.equal(L.tourMedal('count', 600, starter, s), 1);
+  assert.ok(L.medalPrize(3, 300) > L.medalPrize(2, 300) && L.medalPrize(2, 300) > L.medalPrize(1, 300) && L.medalPrize(0, 300) === 0);
+});
