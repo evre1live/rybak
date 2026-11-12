@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { Batch, M, G, BATCH_MAT, BATCH_MAT_2S } from './batch.js';
 import { loadManifest } from './hero.js';
 import { modelInfo, loadModels, spawn } from './models.js';
+import { buildPlaces } from './places.js';
 import { rng, rockGeo, blobGeo, canvasTex, shade, sstep, TAU, fbm2 } from './util.js';
 import { DECKS, DECK_Y, groundH, shoreZ, islandR, ISLAND, ARCH, REEF, CAPE, capeDist, FALLS, LIGHTHOUSE, BACKWATER, deckAt, SCHOOL_HOMES } from './terrain.js';
 import { waveH } from './water.js';
@@ -10,7 +11,11 @@ import { waveH } from './water.js';
 const WOODS = ['#c58a4e', '#b97c42', '#d39a5d', '#a86f3a', '#c9945a'];
 const DARK_WOOD = '#7a5230';
 const ROPE = '#ead9a7';
-export const LAMP_POSTS = [[1.92, -9, -1], [-6.18, -22.3, 1], [6.18, 4.3, -1], [-29.25, 12.7, -1], [-6.5, 9.7, 1]];
+export const LAMP_POSTS = [
+  [1.92, -9, -1], [-6.18, -22.3, 1], [6.18, 4.3, -1], [-29.25, 12.7, -1], [-6.5, 9.7, 1],
+  // на дальних причалах фонари только светятся сами: лишние источники света дорого стоят всей сцене
+  [-20.2, -78.2, 1, true], [208.8, -194.2, 1, true]
+];
 
 /** Сваи, стоящие в воде: вокруг них пена и круги (water.js). */
 export const FOAM_SPOTS = [];
@@ -326,6 +331,20 @@ function buildProps(B, P, r) {
   place('prop-anchor', 7.7, groundH(7.7, 12.6) - 0.06, 12.6, 1.45, -0.7, false, { rz: 0.16 });
   place('prop-tacklebox', 1.95, y + 0.5, 15.33, 0.44, -0.35);
   place('prop-lantern', 5.65, y, -25.4, 0.46, 0.6);
+  // причал у маяка
+  place('prop-crate', -19.2, y, -71.2, 0.62, 0.4);
+  place('prop-barrel', -16.2, y, -77.6, 0.95, 1.2);
+  place('prop-ropecoil', -15.9, y, -70.9, 0.7, 0.3);
+  place('prop-trap', -19.3, y, -77.4, 0.9, 1.4);
+  // Пальмовый остров: мостки и пляж
+  place('prop-crate', 213.2, y, -193.6, 0.6, 0.3);
+  place('prop-netpile', 209.9, y, -186.6, 0.95, 2.1);
+  place('prop-lantern', 213.5, y, -186.0, 0.44, 0.9);
+  place('prop-anchor', 262.5, groundH(262.5, -176.5) - 0.05, -176.5, 1.4, 0.9, false, { rz: 0.2 });
+  place('prop-barrel', 256.6, groundH(256.6, -182.2), -182.2, 0.95, 0.5);
+  place('prop-crate', 253.6, groundH(253.6, -182.4), -182.4, 0.7, 0.9);
+  place('prop-tacklebox', 255, groundH(255, -183.9) + 0.5, -183.9, 0.44, 0.3);
+  place('prop-buoy', 249.5, groundH(249.5, -198) - 0.1, -198, 1.5, 0.4, false, { rz: 0.5 });
   // скамейка у берега
   const bx = 1.4;
   const bz = 15.35;
@@ -384,7 +403,7 @@ function upgradeProps(scene, fallback, floaters) {
 function buildLamps(B, scene) {
   const lamps = [];
   const glassMat = new THREE.MeshStandardMaterial({ color: '#ffe2a8', emissive: '#ffb347', emissiveIntensity: 0, roughness: 0.4 });
-  for (const [x, z, side] of LAMP_POSTS) {
+  for (const [x, z, side, dim] of LAMP_POSTS) {
     const y = DECK_Y;
     B.add(G.cyl(8, 0.8, 1), '#5b3a1e', M(x, y + 1.35, z, 0.16, 2.9, 0.16), { grad: [0.8, 1.05] });
     B.add(G.box(), '#5b3a1e', M(x + side * 0.32, y + 2.7, z, 0.72, 0.07, 0.07));
@@ -398,6 +417,7 @@ function buildLamps(B, scene) {
     glass.position.set(lx, y + 2.32, z);
     glass.scale.set(0.16, 0.24, 0.16);
     scene.add(glass);
+    if (dim) continue;
     const light = new THREE.PointLight('#ffc58a', 0, 14, 1.5);
     light.position.set(lx, y + 2.3, z);
     scene.add(light);
@@ -565,6 +585,22 @@ function buildVegetation(scene, r) {
         near.add(G.ico(0), '#fde047', M(x, 0.16, z, 0.07, 0.07, 0.07));
       }
     }
+  }
+  // южный и восточный склоны большого острова видны только с лодки — там тоже лес
+  const r2 = rng(777);
+  let more = 0;
+  for (let i = 0; i < 2600 && more < 150; i++) {
+    const x = -160 + r2() * 320;
+    const z = 20 + r2() * 125;
+    const d = z - shoreZ(x);
+    if (d <= 78 && x < 120) continue; // северный склон уже засажен
+    const y = groundH(x, z);
+    if (y < 1.2) continue;
+    if (groundH(x + 1.5, z) - y > 1.6 || groundH(x, z + 1.5) - y > 1.6 || y - groundH(x, z + 1.5) > 1.6) continue; // на обрыве деревья не стоят
+    const s = (1.0 + r2() * 0.9) * 1.2;
+    if (r2() < 0.5) pine(far, x, y - 0.2, z, s, r2);
+    else roundTree(far, x, y - 0.2, z, s, r2);
+    more++;
   }
   const mNear = near.build();
   const mFar = far.build(BATCH_MAT, false);
@@ -825,12 +861,7 @@ function buildFloaters(scene) {
   boat.rotation.y = 0.25;
   scene.add(boat);
   list.push({ o: boat, y: 0.08, roll: 0.06, kind: 'boat' });
-  // вторая лодка — у главного пирса (появляется только готовой моделью)
-  const boat2 = new THREE.Group();
-  boat2.position.set(3.25, 0, -11.5);
-  boat2.rotation.y = Math.PI / 2 + 0.08;
-  scene.add(boat2);
-  list.push({ o: boat2, y: 0, roll: 0.05, kind: 'boat' });
+  // у главного пирса стоит прокатная лодка — её ведёт boat.js
   // буйки
   const red = new THREE.MeshStandardMaterial({ color: '#e2452f', roughness: 0.6 });
   const white = new THREE.MeshStandardMaterial({ color: '#f8fafc', roughness: 0.6 });
@@ -973,6 +1004,7 @@ export function buildScenery(scene) {
   const floaters = buildFloaters(scene);
   const gulls = buildGulls(scene);
   const schools = buildSchools(scene);
+  buildPlaces(scene);
   upgradeProps(scene, fallback, floaters);
   return {
     setBoard: shack.setBoard,

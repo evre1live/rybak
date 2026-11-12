@@ -40,7 +40,7 @@ function makeCode(rooms) {
     if (!rooms.has(c)) return c;
   }
 }
-const EVENTS = new Set(['cast', 'land', 'bite', 'hook', 'catch', 'lost', 'emote', 'sold', 'reel', 'jump', 'buy']);
+const EVENTS = new Set(['cast', 'land', 'bite', 'hook', 'catch', 'lost', 'emote', 'sold', 'reel', 'jump', 'buy', 'boat']);
 
 // карточка игрока: имя, внешность, что в руках — всё, что видят друзья
 function cleanCard(c) {

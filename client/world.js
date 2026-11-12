@@ -1,7 +1,7 @@
 // Мир «Солнечной бухты»: рельеф, небо, облака, свет по времени суток — и сборка всего остального.
 import * as THREE from 'three';
 import { clamp, lerp, sstep, fbm2, canvasTex, rng, TAU, isTouch } from './util.js';
-import { groundH, shoreZ, BOUNDS, capeDist, CAPE, ISLAND, islandR, MAP_VIEW, DECKS, LIGHTHOUSE, ARCH } from './terrain.js';
+import { groundH, shoreZ, BOUNDS, WORLD, PALM, WRECK, palmR, capeDist, CAPE, ISLAND, islandR, MAP_VIEW, DECKS, LIGHTHOUSE, ARCH, MOORINGS } from './terrain.js';
 import { createWater, createFoamRings } from './water.js';
 import { buildScenery, FOAM_SPOTS } from './scenery.js';
 import { patchSurface, surfaceU, detailTexture } from './surface.js';
@@ -41,74 +41,97 @@ export function sunDirection(h, out) {
 }
 const MOON = new THREE.Vector3(-0.45, 0.62, -0.5).normalize();
 
-function buildTerrain() {
-  const nx = 230;
-  const nz = 190;
-  const { x0, x1, z0, z1 } = BOUNDS;
+const TERRAIN_MAT = patchSurface(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96 }), { terrain: true });
+const C = (hex) => new THREE.Color(hex);
+const sand = C('#f2e2b3');
+const sandWet = C('#e6d6a6');
+const sandWhite = C('#fbf3d6');
+const seabed = C('#9db9ad');
+const grassA = C('#74c44e');
+const grassB = C('#5aae44');
+const grassC = C('#96d466');
+const dune = C('#b9d27a');
+const rockA = C('#8d95a1');
+const rockB = C('#a7adb7');
+const path = C('#dccb93');
+/** Цвет земли в точке: песок, трава, камень, дно. ny — насколько склон пологий (1 — ровно). */
+function groundTint(c, x, y, z, ny) {
+  const nz1 = fbm2(x * 0.11, z * 0.11, 3);
+  const nz2 = fbm2(x * 0.5 + 9, z * 0.5 + 4, 2);
+  const pr = palmR(x, z);
+  if (pr < 3.4) {
+    // Пальмовый остров: белый песок, в середине — редкая трава на дюне; под водой песок светлый — отмель бирюзовая
+    if (y < -0.1) c.lerpColors(sandWhite, seabed, sstep(-2.5, -11, y)).multiplyScalar(0.95 + nz2 * 0.1);
+    else {
+      c.lerpColors(sandWet, sandWhite, sstep(-0.1, 0.5, y)).multiplyScalar(0.95 + nz2 * 0.08);
+      c.lerp(dune, sstep(1.25, 2.2, y + (nz1 - 0.5) * 0.9) * 0.8);
+    }
+    return;
+  }
+  const d = z - shoreZ(x);
+  const isl = Math.hypot(x - ISLAND.x, z - ISLAND.z) < 40;
+  const inBay = x > BOUNDS.x0 && x < BOUNDS.x1 && z > BOUNDS.z0 && z < BOUNDS.z1;
+  if (y < -0.12 || !inBay) {
+    c.lerpColors(sandWet, seabed, sstep(-0.3, -8, y));
+    if (ny < 0.8) c.lerp(rockA, clamp((0.8 - ny) * 2.2, 0, 0.8));
+    c.multiplyScalar(0.93 + nz2 * 0.12);
+  } else if (capeDist(x, z) < CAPE.r + 3.2 && d < 1) {
+    c.lerpColors(rockA, rockB, nz2).multiplyScalar(0.92 + nz1 * 0.14);
+  } else if (ny < (isl ? 0.74 : 0.5)) {
+    c.lerpColors(rockA, rockB, nz2).multiplyScalar((0.84 + nz1 * 0.22) * (0.94 + 0.08 * Math.sin(y * 2.4 + nz1 * 5)));
+  } else if (y < 0.85 + nz1 * 0.5 && !isl) {
+    c.lerpColors(sand, sandWet, sstep(0.5, -0.1, y)).multiplyScalar(0.95 + nz2 * 0.08);
+  } else {
+    c.lerpColors(grassA, grassB, sstep(0.3, 0.7, nz1));
+    c.lerp(grassC, sstep(0.55, 0.9, nz2) * 0.5);
+    if (isl && ny < 0.9) c.lerp(rockA, clamp((0.9 - ny) * 3, 0, 0.7));
+    else if (!isl && ny < 0.64) c.lerp(rockA, clamp((0.64 - ny) * 4, 0, 0.6));
+    if (x > -56 && x < 49 && d > 2.2 && d < 14) c.lerp(path, 0.8 * Math.exp(-(((d - 7.6) / 1.5) ** 2)) * (0.75 + 0.25 * nz2));
+    if (d > 0 && d < 4.2) c.lerp(sand, sstep(4.2, 2.2, d) * 0.85);
+  }
+}
+/** Кусок рельефа: сетка по groundH с цветом по вершинам. */
+function buildGround(x0, x1, z0, z1, nx, nz) {
   const geo = new THREE.PlaneGeometry(x1 - x0, z1 - z0, nx, nz);
   geo.rotateX(-Math.PI / 2);
   geo.translate((x0 + x1) / 2, 0, (z0 + z1) / 2);
   const p = geo.attributes.position;
-  const uv = geo.attributes.uv;
-  for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i);
-    const z = p.getZ(i);
-    let h = groundH(x, z);
-    // края карты уходят под воду, чтобы земля не обрывалась в пустоту
-    const taper = Math.min(sstep(x1 - 2, x1 - 45, x), sstep(x0 + 2, x0 + 30, x), sstep(z0 + 2, z0 + 20, z));
-    if (h > -2) h = lerp(-2, h, taper);
-    p.setY(i, h);
-    uv.setXY(i, x / 6.5, z / 6.5);
-  }
+  for (let i = 0; i < p.count; i++) p.setY(i, groundH(p.getX(i), p.getZ(i)));
+  geo.deleteAttribute('uv');
   geo.computeVertexNormals();
   const n = geo.attributes.normal;
   const colors = new Float32Array(p.count * 3);
-  const C = (hex) => new THREE.Color(hex);
-  const sand = C('#f2e2b3');
-  const sandWet = C('#e6d6a6');
-  const seabed = C('#9db9ad');
-  const grassA = C('#74c44e');
-  const grassB = C('#5aae44');
-  const grassC = C('#96d466');
-  const rockA = C('#8d95a1');
-  const rockB = C('#a7adb7');
-  const path = C('#dccb93');
   const c = new THREE.Color();
   for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i);
-    const y = p.getY(i);
-    const z = p.getZ(i);
-    const ny = n.getY(i);
-    const nz1 = fbm2(x * 0.11, z * 0.11, 3);
-    const nz2 = fbm2(x * 0.5 + 9, z * 0.5 + 4, 2);
-    const d = z - shoreZ(x);
-    const isl = Math.hypot(x - ISLAND.x, z - ISLAND.z) < 40;
-    if (y < -0.12) {
-      c.lerpColors(sandWet, seabed, sstep(-0.3, -8, y));
-      if (ny < 0.8) c.lerp(rockA, clamp((0.8 - ny) * 2.2, 0, 0.8));
-      c.multiplyScalar(0.93 + nz2 * 0.12);
-    } else if (capeDist(x, z) < CAPE.r + 3.2 && d < 1) {
-      c.lerpColors(rockA, rockB, nz2).multiplyScalar(0.92 + nz1 * 0.14);
-    } else if (ny < (isl ? 0.74 : 0.5)) {
-      c.lerpColors(rockA, rockB, nz2).multiplyScalar((0.84 + nz1 * 0.22) * (0.94 + 0.08 * Math.sin(y * 2.4 + nz1 * 5)));
-    } else if (y < 0.85 + nz1 * 0.5 && !isl) {
-      c.lerpColors(sand, sandWet, sstep(0.5, -0.1, y)).multiplyScalar(0.95 + nz2 * 0.08);
-    } else {
-      c.lerpColors(grassA, grassB, sstep(0.3, 0.7, nz1));
-      c.lerp(grassC, sstep(0.55, 0.9, nz2) * 0.5);
-      if (isl && ny < 0.9) c.lerp(rockA, clamp((0.9 - ny) * 3, 0, 0.7));
-      else if (!isl && ny < 0.64) c.lerp(rockA, clamp((0.64 - ny) * 4, 0, 0.6));
-      if (x > -56 && x < 49 && d > 2.2 && d < 14) c.lerp(path, 0.8 * Math.exp(-(((d - 7.6) / 1.5) ** 2)) * (0.75 + 0.25 * nz2));
-      if (d > 0 && d < 4.2) c.lerp(sand, sstep(4.2, 2.2, d) * 0.85);
-    }
+    groundTint(c, p.getX(i), p.getY(i), p.getZ(i), n.getY(i));
     colors[i * 3] = c.r;
     colors[i * 3 + 1] = c.g;
     colors[i * 3 + 2] = c.b;
   }
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  const m = new THREE.Mesh(geo, patchSurface(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96 }), { terrain: true }));
+  const m = new THREE.Mesh(geo, TERRAIN_MAT);
   m.receiveShadow = true;
   return m;
+}
+function buildTerrain() {
+  const { x0, x1, z0, z1 } = BOUNDS;
+  const g = new THREE.Group();
+  // большой остров с бухтой — подробно
+  g.add(buildGround(x0, x1, z0, z1, 230, 230));
+  // Пальмовый остров с отмелью и отмель с кораблём — отдельными кусками (без нахлёста на большой остров)
+  g.add(buildGround(BOUNDS.x1, PALM.x + 126, PALM.z - 90, PALM.z + 90, 142, 112));
+  g.add(buildGround(WRECK.x - 60, WRECK.x + 60, WRECK.z - 60, BOUNDS.z0, 50, 44));
+  // ровное дно под всем остальным морем: без него сквозь воду за краем подробного рельефа просвечивает пустота
+  const far = new THREE.PlaneGeometry(4000, 4000);
+  far.rotateX(-Math.PI / 2);
+  far.translate(0, -14.75, 0);
+  const col = new Float32Array(12);
+  const c = new THREE.Color().copy(seabed).multiplyScalar(0.98);
+  for (let i = 0; i < 4; i++) col.set([c.r, c.g, c.b], i * 3);
+  far.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  far.deleteAttribute('uv');
+  g.add(new THREE.Mesh(far, TERRAIN_MAT));
+  return g;
 }
 
 const SKY_VERT = /* glsl */ `varying vec3 vDir; void main(){ vDir = position; vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position = p.xyww; }`;
@@ -334,6 +357,7 @@ export class World {
 
   update(dt, t, camera) {
     this.water.uniforms.uTime.value = t;
+    this.water.follow(camera);
     surfaceU.uTimeS.value = t;
     this.skyU.uTime.value = t;
     this.sky.position.copy(camera.position);
@@ -351,13 +375,22 @@ export class World {
   }
 }
 
-/** Мини-карта: вид бухты сверху, рисуется один раз. */
-export function drawMinimap(size = 256) {
+/** Квадрат, в который помещается всё море: для карты, когда игрок в лодке. */
+export const SEA_VIEW = (() => {
+  const w = Math.max(WORLD.x1 - WORLD.x0, WORLD.z1 - WORLD.z0) + 40;
+  const cx = (WORLD.x0 + WORLD.x1) / 2;
+  const cz = (WORLD.z0 + WORLD.z1) / 2;
+  return { x0: cx - w / 2, x1: cx + w / 2, z0: cz - w / 2, z1: cz + w / 2 };
+})();
+/** Мини-карта: вид сверху, рисуется один раз. view — какой квадрат мира показать (по умолчанию бухта). */
+export function drawMinimap(size = 256, view = MAP_VIEW) {
+  const sea = view !== MAP_VIEW;
   const c = document.createElement('canvas');
   c.width = c.height = size;
   const g = c.getContext('2d');
   const img = g.createImageData(size, size);
-  const { x0, x1, z0, z1 } = MAP_VIEW;
+  const { x0, x1, z0, z1 } = view;
+  const px = (x1 - x0) / size; // метров в точке
   const col = (r, gg, b, i) => {
     img.data[i] = r;
     img.data[i + 1] = gg;
@@ -375,12 +408,14 @@ export function drawMinimap(size = 256) {
         const t = sstep(-0.1, -11, h);
         col(lerp(72, 16, t), lerp(224, 112, t), lerp(214, 196, t), k);
       } else if (h < 0.8) col(240, 224, 176, k);
+      else if (palmR(x, z) < 1) col(236 - n * 16, 226 - n * 10, 170, k);
       else {
-        const hx = groundH(x + 1.2, z) - h;
-        const hz = groundH(x, z + 1.2) - h;
-        const steep = Math.hypot(hx, hz);
-        if (steep > 1.3) col(150 + n * 20, 158 + n * 20, 170 + n * 20, k);
-        else col(96 + n * 36 + hx * 30, 188 + n * 30 + hx * 30, 78 + n * 20, k);
+        const e = Math.max(1.2, px);
+        const hx = groundH(x + e, z) - h;
+        const hz = groundH(x, z + e) - h;
+        const steep = Math.hypot(hx, hz) / e;
+        if (steep > 1.08) col(150 + n * 20, 158 + n * 20, 170 + n * 20, k);
+        else col(96 + n * 36 + (hx / e) * 36, 188 + n * 30 + (hx / e) * 36, 78 + n * 20, k);
       }
     }
   g.putImageData(img, 0, 0);
@@ -390,21 +425,46 @@ export function drawMinimap(size = 256) {
   g.strokeStyle = '#7a5230';
   g.lineWidth = 1;
   for (const d of DECKS) {
-    g.fillRect(X(d.x0), Z(d.z0), X(d.x1) - X(d.x0), Z(d.z1) - Z(d.z0));
-    g.strokeRect(X(d.x0), Z(d.z0), X(d.x1) - X(d.x0), Z(d.z1) - Z(d.z0));
+    g.fillRect(X(d.x0), Z(d.z0), Math.max(1.5, X(d.x1) - X(d.x0)), Math.max(1.5, Z(d.z1) - Z(d.z0)));
+    if (!sea) g.strokeRect(X(d.x0), Z(d.z0), X(d.x1) - X(d.x0), Z(d.z1) - Z(d.z0));
   }
-  g.fillStyle = '#b5533c';
-  g.fillRect(X(-13), Z(10.4), X(-7.2) - X(-13), Z(15.4) - Z(10.4));
+  if (!sea) {
+    g.fillStyle = '#b5533c';
+    g.fillRect(X(-13), Z(10.4), X(-7.2) - X(-13), Z(15.4) - Z(10.4));
+  }
   g.fillStyle = '#fff';
   g.strokeStyle = '#d8402f';
-  g.lineWidth = 2.5;
+  g.lineWidth = sea ? 1.6 : 2.5;
   g.beginPath();
-  g.arc(X(LIGHTHOUSE.x), Z(LIGHTHOUSE.z), 4.5, 0, TAU);
+  g.arc(X(LIGHTHOUSE.x), Z(LIGHTHOUSE.z), sea ? 2.6 : 4.5, 0, TAU);
   g.fill();
   g.stroke();
   g.fillStyle = '#8d95a1';
   g.beginPath();
-  g.ellipse(X(ARCH.x), Z(ARCH.z), 4, 9, -0.35, 0, TAU);
+  const ak = sea ? 0.45 : 1;
+  g.ellipse(X(ARCH.x), Z(ARCH.z), 4 * ak, 9 * ak, -0.35, 0, TAU);
   g.fill();
+  if (sea) {
+    // затонувший корабль: тёмный корпус с мачтой
+    const wx = X(WRECK.x);
+    const wz = Z(WRECK.z);
+    g.fillStyle = '#4a3320';
+    g.strokeStyle = '#f1e7cf';
+    g.lineWidth = 1.2;
+    g.beginPath();
+    g.ellipse(wx, wz, 6, 2.6, -0.5, 0, TAU);
+    g.fill();
+    g.stroke();
+  }
+  // причалы для лодки — тёмные кружки с жёлтой каймой
+  for (const m of MOORINGS) {
+    g.fillStyle = '#0e2140';
+    g.strokeStyle = '#ffd60a';
+    g.lineWidth = 1.5;
+    g.beginPath();
+    g.arc(X(m.x), Z(m.z), sea ? 4.2 : 4.6, 0, TAU);
+    g.fill();
+    g.stroke();
+  }
   return c;
 }

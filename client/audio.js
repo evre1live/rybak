@@ -236,6 +236,71 @@ export class Audio2 {
       this.burst(0.02, 'bandpass', 1500, 900, 0.05, 2);
     } else this.burst(0.09, 'bandpass', 900, 500, heavy ? 0.16 : 0.09, 0.7);
   }
+  /** Лодка ткнулась в берег или камень. */
+  thud(p = 1) {
+    this.burst(0.14, 'lowpass', 240, 90, 0.5 * p, 1.2);
+    this.tone(95, 0.2, 'sine', 0.3 * p, 48);
+  }
+  /** Подвесной мотор: k от 0 (холостой ход) до 1 (полный); k < 0 — заглушить. */
+  motor(k) {
+    if (!this.ctx) return;
+    const c = this.ctx;
+    const t = c.currentTime;
+    if (k < 0) {
+      const e = this.eng;
+      if (!e) return;
+      this.eng = null;
+      e.g.gain.setTargetAtTime(0, t, 0.12);
+      e.lg.gain.setTargetAtTime(0, t, 0.08);
+      e.ng.gain.setTargetAtTime(0, t, 0.12);
+      setTimeout(() => {
+        for (const n of [e.o, e.o2, e.lfo, e.n]) n.stop();
+      }, 700);
+      return;
+    }
+    if (!this.eng) {
+      // два генератора через фильтр — гул; громкость дрожит с частотой вспышек — «тарахтение»; шум — вода за кормой
+      const o = c.createOscillator();
+      o.type = 'sawtooth';
+      const o2 = c.createOscillator();
+      o2.type = 'square';
+      const f = c.createBiquadFilter();
+      f.type = 'lowpass';
+      f.Q.value = 1.4;
+      const g = c.createGain();
+      g.gain.value = 0;
+      const lfo = c.createOscillator();
+      lfo.type = 'square';
+      const lg = c.createGain();
+      lfo.connect(lg);
+      lg.connect(g.gain);
+      o.connect(f);
+      o2.connect(f);
+      f.connect(g);
+      g.connect(this.sfx);
+      const n = this.src(true);
+      const nf = c.createBiquadFilter();
+      nf.type = 'bandpass';
+      nf.frequency.value = 700;
+      nf.Q.value = 0.6;
+      const ng = c.createGain();
+      ng.gain.value = 0;
+      n.connect(nf);
+      nf.connect(ng);
+      ng.connect(this.sfx);
+      for (const x of [o, o2, lfo, n]) x.start();
+      this.eng = { o, o2, f, g, lfo, lg, n, ng };
+    }
+    const e = this.eng;
+    const hz = 34 + k * 58;
+    e.o.frequency.setTargetAtTime(hz, t, 0.12);
+    e.o2.frequency.setTargetAtTime(hz * 0.5, t, 0.12);
+    e.lfo.frequency.setTargetAtTime(9 + k * 30, t, 0.12);
+    e.f.frequency.setTargetAtTime(240 + k * 820, t, 0.12);
+    e.g.gain.setTargetAtTime(0.045 + k * 0.07, t, 0.1);
+    e.lg.gain.setTargetAtTime(0.022 + k * 0.012, t, 0.1);
+    e.ng.gain.setTargetAtTime(k * k * 0.1, t, 0.15);
+  }
   /** Скрип лески: громче и выше с натяжением. T < 0 — выключить. */
   strain(T) {
     if (!this.ctx) return;

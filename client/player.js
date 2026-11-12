@@ -1,4 +1,5 @@
-// Игрок от первого лица: ввод (клавиатура, мышь, геймпад, сенсор), ходьба по причалу и берегу, камера.
+// Игрок от первого лица: ввод (клавиатура, мышь, геймпад, сенсор), ходьба по причалу и берегу, место в лодке, камера.
+import * as THREE from 'three';
 import { canStand, standY, deckAt, groundH, SPAWN } from './terrain.js';
 import { clamp, damp } from './util.js';
 import { settings } from './profile.js';
@@ -173,6 +174,7 @@ export class Input {
 
 export const WALK = 3.9; // шаг, м/с
 export const RUN = 7.2; // бег, м/с
+const _seat = new THREE.Vector3();
 
 export class Player {
   constructor(camera) {
@@ -194,6 +196,7 @@ export class Player {
     this.onStep = () => {};
     this.shake = 0;
     this.run = 0; // 0 — шаг, 1 — бег (плавно)
+    this.boat = null; // лодка, в которой сидим (Boat)
   }
   place(x, z, yaw = 0) {
     this.x = x;
@@ -203,8 +206,38 @@ export class Player {
     this.pitch = -0.06;
     this.sit = false;
   }
+  /** Сидим в лодке: место и качку задаёт она, мы только смотрим по сторонам. Лодку к этому кадру уже подвинули. */
+  updateBoat(dt, input) {
+    const b = this.boat;
+    const sens = 0.0022 * settings.sens;
+    // взгляд поворачивается вместе с лодкой — смотришь на нос, и он остаётся перед глазами
+    this.yaw += b.dyaw - input.lookDX * sens;
+    this.pitch = clamp(this.pitch - input.lookDY * sens * (settings.invertY ? -1 : 1), -1.45, 1.45);
+    b.seat(_seat);
+    this.x = _seat.x;
+    this.y = _seat.y;
+    this.z = _seat.z;
+    this.sit = true;
+    this.dangle = true;
+    this.jump = this.vy = this.wade = this.speed = 0;
+    this.run = damp(this.run, 0, 7, dt);
+    this.eyeNow = damp(this.eyeNow, 0.86, 9, dt);
+    this.shake = Math.max(0, this.shake - dt * 3);
+    const sh = this.shake * 0.012;
+    const k = Math.abs(b.k);
+    this.camera.position.set(this.x + (Math.random() - 0.5) * sh, this.y + this.eyeNow + (Math.random() - 0.5) * sh, this.z);
+    // горизонт чуть кренится вместе с лодкой — куда бы ни смотрел
+    const a = this.yaw - b.yaw;
+    this.camera.rotation.set(this.pitch, this.yaw, (b.vis.roll * Math.cos(a) + b.vis.pitch * Math.sin(a)) * 0.6, 'YXZ');
+    const fov = settings.fov + 6 * k;
+    if (Math.abs(this.camera.fov - fov) > 0.02) {
+      this.camera.fov = fov;
+      this.camera.updateProjectionMatrix();
+    }
+  }
   /** canMove: false, когда леска в воде — стоим на месте, только смотрим. */
   update(dt, input, canMove) {
+    if (this.boat) return this.updateBoat(dt, input);
     const sens = 0.0022 * settings.sens;
     this.yaw -= input.lookDX * sens;
     this.pitch = clamp(this.pitch - input.lookDY * sens * (settings.invertY ? -1 : 1), -1.45, 1.45);

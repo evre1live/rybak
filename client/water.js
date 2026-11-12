@@ -1,6 +1,6 @@
 // Вода бухты: бирюзовая на мели, синяя на глубине, с бликами, сеткой света и пеной у берега.
 import * as THREE from 'three';
-import { groundH, BOUNDS } from './terrain.js';
+import { groundH, BOUNDS, WORLD } from './terrain.js';
 import { surfaceU } from './surface.js';
 
 // три волны: направление (x, z), частота, высота, скорость
@@ -111,12 +111,13 @@ function causticTexture(size = 256, cells = 7) {
   return t;
 }
 // карта глубин: по ней вода знает, где мель, где берег
-function depthTexture(w = 400, h = 330) {
+/** Карта глубин участка B: по ней вода знает, где мель, берег и пена. */
+function depthTexture(B, w, h) {
   const data = new Uint8Array(w * h * 4);
   for (let j = 0; j < h; j++)
     for (let i = 0; i < w; i++) {
-      const x = BOUNDS.x0 + ((i + 0.5) / w) * (BOUNDS.x1 - BOUNDS.x0);
-      const z = BOUNDS.z0 + ((j + 0.5) / h) * (BOUNDS.z1 - BOUNDS.z0);
+      const x = B.x0 + ((i + 0.5) / w) * (B.x1 - B.x0);
+      const z = B.z0 + ((j + 0.5) / h) * (B.z1 - B.z0);
       const d = Math.max(0, Math.min(16, -groundH(x, z)));
       const k = (j * w + i) * 4;
       data[k] = data[k + 1] = data[k + 2] = Math.sqrt(d / 16) * 255;
@@ -129,6 +130,21 @@ function depthTexture(w = 400, h = 330) {
   t.needsUpdate = true;
   return t;
 }
+// всё море — грубее: шаг около 2,5 м
+const FAR = { x0: WORLD.x0 - 60, x1: WORLD.x1 + 60, z0: WORLD.z0 - 60, z1: WORLD.z1 + 60 };
+const boundsVec = (B) => new THREE.Vector4(B.x0, B.z0, 1 / (B.x1 - B.x0), 1 / (B.z1 - B.z0));
+// глубина в точке: в бухте — по подробной карте, дальше — по грубой, у границы плавный переход
+const DEPTH_GLSL = /* glsl */ `
+uniform sampler2D uDepth, uDepthFar;
+uniform vec4 uBounds, uBoundsFar;
+float depthAt(vec2 p) {
+  vec2 uv = (p - uBounds.xy) * uBounds.zw;
+  vec2 e = min(uv, 1.0 - uv) / uBounds.zw;
+  float w = clamp(min(e.x, e.y) / 8.0, 0.0, 1.0);
+  float far = texture2D(uDepthFar, (p - uBoundsFar.xy) * uBoundsFar.zw).r;
+  float near = texture2D(uDepth, clamp(uv, 0.0, 1.0)).r;
+  return mix(far, near, w);
+}`;
 
 const waveGLSL = WAVES.map(([dx, dz, k, a, w], i) => `
   { float ph = dot(p, vec2(${dx.toFixed(3)}, ${dz.toFixed(3)})) * ${k.toFixed(3)} + uTime * ${w.toFixed(3)};
@@ -136,15 +152,14 @@ const waveGLSL = WAVES.map(([dx, dz, k, a, w], i) => `
 
 const VERT = /* glsl */ `
 uniform float uTime;
-uniform sampler2D uDepth;
-uniform vec4 uBounds;
+${DEPTH_GLSL}
 varying vec3 vWorld;
 varying float vAmp;
 void main() {
   vec4 wp = modelMatrix * vec4(position, 1.0);
   vec2 p = wp.xz; float h = 0.0; vec2 g = vec2(0.0);
   ${waveGLSL}
-  float dv = texture2D(uDepth, (p - uBounds.xy) * uBounds.zw).r;
+  float dv = depthAt(p);
   float t = clamp((dv * dv * 16.0 - 0.4) / 5.6, 0.0, 1.0);
   vAmp = 0.12 + 0.88 * t * t * (3.0 - 2.0 * t);
   wp.y += h * vAmp;
@@ -154,9 +169,9 @@ void main() {
 const FRAG = /* glsl */ `
 precision highp float;
 uniform float uTime, uGlitter, uFogNear, uFogFar;
-uniform sampler2D uDepth, uNormal, uCaustic, uDet;
+uniform sampler2D uNormal, uCaustic, uDet;
 uniform float uCloudK;
-uniform vec4 uBounds;
+${DEPTH_GLSL}
 uniform vec3 uShallow, uDeep, uSkyZen, uSkyHor, uSunDir, uSunCol, uFogCol;
 varying vec3 vWorld;
 varying float vAmp;
@@ -165,8 +180,7 @@ void main() {
   vec2 p = vWorld.xz; float h = 0.0; vec2 g = vec2(0.0);
   ${waveGLSL}
   g *= vAmp;
-  vec2 uv = (p - uBounds.xy) * uBounds.zw;
-  float dv = texture2D(uDepth, uv).r;
+  float dv = depthAt(p);
   float depth = dv * dv * 16.0;
   vec3 n1 = texture2D(uNormal, p * 0.045 + uTime * vec2(0.012, 0.008)).xyz * 2.0 - 1.0;
   vec3 n2 = texture2D(uNormal, p * 0.13 + uTime * vec2(-0.017, 0.012)).xyz * 2.0 - 1.0;
@@ -238,8 +252,9 @@ export function createWater() {
   geo.setIndex(idx);
   const uniforms = {
     uTime: { value: 0 }, uGlitter: { value: 1 }, uFogNear: { value: 150 }, uFogFar: { value: 1400 },
-    uDepth: { value: depthTexture() }, uNormal: { value: normalTexture() }, uCaustic: { value: causticTexture() }, uDet: surfaceU.uDet, uCloudK: surfaceU.uCloudK,
-    uBounds: { value: new THREE.Vector4(BOUNDS.x0, BOUNDS.z0, 1 / (BOUNDS.x1 - BOUNDS.x0), 1 / (BOUNDS.z1 - BOUNDS.z0)) },
+    uDepth: { value: depthTexture(BOUNDS, 400, 400) }, uDepthFar: { value: depthTexture(FAR, Math.round((FAR.x1 - FAR.x0) / 2.5), Math.round((FAR.z1 - FAR.z0) / 2.5)) },
+    uNormal: { value: normalTexture() }, uCaustic: { value: causticTexture() }, uDet: surfaceU.uDet, uCloudK: surfaceU.uCloudK,
+    uBounds: { value: boundsVec(BOUNDS) }, uBoundsFar: { value: boundsVec(FAR) },
     uShallow: { value: new THREE.Color('#35e0d4') }, uDeep: { value: new THREE.Color('#1273c4') },
     uSkyZen: { value: new THREE.Color('#1f7fe0') }, uSkyHor: { value: new THREE.Color('#a6dcff') },
     uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uSunCol: { value: new THREE.Color('#fff4e0') }, uFogCol: { value: new THREE.Color('#a6dcff') }
@@ -249,13 +264,15 @@ export function createWater() {
   m.position.set(5, 0, -40);
   m.frustumCulled = false;
   m.renderOrder = 2;
-  return { mesh: m, uniforms };
+  // густая середина сетки следует за камерой (шагами в одну ячейку): волны под лодкой настоящие и далеко от бухты
+  const CELL = (190 * 2) / n;
+  const follow = (cam) => m.position.set(Math.round(cam.position.x / CELL) * CELL, 0, Math.round(cam.position.z / CELL) * CELL);
+  return { mesh: m, uniforms, follow };
 }
 
 const RING_VERT = /* glsl */ `
 uniform float uTime;
-uniform sampler2D uDepth;
-uniform vec4 uBounds;
+${DEPTH_GLSL}
 attribute float aSeed;
 varying vec2 vUv;
 varying float vSeed;
@@ -264,7 +281,7 @@ void main() {
   vec4 wp = vec4(position, 1.0);
   vec2 p = wp.xz; float h = 0.0; vec2 g = vec2(0.0);
   ${waveGLSL}
-  float dv = texture2D(uDepth, (p - uBounds.xy) * uBounds.zw).r;
+  float dv = depthAt(p);
   float t = clamp((dv * dv * 16.0 - 0.4) / 5.6, 0.0, 1.0);
   wp.y += h * (0.12 + 0.88 * t * t * (3.0 - 2.0 * t)) + 0.012;
   vUv = uv; vSeed = aSeed;
@@ -319,7 +336,7 @@ export function createFoamRings(spots, wU) {
   geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   geo.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
   geo.setIndex(idx);
-  const uniforms = { uTime: wU.uTime, uDepth: wU.uDepth, uBounds: wU.uBounds, uNormal: wU.uNormal, uGlitter: wU.uGlitter, uSkyHor: wU.uSkyHor };
+  const uniforms = { uTime: wU.uTime, uDepth: wU.uDepth, uBounds: wU.uBounds, uDepthFar: wU.uDepthFar, uBoundsFar: wU.uBoundsFar, uNormal: wU.uNormal, uGlitter: wU.uGlitter, uSkyHor: wU.uSkyHor };
   const m = new THREE.Mesh(geo, new THREE.ShaderMaterial({ uniforms, vertexShader: RING_VERT, fragmentShader: RING_FRAG, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
   m.frustumCulled = false;
   m.renderOrder = 3;

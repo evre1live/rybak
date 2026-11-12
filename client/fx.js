@@ -7,6 +7,7 @@ const RINGS = 24;
 const DROPS = 520;
 const PUFFS = 10;
 const FOAMS = 8;
+const WAKES = 48;
 
 const DROP_VERT = /* glsl */ `
 attribute float aSize;
@@ -65,6 +66,24 @@ const foamTex = () =>
     }
   });
 
+const wakeTex = () =>
+  canvasTex(128, 128, (g) => {
+    // взбитая вода за кормой: сплошное пятно из пузырей, к краям редеет
+    for (let i = 0; i < 90; i++) {
+      const a = (i * 2.399) % 6.283;
+      const d = Math.sqrt((i * 0.618) % 1) * 46;
+      const x = 64 + Math.cos(a) * d;
+      const y = 64 + Math.sin(a) * d;
+      const rr = 7 + ((i * 29) % 13);
+      const gr = g.createRadialGradient(x, y, 0, x, y, rr);
+      gr.addColorStop(0, 'rgba(255,255,255,0.5)');
+      gr.addColorStop(0.5, 'rgba(255,255,255,0.22)');
+      gr.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = gr;
+      g.fillRect(x - rr, y - rr, rr * 2, rr * 2);
+    }
+  });
+
 export class Fx {
   constructor(scene) {
     const geo = new THREE.RingGeometry(0.84, 1, 40);
@@ -115,6 +134,18 @@ export class Fx {
       scene.add(m);
       this.foams.push({ m, t: 0, life: 0, size: 1 });
     }
+    // след за лодкой: пятна пены, которые расходятся и тают
+    const wt = wakeTex();
+    this.wakes = [];
+    for (let i = 0; i < WAKES; i++) {
+      const m = new THREE.Mesh(fg, new THREE.MeshBasicMaterial({ map: wt, transparent: true, opacity: 0, depthWrite: false }));
+      m.visible = false;
+      m.renderOrder = 3;
+      m.rotation.y = i * 2.1;
+      scene.add(m);
+      this.wakes.push({ m, t: 0, life: 0, size: 1 });
+    }
+    this.nextWake = 0;
     this.next = 0;
     this.nextRing = 0;
     this.nextPuff = 0;
@@ -128,6 +159,17 @@ export class Fx {
     for (const p of this.puffs) p.s.material.color.setScalar(v);
     for (const f of this.foams) f.m.material.color.setScalar(v);
     for (const r of this.rings) r.m.material.color.setScalar(v);
+    for (const w of this.wakes) w.m.material.color.setScalar(v);
+  }
+  /** Пятно пены за кормой лодки. */
+  wake(x, z, size = 1, life = 2.9) {
+    const w = this.wakes[this.nextWake++ % WAKES];
+    w.m.position.set(x, 0.03, z);
+    w.t = 0;
+    w.life = life;
+    w.size = size;
+    w.m.visible = true;
+    w.m.material.opacity = 0;
   }
   ripple(x, z, size = 1, life = 1.3, delay = 0) {
     const r = this.rings[this.nextRing++ % RINGS];
@@ -229,6 +271,19 @@ export class Fx {
       f.m.scale.set(s, 1, s);
       f.m.position.y = waveH(f.m.position.x, f.m.position.z, t) + 0.03;
       f.m.material.opacity = 0.8 * (1 - k) * Math.min(1, k * 6);
+    }
+    for (const w of this.wakes) {
+      if (!w.m.visible) continue;
+      w.t += dt;
+      const k = w.t / w.life;
+      if (k >= 1) {
+        w.m.visible = false;
+        continue;
+      }
+      const s = w.size * (0.55 + 1.5 * Math.sqrt(k));
+      w.m.scale.set(s, 1, s);
+      w.m.position.y = waveH(w.m.position.x, w.m.position.z, t) + 0.03;
+      w.m.material.opacity = 0.62 * Math.pow(1 - k, 1.6) * Math.min(1, k * 12);
     }
     let any = false;
     for (let i = 0; i < DROPS; i++) {

@@ -133,6 +133,28 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
   await shot(a, 'c05-friend-catch', 200);
   await G(b, () => { clearInterval(window.__bot); RYBAK.input.primary = false; RYBAK.input.keys.clear(); });
 
+  // лодка: Нори берёт её у пирса и отходит; Жамшид видит лодку, подругу на банке и запись в ленте
+  await G(b, () => { const g = RYBAK; g.fishing.reelIn(true); g.input.locked = true; g.input.enabled = true; g.player.place(0.9, -12, -Math.PI / 2); });
+  await b.waitForFunction(() => /ЛОДКА НАПРОКАТ/.test(document.querySelector('#prompt').textContent), null, { timeout: 20000 });
+  await G(b, () => RYBAK.input.pressed.add('KeyE'));
+  await b.waitForFunction(() => RYBAK.boat.active);
+  await a.waitForFunction(() => /Нори.*берёт лодку/.test(document.querySelector('#feed').textContent), null, { timeout: 20000 });
+  await a.waitForFunction(() => { const p = [...RYBAK.players.values()][0]; const r = p.remote; return p.st && p.st[16] === 1 && r.boat && r.boat.group.visible && (p.st[11] & 1) && Math.abs(r.char.group.position.y - p.st[1]) < 0.25; }, null, { timeout: 20000 });
+  await G(a, () => { const g = RYBAK; g.player.place(1.2, -7.5, -0.56); g.player.pitch = -0.25; });
+  await a.waitForFunction(() => { const r = [...RYBAK.players.values()][0].remote; return !r.boat || r.boat.model !== false; }, null, { timeout: 60000 }).catch(() => {});
+  await shot(a, 'c06-friend-boat', 500);
+  // свою лодку Жамшид видит у пирса по-прежнему: у каждого она своя
+  assert.ok(await G(a, () => !RYBAK.boat.active && RYBAK.boat.moor === 0 && RYBAK.boat.vis.group.visible), 'своя лодка на месте');
+  await G(b, () => RYBAK.input.keys.add('KeyW'));
+  await a.waitForFunction(() => { const p = [...RYBAK.players.values()][0]; const r = p.remote; return p.st && Math.hypot(p.st[0] - 4, p.st[2] + 12) > 25 && r.boat && Math.hypot(r.boat.group.position.x - p.st[0], r.boat.group.position.z - p.st[2]) < 4; }, null, { timeout: 40000 });
+  await G(b, () => RYBAK.input.keys.delete('KeyW'));
+  // подруга оставила лодку у причала маяка — она стоит там и для Жамшида; вернула — лодка исчезла
+  await G(b, () => RYBAK.dock(1));
+  await a.waitForFunction(() => { const p = [...RYBAK.players.values()][0]; const r = p.remote; return p.st && p.st[16] === 3 && !(p.st[11] & 1) && r.boat && Math.hypot(r.boat.group.position.x + 17.5, r.boat.group.position.z + 68.4) < 12; }, null, { timeout: 20000 });
+  await G(b, () => RYBAK.goHome());
+  await a.waitForFunction(() => { const p = [...RYBAK.players.values()][0]; return p.st && p.st[16] === 0 && !p.remote.boat; }, null, { timeout: 20000 });
+  console.log('  лодка друга: видна на ходу и у причала, после возврата исчезает');
+
   // обрыв связи у друга: он пропадает и возвращается на своё место
   const slot = await G(b, () => RYBAK.me.slot);
   await G(b, () => RYBAK.net.ws.close());

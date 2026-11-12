@@ -5,7 +5,7 @@ import { itemIcon, fishIcon, faceIcon } from './icons.js';
 import { heroes } from './hero.js';
 import { OPTIONS, COLOR_KEYS, PRESETS, randomLook, fixLook } from './character.js';
 import { MARKS, markSvg } from './proto.js';
-import { MAP_VIEW, MARKET } from './terrain.js';
+import { MAP_VIEW, MARKET, MOORINGS, WRECK } from './terrain.js';
 import { settings, saveSettings } from './profile.js';
 import { $, $$, el, esc, clamp } from './util.js';
 
@@ -274,33 +274,71 @@ export class UI {
     g.lineTo(W / 2, 17);
     g.fill();
   }
-  minimap(me, others, schools) {
+  /** view — какой квадрат мира на карте: бухта или всё море; boat — где ждёт своя лодка (если мы не в ней). */
+  minimap(me, others, schools, view = MAP_VIEW, boat = null) {
     const g = this.map;
-    if (!this.mapBase) return;
-    g.drawImage(this.mapBase, 0, 0);
-    const X = (x) => ((x - MAP_VIEW.x0) / (MAP_VIEW.x1 - MAP_VIEW.x0)) * 256;
-    const Z = (z) => ((z - MAP_VIEW.z0) / (MAP_VIEW.z1 - MAP_VIEW.z0)) * 256;
+    const sea = view !== MAP_VIEW;
+    const base = sea ? this.g.seaMap() : this.mapBase;
+    if (!base) return;
+    g.drawImage(base, 0, 0);
+    const X = (x) => ((x - view.x0) / (view.x1 - view.x0)) * 256;
+    const Z = (z) => ((z - view.z0) / (view.z1 - view.z0)) * 256;
     if (schools) {
+      const k = sea ? 0.55 : 1;
       g.fillStyle = 'rgba(8,40,70,.75)';
       for (const s of schools) {
         if (s.on < 0.5) continue;
         g.beginPath();
-        g.ellipse(X(s.x), Z(s.z), 7, 4, 0, 0, 7);
+        g.ellipse(X(s.x), Z(s.z), 7 * k, 4 * k, 0, 0, 7);
         g.fill();
         g.beginPath();
-        g.moveTo(X(s.x) + 6, Z(s.z));
-        g.lineTo(X(s.x) + 12, Z(s.z) - 4);
-        g.lineTo(X(s.x) + 12, Z(s.z) + 4);
+        g.moveTo(X(s.x) + 6 * k, Z(s.z));
+        g.lineTo(X(s.x) + 12 * k, Z(s.z) - 4 * k);
+        g.lineTo(X(s.x) + 12 * k, Z(s.z) + 4 * k);
         g.fill();
       }
     }
-    g.fillStyle = '#ffd60a';
     g.strokeStyle = '#0a1a33';
     g.lineWidth = 2;
-    g.beginPath();
-    g.arc(X(MARKET.x - 4), Z(MARKET.z), 5, 0, 7);
-    g.fill();
-    g.stroke();
+    if (!sea) {
+      g.fillStyle = '#ffd60a';
+      g.beginPath();
+      g.arc(X(MARKET.x - 4), Z(MARKET.z), 5, 0, 7);
+      g.fill();
+      g.stroke();
+      // куда можно доплыть: причалы и корабль за краем карты — жёлтые стрелки у рамки
+      for (const m of [...MOORINGS, WRECK]) {
+        const mx = X(m.x);
+        const mz = Z(m.z);
+        if (mx > 0 && mx < 256 && mz > 0 && mz < 256) continue;
+        const a = Math.atan2(mz - 128, mx - 128);
+        g.save();
+        g.translate(Math.max(9, Math.min(247, mx)), Math.max(9, Math.min(247, mz)));
+        g.rotate(a);
+        g.fillStyle = '#ffd60a';
+        g.beginPath();
+        g.moveTo(8, 0);
+        g.lineTo(-5, -6);
+        g.lineTo(-5, 6);
+        g.closePath();
+        g.stroke();
+        g.fill();
+        g.restore();
+      }
+    }
+    if (boat) {
+      // своя лодка ждёт у причала
+      g.save();
+      g.translate(X(boat.x), Z(boat.z));
+      g.rotate(-boat.yaw);
+      g.fillStyle = '#fff';
+      g.lineWidth = 1.6;
+      g.beginPath();
+      g.ellipse(0, 0, sea ? 2.6 : 3.4, sea ? 5 : 7, 0, 0, 7);
+      g.fill();
+      g.stroke();
+      g.restore();
+    }
     const shape = (x, y, m, r) => {
       g.fillStyle = m.color;
       g.strokeStyle = '#0a1a33';
@@ -321,7 +359,8 @@ export class UI {
       g.stroke();
       g.fill();
     };
-    for (const o of others) shape(X(o.x), Z(o.z), MARKS[o.slot % 8], 9);
+    // друзья за краем карты прижимаются к рамке — видно, в какой они стороне
+    for (const o of others) shape(Math.max(8, Math.min(248, X(o.x))), Math.max(8, Math.min(248, Z(o.z))), MARKS[o.slot % 8], sea ? 7 : 9);
     // я — белая стрелка по направлению взгляда
     g.save();
     g.translate(X(me.x), Z(me.z));
@@ -683,6 +722,7 @@ export class UI {
       <button class="btn" data-a="open" data-p="help"><span>КАК ИГРАТЬ</span></button>
       <button class="btn" data-a="open" data-p="settings"><span>НАСТРОЙКИ</span></button>
       ${g.solo ? '' : `<button class="btn cy" data-a="copy"><span>${ic('link')} ССЫЛКА ДЛЯ ДРУЗЕЙ · ${esc(g.code)}</span></button>`}
+      ${g.boat.rented ? '<button class="btn" data-a="home"><span>ВЕРНУТЬСЯ В БУХТУ · СДАТЬ ЛОДКУ</span></button>' : ''}
       <button class="btn ghost" data-a="tolobby"><span>${g.solo ? 'В ЛОББИ' : 'В ЛОББИ К КОМАНДЕ'}</span></button></div>`;
   }
   renderHelp() {
@@ -697,6 +737,7 @@ export class UI {
         <span>${k('МОТАЙ')}</span><span><b>Вываживание:</b> держите кнопку — мотаете, отпускаете — леска слабеет. Стрелка натяжения должна быть в голубой зоне. Рыба рванула вбок — ведите джойстик в другую сторону.</span>
         <span>${k('СМОТАТЬ', 'g')}</span><span>Вернуть снасть. После улова рядом появится «ОТПУСТИТЬ» — за это дают больше опыта.</span>
         <span>${k('РЫНОК')}</span><span>Кнопка появляется у лавки на берегу: продать улов, купить удочки, леску, наживку.</span>
+        <span>${k('ЛОДКА')}</span><span>Подойдите к лодке у пирса — её дают напрокат. Джойстик вперёд — ход, в стороны — руль. Рыбачить можно прямо с борта: в открытом море, у затонувшего корабля, в лагуне Пальмового острова.</span>
         <span>${k('СНАСТИ', 'x')}</span><span>Панель внизу экрана: нажмите на наживку — сменить её, на удочку — открыть все снасти.</span>
         <span>${k('☰', 'g')}</span><span>Меню: журнал рыб, персонаж, настройки. Плашка «ГОЛОС» справа сверху включает и выключает микрофон.</span>
       </div>
@@ -713,6 +754,7 @@ export class UI {
         <span>${k('ЛКМ')}${k('A', 'g')}${k('D', 'g')}</span><span><b>Вываживание:</b> держите кнопку — мотаете, отпускаете — леска слабеет. Стрелка натяжения должна быть в голубой зоне. В красной леска рвётся, в жёлтой рыба сходит. Рванула вбок — ведите удочку в другую сторону.</span>
         <span>${k('ПКМ', 'x')} / ${k('R', 'b')}</span><span>Смотать леску. После улова ${k('R', 'b')} — отпустить рыбу (за это дают больше опыта).</span>
         <span>${k('E')}</span><span>Говорить с торговцем у лавки «Рынок»: продать улов, купить удочки, леску, наживку.</span>
+        <span>${k('E')}</span><span><b>Лодка:</b> подойдите к лодке у пирса — её дают напрокат. ${k('W', 'g')}${k('S', 'g')} — ход, ${k('A', 'g')}${k('D', 'g')} — руль. Рыбачить можно прямо с борта: в открытом море, у затонувшего корабля, в лагуне Пальмового острова. Причалить можно у маяка и на острове.</span>
         <span>${k('TAB', 'x')} ${k('Q', 'x')}</span><span>Снасти и набор. ${k('Q', 'x')} — быстро сменить наживку.</span>
         <span>${k('J', 'g')} ${k('C', 'g')}</span><span>Журнал рыб и редактор персонажа.</span>
         <span>${k('M', 'g')} ${k('V', 'g')} ${k('ENTER', 'g')}</span><span>Микрофон вкл/выкл, говорить по кнопке, написать в чат.</span>
@@ -759,6 +801,7 @@ export class UI {
       case 'start': return g.enterWorld();
       case 'leave': return g.leaveRoom();
       case 'tolobby': return g.toLobby();
+      case 'home': return g.goHome();
       case 'voice': return g.toggleVoice();
       case 'copy': return g.copyLink();
       case 'cat':

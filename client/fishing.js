@@ -35,6 +35,7 @@ export class Fishing {
     this.catch = null;
     this.landT = 0;
     this.reeling = false;
+    this.minD = 2.2; // ближе этого поплавок не кладём; из лодки — дальше, чтобы не упал на нос
     this.refreshGear();
   }
 
@@ -78,7 +79,7 @@ export class Fishing {
     const hx = dir.x / (Math.hypot(dir.x, dir.z) || 1);
     const hz = dir.z / (Math.hypot(dir.x, dir.z) || 1);
     a.clamped = d > max;
-    d = clamp(d, 2.2, max);
+    d = clamp(d, this.minD, max);
     // если под прицелом берег или настил — отступаем дальше по лучу до воды
     let spot = null;
     for (let i = 0; i < 14 && !spot; i++) {
@@ -135,6 +136,7 @@ export class Fishing {
     const p = this.profile;
     this.t += dt;
     this.reeling = false;
+    this.minD = player.boat ? 3.4 : 2.2;
     const st = this.state;
     if (st === 'idle' || st === 'charge') this.updateAim(player);
 
@@ -153,7 +155,7 @@ export class Fishing {
         if (!this.aim.ok) this.toIdle();
         else {
           const need = this.aim.dist / this.kit.cast;
-          const d = Math.max(2.2, Math.min(this.aim.dist, Math.max(this.power, 0.12) * this.kit.cast));
+          const d = Math.max(this.minD, Math.min(this.aim.dist, Math.max(this.power, 0.12) * this.kit.cast));
           const k = d / this.aim.dist;
           this.target.x = player.x + (this.aim.x - player.x) * k;
           this.target.z = player.z + (this.aim.z - player.z) * k;
@@ -218,7 +220,7 @@ export class Fishing {
           this.bx -= (dx / dist) * sp;
           this.bz -= (dz / dist) * sp;
           const s = spotAt(this.bx, this.bz);
-          if (dist < 2.8 || !s) {
+          if (dist < this.minD + 0.6 || !s) {
             this.emit('toast', 'Приманка у ног — забрасывайте снова');
             this.reelIn(true);
             return;
@@ -275,7 +277,8 @@ export class Fishing {
       const evs = fightStep(f, { reel: input.hold, steer: input.steer }, dt, this.kit, Math.random);
       this.reeling = input.hold;
       // рыба ходит под водой: ближе по мере вываживания, в рывке уходит вбок
-      const d = 2.4 + (this.startDist - 2.4) * (1 - f.p);
+      const near = this.minD + 0.2;
+      const d = near + (this.startDist - near) * (1 - f.p);
       this.side = damp(this.side, f.phase === 'run' ? f.dir * Math.min(4, d * 0.4) : Math.sin(this.t * 0.9) * 0.6, 2.2, dt);
       const fx = player.x + this.hx * d + -this.hz * this.side;
       const fz = player.z + this.hz * d + this.hx * this.side;
@@ -387,7 +390,7 @@ export class Fishing {
     this.catch = c;
     this.fight = fightInit(c, this.kit, Math.random);
     this.state = 'fight';
-    this.startDist = Math.max(3, dist);
+    this.startDist = Math.max(this.minD + 0.8, dist);
     const dx = this.bx - this.camera.position.x;
     const dz = this.bz - this.camera.position.z;
     const l = Math.hypot(dx, dz) || 1;

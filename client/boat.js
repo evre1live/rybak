@@ -1,0 +1,306 @@
+// Лодка напрокат: модель с мотором, ход по воде, качка, след за кормой.
+//
+// Нос лодки смотрит туда же, куда «вперёд» у игрока (при yaw = 0 — на север, −Z). Рыбак сидит на средней банке.
+// Лодка у каждого своя: её берут у домашнего пирса, она остаётся за игроком, пока тот не вернёт её обратно.
+import * as THREE from 'three';
+import { canSail, MOORINGS, WORLD } from './terrain.js';
+import { waveH } from './water.js';
+import { loadManifest } from './hero.js';
+import { loadModel, spawn, modelInfo } from './models.js';
+import { Batch, M, G, BATCH_MAT } from './batch.js';
+import { GLOSS_MAT, METAL_MAT } from './env.js';
+import { clamp, damp } from './util.js';
+
+export const BOAT_PRICE = 30; // монет за выход; первый выход бесплатный
+const LEN = 4.3; // длина корпуса, м
+const DRAFT = 0.5; // осадка: настолько киль ниже воды
+const BENCH = 1.14; // высота средней банки над килем
+const SEAT_Z = 0.17; // банка чуть ближе к корме от середины
+export const SEAT_BACK = SEAT_Z;
+const RIM = 1.31; // высота борта над килем
+const STERN = 1.5; // верх транца над килем
+export const VMAX = 12.5; // полный ход, м/с
+const VREV = 3.2; // задний ход
+
+/** Простой корпус, пока модель не загрузилась (и в пробной версии без моделей). */
+function fallbackHull() {
+  const g = new THREE.Group();
+  const B = new Batch();
+  B.auto = true;
+  const m = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#efe7d2', roughness: 0.8, side: THREE.DoubleSide }));
+  m.scale.set(1.1, RIM - 0.02, LEN / 2);
+  m.position.y = RIM;
+  m.castShadow = true;
+  m.receiveShadow = true;
+  g.add(m);
+  B.add(G.torus(0.05, 28), '#d9463b', M(0, RIM, 0, 2.2, LEN, 1.6, Math.PI / 2, 0, 0), { mat: 0 });
+  B.add(G.box(), '#a8733f', M(0, 0.7, 0.1, 1.5, 0.05, 3.0)); // пайол
+  B.add(G.box(), '#b97c42', M(0, BENCH - 0.03, SEAT_Z, 1.86, 0.06, 0.5));
+  B.add(G.box(), '#b97c42', M(0, BENCH + 0.08, -1.45, 1.2, 0.06, 0.6));
+  g.add(B.build(BATCH_MAT, true));
+  return g;
+}
+/** Брусок со скруглёнными рёбрами (единичный): k — насколько он близок к шару. */
+let _round = null;
+function roundBox(k = 0.45) {
+  if (_round) return _round;
+  const g = new THREE.BoxGeometry(1, 1, 1, 5, 5, 5);
+  const p = g.attributes.position;
+  const v = new THREE.Vector3();
+  const n = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i);
+    n.copy(v).normalize().multiplyScalar(0.62);
+    v.lerp(n, k);
+    p.setXYZ(i, v.x, v.y, v.z);
+  }
+  g.computeVertexNormals();
+  return (_round = g);
+}
+/** Подвесной мотор. Начало координат — верх транца: колпак над ним, нога с винтом за кормой, румпель смотрит в лодку. */
+function outboard() {
+  const g = new THREE.Group();
+  const gl = new Batch();
+  const me = new Batch();
+  const B = new Batch();
+  // колпак: тёмно-синий, обтекаемый, с белой и красной полосой — в цвет борта
+  gl.add(roundBox(), '#24405f', M(0, 0.4, 0.1, 0.31, 0.36, 0.54));
+  gl.add(G.box(), '#f4f1e8', M(0, 0.27, 0.1, 0.3, 0.05, 0.52), { mat: 0 });
+  gl.add(G.box(), '#d9463b', M(0, 0.22, 0.1, 0.3, 0.035, 0.52), { mat: 0 });
+  gl.add(G.box(), '#1c2129', M(0, 0.12, 0.1, 0.24, 0.2, 0.38));
+  // струбцина на транце, нога, плита над винтом, редуктор, перо
+  B.add(G.box(), '#262b33', M(0, -0.05, 0.0, 0.26, 0.24, 0.14), { mat: 0 });
+  B.add(G.box(), '#262b33', M(0, -0.62, 0.13, 0.09, 1.4, 0.17), { mat: 0 });
+  B.add(G.box(), '#262b33', M(0, -1.2, 0.17, 0.24, 0.025, 0.4), { mat: 0 });
+  B.add(G.sph(10, 8), '#262b33', M(0, -1.35, 0.15, 0.14, 0.14, 0.44), { mat: 0 });
+  B.add(G.box(), '#262b33', M(0, -1.48, 0.15, 0.02, 0.16, 0.2), { mat: 0 });
+  // румпель с рукояткой
+  B.add(G.cyl(7), '#262b33', M(0, 0.22, -0.34, 0.05, 0.7, 0.05, Math.PI / 2 - 0.1, 0, 0), { mat: 0 });
+  B.add(G.cyl(8), '#d9463b', M(0, 0.26, -0.72, 0.07, 0.18, 0.07, Math.PI / 2 - 0.1, 0, 0), { mat: 0 });
+  g.add(gl.build(GLOSS_MAT, true), B.build(BATCH_MAT, true));
+  // винт крутится отдельно
+  for (let i = 0; i < 3; i++) me.add(G.box(), '#d5b25a', M(Math.cos((i / 3) * 6.283) * 0.08, Math.sin((i / 3) * 6.283) * 0.08, 0, 0.14, 0.06, 0.014, 0, 0, (i / 3) * 6.283));
+  const prop = me.build(METAL_MAT, false);
+  prop.position.set(0, -1.35, 0.39);
+  g.add(prop);
+  g.userData.prop = prop;
+  return g;
+}
+
+const _v = new THREE.Vector3();
+
+/** Лодка на воде: только картинка. Ею пользуются и своя лодка, и лодки друзей. */
+export class BoatVisual {
+  constructor(scene) {
+    this.scene = scene;
+    const g = (this.group = new THREE.Group());
+    g.rotation.order = 'YXZ';
+    this.hull = fallbackHull();
+    g.add(this.hull);
+    this.motor = outboard();
+    this.motor.rotation.x = 0.15; // нога чуть подвёрнута под корму, как на настоящем транце
+    this.motor.position.set(0, RIM, LEN / 2 - 0.06);
+    g.add(this.motor);
+    scene.add(g);
+    this.pitch = 0;
+    this.roll = 0;
+    this.y = 0;
+    this.spin = 0;
+    this.model = false;
+    loadManifest().then(() => {
+      if (this.gone || !modelInfo('prop-boat')) return;
+      loadModel('prop-boat').then((tpl) => {
+        if (this.gone) return;
+        const o = spawn(tpl);
+        // у модели длинная сторона вдоль X, нос — в сторону −X: разворачиваем носом к −Z
+        o.rotation.y = -Math.PI / 2;
+        o.scale.setScalar(LEN);
+        g.remove(this.hull);
+        this.hull = o;
+        g.add(o);
+        this.motor.position.set(0, STERN - 0.02, LEN / 2 - 0.1);
+        this.model = true;
+      }, () => {});
+    });
+  }
+  /** Ставит лодку: x, z — середина, yaw — куда смотрит нос; k — ход от −1 до 1, lean — руль от −1 до 1. */
+  pose(x, z, yaw, t, k = 0, lean = 0, dt = 0.016) {
+    const g = this.group;
+    const sn = Math.sin(yaw);
+    const cs = Math.cos(yaw);
+    // качка: высота воды под носом, кормой и бортами
+    const hb = waveH(x - sn * 1.6, z - cs * 1.6, t);
+    const hs = waveH(x + sn * 1.6, z + cs * 1.6, t);
+    const hl = waveH(x - cs * 0.8, z + sn * 0.8, t);
+    const hr = waveH(x + cs * 0.8, z - sn * 0.8, t);
+    const kk = Math.min(1, dt * 7);
+    const sp = Math.abs(k);
+    this.y += ((hb + hs + hl + hr) / 4 - this.y) * kk;
+    // на ходу нос приподнят и лодку слегка потряхивает; в повороте она кренится внутрь
+    this.pitch += ((hb - hs) / 3.2 + 0.06 * Math.max(0, k) + Math.sin(t * 9) * 0.01 * sp - this.pitch) * kk;
+    this.roll += ((hr - hl) / 1.6 - lean * 0.15 + Math.sin(t * 1.3 + x) * 0.012 - this.roll) * kk;
+    g.position.set(x, this.y - DRAFT + sp * 0.07, z);
+    g.rotation.set(this.pitch, yaw, this.roll);
+    this.motor.rotation.y = lean * 0.45;
+    this.spin += dt * (6 + sp * 70) * (k < 0 ? -1 : 1);
+    this.motor.userData.prop.rotation.z = this.spin;
+  }
+  /** Точка на банке, где сидит рыбак (в мире). */
+  seat(out) {
+    return out.set(0, BENCH, SEAT_Z).applyQuaternion(this.group.quaternion).add(this.group.position);
+  }
+  dispose() {
+    this.gone = true;
+    this.scene.remove(this.group);
+  }
+}
+
+/** Куда встаёт у причала чужая лодка: рядом со своей, борт к борту, дальше от настила. n — место игрока в комнате. */
+export function moorSpot(i, n, out) {
+  const m = MOORINGS[i] || MOORINGS[0];
+  const dx = m.x - m.sx;
+  const dz = m.z - m.sz;
+  const l = Math.hypot(dx, dz) || 1;
+  const k = 2.5 * (1 + (n % 4));
+  out.x = m.x + (dx / l) * k;
+  out.z = m.z + (dz / l) * k;
+  out.yaw = m.yaw;
+  return out;
+}
+
+/** Своя лодка: управление и состояние проката. */
+export class Boat {
+  constructor(scene, fx) {
+    this.vis = new BoatVisual(scene);
+    this.fx = fx;
+    this.x = 0;
+    this.z = 0;
+    this.yaw = 0;
+    this.v = 0;
+    this.k = 0; // ход от −1 до 1 — для картинки и звука
+    this.lean = 0;
+    this.dyaw = 0; // на сколько повернули за кадр — на столько же поворачивается взгляд рыбака
+    this.rented = false;
+    this.away = false; // успели отойти от домашнего пирса: вернёмся — лодка сдаётся
+    this.active = false; // рыбак в лодке
+    this.moor = 0; // у какого причала стоит; −1 — в море
+    this.bump = 0;
+    this.onBump = () => {};
+    this.toMooring(0);
+  }
+  toMooring(i) {
+    const m = MOORINGS[i];
+    this.moor = i;
+    this.x = m.x;
+    this.z = m.z;
+    this.yaw = m.yaw;
+    this.v = 0;
+    this.dyaw = 0;
+    this.active = false;
+  }
+  /** Отчалить: рыбак в лодке. */
+  board() {
+    this.active = true;
+    this.moor = -1;
+    this.v = 0;
+    this.dyaw = 0;
+  }
+  /** Ближайший причал, к которому сейчас можно пристать (−1 — нет такого). */
+  mooringNear() {
+    if (Math.abs(this.v) > 6) return -1;
+    let best = -1;
+    let bd = 9;
+    MOORINGS.forEach((m, i) => {
+      const d = Math.hypot(m.x - this.x, m.z - this.z);
+      if (d < bd) {
+        bd = d;
+        best = i;
+      }
+    });
+    return best;
+  }
+  /** Корпус помещается: нос, середина, корма и оба борта на воде. */
+  fits(x, z, yaw) {
+    const sn = Math.sin(yaw);
+    const cs = Math.cos(yaw);
+    return canSail(x, z) && canSail(x - sn * 1.9, z - cs * 1.9) && canSail(x + sn * 1.8, z + cs * 1.8) && canSail(x - cs * 0.8, z + sn * 0.8) && canSail(x + cs * 0.8, z - sn * 0.8);
+  }
+  /** Шаг управления. throttle: 1 — вперёд, −1 — назад; steer: 1 — вправо; brake — леска в воде, глушим ход. */
+  drive(dt, throttle, steer, brake = false) {
+    const target = throttle > 0 ? VMAX * throttle : VREV * throttle;
+    // разгон за пару секунд; без газа лодка ещё катится, но недолго
+    const turning = throttle && this.v && Math.sign(target) !== Math.sign(this.v);
+    this.v += (target - this.v) * (1 - Math.exp(-dt * (brake ? 1.5 : throttle ? (turning ? 1.7 : 0.75) : 0.5)));
+    if (!throttle) {
+      const d = (brake ? 1.6 : 0.6) * dt;
+      this.v = Math.abs(this.v) <= d ? 0 : this.v - Math.sign(this.v) * d;
+    }
+    const sp = Math.abs(this.v);
+    // руль действует только на ходу; на заднем ходу — наоборот
+    const turn = -steer * (0.2 + 0.8 * Math.min(1, sp / 4.5)) * 0.95 * (this.v < -0.1 ? -1 : 1) * Math.min(1, sp / 0.5);
+    const yaw = this.yaw + turn * dt;
+    const nx = this.x - Math.sin(yaw) * this.v * dt;
+    const nz = this.z - Math.cos(yaw) * this.v * dt;
+    this.dyaw = 0;
+    if (this.fits(nx, nz, yaw)) {
+      this.dyaw = yaw - this.yaw;
+      this.x = nx;
+      this.z = nz;
+      this.yaw = yaw;
+    } else if (sp < 2 && this.fits(this.x, this.z, yaw)) {
+      // стоим у преграды: разворачиваемся на месте
+      this.dyaw = yaw - this.yaw;
+      this.yaw = yaw;
+      this.v *= 0.9;
+    } else {
+      // упёрлись: удар и отскок
+      const edge = nx < WORLD.x0 + 4 || nx > WORLD.x1 - 4 || nz < WORLD.z0 + 4 || nz > WORLD.z1 - 4;
+      if (sp > 1.2 && this.bump <= 0) {
+        this.bump = 0.6;
+        this.onBump(sp, edge);
+      }
+      this.v = -this.v * 0.3;
+    }
+    if (this.bump > 0) this.bump -= dt;
+    this.k = clamp(this.v / VMAX, -1, 1);
+    this.lean = damp(this.lean, steer * Math.min(1, sp / 6), 5, dt);
+  }
+  /** Картинка, след и брызги. Вызывать каждый кадр, в том числе когда лодка стоит у причала. */
+  update(dt, t) {
+    if (!this.active) {
+      this.v = 0;
+      this.k = damp(this.k, 0, 4, dt);
+      this.lean = damp(this.lean, 0, 4, dt);
+    }
+    this.vis.pose(this.x, this.z, this.yaw, t, this.k, this.lean, dt);
+    wake(this, this.fx, this.x, this.z, this.yaw, this.v, dt);
+  }
+  seat(out) {
+    return this.vis.seat(out);
+  }
+  /** Что рассылаем друзьям: 0 — лодки нет, 1 — идём на ней, 2 + i — стоит у причала i. */
+  get net() {
+    return this.active ? 1 : this.rented ? 2 + this.moor : 0;
+  }
+}
+
+/** След за кормой и брызги из-под носа. state хранит пройденный путь (поле wakeD). */
+export function wake(state, fx, x, z, yaw, v, dt) {
+  const sp = Math.abs(v);
+  if (!fx || sp < 1) return;
+  state.wakeD = (state.wakeD || 0) + sp * dt;
+  const sn = Math.sin(yaw);
+  const cs = Math.cos(yaw);
+  if (state.wakeD > 1.5) {
+    state.wakeD = 0;
+    const back = v > 0 ? 2.5 : -2.3;
+    fx.wake(x + sn * back, z + cs * back, 0.8 + sp * 0.1);
+  }
+  if (sp > 4.5 && Math.random() < dt * sp * 2.4) {
+    // брызги из-под скул
+    const side = Math.random() < 0.5 ? -1 : 1;
+    const f = Math.sign(v);
+    _v.set(x - sn * 1.5 * f + cs * side * 0.7, 0.2, z - cs * 1.5 * f - sn * side * 0.7);
+    fx.drop(_v.x, _v.y, _v.z, cs * side * (1.2 + Math.random() * 2) - sn * sp * 0.4 * f, 1.2 + Math.random() * 1.8, -sn * side * (1.2 + Math.random() * 2) - cs * sp * 0.4 * f, 0.035 + Math.random() * 0.035, 0.8);
+  }
+}

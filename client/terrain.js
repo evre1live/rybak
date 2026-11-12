@@ -1,5 +1,5 @@
 // Рельеф «Солнечной бухты»: высота земли и дна, причалы, зоны ловли, где можно ходить.
-import { clamp, sstep, fbm2 } from './util.js';
+import { clamp, lerp, sstep, fbm2 } from './util.js';
 
 export const DECK_Y = 1.1;
 export const ISLAND = { x: 22, z: -100 };
@@ -9,7 +9,11 @@ export const REEF = { x: 21, z: -15 };
 export const CAPE = { ax: 32, az: 13, bx: 41, bz: -9, r: 3.6 };
 export const MARKET = { x: -5.6, z: 12.8, r: 3.2 }; // где стоять, чтобы говорить с торговцем
 export const SPAWN = { x: -2, z: 9 };
-export const BOUNDS = { x0: -170, x1: 170, z0: -190, z1: 90 };
+export const BOUNDS = { x0: -170, x1: 170, z0: -190, z1: 150 }; // большой остров с бухтой: здесь подробный рельеф
+export const WORLD = { x0: -330, x1: 420, z0: -440, z1: 185 }; // куда можно доплыть на лодке
+export const PALM = { x: 270, z: -190, rx: 36, rz: 25 }; // Пальмовый остров: полуоси по кромке воды
+export const WRECK = { x: -135, z: -235, r: 24 }; // затонувший корабль на отмели
+export const SEA = { x: 20, z: -60, r: 115 }; // дальше этого круга от бухты — открытое море
 export const MAP_VIEW = { x0: -78, x1: 100, z0: -142, z1: 36 };
 
 // настилы: по ним ходят, с них ловят
@@ -18,7 +22,13 @@ export const DECKS = [
   { id: 'pier', x0: -1.6, x1: 1.6, z0: -22, z1: 4, along: 'z' },
   { id: 'head', x0: -6, x1: 6, z0: -27, z1: -22, along: 'x' },
   { id: 'walk', x0: -29, x1: -14, z0: 7.5, z1: 10.3, along: 'x' },
-  { id: 'west', x0: -35, x1: -29, z0: 5, z1: 12.5, along: 'x' }
+  { id: 'west', x0: -35, x1: -29, z0: 5, z1: 12.5, along: 'x' },
+  // причал у маяка: мостки от скалы и площадка на конце
+  { id: 'lightwalk', x0: -15, x1: -3.2, z0: -75.4, z1: -72.8, along: 'x' },
+  { id: 'light', x0: -20, x1: -15, z0: -78.5, z1: -70, along: 'x' },
+  // Пальмовый остров: мостки с пляжа и площадка на конце
+  { id: 'palmwalk', x0: 214, x1: 245, z0: -191.3, z1: -188.7, along: 'x' },
+  { id: 'palm', x0: 209, x1: 214, z0: -194.5, z1: -185.5, along: 'x' }
 ];
 // препятствия: лавка, ящики, бочки (круги и прямоугольники)
 export const BOXES = [{ x0: -13.4, x1: -6.9, z0: 10.0, z1: 15.7 }];
@@ -26,7 +36,10 @@ export const CIRCLES = [
   { x: -12.4, z: 5.6, r: 0.75 }, { x: -11.2, z: 5.3, r: 0.6 }, { x: 4.6, z: 14.6, r: 0.8 }, { x: 4.9, z: 5.2, r: 0.55 },
   { x: -5.9, z: 15.2, r: 0.55 }, { x: 5.2, z: -26.2, r: 0.45 },
   // ловушки, сети, якорь
-  { x: -5.0, z: -22.9, r: 0.5 }, { x: -29.8, z: 5.8, r: 0.5 }, { x: 4.9, z: 7.5, r: 0.55 }, { x: 7.7, z: 12.6, r: 0.5 }
+  { x: -5.0, z: -22.9, r: 0.5 }, { x: -29.8, z: 5.8, r: 0.5 }, { x: 4.9, z: 7.5, r: 0.55 }, { x: 7.7, z: 12.6, r: 0.5 },
+  // причал у маяка и Пальмовый остров
+  { x: -19.2, z: -71.2, r: 0.42 }, { x: -16.2, z: -77.6, r: 0.5 }, { x: -19.3, z: -77.4, r: 0.5 },
+  { x: 213.2, z: -193.6, r: 0.42 }, { x: 209.9, z: -186.6, r: 0.5 }, { x: 262.5, z: -176.5, r: 0.5 }, { x: 256.6, z: -182.2, r: 0.5 }, { x: 253.6, z: -182.4, r: 0.45 }
 ];
 
 export function shoreZ(x) {
@@ -71,7 +84,56 @@ export function capeDist(x, z) {
   const t = clamp(((x - CAPE.ax) * vx + (z - CAPE.az) * vz) / (vx * vx + vz * vz), 0, 1);
   return Math.hypot(x - CAPE.ax - vx * t, z - CAPE.az - vz * t);
 }
+/** Расстояние до Пальмового острова в «радиусах»: 1 — кромка воды, около 2 — край отмели. */
+export function palmR(x, z) {
+  const dx = (x - PALM.x) / PALM.rx;
+  const dz = (z - PALM.z) / PALM.rz;
+  const q = Math.hypot(dx, dz);
+  if (q > 4) return q;
+  const a = Math.atan2(dz, dx);
+  return q / (1 + 0.1 * Math.sin(3 * a + 0.7) + 0.06 * Math.sin(5 * a + 2));
+}
+function palmH(x, z) {
+  const r = palmR(x, z);
+  if (r > 3.4) return -99;
+  // песчаный купол до 2,6 м; вокруг — бирюзовая отмель до трёх метров глубины, дальше склон в море
+  if (r < 1) return 2.6 * Math.pow(1 - r * r, 0.85) + 0.3 * (fbm2(x * 0.08, z * 0.08, 2) - 0.5) * (1 - r);
+  const lagoon = -0.04 - 3.1 * Math.pow(sstep(1, 2.15, r), 0.8) + 0.5 * (fbm2(x * 0.07 + 3, z * 0.07, 2) - 0.5) * sstep(1.1, 1.6, r);
+  return lerp(lagoon, -14, sstep(2.1, 3.3, r));
+}
+function wreckH(x, z) {
+  const r2 = (x - WRECK.x) ** 2 + (z - WRECK.z) ** 2;
+  if (r2 > 4900) return -99;
+  return -14 + 12.5 * Math.exp(-r2 / 380) + 0.8 * (fbm2(x * 0.12, z * 0.12, 2) - 0.5) * Math.exp(-r2 / 900);
+}
+const EDGE_DEPTH = -9;
+/**
+ * У краёв подробного рельефа земля уходит под воду: большой остров можно обойти на лодке кругом.
+ * Край — не прямоугольник, а скруглённый овал с неровной кромкой: с моря и на карте берег выглядит живым.
+ * Возвращает «радиус»: меньше 0,76 — рельеф как есть, около 1 — край, дальше — открытое море.
+ */
+function edgeR(x, z) {
+  const { x0, x1, z0, z1 } = BOUNDS;
+  const u = Math.abs((x - (x0 + x1) / 2) / ((x1 - x0) / 2));
+  const v = Math.abs((z - (z0 + z1) / 2) / ((z1 - z0) / 2));
+  if (u < 0.55 && v < 0.55) return 0;
+  return Math.pow(u ** 3.4 + v ** 3.4, 1 / 3.4) + 0.11 * (fbm2(x * 0.013 + 5, z * 0.013 + 9, 3) - 0.5);
+}
 export function groundH(x, z) {
+  let h = bayH(x, z);
+  const r = edgeR(x, z);
+  if (r > 0.76) {
+    // вокруг острова — отмель на девяти метрах, дальше дно плавно уходит на глубину открытого моря
+    const shelf = lerp(-14, EDGE_DEPTH, sstep(1.32, 1.0, r));
+    if (h > shelf) h = lerp(shelf, h, sstep(0.985, 0.76, r));
+  }
+  const hp = palmH(x, z);
+  if (hp > h) h = hp;
+  const hw = wreckH(x, z);
+  if (hw > h) h = hw;
+  return h;
+}
+function bayH(x, z) {
   let h = mainH(x, z);
   const hi = islandH(x, z);
   if (hi > h) h = hi;
@@ -115,9 +177,44 @@ export function canStand(x, z) {
   for (const b of BOXES) if (x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1) return false;
   for (const c of CIRCLES) if ((x - c.x) ** 2 + (z - c.z) ** 2 < c.r * c.r) return false;
   if (onDecks(x, z)) return true;
+  // Пальмовый остров: весь песок и вода по колено вокруг
+  if (palmR(x, z) < 1.5) return groundH(x, z) >= -WADE;
   if (x < -54 || x > 47 || z < -12.6) return false;
   if (groundH(x, z) < -WADE) return false;
   return z - shoreZ(x) < 13.5;
+}
+
+// ── лодка ──
+/** Где можно причалить. x, z, yaw — как встаёт лодка; sx, sz, syaw — куда и лицом куда выходит рыбак. rent — здесь лодку берут и сдают. */
+// Домашняя лодка стоит носом от пирса, на северо-восток: прямо по курсу — проход между головой пирса и рифом.
+export const MOORINGS = [
+  { id: 'home', name: 'Солнечная бухта', rent: true, x: 4.0, z: -12, yaw: -0.6, sx: 0.95, sz: -12, syaw: -Math.PI / 2 },
+  { id: 'light', name: 'Причал у маяка', x: -17.5, z: -68.4, yaw: Math.PI / 2, sx: -17.5, sz: -70.7, syaw: Math.PI },
+  { id: 'palm', name: 'Пальмовый остров', x: 211.5, z: -183.9, yaw: Math.PI / 2, sx: 211.5, sz: -186.2, syaw: Math.PI }
+];
+// во что лодка упирается помимо берега и причалов: риф, опоры арки, скалы в море, корабль, буйки
+const SAIL_BLOCKS = [
+  { x: REEF.x, z: REEF.z, r: 7.6 },
+  { x: ARCH.x - 2.94, z: ARCH.z - 8.08, r: 4.8 }, { x: ARCH.x + 2.94, z: ARCH.z + 8.08, r: 4.8 },
+  ...[[98, -72, 7], [112, -40, 5], [90, -104, 6], [126, -98, 9], [-58, -96, 5], [-76, -122, 7], [140, -20, 5]].map(([x, z, s]) => ({ x, z, r: s * 1.25 })),
+  { x: WRECK.x, z: WRECK.z, r: 8.5 },
+  ...[[-12, -43], [15, -37], [45, -31], [-27, -12]].map(([x, z]) => ({ x, z, r: 1.2 }))
+];
+/** Может ли здесь быть лодка: глубина под килем, не причал, не скала. */
+export function canSail(x, z) {
+  if (x < WORLD.x0 || x > WORLD.x1 || z < WORLD.z0 || z > WORLD.z1) return false;
+  if (groundH(x, z) > -0.6) return false;
+  for (const d of DECKS) if (x > d.x0 - 0.7 && x < d.x1 + 0.7 && z > d.z0 - 0.7 && z < d.z1 + 0.7) return false;
+  for (const c of SAIL_BLOCKS) if ((x - c.x) ** 2 + (z - c.z) ** 2 < c.r * c.r) return false;
+  // камни у берега острова с маяком, на мысу и вдоль западного берега торчат дальше кромки воды
+  const dx = x - ISLAND.x;
+  const dz = z - ISLAND.z;
+  const ri = Math.hypot(dx, dz);
+  if (ri < 46 && ri - islandR(Math.atan2(dz, dx)) < 6.5) return false;
+  if (capeDist(x, z) < CAPE.r + 3.6) return false;
+  const dw = z - shoreZ(x);
+  if (x < -60 && x > BOUNDS.x0 + 20 && dw > -7.5 && dw < 6) return false;
+  return true;
 }
 
 /** Что за место в воде: глубина и зона ловли. null — не вода. */
@@ -132,13 +229,18 @@ export function spotAt(x, z) {
   if (Math.hypot(x - BACKWATER.x, z - BACKWATER.z) < BACKWATER.r && x < -25) zone = 'backwater';
   else if (fall) zone = 'falls';
   else if (Math.hypot(x - ARCH.x, z - ARCH.z) < 14) zone = 'arch';
+  else if (Math.hypot(x - WRECK.x, z - WRECK.z) < WRECK.r) zone = 'wreck';
+  else if (palmR(x, z) < 2.35) zone = 'lagoon';
   else if (Math.hypot(dx, dz) - islandR(Math.atan2(dz, dx)) < 13 || Math.hypot(x - REEF.x, z - REEF.z) < 9.5 || (capeDist(x, z) < CAPE.r + 7 && depth < 7)) zone = 'reef';
   else if (pier && depth < 3.8) zone = 'pier';
+  else if (depth > 8 && Math.hypot(x - SEA.x, z - SEA.z) > SEA.r) zone = 'sea';
   else zone = depth < 2.5 ? 'shallow' : depth < 6 ? 'mid' : 'deep';
   return { depth, zone, pier };
 }
 
 // косяки рыбы: где они могут стоять (точка, зона для подписи на карте)
 export const SCHOOL_HOMES = [
-  [-8, -9], [9, -7], [13, -31], [-14, -39], [1, -45], [22, -23], [-39, 11], [8, -66], [33, -66], [60, -42], [14, -52], [-24, -19], [42, -27], [-33, 2], [-4, -33]
+  [-8, -9], [9, -7], [13, -31], [-14, -39], [1, -45], [22, -23], [-39, 11], [8, -66], [33, -66], [60, -42], [14, -52], [-24, -19], [42, -27], [-33, 2], [-4, -33],
+  // новые места: у корабля, в лагуне, в открытом море
+  [-124, -224], [-146, -246], [228, -160], [246, -226], [150, -215], [60, -255], [-40, -205], [330, -120]
 ];

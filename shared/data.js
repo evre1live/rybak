@@ -16,7 +16,11 @@ export const ZONES = {
   backwater: { name: 'Заводь', hint: 'Тихая вода с кувшинками на западе', act: 1.0 },
   reef: { name: 'Риф', hint: 'Камни и берег острова', act: 1.1 },
   falls: { name: 'Водопад', hint: 'Пресная вода под скалами острова', act: 1.15 },
-  arch: { name: 'Арка', hint: 'Каменная арка на востоке', act: 0.62 }
+  arch: { name: 'Арка', hint: 'Каменная арка на востоке', act: 0.62 },
+  // куда добираются на лодке
+  sea: { name: 'Открытое море', hint: 'Далеко от берега — только на лодке', act: 0.9 },
+  lagoon: { name: 'Лагуна', hint: 'Бирюзовая отмель у Пальмового острова', act: 1.15 },
+  wreck: { name: 'Затонувший корабль', hint: 'Отмель с кораблём на северо-западе', act: 0.85 }
 };
 
 export const DAY_PARTS = { dawn: 'Рассвет', day: 'День', dusk: 'Закат', night: 'Ночь' };
@@ -27,7 +31,7 @@ const fish = (id, name, rar, wMin, wMax, price, str, zones, baits, lure, time, l
 
 // price — монет за рыбу среднего размера; str — характер при вываживании
 export const FISH = [
-  fish('bychok', 'Бычок', 0, 0.04, 0.28, 9, 0.6, { pier: 6, shallow: 5, reef: 2, mid: 1 }, { worm: 1.4, maggot: 1.2, shrimp: 1.3, bread: 0.7 }, 0, null,
+  fish('bychok', 'Бычок', 0, 0.04, 0.28, 9, 0.6, { pier: 6, shallow: 5, reef: 2, mid: 1, lagoon: 2 }, { worm: 1.4, maggot: 1.2, shrimp: 1.3, bread: 0.7 }, 0, null,
     { shape: 'goby', back: '#6b5a3c', side: '#a08a5f', belly: '#e8dcc0', fin: '#7a6a48', pat: 'marble', patC: '#4a3d27', lenK: 31 },
     'Головастый житель свай. Клюёт на всё и всегда — первая рыба каждого рыбака.'),
   fish('plotva', 'Плотва', 0, 0.08, 0.6, 11, 0.7, { backwater: 5, shallow: 5, mid: 2, falls: 1 }, { bread: 1.3, maggot: 1.5, worm: 1.1, corn: 1.0 }, 0, null,
@@ -36,29 +40,29 @@ export const FISH = [
   fish('karas', 'Карась', 0, 0.15, 1.4, 16, 0.9, { backwater: 7, shallow: 1 }, { bread: 1.4, corn: 1.4, worm: 1.1, maggot: 1.1 }, 0, null,
     { shape: 'tall', back: '#7a6a2a', side: '#d9b14a', belly: '#f1e2a8', fin: '#a8742a', pat: 'scales', lenK: 29 },
     'Золотистый увалень из заводи. Берёт неторопливо, но упирается честно.'),
-  fish('stavrida', 'Ставрида', 0, 0.08, 0.55, 13, 0.9, { mid: 6, deep: 3, shallow: 1, reef: 1 }, { shrimp: 1.4, worm: 0.8, maggot: 0.9 }, 1.0, null,
+  fish('stavrida', 'Ставрида', 0, 0.08, 0.55, 13, 0.9, { mid: 6, deep: 3, shallow: 1, reef: 1, sea: 5, lagoon: 2 }, { shrimp: 1.4, worm: 0.8, maggot: 0.9 }, 1.0, null,
     { shape: 'slim', back: '#3f7d86', side: '#bcd3d6', belly: '#f2f6f6', fin: '#c9b458', pat: 'line', patC: '#e4d24a', lenK: 36 },
     'Ходит стаями на средней воде. Хорошо идёт на блесну.'),
   fish('okun', 'Окунь', 0, 0.1, 1.3, 18, 1.0, { pier: 5, reef: 4, shallow: 2, backwater: 2, mid: 1, falls: 2 }, { worm: 1.5, maggot: 1.1, live: 1.2, shrimp: 1.0 }, 1.2, null,
     { shape: 'std', back: '#4d6b2f', side: '#9fb04a', belly: '#f0ecc8', fin: '#e0522a', pat: 'bars', patC: '#26391a', lenK: 32 },
     'Полосатый разбойник. Держится у свай и камней, хватает червя с разгона.'),
-  fish('kefal', 'Кефаль', 0, 0.25, 2.2, 24, 1.1, { shallow: 4, mid: 4, pier: 2, reef: 1 }, { bread: 1.5, corn: 1.1, maggot: 1.0, worm: 0.8 }, 0, null,
+  fish('kefal', 'Кефаль', 0, 0.25, 2.2, 24, 1.1, { shallow: 4, mid: 4, pier: 2, reef: 1, lagoon: 5 }, { bread: 1.5, corn: 1.1, maggot: 1.0, worm: 0.8 }, 0, null,
     { shape: 'slim', back: '#566673', side: '#c2ccd2', belly: '#f4f5f5', fin: '#7d8a94', pat: 'lines', patC: '#7c8c97', lenK: 37 },
     'Осторожная и быстрая. Лучше всего клюёт на хлеб у самого берега.'),
 
-  fish('kambala', 'Камбала', 1, 0.25, 3.2, 46, 1.0, { deep: 5, mid: 3, shallow: 1 }, { worm: 1.3, shrimp: 1.5, squid: 1.3 }, 0, null,
+  fish('kambala', 'Камбала', 1, 0.25, 3.2, 46, 1.0, { deep: 5, mid: 3, shallow: 1, lagoon: 3, sea: 2 }, { worm: 1.3, shrimp: 1.5, squid: 1.3 }, 0, null,
     { shape: 'flat', back: '#6f5a3a', side: '#8b7347', belly: '#efe6d2', fin: '#7b6540', pat: 'spots', patC: '#e07b2c', lenK: 30 },
     'Плоская хитрюга с песчаного дна. Ищите её на глубине.'),
-  fish('skumbria', 'Скумбрия', 1, 0.2, 1.6, 42, 1.4, { mid: 4, deep: 5, reef: 1 }, { shrimp: 1.2, squid: 1.2, live: 1.0 }, 1.6, null,
+  fish('skumbria', 'Скумбрия', 1, 0.2, 1.6, 42, 1.4, { mid: 4, deep: 5, reef: 1, sea: 7 }, { shrimp: 1.2, squid: 1.2, live: 1.0 }, 1.6, null,
     { shape: 'slim', back: '#1f6f8a', side: '#b9d6d8', belly: '#f5f8f8', fin: '#3d6c7a', pat: 'tiger', patC: '#123c4d', lenK: 37 },
     'Стремительная, с тигровой спиной. Обожает блёсны.'),
   fish('lesh', 'Лещ', 1, 0.4, 3.5, 50, 1.1, { backwater: 5, mid: 2, deep: 1 }, { corn: 1.5, maggot: 1.4, worm: 1.2, bread: 1.0 }, 0, { dawn: 1.4, night: 1.2 },
     { shape: 'tall', back: '#5d5a4a', side: '#b9b39a', belly: '#ece8d8', fin: '#575248', pat: 'scales', lenK: 33 },
     'Широкий, как сковорода. Лучше всего берёт на рассвете.'),
-  fish('morokun', 'Морской окунь', 1, 0.3, 3.0, 58, 1.3, { reef: 6, deep: 2, arch: 2, pier: 1 }, { shrimp: 1.5, squid: 1.3, live: 1.2, worm: 0.7 }, 1.0, null,
+  fish('morokun', 'Морской окунь', 1, 0.3, 3.0, 58, 1.3, { reef: 6, deep: 2, arch: 2, pier: 1, wreck: 7, lagoon: 2 }, { shrimp: 1.5, squid: 1.3, live: 1.2, worm: 0.7 }, 1.0, null,
     { shape: 'std', back: '#b53a22', side: '#e8643a', belly: '#f6c9a8', fin: '#d8492a', pat: 'marble', patC: '#8f2a18', lenK: 31, bigEye: true },
     'Красный колючий житель рифа. На рынке его разбирают первым.'),
-  fish('sargan', 'Сарган', 1, 0.15, 1.1, 48, 1.2, { mid: 5, shallow: 2, deep: 2 }, { shrimp: 1.2, live: 1.3 }, 1.5, { dawn: 1.3, dusk: 1.3 },
+  fish('sargan', 'Сарган', 1, 0.15, 1.1, 48, 1.2, { mid: 5, shallow: 2, deep: 2, lagoon: 4, sea: 3 }, { shrimp: 1.2, live: 1.3 }, 1.5, { dawn: 1.3, dusk: 1.3 },
     { shape: 'needle', back: '#2f8a6a', side: '#c9e0d6', belly: '#f6f9f7', fin: '#5a9a84', pat: 'line', patC: '#3fb7a0', lenK: 62 },
     'Рыба-стрела с длинным клювом. Гоняется за блесной у поверхности.'),
   fish('karp', 'Карп', 1, 1.0, 9, 95, 1.35, { backwater: 5, falls: 1 }, { corn: 1.7, bread: 1.2, worm: 1.0, maggot: 0.9 }, 0, { dawn: 1.3, dusk: 1.3, night: 1.1 },
@@ -74,38 +78,38 @@ export const FISH = [
   fish('forel', 'Форель', 2, 0.3, 4.5, 210, 1.5, { falls: 8, reef: 1 }, { maggot: 1.3, worm: 1.2, corn: 1.0, shrimp: 1.0 }, 1.5, { dawn: 1.4, dusk: 1.2, night: 0.6 },
     { shape: 'std', back: '#5b6b3a', side: '#c9b79a', belly: '#f3ead8', fin: '#b0703a', pat: 'dots', patC: '#2c2c22', band: '#e37a8c', lenK: 38 },
     'Живёт в пресной струе под водопадом. Красива и сильна.'),
-  fish('dorado', 'Дорада', 2, 0.4, 4.5, 230, 1.5, { reef: 6, arch: 2, deep: 1 }, { shrimp: 1.7, squid: 1.3, worm: 0.7 }, 0, null,
+  fish('dorado', 'Дорада', 2, 0.4, 4.5, 230, 1.5, { reef: 6, arch: 2, deep: 1, lagoon: 6, wreck: 3 }, { shrimp: 1.7, squid: 1.3, worm: 0.7 }, 0, null,
     { shape: 'tall', back: '#6f8794', side: '#d5dde0', belly: '#f6f7f7', fin: '#8795a0', pat: 'scales', band: '#e8b830', lenK: 31 },
     'Серебряная, с золотой бровью. Рифовая лакомка — подавай ей креветку.'),
-  fish('sibas', 'Сибас', 2, 0.6, 8, 240, 1.7, { reef: 4, deep: 3, mid: 2, arch: 2 }, { live: 1.6, shrimp: 1.3, squid: 1.2 }, 1.6, { dawn: 1.3, dusk: 1.4, night: 1.1 },
+  fish('sibas', 'Сибас', 2, 0.6, 8, 240, 1.7, { reef: 4, deep: 3, mid: 2, arch: 2, sea: 4, wreck: 4, lagoon: 2 }, { live: 1.6, shrimp: 1.3, squid: 1.2 }, 1.6, { dawn: 1.3, dusk: 1.4, night: 1.1 },
     { shape: 'std', back: '#4a5a66', side: '#c3ccd2', belly: '#f5f6f6', fin: '#5c6a75', pat: 'scales', lenK: 40 },
     'Морской волк. Бьётся до последнего и часто рвёт слабую леску.'),
-  fish('ugor', 'Угорь', 2, 0.4, 4.5, 260, 1.6, { pier: 3, backwater: 3, deep: 2, reef: 2 }, { worm: 1.6, live: 1.3, shrimp: 1.0 }, 0, { night: 2.2, dusk: 1.2, day: 0.25, dawn: 0.6 },
+  fish('ugor', 'Угорь', 2, 0.4, 4.5, 260, 1.6, { pier: 3, backwater: 3, deep: 2, reef: 2, wreck: 5 }, { worm: 1.6, live: 1.3, shrimp: 1.0 }, 0, { night: 2.2, dusk: 1.2, day: 0.25, dawn: 0.6 },
     { shape: 'eel', back: '#3a3d26', side: '#6f6b3a', belly: '#d9d2a0', fin: '#4a4a2c', pat: 'none', lenK: 78 },
     'Скользкий ночной гость. Днём его почти не поймать.'),
 
   fish('som', 'Сом', 3, 4, 45, 900, 1.7, { backwater: 3, deep: 2 }, { live: 1.8, squid: 1.5, worm: 0.8 }, 0.6, { night: 2.2, dusk: 1.5, day: 0.35, dawn: 0.8 },
     { shape: 'cat', back: '#2f3a2c', side: '#5c6648', belly: '#e6e0c4', fin: '#39422f', pat: 'marble', patC: '#1c241a', lenK: 44 },
     'Усатый великан. Выходит на охоту в темноте и тянет, как трактор.'),
-  fish('tunec', 'Тунец', 3, 6, 70, 1500, 2.3, { deep: 3, arch: 2 }, { live: 1.5, squid: 1.6 }, 1.8, { dawn: 1.3, day: 1.1 },
+  fish('tunec', 'Тунец', 3, 6, 70, 1500, 2.3, { deep: 3, arch: 2, sea: 6 }, { live: 1.5, squid: 1.6 }, 1.8, { dawn: 1.3, day: 1.1 },
     { shape: 'tuna', back: '#17335c', side: '#9fb3c4', belly: '#f0f3f5', fin: '#e8c62a', pat: 'none', lenK: 37 },
-    'Торпеда открытого моря. Заходит в бухту только на большую глубину.', { minDepth: 9 }),
+    'Торпеда открытого моря. В бухту заходит только на большую глубину — за ним лучше выйти на лодке.', { minDepth: 9 }),
   fish('losos', 'Лосось', 3, 1.5, 16, 800, 1.9, { falls: 4, reef: 1 }, { shrimp: 1.3, live: 1.3, maggot: 0.8 }, 1.7, { dawn: 1.7, dusk: 1.5, day: 0.7, night: 0.5 },
     { shape: 'std', back: '#4a5f6b', side: '#c9c4c8', belly: '#f6f1f1', fin: '#6a6f78', pat: 'dots', patC: '#22262b', band: '#e08a8a', lenK: 43 },
     'Король водопада. Приходит на заре и на закате.'),
-  fish('skat', 'Скат', 3, 2.5, 28, 1000, 1.8, { deep: 4, reef: 1, arch: 1 }, { squid: 1.7, shrimp: 1.4, live: 1.0 }, 0, { night: 1.4 },
+  fish('skat', 'Скат', 3, 2.5, 28, 1000, 1.8, { deep: 4, reef: 1, arch: 1, sea: 2.5, wreck: 3 }, { squid: 1.7, shrimp: 1.4, live: 1.0 }, 0, { night: 1.4 },
     { shape: 'ray', back: '#8a744e', side: '#8a744e', belly: '#f1ead8', fin: '#6f5c3c', pat: 'spots', patC: '#3f8fd0', lenK: 34 },
     'Парит над песком на глубине. Поднять его со дна — отдельный труд.', { minDepth: 6 }),
 
-  fish('mech', 'Рыба-меч', 4, 25, 160, 6500, 2.5, { arch: 0.8, deep: 0.3 }, { live: 1.5, squid: 1.7 }, 1.6, null,
+  fish('mech', 'Рыба-меч', 4, 25, 160, 6500, 2.5, { arch: 0.8, deep: 0.3, sea: 1.6 }, { live: 1.5, squid: 1.7 }, 1.6, null,
     { shape: 'sword', back: '#2a3d6b', side: '#8fa0b8', belly: '#eef1f4', fin: '#24345c', pat: 'none', lenK: 52 },
-    'Легенда бухты. Говорят, её видели у каменной арки.', { minDepth: 9 }),
+    'Легенда бухты. Говорят, её видели у каменной арки и далеко в открытом море.', { minDepth: 9 }),
   fish('koi', 'Золотой кои', 4, 1.5, 11, 4200, 1.5, { backwater: 1.5, falls: 0.6 }, { corn: 1.6, bread: 1.2, maggot: 1.0 }, 0, { dawn: 1.8 },
     { shape: 'carp', back: '#f0a020', side: '#f7c948', belly: '#fff3c4', fin: '#f08a1c', pat: 'koi', patC: '#ffffff', lenK: 30 },
     'Приносит удачу. Показывается в заводи на рассвете — и то не каждому.'),
-  fish('starik', 'Мероу «Старик»', 4, 35, 140, 8000, 2.4, { arch: 1.0 }, { live: 1.6, squid: 1.6 }, 1.0, { dusk: 1.5, night: 1.3 },
+  fish('starik', 'Мероу «Старик»', 4, 35, 140, 8000, 2.4, { arch: 1.0, wreck: 1.6 }, { live: 1.6, squid: 1.6 }, 1.0, { dusk: 1.5, night: 1.3 },
     { shape: 'grouper', back: '#4a3a2a', side: '#8a6f4f', belly: '#d9c9a8', fin: '#5a4532', pat: 'marble', patC: '#cdb890', lenK: 31 },
-    'Старожил арки. Смотрители маяка рассказывают о нём уже сорок лет.')
+    'Старожил арки. Смотрители маяка рассказывают о нём уже сорок лет — а кто-то видел его в трюме затонувшего корабля.')
 ];
 export const FISH_BY_ID = Object.fromEntries(FISH.map((f) => [f.id, f]));
 

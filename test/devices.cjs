@@ -129,6 +129,23 @@ const atHead = (page) => G(page, () => { RYBAK.player.place(0.6, -20, 0.1); RYBA
     await shot(page, 'd05-phone-pause');
     await G(page, () => RYBAK.ui.closePanel());
     await page.waitForFunction(() => !document.querySelector('#touch').classList.contains('hidden'));
+    // лодка: у пирса появляется кнопка, джойстик ведёт лодку, кнопки «сесть» в ней нет
+    await G(page, () => { RYBAK.fishing.reelIn(true); RYBAK.player.place(0.9, -12, -Math.PI / 2); });
+    await page.waitForFunction(() => { const e = document.querySelector('#tE'); return e.textContent === 'ЛОДКА' && !e.classList.contains('hidden'); }, null, { timeout: 30000 });
+    assert.equal(await vis('#tSit'), false, 'у лодки вместо «сесть» — кнопка лодки');
+    assert.match(await page.textContent('#prompt'), /^ЛОДКА НАПРОКАТ/, 'подсказка без названия клавиши');
+    await page.tap('#tE');
+    await page.waitForFunction(() => RYBAK.boat.active && document.querySelector('#tE').textContent === 'НА ПИРС', null, { timeout: 30000 });
+    assert.equal(await vis('#tSit'), false);
+    const bz = await G(page, () => RYBAK.boat.z);
+    await touch('touchStart', [[sx, sy]]);
+    await touch('touchMove', [[sx, sy - 90]]);
+    await page.waitForFunction((z) => RYBAK.boat.z < z - 8 && RYBAK.boat.v > 3, bz, { timeout: 30000 });
+    await touch('touchEnd', []);
+    await page.waitForFunction(() => document.querySelector('#tE').classList.contains('hidden'), null, { timeout: 30000 }); // отошли от пирса — причаливать некуда
+    await shot(page, 'd07-phone-boat', 200);
+    await G(page, () => RYBAK.goHome());
+    await page.waitForFunction(() => !RYBAK.boat.active && !document.querySelector('#touch').classList.contains('hidden'));
     // панель снастей нажимается: удочка открывает снасти
     await page.tap('#hotbar .slot[data-k="rod"]');
     await page.waitForFunction(() => RYBAK.ui.panel === 'tackle');

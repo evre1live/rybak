@@ -277,7 +277,8 @@ export function newProfile() {
     cooler: [],
     journal: {},
     stats: { casts: 0, caught: 0, sold: 0, earned: 0, snaps: 0, escapes: 0, best: null, legends: 0 },
-    seenIntro: false
+    seenIntro: false,
+    boatTrips: 0
   };
 }
 // подлатать сохранение из старой версии или с повреждениями
@@ -293,6 +294,7 @@ export function fixProfile(p) {
   p.cooler = p.cooler.filter((c) => c && (FISH_BY_ID[c.sp] || JUNK_BY_ID[c.sp]) && c.w > 0);
   p.coins = Math.max(0, Math.round(Number(p.coins) || 0));
   p.xp = Math.max(0, Math.round(Number(p.xp) || 0));
+  p.boatTrips = Math.max(0, Math.round(Number(p.boatTrips) || 0));
   if (tackleCount(p, p.equip.tackle) <= 0) p.equip.tackle = 'bread';
   p.v = PROFILE_VERSION;
   return p;

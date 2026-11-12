@@ -295,6 +295,164 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     console.log('  ходьба: пирс до края, мостки, берег и вода по колено');
   }
 
+  // лодка: взять у пирса, выйти в открытое море, поймать место с борта, причалить у маяка, вернуться и сдать
+  {
+    const bp = await open(browser, 'q=low&norender&h=13', 'boat');
+    await bp.fill('#nm', 'Капитан');
+    await G(bp, () => { RYBAK.profile.seenIntro = true; });
+    await bp.click('[data-a="solo"]');
+    await bp.waitForFunction(() => RYBAK.state === 'lobby');
+    await bp.click('[data-a="start"]');
+    await bp.waitForFunction(() => RYBAK.state === 'world');
+    await G(bp, () => {
+      // кадры игры считаем сами: время точное и не зависит от скорости машины
+      window.__run = (sec, each) => {
+        const g = RYBAK;
+        const raf = window.requestAnimationFrame;
+        window.requestAnimationFrame = () => 0;
+        let now = performance.now();
+        g.last = now;
+        let t = 0;
+        while (t < sec) {
+          if (each && each(t) === false) break;
+          now += 1000 / 60;
+          g.frame(now);
+          t += 1 / 60;
+        }
+        window.requestAnimationFrame = raf;
+        g.last = performance.now();
+        return t;
+      };
+      // рулевой: держит курс на точки по очереди клавишами, как игрок; у последней сбавляет ход
+      window.__sail = (pts, reach = 6, max = 150) => {
+        const g = RYBAK;
+        const b = g.boat;
+        const k = g.input.keys;
+        let n = 0;
+        let bumps = 0;
+        const ob = b.onBump;
+        b.onBump = (...a) => { bumps++; ob(...a); };
+        const t = window.__run(max, () => {
+          const last = n === pts.length - 1;
+          const d = Math.hypot(pts[n][0] - b.x, pts[n][1] - b.z);
+          if (d < (last ? reach : 9) && ++n >= pts.length) return false;
+          const [x, z] = pts[n];
+          let da = Math.atan2(-(x - b.x), -(z - b.z)) - b.yaw;
+          while (da > Math.PI) da -= 2 * Math.PI;
+          while (da < -Math.PI) da += 2 * Math.PI;
+          for (const c of ['KeyW', 'KeyS', 'KeyA', 'KeyD']) k.delete(c);
+          // сбавляем ход перед последней точкой и на крутом повороте — как осторожный рулевой
+          const slow = (n === pts.length - 1 && Math.hypot(x - b.x, z - b.z) < 24) || Math.abs(da) > 1;
+          if (!slow || b.v < 4) k.add('KeyW');
+          else if (b.v > 6) k.add('KeyS');
+          if (da > 0.05) k.add('KeyA');
+          else if (da < -0.05) k.add('KeyD');
+        });
+        for (const c of ['KeyW', 'KeyS', 'KeyA', 'KeyD']) k.delete(c);
+        b.onBump = ob;
+        return { t: +t.toFixed(1), bumps, done: n >= pts.length, x: +b.x.toFixed(1), z: +b.z.toFixed(1), v: +b.v.toFixed(1) };
+      };
+    });
+    const prompt = (re) => bp.waitForFunction((src) => new RegExp(src).test(document.querySelector('#prompt').textContent), re.source, { timeout: 40000 });
+    const use = () => G(bp, () => RYBAK.input.pressed.add('KeyE'));
+    // идём по пирсу пешком — у лодки появляется подсказка; первый выход бесплатный
+    await G(bp, () => { const g = RYBAK; g.input.locked = true; g.input.enabled = true; g.player.place(0, 2, 0); g.input.keys.add('KeyW'); });
+    await prompt(/ЛОДКА НАПРОКАТ — ПЕРВЫЙ ВЫХОД БЕСПЛАТНО/);
+    await G(bp, () => RYBAK.input.keys.delete('KeyW'));
+    await shot(bp, '24-boat-prompt', 200);
+    await use();
+    await bp.waitForFunction(() => RYBAK.boat.active && RYBAK.player.boat === RYBAK.boat && /ХОД.*РУЛЬ/.test(document.querySelector('#hints').textContent));
+    const b0 = await G(bp, () => { const g = RYBAK; return { coins: g.profile.coins, trips: g.profile.boatTrips, sit: g.player.sit && g.player.dangle, y: g.player.y, rented: g.boat.rented, net: g.boat.net }; });
+    assert.equal(b0.coins, 40, 'первый выход бесплатный');
+    assert.equal(b0.trips, 1);
+    assert.ok(b0.sit && b0.rented && b0.net === 1 && b0.y > 0.35 && b0.y < 1, `сидим на банке над водой: ${b0.y}`);
+    await bp.waitForFunction(() => RYBAK.boat.vis.model, null, { timeout: 60000 }).catch(() => {});
+    await shot(bp, '25-boat-seat', 200);
+    // сразу выйти обратно можно — прокат при этом не кончается
+    await prompt(/ВЫЙТИ НА ПИРС/);
+    await use();
+    await bp.waitForFunction(() => !RYBAK.boat.active && !RYBAK.player.boat);
+    assert.ok(await G(bp, () => RYBAK.boat.rented && RYBAK.player.onDeck && !RYBAK.player.sit), 'вышли на пирс, лодка за нами');
+    await prompt(/СЕСТЬ В ЛОДКУ/);
+    await use();
+    await bp.waitForFunction(() => RYBAK.boat.active);
+    // разгон по прямой
+    const run = await G(bp, () => { const g = RYBAK; const b = g.boat; const x0 = b.x; const z0 = b.z; window.__run(0.5); const fov0 = g.camera.fov; g.input.keys.add('KeyW'); window.__run(4); g.input.keys.delete('KeyW'); return { d: Math.hypot(b.x - x0, b.z - z0), v: b.v, fov: g.camera.fov, fov0 }; });
+    assert.ok(run.d > 28 && run.d < 42 && run.v > 11.3 && run.v <= 12.5, `за четыре секунды разогнались: ${run.d.toFixed(1)} м, ход ${run.v.toFixed(1)}`);
+    assert.ok(run.fov > run.fov0 + 4, `на ходу поле зрения шире: ${run.fov0.toFixed(1)} → ${run.fov.toFixed(1)}`);
+    // из бухты на простор; там проверяем руль: взгляд поворачивается вместе с лодкой
+    const out1 = await G(bp, () => window.__sail([[0, -48], [-30, -62], [-40, -140]]));
+    assert.ok(out1.done && out1.bumps === 0, 'вышли из бухты без столкновений: ' + JSON.stringify(out1));
+    const steer = await G(bp, () => { const g = RYBAK; const b = g.boat; const k = g.input.keys; const y0 = b.yaw; k.add('KeyW'); k.add('KeyD'); window.__run(1); k.delete('KeyD'); const right = b.yaw - y0; k.add('KeyA'); window.__run(1.6); k.delete('KeyA'); k.delete('KeyW'); return { right, left: b.yaw - y0 - right, look: g.player.yaw - b.yaw }; });
+    assert.ok(steer.right < -0.6 && steer.left > 1, `руль: вправо ${steer.right.toFixed(2)}, влево ${steer.left.toFixed(2)}`);
+    assert.ok(Math.abs(steer.look) < 0.01, 'взгляд поворачивается вместе с лодкой');
+    // в открытое море
+    const sea = await G(bp, () => window.__sail([[-40, -200]]));
+    assert.ok(sea.done && sea.bumps === 0, 'дошли до открытого моря без столкновений: ' + JSON.stringify(sea));
+    await G(bp, () => window.__run(1.5));
+    await bp.waitForFunction(() => document.querySelector('#locName').textContent === 'ОТКРЫТОЕ МОРЕ' && RYBAK.mapSea === true);
+    assert.match(await bp.textContent('#toasts'), /Открытое море/);
+    await shot(bp, '26-boat-sea', 200);
+    // заброс с борта: поплавок в зоне «открытое море», не ближе носа; с леской в воде лодка стоит
+    const cast = await G(bp, () => {
+      const g = RYBAK; const i = g.input; const b = g.boat;
+      window.__run(4);
+      g.player.pitch = -0.2; g.player.yaw = b.yaw + Math.PI / 2;
+      i.primary = true; i.pressed.add('Primary'); window.__run(1.3);
+      i.primary = false; window.__run(2.5);
+      const out = { st: g.fishing.state, zone: g.fishing.spot && g.fishing.spot.zone, d: Math.hypot(g.fishing.bx - g.player.x, g.fishing.bz - g.player.z) };
+      const x0 = b.x; const z0 = b.z;
+      i.keys.add('KeyW'); window.__run(2); i.keys.delete('KeyW');
+      out.drift = Math.hypot(b.x - x0, b.z - z0);
+      return out;
+    });
+    assert.ok(['wait', 'bite'].includes(cast.st) && cast.zone === 'sea' && cast.d >= 3.4, 'заброс с лодки: ' + JSON.stringify(cast));
+    assert.ok(cast.drift < 0.3, 'с леской в воде лодка стоит: ' + cast.drift);
+    await shot(bp, '27-boat-cast', 200);
+    await G(bp, () => { RYBAK.input.pressed.add('KeyR'); window.__run(0.3); RYBAK.fishing.reelIn(true); });
+    // к причалу у маяка
+    const toLight = await G(bp, () => window.__sail([[-45, -80], [-18, -66]], 5));
+    assert.ok(toLight.done, 'дошли до причала у маяка: ' + JSON.stringify(toLight));
+    await G(bp, () => window.__run(1.2));
+    await prompt(/ПРИЧАЛИТЬ — ПРИЧАЛ У МАЯКА/);
+    await use();
+    await bp.waitForFunction(() => !RYBAK.boat.active && document.querySelector('#locName').textContent === 'ОСТРОВ С МАЯКОМ');
+    const jetty = await G(bp, () => { const g = RYBAK; const p = g.player; return { deck: p.onDeck, y: p.y, x: p.x, z: p.z, moor: g.boat.moor, rented: g.boat.rented, net: g.boat.net, sit: p.sit }; });
+    assert.ok(jetty.deck && Math.abs(jetty.y - 1.1) < 0.05 && jetty.moor === 1 && jetty.rented && jetty.net === 3 && !jetty.sit, 'стоим на причале у маяка: ' + JSON.stringify(jetty));
+    await shot(bp, '28-boat-jetty', 300);
+    // по мосткам можно пройтись и вернуться к лодке
+    const stroll = await G(bp, () => { const g = RYBAK; const p = g.player; const z0 = p.z; p.yaw = 0; g.input.keys.add('KeyW'); window.__run(1); g.input.keys.delete('KeyW'); const out = z0 - p.z; p.yaw = Math.PI; g.input.keys.add('KeyW'); window.__run(1.4); g.input.keys.delete('KeyW'); return out; });
+    assert.ok(stroll > 2.5, 'прошлись по причалу: ' + stroll);
+    await prompt(/СЕСТЬ В ЛОДКУ/);
+    await use();
+    await bp.waitForFunction(() => RYBAK.boat.active);
+    // домой: лодка сдаётся
+    const home = await G(bp, () => window.__sail([[-30, -58], [0, -42], [12, -30], [8.5, -18.5]], 4));
+    assert.ok(home.done, 'вернулись к пирсу: ' + JSON.stringify(home));
+    await G(bp, () => window.__run(1.2));
+    await prompt(/ПРИЧАЛИТЬ И СДАТЬ ЛОДКУ — СОЛНЕЧНАЯ БУХТА/);
+    await use();
+    await bp.waitForFunction(() => !RYBAK.boat.active && !RYBAK.boat.rented && RYBAK.boat.net === 0 && document.querySelector('#locName').textContent === 'СОЛНЕЧНАЯ БУХТА' && RYBAK.mapSea === false);
+    assert.ok(await G(bp, () => RYBAK.player.onDeck && Math.abs(RYBAK.player.z + 12) < 0.5), 'стоим на домашнем пирсе');
+    // второй выход — за монеты; без монет лодку не дают
+    await prompt(/ЛОДКА НАПРОКАТ — 30 МОНЕТ/);
+    await use();
+    await bp.waitForFunction(() => RYBAK.boat.active);
+    assert.equal(await G(bp, () => RYBAK.profile.coins), 10, 'прокат стоит 30 монет');
+    // из меню можно сразу вернуться в бухту
+    await G(bp, () => RYBAK.ui.openPanel('pause'));
+    await bp.click('[data-a="home"]');
+    await bp.waitForFunction(() => !RYBAK.boat.active && !RYBAK.boat.rented && RYBAK.ui.panel === null && RYBAK.player.onDeck);
+    await G(bp, () => { RYBAK.input.locked = true; RYBAK.input.enabled = true; });
+    await prompt(/ЛОДКА НАПРОКАТ — 30 МОНЕТ/);
+    await use();
+    await bp.waitForFunction(() => /не хватает 20 монет/.test(document.querySelector('#toasts').textContent));
+    assert.ok(await G(bp, () => !RYBAK.boat.active && !RYBAK.boat.rented && RYBAK.profile.coins === 10), 'без монет лодку не дают');
+    assert.ok(!bp.__err, 'ошибки на странице (лодка)');
+    await bp.close();
+    console.log(`  лодка: разгон ${run.d.toFixed(0)} м за 4 с, из бухты в море за ${(out1.t + sea.t).toFixed(0)} с, к маяку за ${toLight.t} с, домой за ${home.t} с`);
+  }
+
   // сохранение переживает перезагрузку
   await page.waitForTimeout(500);
   const saved = await G(page, () => JSON.parse(localStorage.getItem('rybak.profile.v1')));

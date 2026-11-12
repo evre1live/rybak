@@ -4,12 +4,15 @@ import { Character } from './character.js';
 import { buildRod, buildFloat, buildLure } from './gear3d.js';
 import { buildFish, wiggleFish } from './fish3d.js';
 import { FishLine } from './line.js';
+import { BoatVisual, moorSpot, wake, VMAX, SEAT_BACK } from './boat.js';
 import { S, FS_NAME, FLAG } from './proto.js';
 import { ITEMS, FISH_BY_ID, isLure } from '../shared/data.js';
 import { angDiff, lerp, clamp } from './util.js';
 
 const tip = new THREE.Vector3();
 const end = new THREE.Vector3();
+const seat = new THREE.Vector3();
+const spot = { x: 0, z: 0, yaw: 0 };
 const DELAY = 0.14;
 
 export class Remote {
@@ -35,6 +38,7 @@ export class Remote {
     this.talk = 0;
     this.wake = 0;
     this.held = null;
+    this.boat = null; // лодка друга: появляется, когда он её берёт
     this.setCard(p.card);
     if (p.st) this.push(p.st, performance.now() / 1000);
   }
@@ -92,6 +96,12 @@ export class Remote {
       this.emoteT = 2.6;
     }
   }
+  dropBoat() {
+    if (this.boat) {
+      this.boat.dispose();
+      this.boat = null;
+    }
+  }
   dropFish() {
     if (this.fish) {
       this.scene.remove(this.fish);
@@ -106,6 +116,7 @@ export class Remote {
     const g = this.char.group;
     if (!this.b || !visible) {
       g.visible = false;
+      this.dropBoat();
       this.bob.visible = false;
       this.line.hide();
       if (this.fish) this.fish.visible = false;
@@ -124,6 +135,25 @@ export class Remote {
     g.rotation.y = yaw + Math.PI;
     const fs = b[S.FS] | 0;
     const flags = b[S.FLAGS] | 0;
+    // лодка: друг идёт на ней или оставил у причала
+    const bs = b[S.BOAT] | 0;
+    if (bs > 0) {
+      if (!this.boat) this.boat = new BoatVisual(this.scene);
+      if (bs === 1) {
+        const y0 = a[S.BYAW] ?? b[S.BYAW] ?? 0;
+        const byaw = y0 + angDiff(y0, b[S.BYAW] ?? y0) * Math.min(1, u);
+        const v = (a[S.BOAT] | 0) === 1 ? L(S.SPEED) : 0;
+        // друг присылает, где сидит; середина лодки чуть впереди банки
+        const cx = x - Math.sin(byaw) * SEAT_BACK;
+        const cz = z - Math.cos(byaw) * SEAT_BACK;
+        this.boat.pose(cx, cz, byaw, t, clamp(v / VMAX, -1, 1), (b[S.STEER] || 0) * Math.min(1, Math.abs(v) / 6), dt);
+        wake(this, fx, cx, cz, byaw, v, dt);
+        g.position.copy(this.boat.seat(seat));
+      } else {
+        moorSpot(bs - 2, this.slot, spot);
+        this.boat.pose(spot.x, spot.z, spot.yaw, t, 0, 0, dt);
+      }
+    } else this.dropBoat();
     if (this.emoteT > 0) this.emoteT -= dt;
     if (this.sayT > 0) this.sayT -= dt;
     if (this.held) {
@@ -135,7 +165,7 @@ export class Remote {
       }
     }
     this.char.update(dt, {
-      speed: L(S.SPEED), mode: this.held ? 'landed' : FS_NAME[fs] || 'hold', castK: L(S.K), reel: !!(flags & FLAG.reel), steer: b[S.STEER] || 0,
+      speed: bs === 1 ? 0 : L(S.SPEED), mode: this.held ? 'landed' : FS_NAME[fs] || 'hold', castK: L(S.K), reel: !!(flags & FLAG.reel), steer: b[S.STEER] || 0,
       sit: !!(flags & FLAG.sit), dangle: !!(flags & FLAG.dangle), emote: this.emoteT > 0 ? this.emote : null, talk: this.talk, pitch: L(S.PITCH)
     });
     const rod = this.char.rod;
@@ -177,6 +207,7 @@ export class Remote {
     g.visible = true;
     g.position.set(x, y, z);
     g.rotation.y = 0;
+    this.dropBoat();
     this.bob.visible = false;
     this.line.hide();
     if (this.fish) this.fish.visible = false;
@@ -194,6 +225,7 @@ export class Remote {
     this.char.dispose();
     if (this.bob) this.scene.remove(this.bob);
     this.dropFish();
+    this.dropBoat();
     this.line.dispose();
   }
 }
