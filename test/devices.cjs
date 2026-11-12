@@ -259,6 +259,63 @@ const atHead = (page) => G(page, () => { RYBAK.player.place(0.6, -20, 0.1); RYBA
     console.log('  пробная версия одним файлом: без сети, шрифты и значки на месте, рыбалка идёт');
   }
 
+  // ───── кэш игры на устройстве: первый запуск заводит его, без сети игра открывается, новая версия не качает лишнего ─────
+  {
+    const SW = require('node:path').join(__dirname, '..', 'public', 'sw.js');
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+    const p = await ctx.newPage();
+    p.on('pageerror', (e) => { console.log('[cache] PAGEERROR', e.message.slice(0, 300)); p.__err = 1; });
+    let glb = 0; // запросы самого кэша — это и есть походы в сеть: страница получает ответы от него
+    ctx.on('request', (r) => { if (/\.glb/.test(r.url()) && r.serviceWorker()) glb++; });
+    const ready = () => p.waitForFunction(() => window.RYBAK && window.__frames > 3, null, { timeout: 120000 });
+    await p.goto(`${BASE}/?sw=2&norender&q=low`);
+    await ready();
+    await p.waitForFunction(() => navigator.serviceWorker.controller && RYBAK.cache && RYBAK.cache.total > 100 && RYBAK.cache.done === RYBAK.cache.total, null, { timeout: 120000 });
+    const c1 = await p.evaluate(async () => ({ total: RYBAK.cache.total, keys: await caches.keys(), n: (await (await caches.open((await caches.keys())[0])).keys()).length, lite: (await (await caches.open((await caches.keys())[0])).keys()).filter((r) => /\.lite\.glb/.test(r.url)).length }));
+    assert.ok(c1.keys.length === 1 && c1.n > 100 && c1.lite === 0, `кэш заведён, облегчённые модели компьютеру не качаем: ${JSON.stringify(c1)}`);
+    // без сети: страница, код и модели — из кэша; на заставке сказано, что сервер не отвечает; одиночная рыбалка идёт
+    await ctx.setOffline(true);
+    await p.goto(`${BASE}/?sw=2&norender&q=low`);
+    await ready();
+    await p.waitForFunction(() => RYBAK.serverUp === false && !document.querySelector('#srvNote').classList.contains('hidden'), null, { timeout: 20000 });
+    await p.fill('#nm', 'Автоном');
+    await p.evaluate(() => { RYBAK.profile.seenIntro = true; });
+    await p.click('[data-a="solo"]');
+    await p.waitForFunction(() => RYBAK.state === 'lobby', null, { timeout: 20000 });
+    await p.evaluate(() => RYBAK.enterWorld());
+    await p.waitForFunction(() => RYBAK.state === 'world');
+    await p.waitForFunction(() => { const e = RYBAK.world.scenery.envState(); return e.trees && e.rocks && e.kiosk && e.lighthouse; }, null, { timeout: 60000 });
+    await shot(p, 'd09-offline-world', 300);
+    await ctx.setOffline(false);
+    // новая версия (как после выкладки): на заставке страница перезапускается сама, неизменённые модели переходят из старого кэша
+    const src = fs.readFileSync(SW, 'utf8');
+    const v0 = /const VERSION = "([0-9a-f]+)"/.exec(src)[1];
+    fs.writeFileSync(SW, src.replace(`"${v0}"`, '"feedfacecafe"').replace(/"\/style\.css":"[0-9a-f]+"/, '"/style.css":"000000000000"'));
+    try {
+      glb = 0;
+      await p.goto(`${BASE}/?sw=2&norender&q=low`);
+      let keys = '';
+      for (let i = 0; i < 120 && keys !== 'rybak-feedfacecafe'; i++) {
+        keys = await p.evaluate(async () => (await caches.keys()).join()).catch(() => '');
+        await new Promise((ok) => setTimeout(ok, 500));
+      }
+      assert.equal(keys, 'rybak-feedfacecafe', 'старый кэш заменён новым');
+      await p.waitForTimeout(1500);
+      await ready();
+      const n2 = await p.evaluate(async () => (await (await caches.open('rybak-feedfacecafe')).keys()).length);
+      assert.ok(n2 > 100 && glb === 0, `модели перешли в новый кэш без скачивания: файлов ${n2}, скачано моделей ${glb}`);
+    } finally {
+      fs.writeFileSync(SW, src);
+    }
+    // ?nosw снимает кэш совсем
+    await p.goto(`${BASE}/?nosw&norender&q=low`);
+    await ready();
+    await p.waitForFunction(() => navigator.serviceWorker.getRegistrations().then((r) => (window.__regs = r.length)) && window.__regs === 0, null, { timeout: 20000 });
+    assert.ok(!p.__err, 'ошибки на странице (кэш на устройстве)');
+    await ctx.close();
+    console.log('  кэш на устройстве: заведён, без сети игра идёт, новая версия берёт модели из старого кэша');
+  }
+
   await browser.close();
   console.log('УСТРОЙСТВА: всё в порядке');
 })().catch((e) => { console.error('ПРОВАЛ:', e.message.split('\n').slice(0, 6).join('\n'), '\n', (e.stack || '').split('\n').filter((l) => l.includes('devices.cjs')).slice(0, 2).join('\n')); process.exit(1); });

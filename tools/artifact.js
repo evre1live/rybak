@@ -29,6 +29,8 @@ const swap = (from, to) => {
 swap('<title>Рыбак — рыбалка с друзьями</title>', '<title>Рыбак — пробная рыбалка</title>');
 swap('<link rel="icon" href="favicon.svg">', `<link rel="icon" href="${icon}">`);
 swap('<link rel="stylesheet" href="style.css">', `<style>${css}</style>`);
+// пробная версия живёт одним файлом: ни значков приложения, ни кэша на устройстве у неё нет
+swap('<link rel="manifest" href="manifest.webmanifest">\n<link rel="apple-touch-icon" href="icon-192.png">\n', '');
 swap('<script src="app.js"></script>', `<script>window.RYBAK_OFFLINE = true;</script>\n<script>${js}</script>`);
 
 mkdirSync(dirname(out), { recursive: true });

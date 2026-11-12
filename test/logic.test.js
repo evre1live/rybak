@@ -335,3 +335,70 @@ test('турнир: зачёт, таблица, призы и медали', () 
   assert.equal(L.tourMedal('count', 600, starter, s), 1);
   assert.ok(L.medalPrize(3, 300) > L.medalPrize(2, 300) && L.medalPrize(2, 300) > L.medalPrize(1, 300) && L.medalPrize(0, 300) === 0);
 });
+
+// ───── автоподбор качества (client/perf.js): чистая логика, без отрисовки ─────
+import { newTuner, tuneStep, needDrop, scaleFor, TARGET_MS, BUDGET_MS, Perf, isSoftware } from '../client/perf.js';
+
+test('подбор при загрузке: дорогой кадр — ступень ниже, небольшое превышение — разрешение меньше', () => {
+  assert.ok(needDrop(40, 'high') && needDrop(40, 'medium') && !needDrop(40, 'low'), 'ниже «низкого» ступени нет');
+  assert.ok(!needDrop(BUDGET_MS * 2, 'high'));
+  assert.equal(scaleFor(6, 'high'), 1, 'запас есть — разрешение полное');
+  assert.equal(scaleFor(BUDGET_MS * 1.05, 'high'), 1, 'чуть больше нормы — не трогаем');
+  const s = scaleFor(20, 'high');
+  assert.ok(s > 0.7 && s < 0.82, `20 мс на «высоком» → около 77 %: ${s}`);
+  assert.equal(scaleFor(500, 'medium'), 0.62, 'нижняя граница на «среднем»');
+  assert.equal(scaleFor(500, 'low'), 0.5, 'и на «низком»');
+  assert.ok(isSoftware('Google, Vulkan 1.3.0 (SwiftShader Device (Subzero))') && isSoftware('llvmpipe (LLVM 15)') && !isSoftware('Apple M4') && !isSoftware('Intel(R) UHD Graphics 620'));
+});
+
+test('подбор на ходу: проседает — разрешение вниз, потом ступень; идёт ровно — разрешение обратно', () => {
+  const st = newTuner();
+  const q = { scale: 1, floor: 0.62, canDrop: true, drs: true };
+  const run = (avg, n) => { const out = []; for (let i = 0; i < n; i++) { const r = tuneStep(st, avg, q); if (r) { out.push(r); if (r.scale) q.scale = r.scale; } } return out; };
+  // ровные 60 кадров: ничего не трогаем
+  assert.deepEqual(run(16.7, 40), []);
+  // 30 мс на кадр: через секунду разрешение уходит вниз, и так до нижней границы
+  const down = run(30, 40);
+  assert.ok(down.length >= 3 && down[0].scale < 1 && down[0].scale >= 0.75, `первый шаг не резче четверти: ${JSON.stringify(down[0])}`);
+  const drop = down.findIndex((r) => r.drop);
+  assert.ok(drop > 0 && down.slice(0, drop).every((r) => r.scale), 'сначала разрешение, и только на нижней границе — ступень качества');
+  assert.ok(Math.abs(q.scale - 0.62) < 0.001, `дошли до границы: ${q.scale}`);
+  // полегчало: разрешение возвращается шагами, но не выше того, на чём просело, — пока не пройдёт время
+  Object.assign(st, newTuner());
+  q.scale = 0.7;
+  st.ceil = 0.85;
+  const up = run(16.7, 60);
+  assert.ok(up.length >= 2 && up.every((r) => r.scale > 0.7) && q.scale > 0.82 && q.scale <= 0.85, `вернулись к потолку (с точностью до шага): ${q.scale}`);
+  run(16.7, 200);
+  assert.ok(st.ceil > 0.85 && q.scale > 0.85, 'долго ровно — потолок поднимается');
+  // подняли — и тут же просело: значит, выше не по силам, следующая попытка откладывается вдвое
+  Object.assign(st, newTuner());
+  q.scale = 0.7;
+  st.ceil = 0.8;
+  assert.ok(run(16.7, 12).some((r) => r.scale > 0.7), 'подняли');
+  assert.ok(run(30, 6).some((r) => r.scale < 0.76) && st.wait === 60, `просело сразу после подъёма — ждём дольше: ${st.wait}`);
+  // кадры между нормой и порогом (20 мс) — ни вверх, ни вниз
+  Object.assign(st, newTuner());
+  q.scale = 0.8;
+  assert.deepEqual(run(TARGET_MS * 1.1, 60), []);
+  // без плавного разрешения: только ступень, и не раньше четырёх секунд
+  Object.assign(st, newTuner());
+  const q2 = { scale: 1, floor: 0.62, canDrop: true, drs: false };
+  const outs = [];
+  for (let i = 0; i < 8; i++) outs.push(tuneStep(st, 40, q2));
+  assert.ok(outs.slice(0, 7).every((r) => r === null) && outs[7] && outs[7].drop);
+  // ручное качество: ступень не трогаем никогда
+  Object.assign(st, newTuner());
+  const q3 = { scale: 0.62, floor: 0.62, canDrop: false, drs: true };
+  for (let i = 0; i < 60; i++) assert.equal(tuneStep(st, 50, q3), null);
+});
+
+test('счётчик кадров: среднее, худшие кадры и рывки', () => {
+  const p = new Perf({ getContext: () => ({ getExtension: () => null, getParameter: () => 'Тестовая карта', RENDERER: 1 }) });
+  assert.equal(p.gpu, 'Тестовая карта');
+  for (let i = 0; i < 99; i++) p.push(10);
+  p.push(80);
+  p.push(5000); // вкладка была в фоне — не считается
+  const s = p.stats();
+  assert.ok(s.n === 100 && Math.abs(s.avg - 10.7) < 0.01 && s.max === 80 && s.hitches === 1 && Math.round(s.fps) === 93, JSON.stringify(s));
+});

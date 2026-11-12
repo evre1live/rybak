@@ -2,6 +2,7 @@
 // Render ставит пакеты с --omit=dev и ничего не собирает.
 import { build, context } from 'esbuild';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -40,3 +41,26 @@ if (watch) {
   const ctx = await context(opts);
   await ctx.watch();
 } else await build(opts);
+
+// Кэш игры на устройстве (public/sw.js): список файлов с отпечатками содержимого. По ним видно, что изменилось
+// с прошлой версии: остальное игрок заново не качает.
+if (!watch) {
+  const pub = path.join(root, 'public');
+  const files = {};
+  const walk = (dir) => {
+    for (const name of fs.readdirSync(dir).sort()) {
+      const full = path.join(dir, name);
+      if (fs.statSync(full).isDirectory()) walk(full);
+      else {
+        const rel = '/' + path.relative(pub, full).split(path.sep).join('/');
+        if (rel === '/sw.js') continue;
+        files[rel] = crypto.createHash('sha1').update(fs.readFileSync(full)).digest('hex').slice(0, 12);
+      }
+    }
+  };
+  walk(pub);
+  const version = crypto.createHash('sha1').update(JSON.stringify(files)).digest('hex').slice(0, 10);
+  const src = fs.readFileSync(path.join(root, 'tools/sw.src.js'), 'utf8');
+  fs.writeFileSync(path.join(pub, 'sw.js'), src.replace("'__VERSION__'", JSON.stringify(version)).replace('__FILES__', JSON.stringify(files)));
+  console.log(`  public/sw.js  версия ${version}, файлов ${Object.keys(files).length}`);
+}

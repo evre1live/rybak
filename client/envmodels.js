@@ -9,6 +9,7 @@ import { loadManifest } from './hero.js';
 import { modelInfo, loadModel, spawn } from './models.js';
 import { Scatter, spot01 } from './scatter.js';
 import { patchModel } from './surface.js';
+import { small } from './smalls.js';
 import { canvasTex, isTouch, TAU } from './util.js';
 import { BOXES, CIRCLES, DECK_Y, groundH } from './terrain.js';
 
@@ -38,7 +39,7 @@ export const envState = () => ({ ...state, lit: lits.length, glowing: lits.reduc
 const GREY = (k) => ({ r: k, g: k, b: k });
 // как рисуются копии камней: rock — вблизи поверх текстуры мелкий рисунок камня (surface.js)
 const ROCK_OPT = {
-  'env-rock1': { cell: 60, near: 45, vary: 0.3, tint: GREY(1.25), rock: true },
+  'env-rock1': { cell: 104, near: 45, vary: 0.3, tint: GREY(1.25), rock: true },
   'env-rock2': { cell: 400, near: 1e5, vary: 0.2, tint: GREY(1.45), rock: true },
   'env-rock3': { cell: 400, near: 1e5, vary: 0.2, tint: GREY(1.42), rock: true },
   'env-cliff1': { cell: 130, near: 140, vary: 0.25, tint: GREY(1.0), rock: true },
@@ -159,8 +160,10 @@ function patched(tpl, opts) {
   }
   return tpl;
 }
-function put(scene, tpl, p) {
+/** size — наибольший размер в метрах, если предмет мелкий: такой не отражается в воде и не рисуется издали (smalls.js). */
+function put(scene, tpl, p, size = 0) {
   const o = spawn(patched(tpl, p.rock ? { rock: true } : undefined));
+  if (size) small(o, p.x, p.z, size);
   if (p.fit) {
     const size = modelInfo(p.id).size;
     o.scale.set(p.fit[0] / size[0], p.fit[1] / size[1], p.fit[2] / size[2]);
@@ -216,7 +219,7 @@ export function upgradeEnv(scene) {
         'env-bush': { sway: 0.006, near: 22, tint: { r: 0.74, g: 0.94, b: 0.9 }, sat: 0.78 }
       };
       Promise.all(trees.map((id) => loadModel(id)))
-        .then(() => Promise.all(trees.map((id) => scatter.add(id, ENV.flora[id], { cell: 56, near: 55, vary: 0.55, ...opt[id] }))))
+        .then(() => Promise.all(trees.map((id) => scatter.add(id, ENV.flora[id], { cell: 104, near: 55, vary: 0.55, ...opt[id] }))))
         .then(() => {
           drop(scene, 'trees');
           state.trees = true;
@@ -251,7 +254,7 @@ export function upgradeEnv(scene) {
     }
     // ── сваи причалов: рядом подробные, дальше — грубые копии ──
     if (has('env-pile'))
-      scatter.add('env-pile', ENV.docks, { cell: 36, near: 30, vary: 0.35 }).then(() => {
+      scatter.add('env-pile', ENV.docks, { cell: 72, near: 30, vary: 0.35 }).then(() => {
         drop(scene, 'piles');
         state.piles = ENV.docks.length;
       }, fail);
@@ -263,7 +266,9 @@ export function upgradeEnv(scene) {
           tpl.gained = true;
           tpl.scene.traverse((c) => c.isMesh && c.material.color.multiplyScalar(p.gain));
         }
-        const o = put(scene, tpl, p);
+        // мелкие одиночные модели (не фонари: их отражение в воде заметно) — в «мелочь»
+        const sz = modelInfo(p.id) && modelInfo(p.id).size ? Math.max(...modelInfo(p.id).size) * (p.s || 1) : 9;
+        const o = put(scene, tpl, p, !p.fit && !p.lit && !p.glows && !p.fire && sz < 3.2 ? sz : 0);
         if (p.key) drop(scene, p.key);
         if (p.key && p.key in state) state[p.key] = true;
         if (p.block) CIRCLES.push({ x: p.x, z: p.z, r: p.block });
@@ -350,14 +355,14 @@ export function upgradeEnv(scene) {
       loadModel('env-fender').then((tpl) => {
         const s = 1.05;
         for (const [x, z, ry] of [[1.76, -10.9, Math.PI / 2], [1.76, -13.3, Math.PI / 2], [-17.1, -69.86, 0], [-18.6, -69.86, 0], [211.0, -185.36, 0], [212.4, -185.36, 0]]) {
-          put(scene, tpl, { x, y: DECK_Y + 0.1 - s * 0.988, z, s, ry });
+          put(scene, tpl, { x, y: DECK_Y + 0.1 - s * 0.988, z, s, ry }, 1.05);
           state.singles++;
         }
       }, fail);
     // ── скамейка на причале у маяка ──
     if (has('env-bench'))
       loadModel('env-bench').then((tpl) => {
-        put(scene, tpl, { x: -17.8, y: DECK_Y, z: -78.0, s: 1.62, ry: Math.PI });
+        put(scene, tpl, { x: -17.8, y: DECK_Y, z: -78.0, s: 1.62, ry: Math.PI }, 1.62);
         CIRCLES.push({ x: -17.8, z: -78.0, r: 0.65 });
         state.singles++;
       }, fail);
@@ -376,7 +381,7 @@ export function upgradeEnv(scene) {
           }
           if (!best) continue;
           const ry = spot01(best[0], best[2], 6) * TAU;
-          const o = put(scene, tpl, { x: best[0], y: best[1], z: best[2], s: 0.5, ry });
+          const o = put(scene, tpl, { x: best[0], y: best[1], z: best[2], s: 0.5, ry }, 0.8);
           gulls.push({ o, ry, pile: best, ph: ry * 3, turn: 0 });
           state.gulls++;
         }

@@ -1,0 +1,17 @@
+{
+  "name": "Рыбак — рыбалка с друзьями",
+  "short_name": "Рыбак",
+  "description": "Рыбалка с друзьями от первого лица: голосовой чат, рынок, снасти и свой персонаж.",
+  "lang": "ru",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0b1d3a",
+  "theme_color": "#0e2140",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

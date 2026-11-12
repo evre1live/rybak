@@ -512,6 +512,7 @@ export class UI {
         <div class="or">или</div>
         <button class="btn ghost" data-a="solo"><span>РЫБАЧИТЬ В ОДИНОЧКУ</span></button>`}
       </div>
+      <div class="tnote${this.g.serverUp === false ? '' : ' hidden'}" id="srvNote">Сервер просыпается — комнаты заработают через минуту. В одиночку можно рыбачить уже сейчас.</div>
       <div class="tfoot">${this.g.offline ? 'Прогресс хранится в этом браузере' : 'Голосовой чат включается в комнате · прогресс хранится в этом браузере'}<br><a data-a="help">Как играть</a> · <a data-a="settings">Настройки</a></div>
     </div>`;
     setTimeout(() => {
@@ -557,6 +558,7 @@ export class UI {
     else if (name === 'help') this.renderHelp();
     else if (name === 'quests') this.renderQuests();
     else if (name === 'tour') this.renderTour();
+    else if (name === 'bench') this.renderBench();
     this.g.onPanel(name);
   }
   closePanel() {
@@ -730,7 +732,9 @@ export class UI {
         <span>Чувствительность мыши</span>${rng('sens', 0.3, 3, 0.05)}
         <span>Перевернуть мышь по вертикали</span>${tog('invertY')}
         <span>Угол обзора</span>${rng('fov', 50, 90, 1)}
-        <span>Графика</span><select data-set="quality">${[['auto', 'Авто'], ['high', 'Высокая'], ['medium', 'Средняя'], ['low', 'Низкая']].map(([v, n]) => `<option value="${v}" ${s.quality === v ? 'selected' : ''}>${n}</option>`).join('')}</select>
+        <span>Графика${s.quality === 'auto' ? `<small class="sub">сейчас: ${{ low: 'низкая', medium: 'средняя', high: 'высокая' }[this.g.gfx.quality]}${this.g.gfx.scale < 0.99 ? `, разрешение ${Math.round(this.g.gfx.scale * 100)}%` : ''}</small>` : ''}</span><select data-set="quality">${[['auto', 'Авто'], ['high', 'Высокая'], ['medium', 'Средняя'], ['low', 'Низкая']].map(([v, n]) => `<option value="${v}" ${s.quality === v ? 'selected' : ''}>${n}</option>`).join('')}</select>
+        <span>Плавное разрешение<small class="sub">кадры проседают — картинка чуть мельче</small></span>${tog('drs')}
+        <span>Счётчик кадров (F3)</span>${tog('fps')}
         <span>Общая громкость</span>${rng('master', 0, 1, 0.02)}
         <span>Море, чайки, ветер</span>${rng('amb', 0, 1, 0.02)}
         <span>Звуки рыбалки</span>${rng('sfx', 0, 1, 0.02)}
@@ -739,8 +743,51 @@ export class UI {
         <span>Голос тише с расстоянием</span>${tog('near')}
         <span>Подсказки клавиш внизу</span>${tog('hints')}
       </div>
+      ${this.g.cache && this.g.cache.on ? `<div class="hint cachenote">Игра сохранена на этом устройстве${this.g.cache.total ? `: ${this.g.cache.done} из ${this.g.cache.total} файлов` : ''} — открывается сразу и не ждёт сервер.</div>` : ''}
       <button class="btn pri" data-a="close"><span>ГОТОВО</span></button>
+      ${this.g.installPrompt ? '<button class="btn sm" data-a="install"><span>УСТАНОВИТЬ КАК ПРИЛОЖЕНИЕ</span></button>' : ''}
+      <button class="btn sm" data-a="bench"><span>ПРОВЕРКА КОМПЬЮТЕРА</span></button>
       <button class="btn ghost sm" data-a="reset"><span>НАЧАТЬ ЗАНОВО — СТЕРЕТЬ ПРОГРЕСС</span></button></div>`;
+  }
+  /** Проверка компьютера: идёт замер — полоса, кончился — итог, который можно скопировать и прислать. */
+  renderBench() {
+    const r = this.g.lastBench;
+    const run = this.benchRun;
+    this.screen.innerHTML = `<div class="dim${run ? ' clear' : ''}"></div><div class="center bench">
+      <h1>ПРОВЕРКА КОМПЬЮТЕРА</h1>
+      ${run ? `<div class="hint">Смотрим четыре вида бухты: ${esc(run.name || '…')}</div><div class="bbar"><i style="transform:scaleX(${(run.k || 0).toFixed(2)})"></i></div>`
+        : r ? `<div class="verdict">${esc(r.verdict)}</div><pre class="report">${esc(r.text)}</pre>
+      <div class="hint">Если игра тормозит — скопируйте этот текст и пришлите: по нему видно, что именно мешает.</div>
+      <button class="btn pri" data-a="benchcopy"><span>СКОПИРОВАТЬ</span></button>
+      ${settings.quality === 'auto' ? '<button class="btn sm" data-a="recalib"><span>ПОДОБРАТЬ КАЧЕСТВО ЗАНОВО</span></button>' : ''}` : ''}
+      ${run ? '' : '<button class="btn ghost sm" data-a="open" data-p="settings"><span>НАЗАД</span></button>'}</div>`;
+  }
+  async runBench(recalib = false) {
+    if (this.benchRun) return;
+    this.benchRun = { k: 0, name: '' };
+    this.openPanel('bench');
+    if (recalib) {
+      this.benchRun.name = 'подбираем качество';
+      this.renderBench();
+      await this.g.recalibrate();
+    }
+    await this.g.bench((k, name) => {
+      this.benchRun = { k, name };
+      if (this.panel === 'bench') this.renderBench();
+    });
+    this.benchRun = null;
+    if (this.panel === 'bench') this.renderBench();
+  }
+  /** Окошко со счётчиком кадров (F3): html — что показать, null — убрать. */
+  perfBox(html) {
+    let el = $('#perfBox');
+    if (html == null) return el && el.remove();
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'perfBox';
+      document.body.appendChild(el);
+    }
+    el.innerHTML = html;
   }
   renderPause() {
     const g = this.g;
@@ -926,6 +973,23 @@ export class UI {
         g.saveLook({ hero: this.ed.look.hero });
         return this.closePanel();
       case 'edcancel': return this.closePanel();
+      case 'install': {
+        const pr = g.installPrompt;
+        if (!pr) return;
+        g.installPrompt = null;
+        pr.prompt();
+        return this.renderSettings();
+      }
+      case 'bench': return this.runBench();
+      case 'recalib': return this.runBench(true);
+      case 'benchcopy': {
+        const r = g.lastBench;
+        if (!r) return;
+        const done = () => this.toast('Отчёт скопирован — вставьте его в сообщение', 'good', 2600);
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(r.text).then(done, () => this.toast('Не вышло скопировать — выделите текст мышью', '', 3000));
+        else this.toast('Выделите текст мышью и скопируйте', '', 3000);
+        return;
+      }
       case 'tog':
         settings[id] = !settings[id];
         saveSettings();

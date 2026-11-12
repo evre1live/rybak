@@ -1,6 +1,6 @@
 // РЫБАК — сборка игры: состояния (меню → лобби → рыбалка), главный цикл, связь всех частей.
 import * as THREE from 'three';
-import { Gfx } from './gfx.js';
+import { Gfx, QUALITIES } from './gfx.js';
 import { loadManifest, loadHero, heroes, fpLook, heroEye } from './hero.js';
 import { loadModel, modelInfo } from './models.js';
 import { setEnvLight } from './env.js';
@@ -19,7 +19,7 @@ import { Net } from './net.js';
 import { createVoice } from './voice.js';
 import { Audio2 } from './audio.js';
 import { UI } from './ui.js';
-import { loadProfile, saveProfile, settings, session } from './profile.js';
+import { loadProfile, saveProfile, settings, saveSettings, session } from './profile.js';
 import { S, FLAG } from './proto.js';
 import { DECK_Y, MARKET, MOORINGS, RENT_DESK, MAP_VIEW, WRECK, SEA, ISLAND, palmR, canStand } from './terrain.js';
 import { ITEMS, FISH_BY_ID, JUNK_BY_ID, RARITY, ZONES, BAITS, LURES, clockHours, dayPart, fmtW, fmtCoins, isLure } from '../shared/data.js';
@@ -29,6 +29,9 @@ import {
   TOURS, TOUR_COUNTDOWN, tourBlank, tourAdd, tourTable, tourPrize, tourMedal, medalPrize, tourScoreText, MEDALS
 } from '../shared/logic.js';
 import { $, esc, clamp, damp, isTouch } from './util.js';
+import { Perf, isSoftware, newTuner, tuneStep, needDrop, scaleFor, TARGET_MS } from './perf.js';
+import { surfaceU } from './surface.js';
+import { initCache, wakeServer } from './offline.js';
 
 const SPAWNS = [[-2, 9], [0.6, 9.4], [-4, 8.2], [2.6, 8.6], [-1, 11], [1.6, 11.4], [-3.6, 11], [3.6, 10.4]];
 const LINE_Z = 7;
@@ -64,11 +67,18 @@ class Game {
     const touch = isTouch();
     document.body.classList.toggle('touch', touch);
     this.auto = settings.quality === 'auto';
-    this.gfx = new Gfx(this.canvas, q.get('q') || (this.auto ? (touch ? 'medium' : 'high') : settings.quality));
+    // на «авто» начинаем с того, что подобрали на этой машине в прошлый раз (calibrate), а не с «высокого»
+    const was = this.auto && settings.autoQ && QUALITIES.includes(settings.autoQ.tier) ? settings.autoQ : null;
+    this.gfx = new Gfx(this.canvas, q.get('q') || (this.auto ? (was ? was.tier : touch ? 'medium' : 'high') : settings.quality));
+    this.perf = new Perf(this.gfx.renderer);
+    this.tuner = newTuner();
+    this.perfOn = false; // окошко со счётчиком кадров (F3)
+    this.calib = null; // чем кончился подбор качества при загрузке
     this.world = new World();
     this.scene = this.world.scene;
     this.camera = new THREE.PerspectiveCamera(settings.fov, this.gfx.w / Math.max(1, this.gfx.h), 0.07, 3400);
     this.camera.rotation.order = 'YXZ';
+    this.camera.layers.enable(1); // слой 1 — мелочь, которой нет в отражении воды: игрок её видит, зеркальная камера — нет
     this.scene.add(this.camera);
     this.input = new Input(this.canvas);
     this.input.touch.on = touch;
@@ -102,6 +112,7 @@ class Game {
     };
     // мягкий свет от камеры на экране команды и в редакторе: лица не должны тонуть в тени, когда солнце сзади
     this.fill = new THREE.DirectionalLight('#fff1dc', 0);
+    this.fill.visible = false; // погашена — значит, её нет: иначе она считалась бы в шейдерах всей сцены
     this.scene.add(this.fill, this.fill.target);
     this.audio = new Audio2();
     // шаги: доски причала, земля, вода по колено
@@ -197,7 +208,16 @@ class Game {
     this.ui.refreshHud();
     this.ui.showTitle();
     this.last = performance.now();
-    requestAnimationFrame((t) => this.frame(t));
+    // кэш игры на устройстве и сервер: из кэша игра открывается раньше, чем проснётся сервер, — говорим об этом на заставке
+    this.serverUp = null;
+    initCache(this);
+    wakeServer((ok) => {
+      if (this.serverUp === ok) return;
+      this.serverUp = ok;
+      const el = $('#srvNote');
+      if (el) el.classList.toggle('hidden', ok || this.state !== 'title');
+    });
+    this.boot();
     setTimeout(() => $('#loading').classList.add('out'), 300);
     setTimeout(() => $('#loading').remove(), 1200);
   }
@@ -839,8 +859,23 @@ class Game {
     this.camera.fov = settings.fov;
     this.camera.updateProjectionMatrix();
     this.audio.applyVolume();
-    this.auto = settings.quality === 'auto';
-    if (!this.auto && !this.params.get('q')) this.gfx.setQuality(settings.quality);
+    const auto = settings.quality === 'auto';
+    if (!this.params.get('q')) {
+      if (!auto) {
+        this.gfx.setQuality(settings.quality);
+        if (this.auto || settings.drs === false) this.gfx.setScale(1); // выбрали качество сами — разрешение полное
+      } else if (!this.auto && !this.booting) {
+        // вернулись на «авто»: берём то, что подобрано для этой видеокарты
+        const a = settings.autoQ;
+        if (a && a.gpu === this.perf.gpu && QUALITIES.includes(a.tier)) {
+          this.gfx.setQuality(a.tier);
+          this.gfx.setScale(a.scale || 1);
+        }
+      }
+    }
+    this.auto = auto;
+    this.tuner = newTuner();
+    if (this.perfOn !== !!settings.fps) this.togglePerf(!!settings.fps);
     this.ui.hintKey = '';
   }
 
@@ -1102,6 +1137,10 @@ class Game {
   // ───── клавиши вне игрового цикла ─────
   onKey(e) {
     const ui = this.ui;
+    if (e.code === 'F3') {
+      e.preventDefault();
+      return this.togglePerf();
+    }
     if (ui.chatOpen) {
       if (e.code === 'Escape') {
         this.input.lockedAt = performance.now(); // Esc заодно отпускает мышь — паузу из-за этого не открываем
@@ -1353,8 +1392,10 @@ class Game {
 
   // ───── главный цикл ─────
   frame(now) {
-    requestAnimationFrame((t) => this.frame(t));
-    const dt = Math.max(0, Math.min(0.1, (now - this.last) / 1000)) * this.timeScale;
+    if (!this.manual) requestAnimationFrame((t) => this.frame(t)); // при замерах кадры идут по команде, а не по часам экрана
+    const frameT0 = performance.now();
+    const rawMs = now - this.last;
+    const dt = Math.max(0, Math.min(0.1, rawMs / 1000)) * this.timeScale;
     this.last = now;
     if (this.gfx.resize()) {
       this.camera.aspect = this.gfx.w / this.gfx.h;
@@ -1493,6 +1534,7 @@ class Game {
     // свой персонаж: в лобби и в редакторе
     const showMe = this.state === 'lobby' || !!this.editing;
     this.fill.intensity = damp(this.fill.intensity, showMe ? (this.world.night > 0.5 ? 0.55 : 1.0) : 0, 6, dt);
+    this.fill.visible = this.fill.intensity > 0.01; // погашенная подсветка не должна считаться в шейдерах всей сцены
     if (this.fill.intensity > 0.01) {
       this.fill.position.copy(this.camera.position);
       this.camera.getWorldDirection(this.fill.target.position).multiplyScalar(6).add(this.camera.position);
@@ -1557,6 +1599,13 @@ class Game {
     }
     this.vendor.update(dt, { mode: 'idle', variant: ui.panel === 'sell' || ui.panel === 'shop' ? 1 : 0, talk: ui.panel === 'sell' ? 0.3 : 0 });
 
+    if (this.camOverride) {
+      // проверка компьютера: вид задан, игрок и меню не при чём
+      cam.position.set(...this.camOverride.p);
+      cam.lookAt(...this.camOverride.t);
+      cam.fov = 60;
+      cam.updateProjectionMatrix();
+    }
     const schools = this.world.scenery.schools;
     schools.update(hashStr(this.seed), Math.max(0, T));
     {
@@ -1586,20 +1635,291 @@ class Game {
     }
     i.endFrame();
     window.__frames = (window.__frames || 0) + 1;
-    // автоподбор качества: если кадры долгие — упрощаем картинку
-    this.frameMs = this.frameMs * 0.95 + dt * 1000 * 0.05;
-    if (this.auto && this.state === 'world' && !this.params.get('q')) {
-      this.slowT = this.frameMs > 30 ? this.slowT + dt : Math.max(0, this.slowT - dt);
-      if (this.slowT > 4) {
-        this.slowT = 0;
-        // сначала отказываемся от самого дорогого — отражений в воде (ради них сцена рисуется второй раз); не помогло — качество ниже
-        if (this.gfx.quality === 'high' && this.gfx.canPost && this.gfx.reflect) this.gfx.reflect = false;
-        else {
-          const q = this.gfx.quality === 'high' ? 'medium' : this.gfx.quality === 'medium' ? 'low' : null;
-          if (q) this.gfx.setQuality(q);
-        }
+    this.frameMs = this.frameMs * 0.95 + rawMs * 0.05;
+    if (!this.manual) {
+      this.perf.push(rawMs);
+      if (this.tunePlan) {
+        // Прежде чем упрощать картинку, проверяем, что кадры долгие из-за неё: ждём видеокарту и смотрим цену этого кадра.
+        // Браузер в режиме экономии сам держит 30 кадров в секунду — тогда упрощать бесполезно, картинка станет хуже даром.
+        const plan = this.tunePlan;
+        this.tunePlan = null;
+        const gl = this.gfx.renderer.getContext();
+        gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, (this.px1 = this.px1 || new Uint8Array(4)));
+        const work = performance.now() - frameT0;
+        this.lastWork = work;
+        if (work > TARGET_MS * 0.6) this.applyTune(plan);
+        else this.tuner.hold = 20; // десять секунд не трогаем: дело не в отрисовке
+      }
+      this.tune(rawMs);
+      if (this.perfOn && (this.perfT = (this.perfT || 0) + rawMs) > 500) {
+        this.perfT = 0;
+        this.ui.perfBox(this.perfLine());
       }
     }
+  }
+  /**
+   * Загрузка за заставкой: модели локации, шейдеры, текстуры и подбор качества. Всё, что иначе случилось бы
+   * рывками уже в игре (первая отрисовка предмета — сборка его шейдера и отправка текстур), делается здесь.
+   */
+  async boot() {
+    const el = $('#boot'), fill = $('#bootFill'), txt = $('#bootTxt');
+    const say = (k, text) => {
+      if (fill) fill.style.transform = `scaleX(${k.toFixed(3)})`;
+      if (txt && text) txt.textContent = text;
+    };
+    const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
+    // проверкам (?norender) ждать нечего; ?boot=full — пройти загрузку целиком и в них
+    const quick = (this.noRender || this.offline) && this.params.get('boot') !== 'full';
+    this.booting = true;
+    try {
+      if (!quick) {
+        say(0.3, 'Загружаем модели…');
+        const sc = this.world.scenery;
+        for (let i = 0; i < 120; i++) {
+          // не дольше 12 секунд: на медленной сети остальное догрузится уже на заставке
+          const e = sc.envState();
+          const got = [e.trees, e.palms, e.rocks, e.lighthouse, e.kiosk, e.lamps > 0, !sc.propsState().fallback].filter(Boolean).length;
+          say(0.3 + 0.3 * (got / 7));
+          if (got === 7) break;
+          await wait(100);
+        }
+        // без видеокарты (программная отрисовка) «высокое» незачем даже собирать
+        if (this.auto && !this.params.get('q') && !settings.autoQ && isSoftware(this.perf.gpu)) this.gfx.setQuality('low');
+        say(0.6, 'Готовим видеокарту…');
+        await this.gfx.prepare(this.scene, this.camera, (k) => say(0.6 + 0.26 * k), Object.values(surfaceU).map((u) => u.value));
+        if (this.auto && !this.params.get('q')) {
+          say(0.86, 'Подбираем качество…');
+          await this.calibrate();
+        }
+        say(0.94, 'Зажигаем фонари…');
+        await this.prelight();
+        // один кадр за заставкой: соберётся то, что собирается только при отрисовке (шейдеры теней), и уйдут буферы
+        this.manual = true;
+        if (this.noRender) window.__render = true;
+        this.frame(performance.now());
+        await wait(0);
+      } else if (this.auto && !this.params.get('q') && settings.autoQ && settings.autoQ.gpu === this.perf.gpu) {
+        this.gfx.setScale(settings.autoQ.scale || 1);
+        if (settings.autoQ.refl === false) this.gfx.reflect = false;
+      }
+    } catch (e) {
+      console.warn('загрузка', e);
+    }
+    this.booting = false;
+    say(1);
+    if (el) {
+      el.classList.add('gone');
+      setTimeout(() => el.remove(), 700);
+    }
+    this.manual = false;
+    this.last = performance.now();
+    requestAnimationFrame((t) => this.frame(t));
+  }
+  /**
+   * Ночью горят фонари, в лобби героя подсвечивает лампа у камеры — а число источников света зашито в шейдеры всей сцены.
+   * Собираем оба набора заранее (браузер делает это в фоне): на закате и при входе в лобби рывка не будет.
+   */
+  async prelight() {
+    const lamps = this.world.scenery.lampLights;
+    const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
+    for (const [L, F] of [[true, false], [false, true]]) {
+      const keep = [lamps.map((l) => l.visible), this.fill.visible];
+      lamps.forEach((l) => (l.visible = L));
+      this.fill.visible = F;
+      try {
+        await Promise.race([this.gfx.renderer.compileAsync(this.scene, this.camera), wait(20000)]);
+      } catch (e) {
+        /* соберутся, когда понадобятся */
+      }
+      lamps.forEach((l, i) => (l.visible = keep[0][i]));
+      this.fill.visible = keep[1];
+    }
+  }
+  /** Цена кадра, мс: рисуем кадр и ждём, пока видеокарта его закончит, — так видно настоящее время, а не частоту экрана. */
+  async frameCost(n = 8, warm = 3) {
+    const gl = this.gfx.renderer.getContext();
+    const px = new Uint8Array(4);
+    const ms = [];
+    const manual = this.manual;
+    this.manual = true;
+    for (let i = 0; i < n + warm; i++) {
+      const t = performance.now();
+      if (this.noRender) window.__render = true;
+      this.frame(t);
+      gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      if (i >= warm) ms.push(performance.now() - t);
+      if (i % 4 === 3) await new Promise((ok) => setTimeout(ok, 0)); // заставка и страница должны дышать
+    }
+    this.manual = manual;
+    return ms.sort((a, b) => a - b)[ms.length >> 1];
+  }
+  /**
+   * Подбор качества под машину (на «авто»). Меряем цену кадра заставки: дорого — ступень ниже и новый замер;
+   * укладываемся с небольшим превышением — берём разрешение поменьше. Итог запоминается для этой видеокарты,
+   * в следующий раз игра начнёт сразу с него. force — мерить заново.
+   */
+  async calibrate(force = false) {
+    const g = this.gfx;
+    const gpu = this.perf.gpu;
+    const saved = settings.autoQ;
+    if (!force && saved && saved.gpu === gpu && QUALITIES.includes(saved.tier)) {
+      g.setQuality(saved.tier);
+      g.setScale(saved.scale || 1);
+      if (saved.refl === false) g.reflect = false; // от отражений в воде на этой машине уже отказывались
+      return (this.calib = { ...saved, from: 'saved' });
+    }
+    g.reflect = this.params.get('refl') !== '0';
+    g.setScale(1);
+    let tier = isSoftware(gpu) ? 'low' : isTouch() ? 'medium' : 'high';
+    g.setQuality(tier);
+    const log = [];
+    let ms = await this.frameCost();
+    log.push([tier, +ms.toFixed(1)]);
+    while (needDrop(ms, tier)) {
+      tier = tier === 'high' ? 'medium' : 'low';
+      g.setQuality(tier);
+      // на «низком» нет теней — у всех материалов другие шейдеры: собираем их заранее, не подвешивая страницу
+      await g.prepare(this.scene, this.camera);
+      ms = await this.frameCost();
+      log.push([tier, +ms.toFixed(1)]);
+    }
+    g.setScale(scaleFor(ms, tier));
+    this.tuner = newTuner();
+    settings.autoQ = { gpu, tier, scale: g.scale, ms: +ms.toFixed(1), v: 1 };
+    saveSettings();
+    return (this.calib = { ...settings.autoQ, from: 'measured', log });
+  }
+  /** Автоподбор на ходу: кадры проседают — уменьшаем разрешение, не помогло — картинка проще; полегчало — возвращаем. */
+  tune(ms) {
+    const g = this.gfx;
+    if (this.params.get('q') || this.noRender || this.booting || document.hidden || ms > 400) return;
+    const A = (this.tuneAcc = this.tuneAcc || { sum: 0, n: 0 });
+    A.sum += ms;
+    A.n++;
+    if (A.sum < 500) return;
+    const avg = A.sum / A.n;
+    A.sum = A.n = 0;
+    const out = tuneStep(this.tuner, avg, { scale: g.scale, floor: g.quality === 'low' ? 0.5 : 0.62, canDrop: this.auto && g.quality !== 'low', drs: settings.drs !== false });
+    if (!out) return;
+    // вверх — сразу; вниз — после проверки настоящей цены следующего кадра (см. frame)
+    if (out.scale && out.scale > g.scale) this.applyTune(out);
+    else this.tunePlan = out;
+  }
+  applyTune(out) {
+    const g = this.gfx;
+    if (out.scale) g.setScale(out.scale);
+    else if (g.quality === 'high' && g.canPost && g.reflect) g.reflect = false; // сначала отказываемся от самого дорогого — отражений (ради них сцена рисуется второй раз)
+    else {
+      g.setQuality(g.quality === 'high' ? 'medium' : 'low');
+      g.setScale(0.85);
+    }
+    if (this.auto) {
+      settings.autoQ = { gpu: this.perf.gpu, tier: g.quality, scale: g.scale, refl: g.reflect, v: 1 };
+      saveSettings();
+    }
+  }
+  /** Подбор качества заново (кнопка в «Проверке компьютера»): кадры на время замера идут по команде. */
+  async recalibrate() {
+    if (this.benchOn || !this.auto) return this.calib;
+    this.benchOn = true;
+    this.manual = true;
+    await new Promise((ok) => setTimeout(ok, 60));
+    const keep = [this.fixedHour, this.forceWx];
+    this.fixedHour = 14.5;
+    this.forceWx = 'clear';
+    this.camOverride = { p: [0.5, 3, -26], t: [-6, 2.5, 30] };
+    try {
+      await this.calibrate(true);
+    } finally {
+      this.camOverride = null;
+      [this.fixedHour, this.forceWx] = keep;
+      this.manual = false;
+      this.benchOn = false;
+      this.last = performance.now();
+      requestAnimationFrame((t) => this.frame(t));
+    }
+    return this.calib;
+  }
+  /** Строка для окошка F3. */
+  perfLine() {
+    const s = this.perf.stats(), g = this.gfx, r = g.renderer, i = r.info.render;
+    const qn = { low: 'низкое', medium: 'среднее', high: 'высокое' }[g.quality];
+    return `${s.fps.toFixed(0)} к/с · ${s.avg.toFixed(1)} мс · худшие ${s.p99.toFixed(0)} мс<br>${qn}${this.auto ? ' (авто)' : ''} · ${r.domElement.width}×${r.domElement.height}${g.scale < 0.99 ? ` · ${Math.round(g.scale * 100)}%` : ''}<br>вызовов ${i.calls} · треугольников ${(i.triangles / 1000).toFixed(0)} тыс.`;
+  }
+  togglePerf(on = !this.perfOn) {
+    this.perfOn = on;
+    settings.fps = on;
+    saveSettings();
+    this.perf.reset();
+    this.ui.perfBox(on ? this.perfLine() : null);
+  }
+  /**
+   * «Проверка компьютера»: четыре вида бухты, на каждом — цена кадра (с ожиданием видеокарты) и обычный ход по часам экрана.
+   * Итог — текст, который можно скопировать и прислать: по нему видно, что на этой машине тормозит.
+   */
+  async bench(onStep = () => {}, { frames = 14, warm = 4, pace = 70 } = {}) {
+    if (this.benchOn) return null;
+    this.benchOn = true;
+    const VIEWS = [['пирс', [0.5, 3, -26], [-6, 2.5, 30]], ['берег', [-22, 2.9, 13], [40, 3, 6]], ['заводь', [-28, 2.9, 4], [-44, 0.5, 15]], ['море', [-70, 2.3, -150], [10, 12, 30]]];
+    const g = this.gfx, r = g.renderer;
+    const keepHour = this.fixedHour, keepWx = this.forceWx;
+    this.fixedHour = 14.5;
+    this.forceWx = 'clear';
+    this.manual = true;
+    await new Promise((ok) => setTimeout(ok, 60)); // очередной кадр по часам экрана пройдёт и больше не назначится
+    const rows = [];
+    const deltas = [];
+    let hitches = 0;
+    for (let v = 0; v < VIEWS.length; v++) {
+      const [name, p, t] = VIEWS[v];
+      onStep(v / VIEWS.length, name);
+      this.camOverride = { p, t };
+      const cost = await this.frameCost(frames, warm);
+      const info = { calls: r.info.render.calls, tris: r.info.render.triangles };
+      // обычный ход: кадры по часам экрана, как в игре
+      let last = 0;
+      for (let i = 0; i < pace; i++) {
+        const now = await new Promise((ok) => requestAnimationFrame(ok));
+        if (this.noRender) window.__render = true;
+        this.frame(now);
+        if (i > Math.min(5, pace >> 1) && last) {
+          deltas.push(now - last);
+          if (now - last > 50) hitches++;
+        }
+        last = now;
+      }
+      rows.push({ name, cost, ...info });
+    }
+    this.camOverride = null;
+    this.fixedHour = keepHour;
+    this.forceWx = keepWx;
+    this.manual = false;
+    this.benchOn = false;
+    this.last = performance.now();
+    requestAnimationFrame((t) => this.frame(t));
+    deltas.sort((a, b) => a - b);
+    const avg = deltas.reduce((s, x) => s + x, 0) / Math.max(1, deltas.length);
+    const res = {
+      gpu: this.perf.gpu, quality: g.quality, auto: this.auto, scale: g.scale, buf: [r.domElement.width, r.domElement.height], screen: [g.w, g.h], dpr: window.devicePixelRatio || 1,
+      rows, fps: 1000 / Math.max(avg, 0.1), p99: deltas[Math.floor(deltas.length * 0.99)] || 0, max: deltas[deltas.length - 1] || 0, hitches,
+      cores: navigator.hardwareConcurrency || 0, mem: navigator.deviceMemory || 0, ua: navigator.userAgent
+    };
+    const qn = { low: 'низкое', medium: 'среднее', high: 'высокое' }[res.quality];
+    const worst = Math.max(...rows.map((x) => x.cost));
+    res.verdict = res.fps >= 55 && worst < 14 ? 'Игра идёт плавно, запас есть.' : res.fps >= 50 ? 'Игра идёт плавно, но без запаса.' : res.fps >= 38 ? 'Тяжеловато: кадров меньше, чем хотелось бы.' : 'Этой машине тяжело.';
+    res.text = [
+      'РЫБАК — проверка компьютера',
+      `Видеокарта: ${res.gpu || 'браузер не сообщил'}`,
+      `Окно ${res.screen[0]}×${res.screen[1]} (×${res.dpr}), рисуется ${res.buf[0]}×${res.buf[1]}${res.scale < 0.99 ? `, разрешение ${Math.round(res.scale * 100)}%` : ''}`,
+      `Качество: ${qn}${res.auto ? ' (авто)' : ''}`,
+      `Цена кадра, мс: ${rows.map((x) => `${x.name} ${x.cost.toFixed(1)}`).join(', ')}`,
+      `В игре: ${res.fps.toFixed(0)} к/с, худшие кадры ${res.p99.toFixed(0)} мс, самый долгий ${res.max.toFixed(0)} мс, рывков дольше 50 мс: ${hitches}`,
+      `Вызовов отрисовки ${Math.min(...rows.map((x) => x.calls))}–${Math.max(...rows.map((x) => x.calls))}, треугольников ${(Math.min(...rows.map((x) => x.tris)) / 1e6).toFixed(2)}–${(Math.max(...rows.map((x) => x.tris)) / 1e6).toFixed(2)} млн`,
+      `Процессор: потоков ${res.cores || '?'}, память ${res.mem ? res.mem + ' ГБ' : '?'}`,
+      res.ua,
+      res.verdict
+    ].join('\n');
+    return (this.lastBench = res);
   }
   /** Картинка бухты для карточки места в лобби — снимаем один раз с готового кадра. */
   takeShot() {
@@ -1682,4 +2002,7 @@ class Game {
   }
 }
 
-window.RYBAK = new Game();
+// Мир строится одним куском и занимает страницу на несколько секунд: сначала даём браузеру нарисовать заставку.
+const start = () => (window.RYBAK = new Game());
+if (new URLSearchParams(location.search).has('norender')) start();
+else requestAnimationFrame(() => setTimeout(start, 30));

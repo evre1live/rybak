@@ -10,6 +10,7 @@ import { rng, rockGeo, blobGeo, canvasTex, shade, sstep, TAU, fbm2 } from './uti
 import { DECKS, CIRCLES, DECK_Y, groundH, shoreZ, islandR, ISLAND, ARCH, ARCH_LEGS, REEF, CAPE, capeDist, FALLS, LIGHTHOUSE, COTTAGE, cottageUV, BACKWATER, deckAt, SCHOOL_HOMES } from './terrain.js';
 import { waveH } from './water.js';
 import { Fauna } from './fauna.js';
+import { small, cullSmall, smallState } from './smalls.js';
 
 const WOODS = ['#c58a4e', '#b97c42', '#d39a5d', '#a86f3a', '#c9945a'];
 const PILE_H = 2.1; // высота готовой сваи (env-pile), м: низ с водорослями приходится на кромку воды
@@ -412,6 +413,7 @@ function upgradeProps(scene, fallback, floaters) {
         o.position.set(p.x, bt && bt.info.size ? base.y + bt.info.size[1] * base.s : p.y, p.z);
         o.rotation.set(p.rx || 0, p.ry, p.rz || 0, 'YXZ');
         if (p.ns) o.traverse((c) => (c.castShadow = false)); // под крышей лавки тень всё равно не видна
+        small(o, p.x, p.z, tpl.info.size ? Math.max(...tpl.info.size) * p.s : 1);
         scene.add(o);
         propsDone.placed++;
       }
@@ -1127,38 +1129,69 @@ function buildFloaters(scene) {
 }
 
 function buildGulls(scene) {
-  const mat = new THREE.MeshStandardMaterial({ color: '#f8fafc', roughness: 0.9, side: THREE.DoubleSide });
-  const tip = new THREE.MeshStandardMaterial({ color: '#475569', roughness: 0.9, side: THREE.DoubleSide });
-  const gulls = [];
+  // Все чайки — один меш с копиями: тело и два крыла слиты в одну геометрию, взмах считает шейдер
+  // (aWing: −1 и +1 — левое и правое крыло, 0 — тело; aFlap — угол взмаха у каждой чайки свой).
+  const pos = [], col = [], wing = [];
+  const put = (g, c, w, m) => {
+    const p = g.attributes.position, ix = g.index;
+    const v = new THREE.Vector3();
+    const one = (i) => {
+      v.fromBufferAttribute(p, i).applyMatrix4(m);
+      pos.push(v.x, v.y, v.z);
+      col.push(c.r, c.g, c.b);
+      wing.push(w);
+    };
+    if (ix) for (let i = 0; i < ix.count; i++) one(ix.getX(i));
+    else for (let i = 0; i < p.count; i++) one(i);
+  };
+  const white = new THREE.Color('#f8fafc'), grey = new THREE.Color('#475569');
   const wingG = new THREE.BufferGeometry();
   wingG.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, -0.16, 0, 0, 0.16, 0.75, 0, 0.1, 0, 0, -0.16, 0.75, 0, 0.1, 0.8, 0, -0.08], 3));
-  wingG.computeVertexNormals();
+  const M4 = new THREE.Matrix4();
+  put(G.sph(8, 6), white, 0, M4.makeScale(0.22, 0.2, 0.62));
+  for (const s of [-1, 1]) {
+    put(wingG, white, s, M4.makeScale(s, 1, 1));
+    // тёмный кончик крыла: та же форма, вдвое короче, на конце
+    put(wingG, grey, s, M4.makeScale(s, 1, 1).multiply(new THREE.Matrix4().makeTranslation(0.72, 0, 0)).multiply(new THREE.Matrix4().makeScale(0.5, 1, 0.7)));
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  geo.setAttribute('aWing', new THREE.Float32BufferAttribute(wing, 1));
+  geo.computeVertexNormals();
   const centers = [[20, 34, -98, 28], [0, 16, -20, 20], [-30, 22, -40, 30], [50, 26, -50, 24], [5, 13, 4, 14]];
-  centers.forEach(([cx, cy, cz, rad], i) => {
-    const g = new THREE.Group();
-    const body = new THREE.Mesh(G.sph(8, 6), mat);
-    body.scale.set(0.22, 0.2, 0.62);
-    g.add(body);
-    const wings = [];
-    for (const s of [-1, 1]) {
-      const w = new THREE.Group();
-      const a = new THREE.Mesh(wingG, mat);
-      const b = new THREE.Mesh(wingG, tip);
-      b.scale.set(0.5, 1, 0.7);
-      b.position.x = 0.72;
-      a.add(b);
-      w.add(a);
-      w.scale.x = s;
-      g.add(w);
-      wings.push(w);
+  const flap = new THREE.InstancedBufferAttribute(new Float32Array(centers.length), 1);
+  geo.setAttribute('aFlap', flap);
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side: THREE.DoubleSide });
+  mat.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float aWing;\nattribute float aFlap;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n{ float a = aFlap * aWing; float c = cos(a), s = sin(a); transformed.xy = vec2(transformed.x * c - transformed.y * s, transformed.x * s + transformed.y * c); }');
+  };
+  mat.customProgramCacheKey = () => 'gull1';
+  const mesh = new THREE.InstancedMesh(geo, mat, centers.length);
+  mesh.frustumCulled = false; // чайки летают по всей бухте
+  mesh.name = 'gulls';
+  mesh.layers.set(1); // в отражении воды их нет
+  scene.add(mesh);
+  const o = new THREE.Object3D();
+  const list = centers.map(([cx, cy, cz, rad], i) => ({ cx, cy, cz, rad, ph: i * 1.7, sp: 0.16 + i * 0.03, dir: i % 2 ? 1 : -1 }));
+  return {
+    mesh,
+    update(t) {
+      list.forEach((b, i) => {
+        const a = b.ph + t * b.sp * b.dir;
+        o.position.set(b.cx + Math.cos(a) * b.rad, b.cy + Math.sin(t * 0.3 + b.ph) * 2.5, b.cz + Math.sin(a) * b.rad);
+        o.rotation.set(0, -a + (b.dir > 0 ? Math.PI : 0), -b.dir * 0.25);
+        o.updateMatrix();
+        mesh.setMatrixAt(i, o.matrix);
+        flap.setX(i, Math.sin(t * 5.5 + b.ph * 3) * 0.55 * (0.4 + 0.6 * Math.max(0, Math.sin(t * 0.4 + b.ph))));
+      });
+      mesh.instanceMatrix.needsUpdate = true;
+      flap.needsUpdate = true;
     }
-    scene.add(g);
-    gulls.push({ g, wings, cx, cy, cz, rad, ph: i * 1.7, sp: 0.16 + i * 0.03, dir: i % 2 ? 1 : -1 });
-  });
-  return gulls;
+  };
 }
-
-// косяки: тёмные силуэты под водой, от них клёв лучше
 function buildSchools(fauna) {
   const PER = 9;
   const N = 6;
@@ -1238,11 +1271,20 @@ export function buildScenery(scene) {
     setBoard: shack.setBoard,
     schools,
     fauna,
+    /** Источники света фонарей: днём выключены совсем. */
+    lampLights: lamps.lamps,
+    /** Для проверок: мелочь мира — сколько её и сколько сейчас рисуется. */
+    smallState,
     /** Для проверок: спрятан ли запасной меш и сколько готовых моделей расставлено. */
     propsState: () => ({ fallback: fallback.visible, ...propsDone }),
     /** night: 0 днём … 1 ночью; light — общая яркость дня */
     setNight(night, light) {
-      for (const l of lamps.lamps) l.intensity = night * 9;
+      // днём фонари не просто не светят — их нет среди источников света: каждый источник считается в каждой точке
+      // каждой освещённой поверхности, даже погашенный. Шейдеры на оба случая собраны при загрузке (main.js, boot).
+      for (const l of lamps.lamps) {
+        l.intensity = night * 9;
+        l.visible = night > 0.004;
+      }
       shack.glow.intensity = 6 + night * 6;
       lamps.glassMat.emissiveIntensity = 0.05 + night * 1.9;
       lh.lampMat.emissiveIntensity = 0.25 + night * 2.4;
@@ -1252,7 +1294,10 @@ export function buildScenery(scene) {
       envNight(night);
     },
     update(dt, t, camera) {
-      if (camera) env.update(camera, t);
+      if (camera) {
+        env.update(camera, t);
+        cullSmall(camera);
+      }
       falls.uTime.value = t;
       lh.beam.rotation.y = t * 0.45;
       for (const f of floaters) {
@@ -1261,14 +1306,7 @@ export function buildScenery(scene) {
         f.o.rotation.z = Math.sin(t * 0.9 + p.x) * f.roll;
         f.o.rotation.x = Math.cos(t * 0.7 + p.z) * f.roll * 0.7;
       }
-      for (const b of gulls) {
-        const a = b.ph + t * b.sp * b.dir;
-        b.g.position.set(b.cx + Math.cos(a) * b.rad, b.cy + Math.sin(t * 0.3 + b.ph) * 2.5, b.cz + Math.sin(a) * b.rad);
-        b.g.rotation.set(0, -a + (b.dir > 0 ? Math.PI : 0), -b.dir * 0.25);
-        const flap = Math.sin(t * 5.5 + b.ph * 3) * 0.55 * (0.4 + 0.6 * Math.max(0, Math.sin(t * 0.4 + b.ph)));
-        b.wings[0].rotation.z = -flap;
-        b.wings[1].rotation.z = flap;
-      }
+      gulls.update(t);
     }
   };
 }

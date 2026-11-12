@@ -131,6 +131,8 @@ export class Gfx {
     // затенение в углах и отражения в воде можно выключить на ходу — для замеров, во что они обходятся
     this.aoK = AO_K;
     this.reflect = REFLECT;
+    r.info.autoReset = false; // счёт вызовов отрисовки — за весь кадр (тени, отражение, сцена), а не за последний проход
+    this.scale = 1; // доля от разрешения ступени качества: её уменьшает автоподбор, когда кадры проседают
     this.quality = null;
     this.w = this.h = 0;
     this.ratio = 0;
@@ -146,6 +148,7 @@ export class Gfx {
     surfaceU.uDetail.value = q === 'low' ? 0 : 1; // на «низком» — без фактуры дерева и камня: экономим выборки из текстур
     detail.lod = q === 'high' ? 1 : q === 'medium' ? 0.7 : 0.45; // подробные деревья и камни — только вблизи
     detail.grass = q === 'high' ? 44 : q === 'medium' ? 30 : 0; // пучки травы вокруг игрока; на «низком» их нет
+    detail.far = q === 'high' ? 170 : q === 'medium' ? 125 : 85; // с какого расстояния видна мелочь размером в метр (ящик, бочка)
     this.dropPost();
     this.w = 0;
     this.resize();
@@ -153,9 +156,56 @@ export class Gfx {
   /** Сколько точек буфера на одну точку экрана. */
   pixelRatio(w, h) {
     const dpr = window.devicePixelRatio || 1;
-    if (this.quality === 'low') return Math.min(dpr, 1);
-    if (this.quality === 'medium') return Math.min(dpr, 1.5);
-    return Math.min(dpr, 2, Math.max(1, Math.sqrt(HIGH_PIXELS / Math.max(1, w * h))));
+    const base = this.quality === 'low' ? Math.min(dpr, 1) : this.quality === 'medium' ? Math.min(dpr, 1.5) : Math.min(dpr, 2, Math.max(1, Math.sqrt(HIGH_PIXELS / Math.max(1, w * h))));
+    // мельче 540 строк не рисуем: дальше картинка разваливается (надписи и меню от этого не зависят — они поверх)
+    return Math.min(base, Math.max(base * this.scale, 540 / Math.max(1, h)));
+  }
+  /** Разрешение: доля от положенного ступени качества (0,4…1). Меняется шагами не мельче 1,5 %. */
+  setScale(k) {
+    k = Math.max(0.4, Math.min(1, k));
+    if (Math.abs(k - this.scale) < 0.015) return false;
+    this.scale = k;
+    this.resize();
+    return true;
+  }
+  /**
+   * Перед первым кадром: собрать шейдеры всей сцены, не подвешивая страницу, и отдать текстуры видеокарте —
+   * иначе всё это случится рывками уже в игре, когда предмет впервые попадёт в кадр. onStep(доля) — для полосы загрузки.
+   */
+  async prepare(scene, camera, onStep = () => {}, extra = []) {
+    const r = this.renderer;
+    const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
+    try {
+      await Promise.race([r.compileAsync(scene, camera), wait(30000)]);
+    } catch (e) {
+      /* не вышло заранее — соберутся по ходу дела */
+    }
+    onStep(0.5);
+    const seen = new Set();
+    const take = (t) => {
+      if (t && t.isTexture && !t.isRenderTargetTexture && t.image && (t.image.width || t.image.data)) seen.add(t);
+    };
+    for (const t of extra) take(t);
+    scene.traverse((o) => {
+      for (const m of Array.isArray(o.material) ? o.material : o.material ? [o.material] : []) {
+        for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'aoMap', 'alphaMap']) take(m[k]);
+        if (m.uniforms) for (const u of Object.values(m.uniforms)) take(u && u.value);
+      }
+    });
+    let i = 0;
+    for (const t of seen) {
+      try {
+        r.initTexture(t);
+      } catch (e) {
+        /* эта текстура загрузится при первом показе */
+      }
+      if (++i % 6 === 0) {
+        onStep(0.5 + (0.5 * i) / seen.size);
+        await wait(0);
+      }
+    }
+    onStep(1);
+    return seen.size;
   }
   resize() {
     const cv = this.renderer.domElement;
@@ -308,6 +358,7 @@ export class Gfx {
   }
   render(scene, camera, exposure = 1) {
     const r = this.renderer;
+    r.info.reset();
     r.toneMappingExposure = exposure;
     const W = this.water;
     if (this.quality !== 'high' || !this.canPost) {

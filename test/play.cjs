@@ -789,6 +789,139 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     await fp.close();
   }
 
+  // загрузка и скорость: заставка, подбор качества под машину, плавное разрешение, счётчик кадров, проверка компьютера
+  {
+    const ctx = await browser.newContext({ viewport: { width: 480, height: 270 } });
+    const bp = await ctx.newPage();
+    bp.on('pageerror', (e) => { console.log('[boot] PAGEERROR', e.message.slice(0, 500)); bp.__err = (bp.__err || 0) + 1; });
+    // первый запуск: пока идёт загрузка, на экране заставка с полосой; качество подбирается замером
+    await bp.goto(`${BASE}/?norender&boot=full&h=13`);
+    assert.ok(await G(bp, () => !!document.querySelector('#boot') && document.querySelector('#bootTxt').textContent.length > 3), 'заставка загрузки на экране');
+    await bp.waitForFunction(() => window.RYBAK && window.__frames > 3 && !RYBAK.booting, null, { timeout: 240000 });
+    await bp.waitForFunction(() => !document.querySelector('#boot'), null, { timeout: 5000 });
+    const c1 = await G(bp, () => ({ calib: RYBAK.calib, q: RYBAK.gfx.quality, scale: RYBAK.gfx.scale, saved: JSON.parse(localStorage.getItem('rybak.settings.v1')).autoQ, gpu: RYBAK.perf.gpu, progs: RYBAK.gfx.renderer.info.programs.length }));
+    // в проверке видеокарты нет (отрисовка программная): игра должна сама уйти на «низкое» и уменьшить разрешение
+    assert.ok(c1.calib && c1.calib.from === 'measured' && c1.q === 'low' && c1.scale <= 0.75 && c1.calib.ms > 20, `качество подобрано замером: ${JSON.stringify(c1.calib)}`);
+    assert.ok(c1.saved && c1.saved.tier === 'low' && c1.saved.gpu === c1.gpu && c1.gpu.length > 3, 'итог запомнен для этой видеокарты');
+    assert.ok(c1.progs > 20, `шейдеры собраны до первого кадра: ${c1.progs}`);
+    // второй запуск: берём запомненное, не меряя заново
+    await bp.goto(`${BASE}/?norender&boot=full&h=13`);
+    await bp.waitForFunction(() => window.RYBAK && window.__frames > 3 && !RYBAK.booting, null, { timeout: 240000 });
+    const c2 = await G(bp, () => ({ from: RYBAK.calib && RYBAK.calib.from, q: RYBAK.gfx.quality, scale: RYBAK.gfx.scale }));
+    assert.ok(c2.from === 'saved' && c2.q === 'low' && Math.abs(c2.scale - c1.scale) < 0.01, `второй запуск — из запомненного: ${JSON.stringify(c2)}`);
+
+    // плавное разрешение на ходу: кадры долгие — буфер меньше; идёт ровно — возвращается
+    await bp.setViewportSize({ width: 1280, height: 720 });
+    await bp.waitForTimeout(300);
+    const tn = await G(bp, async () => {
+      const g = RYBAK, gf = g.gfx, cv = gf.renderer.domElement;
+      // tune решает, а вниз идёт только после проверки настоящей цены кадра (в игре — на следующем кадре); здесь применяем сразу
+      const feed = (ms, n) => { for (let i = 0; i < n; i++) { g.tune(ms); if (g.tunePlan) { g.applyTune(g.tunePlan); g.tunePlan = null; } } };
+      g.noRender = false; // в проверке кадры идут по команде — автоподбор включаем вручную
+      gf.setScale(1);
+      window.__render = true; await new Promise((ok) => setTimeout(ok, 100));
+      const full = [cv.width, cv.height];
+      feed(40, 200);
+      const low = [cv.width, cv.height], sLow = gf.scale, saved = JSON.parse(localStorage.getItem('rybak.settings.v1')).autoQ.scale;
+      feed(16, 4000);
+      const back = gf.scale;
+      g.noRender = true;
+      return { full, low, sLow, saved, back, q: gf.quality };
+    });
+    assert.ok(tn.full[0] === 1280 && tn.low[0] < 1100 && tn.sLow <= 0.75 && tn.q === 'low', `кадры долгие — рисуем мельче: ${JSON.stringify(tn)}`);
+    assert.ok(Math.abs(tn.saved - tn.sLow) < 0.02 && tn.back > tn.sLow + 0.1, `разрешение запомнено и возвращается, когда полегчало: ${JSON.stringify(tn)}`);
+    // браузер сам держит 30 кадров в секунду (режим экономии), а кадр на деле лёгкий — картинку не трогаем
+    const eco = await G(bp, async () => {
+      const g = RYBAK, gf = g.gfx;
+      gf.setScale(1);
+      g.tuner.hold = 0;
+      g.noRender = false;
+      for (let i = 0; i < 40 && !g.tunePlan; i++) g.tune(34);
+      g.noRender = true;
+      const planned = !!g.tunePlan;
+      // подменяем «цену кадра» на два кадра: часы стоят, видеокарту ждать не надо — кадр будто бы мгновенный
+      const gl = gf.renderer.getContext(), rp = gl.readPixels, now = performance.now, t = now.call(performance);
+      performance.now = () => t;
+      gl.readPixels = function () {};
+      await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
+      performance.now = now;
+      gl.readPixels = rp;
+      return { planned, scale: gf.scale, hold: g.tuner.hold, plan: g.tunePlan };
+    });
+    assert.ok(eco.planned && eco.scale === 1 && eco.hold > 10 && eco.plan === null, `кадр лёгкий, а частота низкая — разрешение не трогаем: ${JSON.stringify(eco)}`);
+
+    // счётчик кадров по F3 и строчка в настройках
+    await bp.keyboard.press('F3');
+    await bp.waitForSelector('#perfBox');
+    assert.match(await bp.textContent('#perfBox'), /к\/с/);
+    assert.ok(await G(bp, () => JSON.parse(localStorage.getItem('rybak.settings.v1')).fps === true));
+    await bp.keyboard.press('F3');
+    assert.equal(await bp.locator('#perfBox').count(), 0);
+    await bp.click('.tfoot [data-a="settings"]');
+    await bp.waitForSelector('.set');
+    const setTxt = await bp.textContent('.center');
+    assert.ok(/Плавное разрешение/.test(setTxt) && /Счётчик кадров/.test(setTxt) && /ПРОВЕРКА КОМПЬЮТЕРА/.test(setTxt) && /сейчас: низкая/.test(setTxt), 'в настройках — плавное разрешение, счётчик, проверка и что подобрано на «авто»');
+    await shot(bp, '37-settings-perf');
+    // выбрали качество сами — разрешение полное, автоподбор ступень не трогает
+    await bp.selectOption('[data-set="quality"]', 'medium');
+    assert.deepEqual(await G(bp, () => [RYBAK.gfx.quality, RYBAK.gfx.scale, RYBAK.auto]), ['medium', 1, false]);
+    await bp.selectOption('[data-set="quality"]', 'auto');
+    assert.equal(await G(bp, () => RYBAK.gfx.quality), 'low', 'вернулись на «авто» — к тому, что подобрано');
+    await bp.keyboard.press('Escape');
+
+    // проверка компьютера: четыре вида, цена кадра, отчёт текстом — его можно скопировать и прислать
+    await bp.setViewportSize({ width: 480, height: 270 });
+    const bn = await G(bp, async () => {
+      const steps = [];
+      const r = await RYBAK.bench((k, name) => steps.push(name), { frames: 2, warm: 1, pace: 3 });
+      return { steps, rows: r.rows.map((x) => [x.name, x.cost > 0, x.calls, x.tris]), fps: r.fps, text: r.text, verdict: r.verdict, running: RYBAK.benchOn, manual: !!RYBAK.manual, cam: RYBAK.camOverride };
+    });
+    assert.deepEqual(bn.steps, ['пирс', 'берег', 'заводь', 'море']);
+    assert.ok(bn.rows.length === 4 && bn.rows.every((x) => x[1] && x[2] > 20 && x[2] < 260 && x[3] > 1e5), `замер по четырём видам: ${JSON.stringify(bn.rows)}`);
+    assert.ok(/Видеокарта: /.test(bn.text) && /Цена кадра, мс: пирс/.test(bn.text) && /Качество: низкое \(авто\)/.test(bn.text) && bn.verdict.length > 5 && bn.fps > 0, 'отчёт собран');
+    assert.ok(!bn.running && !bn.manual && bn.cam === null, 'после проверки игра идёт как раньше');
+    await bp.waitForFunction((f) => window.__frames > f + 3, await G(bp, () => window.__frames), { timeout: 20000 });
+    await bp.setViewportSize({ width: 1280, height: 720 });
+    await G(bp, () => RYBAK.ui.openPanel('bench'));
+    await bp.waitForSelector('.bench .report');
+    assert.match(await bp.textContent('.bench .report'), /РЫБАК — проверка компьютера/);
+    assert.ok((await bp.locator('.bench [data-a="benchcopy"]').count()) === 1 && (await bp.locator('.bench [data-a="recalib"]').count()) === 1);
+    await shot(bp, '38-bench-report');
+    await bp.keyboard.press('Escape');
+
+    // мелочь мира: в отражении воды её нет, издали она не рисуется; чайки — один меш на всех
+    await bp.fill('#nm', 'Механик');
+    await G(bp, () => { RYBAK.profile.seenIntro = true; });
+    await bp.click('[data-a="solo"]');
+    await bp.waitForFunction(() => RYBAK.state === 'lobby');
+    await G(bp, () => RYBAK.enterWorld());
+    await bp.waitForFunction(() => RYBAK.state === 'world');
+    await bp.waitForFunction(() => RYBAK.world.scenery.smallState().n > 15 && !RYBAK.world.scenery.propsState().fallback, null, { timeout: 120000 });
+    const sm = await G(bp, async () => {
+      const g = RYBAK, sc = g.world.scenery, w = (ms) => new Promise((ok) => setTimeout(ok, ms));
+      g.ui.closePanel();
+      const near = sc.smallState();
+      g.player.place(-70, -150, 0);
+      const up = g.player.update;
+      g.player.update = function () { this.x = -70; this.z = -150; g.camera.position.set(-70, 2.3, -150); };
+      await w(1500);
+      const far = sc.smallState();
+      g.player.update = up;
+      g.player.place(-2, 9, 0);
+      await w(1500);
+      const gulls = g.scene.getObjectByName('gulls');
+      let mirror = 0, both = 0;
+      g.scene.traverse((o) => { if (o.isMesh) (o.layers.mask === 2 ? mirror++ : both++); });
+      window.__render = true; await w(300);
+      return { near, far, back: sc.smallState(), gulls: gulls && gulls.isInstancedMesh ? gulls.count : 0, mirror, both, cam: g.camera.layers.mask, calls: g.gfx.renderer.info.render.calls };
+    });
+    assert.ok(sm.near.n > 15 && sm.far.shown < sm.near.n * 0.5 && sm.back.shown > sm.far.shown, `издали мелочь не рисуется, вблизи возвращается: ${JSON.stringify(sm)}`);
+    assert.ok(sm.gulls === 5 && sm.mirror > 15 && sm.both > 40 && sm.cam === 3, `чайки одним мешем, мелочь на своём слое: ${JSON.stringify(sm)}`);
+    assert.ok(sm.calls > 20 && sm.calls < 230, `вызовов отрисовки на «низком» у причала: ${sm.calls}`);
+    assert.ok(!bp.__err, 'ошибки на странице (загрузка и скорость)');
+    await ctx.close();
+  }
+
   // старое сохранение с персонажем «из частей»: такого персонажа больше нет — игрок получает героя, остальное на месте
   {
     const old = await browser.newPage({ viewport: { width: W, height: H } });

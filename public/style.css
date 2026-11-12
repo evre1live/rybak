@@ -419,3 +419,23 @@ body.touch #prompt{top:auto;bottom:26%}
 
 .flash{position:absolute;inset:0;pointer-events:none;z-index:3;animation:flash .75s ease-out forwards}
 @keyframes flash{0%{opacity:0}10%{opacity:1}100%{opacity:0}}
+
+/* заставка загрузки: полоса движется сама (transform), даже пока страница занята сборкой мира */
+#boot{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.1em;background:radial-gradient(ellipse at 50% 38%,#17407a,#0b1c38 62%,#07122a);color:#fff;transition:opacity .5s;font-family:var(--body,sans-serif)}
+#boot.gone{opacity:0;pointer-events:none}
+#boot .bt{font:900 clamp(2.6em,9vw,5.6em)/1 var(--disp,sans-serif);letter-spacing:.06em;color:var(--ye,#ffd60a);text-shadow:0 .08em 0 rgba(0,0,0,.35)}
+#boot .bs{font-size:1.05em;opacity:.85;min-height:1.3em}
+.bbar{position:relative;width:min(22em,70vw);height:.6em;border-radius:.4em;background:rgba(255,255,255,.14);overflow:hidden}
+.bbar i{position:absolute;inset:0;background:var(--ye,#ffd60a);transform-origin:0 50%;transform:scaleX(.12);transition:transform .35s ease-out}
+.bbar::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent);transform:translateX(-100%);animation:bootShine 1.3s linear infinite;will-change:transform}
+@keyframes bootShine{to{transform:translateX(100%)}}
+/* счётчик кадров (F3) */
+#perfBox{position:fixed;left:50%;top:5.2em;transform:translateX(-50%);z-index:40;padding:.45em .8em;border-radius:.5em;background:rgba(6,16,36,.78);color:#dbeafe;font:600 12px/1.45 ui-monospace,Menlo,Consolas,monospace;text-align:center;pointer-events:none;white-space:nowrap}
+/* проверка компьютера */
+.set .sub{display:block;font-size:.72em;font-weight:500;opacity:.7;margin-top:.15em}
+.bench .report{max-width:min(46em,92vw);max-height:38vh;overflow:auto;margin:0;padding:.9em 1.1em;border-radius:.7em;background:rgba(6,16,36,.82);border:.1em solid rgba(60,140,220,.5);color:#dbeafe;font:500 .82em/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;text-align:left;user-select:text;-webkit-user-select:text;pointer-events:auto}
+.bench .verdict{font-size:1.25em;font-weight:800;color:var(--ye,#ffd60a)}
+.bench .hint{max-width:34em;opacity:.85;text-align:center}
+.dim.clear{background:none}
+.tnote{max-width:26em;margin:.2em auto 0;padding:.5em .8em;border-radius:.6em;background:rgba(6,16,36,.72);color:#ffe9a8;font-size:.86em;line-height:1.35;text-align:center}
+.cachenote{max-width:30em;font-size:.82em;opacity:.8;text-align:center}
