@@ -50,6 +50,17 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
   await page.keyboard.press('Escape');
   await page.click('.nav [data-p="journal"]');
   await page.waitForSelector('.jstats');
+  {
+    // полоса «до уровня»: её длина — доля набранного опыта (обычной шириной, а не растяжением, как у полосы вываживания).
+    // У новичка опыта нет — на время проверки даём половину уровня и открываем журнал заново.
+    await G(page, () => { RYBAK.profile.xp = 30; RYBAK.ui.openPanel('journal'); });
+    const lv = await G(page, () => {
+      const i = document.querySelector('.loadout .pbar i'), b = i.parentElement.getBoundingClientRect(), r = i.getBoundingClientRect();
+      return { w: r.width, bar: b.width, set: parseFloat(i.style.width) };
+    });
+    await G(page, () => { RYBAK.profile.xp = 0; RYBAK.ui.openPanel('journal'); });
+    assert.ok(lv.bar > 100 && lv.set === 50 && Math.abs(lv.w / lv.bar - 0.5) < 0.03, `полоса «до уровня» нарисована по своей ширине: ${JSON.stringify(lv)}`);
+  }
   await shot(page, '04-journal');
   await page.keyboard.press('Escape');
   await page.click('.nav [data-p="editor"]');
@@ -141,6 +152,22 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
   await shot(page, '11-bite');
   await page.waitForFunction(() => RYBAK.fishing.state === 'fight', null, { timeout: 30000 });
   await page.waitForFunction(() => RYBAK.fishing.state !== 'fight' || RYBAK.fishing.fight.p > 0.35, null, { timeout: 60000 });
+  {
+    // стрелка натяжения и полоса вываживания двигаются сдвигом и растяжением — проверяем, что стоят там, где положено
+    const hud = await G(page, () => new Promise((ok) => requestAnimationFrame(() => {
+      const f = RYBAK.fishing.fight;
+      if (!f || RYBAK.fishing.state !== 'fight') return ok(null);
+      const bar = document.querySelector('.tbar').getBoundingClientRect(), ptr = document.querySelector('#tptr').getBoundingClientRect();
+      const pb = document.querySelector('#pfill').parentElement.getBoundingClientRect(), pf = document.querySelector('#pfill').getBoundingClientRect();
+      const cs = getComputedStyle(document.querySelector('#tptr'));
+      ok({ T: f.T, p: f.p, ptr: (ptr.left - bar.left) / bar.width, fill: pf.width / pb.width, left: pf.left - pb.left, trans: cs.transitionDuration, pct: document.querySelector('#ppct').textContent });
+    })));
+    if (hud) {
+      assert.ok(Math.abs(hud.ptr - hud.T) < 0.03, `стрелка натяжения стоит на своём месте: ${JSON.stringify(hud)}`);
+      assert.ok(Math.abs(hud.fill - hud.p) < 0.03 && Math.abs(hud.left) < 3, `полоса вываживания нужной длины: ${JSON.stringify(hud)}`);
+      assert.ok(/^0s/.test(hud.trans) && hud.pct === Math.round(hud.p * 100) + '%', `стрелка без сглаживающей задержки, проценты те же: ${JSON.stringify(hud)}`);
+    }
+  }
   await shot(page, '12-fight');
   await G(page, () => { window.__keep = true; });
   await page.waitForFunction(() => window.__log.includes('caught'), null, { timeout: 240000 });
@@ -594,6 +621,10 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     await G(wp, () => RYBAK.input.pressed.add('KeyK'));
     await wp.waitForSelector('.qcard.done');
     assert.equal(await wp.locator('.qcard.done').count(), 2);
+    {
+      const bars = await G(wp, () => [...document.querySelectorAll('.qcard')].map((c) => { const i = c.querySelector('.pbar i'); return +(i.getBoundingClientRect().width / i.parentElement.getBoundingClientRect().width).toFixed(2); }));
+      assert.ok(bars.length === 3 && bars[0] > 0.95 && bars[1] > 0.95 && bars[2] < 0.05, `полосы заданий: выполненные — полные, остальное — по счёту: ${JSON.stringify(bars)}`);
+    }
     await shot(wp, '32-quests', 200);
     await wp.keyboard.press('Escape');
 
@@ -827,8 +858,8 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     await bp.waitForTimeout(300);
     const tn = await G(bp, async () => {
       const g = RYBAK, gf = g.gfx, cv = gf.renderer.domElement;
-      // tune решает, а вниз идёт только после проверки настоящей цены кадра (в игре — на следующем кадре); здесь применяем сразу
-      const feed = (ms, n) => { for (let i = 0; i < n; i++) { g.tune(ms); if (g.tunePlan) { g.applyTune(g.tunePlan); g.tunePlan = null; } } };
+      // tune решает, а вниз идёт только после проверки настоящей цены кадра (в игре — на двух следующих кадрах); здесь применяем сразу
+      const feed = (ms, n) => { for (let i = 0; i < n; i++) { g.tune(ms); if (g.tunePlan) { g.applyTune(g.tunePlan.out); g.tunePlan = null; } } };
       g.noRender = false; // в проверке кадры идут по команде — автоподбор включаем вручную
       gf.setScale(1);
       window.__render = true; await new Promise((ok) => setTimeout(ok, 100));
@@ -891,6 +922,7 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     assert.deepEqual(bn.steps, ['пирс', 'берег', 'заводь', 'море']);
     assert.ok(bn.rows.length === 4 && bn.rows.every((x) => x[1] && x[2] > 20 && x[2] < 260 && x[3] > 1e5), `замер по четырём видам: ${JSON.stringify(bn.rows)}`);
     assert.ok(/Видеокарта: /.test(bn.text) && /Цена кадра, мс: пирс/.test(bn.text) && /Качество: низкое \(авто\)/.test(bn.text) && bn.verdict.length > 5 && bn.fps > 0, 'отчёт собран');
+    assert.ok(/неровных кадров \d+%/.test(bn.text) && /Подбор при загрузке: низкое [\d.]+ мс/.test(bn.text), `в отчёте — ровность хода и чем кончился подбор при загрузке: ${bn.text}`);
     assert.ok(!bn.running && !bn.manual && bn.cam === null, 'после проверки игра идёт как раньше');
     await bp.waitForFunction((f) => window.__frames > f + 3, await G(bp, () => window.__frames), { timeout: 20000 });
     await bp.setViewportSize({ width: 1280, height: 720 });

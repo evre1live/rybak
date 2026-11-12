@@ -10,6 +10,12 @@ const pending = new Map();
 
 export const modelInfo = (id) => heroes.props[id] || null;
 export const modelReady = (id) => ready.get(id) || null;
+// Кто отдаёт текстуры загруженной модели видеокарте (gfx.warm). Модель считается готовой, когда они уже там:
+// иначе все текстуры ушли бы разом в том кадре, где модель впервые показалась, — рывок посреди игры.
+let warmer = null;
+export const setWarmer = (fn) => {
+  warmer = fn;
+};
 
 function tune(scene, info) {
   const fish = info.group === 'fish';
@@ -68,8 +74,12 @@ export function loadModel(id) {
                   shrink(o.material.normalMap, 256);
                 });
               const tpl = { id, info, scene: g.scene };
-              ready.set(id, tpl);
-              res(tpl);
+              const done = () => {
+                ready.set(id, tpl);
+                res(tpl);
+              };
+              if (warmer) Promise.resolve(warmer(g.scene)).then(done, done);
+              else done();
             },
             undefined,
             rej

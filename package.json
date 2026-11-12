@@ -14,6 +14,7 @@
     "test:coop": "node test/coop.cjs",
     "balance": "node tools/balance.js",
     "test:devices": "node test/devices.cjs",
+    "test:warm": "node test/warm.cjs",
     "solo": "node tools/artifact.js"
   },
   "engines": {

@@ -2,9 +2,9 @@
 import * as THREE from 'three';
 import { Gfx, QUALITIES } from './gfx.js';
 import { loadManifest, loadHero, heroes, fpLook, heroEye } from './hero.js';
-import { loadModel, modelInfo } from './models.js';
+import { loadModel, loadModels, modelInfo, modelReady, setWarmer } from './models.js';
 import { setEnvLight } from './env.js';
-import { adopt } from './fish3d.js';
+import { adopt, buildFish, warmFish } from './fish3d.js';
 import { modelShot, faceShot } from './icons.js';
 import { World, drawMinimap, SEA_VIEW } from './world.js';
 import { Character, VENDOR_PUPPET } from './character.js';
@@ -22,19 +22,20 @@ import { UI } from './ui.js';
 import { loadProfile, saveProfile, settings, saveSettings, session } from './profile.js';
 import { S, FLAG } from './proto.js';
 import { DECK_Y, MARKET, MOORINGS, RENT_DESK, MAP_VIEW, WRECK, SEA, ISLAND, palmR, canStand } from './terrain.js';
-import { ITEMS, FISH_BY_ID, JUNK_BY_ID, RARITY, ZONES, BAITS, LURES, clockHours, dayPart, fmtW, fmtCoins, isLure } from '../shared/data.js';
+import { ITEMS, FISH_BY_ID, JUNK, JUNK_BY_ID, RARITY, ZONES, BAITS, LURES, clockHours, dayPart, fmtW, fmtCoins, isLure } from '../shared/data.js';
 import {
-  marketState, hashStr, buy, equip, sell, kitStats, levelInfo, tackleCount, fishValue, newProfile,
+  marketState, hashStr, buy, equip, sell, kitStats, levelInfo, tackleCount, fishValue, newProfile, speciesWeights,
   weatherAt, WEATHER, syncQuests, questEvent, questText, questDay,
   TOURS, TOUR_COUNTDOWN, tourBlank, tourAdd, tourTable, tourPrize, tourMedal, medalPrize, tourScoreText, MEDALS
 } from '../shared/logic.js';
 import { $, esc, clamp, damp, isTouch } from './util.js';
-import { Perf, isSoftware, newTuner, tuneStep, pickQuality, scaleFor, TARGET_MS, yieldNow } from './perf.js';
+import { Perf, isSoftware, newTuner, tuneStep, longShare, pickQuality, scaleFor, TARGET_MS, yieldNow } from './perf.js';
 import { surfaceU } from './surface.js';
 import { initCache, wakeServer } from './offline.js';
 
 const SPAWNS = [[-2, 9], [0.6, 9.4], [-4, 8.2], [2.6, 8.6], [-1, 11], [1.6, 11.4], [-3.6, 11], [3.6, 10.4]];
 const LINE_Z = 7;
+const WARM_FISH = 'plotva'; // на этой модели собираются шейдеры для всей рыбы (у моделей рыб материалы устроены одинаково)
 const CALIB_V = 4; // версия правил подбора качества: сменились пороги — запомненный итог не годится, меряем заново
 const lineX = (slot) => -5.0 + slot * 1.32;
 const v3 = new THREE.Vector3();
@@ -71,8 +72,10 @@ class Game {
     // на «авто» начинаем с того, что подобрали на этой машине в прошлый раз (calibrate), а не с «высокого»
     const was = this.auto && settings.autoQ && settings.autoQ.v === CALIB_V && QUALITIES.includes(settings.autoQ.tier) ? settings.autoQ : null;
     this.gfx = new Gfx(this.canvas, q.get('q') || (this.auto ? (was ? was.tier : touch ? 'medium' : 'high') : settings.quality));
+    setWarmer((root) => this.gfx.warm(root)); // текстуры загруженных моделей — видеокарте заранее и по одной (gfx.warm)
     this.perf = new Perf(this.gfx.renderer);
     this.tuner = newTuner();
+    this.litSets = new Set(); // какие наборы света уже собраны: «ступень|фонари|подсветка» (prelight, lightSets)
     this.perfOn = false; // окошко со счётчиком кадров (F3)
     this.calib = null; // чем кончился подбор качества при загрузке
     this.world = new World();
@@ -151,6 +154,21 @@ class Game {
       const info = modelInfo('junk-' + id);
       return info ? adopt(g, 'junk-' + id, false, -(info.size ? info.size[1] : 1) / 2) : g;
     };
+    // Заготовки для сборки шейдеров: рыба (процедурная и готовая модель) и хлам невидимо лежат в сцене с самой загрузки.
+    // Шейдеры собираются по всей сцене — за заставкой, при смене света и ступени качества; с ними соберутся и «рыбьи».
+    // Иначе они собирались бы в момент первой подсечки (три сборки подряд) — рывок в самом начале вываживания.
+    this.warmBox = new THREE.Group();
+    this.warmBox.name = 'warm';
+    this.warmBox.visible = false;
+    this.warmBox.add(warmFish(WARM_FISH));
+    this.scene.add(this.warmBox);
+    this.warmDone = false;
+    loadModels(['fish-' + WARM_FISH, 'junk-boot']).then(() => {
+      this.warmBox.add(buildFish(WARM_FISH), this.fishing.makeJunk('boot'));
+      this.warmDone = true;
+      // заставка модели не дождалась (медленная сеть) — собираем их шейдеры в фоне сейчас
+      if (this.prepared) this.gfx.shaders(this.scene, this.camera);
+    });
     this.ui = new UI(this);
     this.ui.mapBase = drawMinimap(256);
     // карта всего моря рисуется дольше — готовим её чуть позже, не в первый кадр
@@ -161,6 +179,7 @@ class Game {
     this.scene.add(this.meChar.group);
     // торговец за прилавком
     this.vendor = new Character(VENDOR_PUPPET, { puppet: true });
+    this.modelReady = (id) => !!modelReady(id); // для проверок: загружена ли модель (и её текстуры уже у видеокарты)
     /** Снимок модели в картинку — им пользуются tools/bake-icons.cjs и проверочные листы. */
     this.modelShot = (id, view) => loadModel(id).then((t) => modelShot(t, view));
     /** Портрет героя — для tools/bake-icons.cjs --faces. */
@@ -469,9 +488,16 @@ class Game {
   }
 
   // ───── переходы ─────
+  /** Сменился вид (лобби ↔ бухта): первые секунды новые предметы впервые попадают в кадр — по ним о скорости не судим. */
+  settle() {
+    this.tuner.bad = this.tuner.good = 0;
+    this.tuner.hold = Math.max(this.tuner.hold, 4);
+    this.tunePlan = null;
+  }
   toLobbyState() {
     this.state = 'lobby';
     this.inWorld = false;
+    this.settle();
     this.resetBoat();
     this.fishing.reelIn(true);
     this.vm.setVisible(false);
@@ -497,6 +523,7 @@ class Game {
     this.audio.start();
     this.state = 'world';
     this.inWorld = true;
+    this.settle();
     const sp = SPAWNS[this.me.slot % SPAWNS.length];
     this.resetBoat();
     this.player.place(sp[0], sp[1], 0);
@@ -876,6 +903,7 @@ class Game {
     }
     this.auto = auto;
     this.tuner = newTuner();
+    if (!this.booting && this.prepared) this.lightSets(); // сменили ступень — её шейдеры для ночи и лобби соберутся в фоне
     if (this.perfOn !== !!settings.fps) this.togglePerf(!!settings.fps);
     this.ui.hintKey = '';
   }
@@ -889,6 +917,33 @@ class Game {
     if (gp) gp.vibrationActuator.playEffect('dual-rumble', { duration: ms, strongMagnitude: strong, weakMagnitude: strong * 0.6 }).catch(() => {});
     else if (navigator.vibrate && this.input.touch.on) navigator.vibrate(ms);
   }
+  /**
+   * Пока поплавок на воде — подгружаем модели тех, кто здесь может клюнуть (от частых к редким), и хлама.
+   * Кто именно клюнул, решается при подсечке; к этому времени модель и её текстуры уже у видеокарты,
+   * и вываживание начинается без рывка. По две за раз: загрузка не должна мешать игре.
+   */
+  preloadCatch() {
+    const f = this.fishing;
+    if (!f.spot) return;
+    const all = speciesWeights(f.spot, this.profile.equip.tackle, this.hours).sort((a, b) => b.w - a.w);
+    // берём тех, на кого приходится девять поклёвок из десяти (на телефоне — не больше пяти видов: памяти мало);
+    // редкий гость подгрузится при подсечке, как раньше, — шейдеры для него уже собраны
+    const total = all.reduce((s, e) => s + e.w, 0);
+    const fish = [];
+    let acc = 0;
+    for (const e of all) {
+      if (fish.length >= (isTouch() ? 5 : 12) || acc >= total * 0.92) break;
+      fish.push(e);
+      acc += e.w;
+    }
+    this.preIds = [...fish.map((e) => 'fish-' + e.f.id), ...JUNK.map((j) => 'junk-' + j.id)].filter((id) => modelInfo(id));
+    const q = (this.preQ = this.preIds.filter((id) => !modelReady(id)));
+    const next = () => {
+      if (this.preQ === q && q.length) loadModel(q.shift()).then(next, next);
+    };
+    next();
+    next();
+  }
   onFish(type, d) {
     const ui = this.ui;
     const a = this.audio;
@@ -901,6 +956,7 @@ class Game {
       case 'land':
         a.splash(0.5);
         this.fauna.scare(d.x, d.z, 2.4);
+        this.preloadCatch();
         if (d.short) ui.toast('Недолёт: держите кнопку дольше — до белой риски', '', 2200);
         else if (d.hot) ui.toast('Прямо в косяк!', 'good', 1600);
         return this.ev('land', { x: +d.x.toFixed(1), z: +d.z.toFixed(1) });
@@ -1640,16 +1696,19 @@ class Game {
     if (!this.manual) {
       this.perf.push(rawMs);
       if (this.tunePlan) {
-        // Прежде чем упрощать картинку, проверяем, что кадры долгие из-за неё: ждём видеокарту и смотрим цену этого кадра.
+        // Прежде чем упрощать картинку, проверяем, что кадры долгие из-за неё: ждём видеокарту и смотрим цену кадра.
         // Браузер в режиме экономии сам держит 30 кадров в секунду — тогда упрощать бесполезно, картинка станет хуже даром.
+        // Смотрим два кадра подряд и берём дорогой: отражение в воде рисуется через кадр.
         const plan = this.tunePlan;
-        this.tunePlan = null;
         const gl = this.gfx.renderer.getContext();
         gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, (this.px1 = this.px1 || new Uint8Array(4)));
-        const work = performance.now() - frameT0;
-        this.lastWork = work;
-        if (work > TARGET_MS * 0.6) this.applyTune(plan);
-        else this.tuner.hold = 20; // десять секунд не трогаем: дело не в отрисовке
+        plan.work = Math.max(plan.work, performance.now() - frameT0);
+        if (++plan.n >= 2) {
+          this.tunePlan = null;
+          this.lastWork = plan.work;
+          if (plan.work > TARGET_MS * 0.6) this.applyTune(plan.out);
+          else this.tuner.hold = 20; // десять секунд не трогаем: дело не в отрисовке
+        }
       }
       this.tune(rawMs);
       if (this.perfOn && (this.perfT = (this.perfT || 0) + rawMs) > 500) {
@@ -1681,12 +1740,14 @@ class Game {
           const e = sc.envState();
           const got = [e.trees, e.palms, e.rocks, e.lighthouse, e.kiosk, e.lamps > 0, !sc.propsState().fallback].filter(Boolean).length;
           say(0.3 + 0.3 * (got / 7));
-          if (got === 7) break;
+          // модель рыбы для сборки «рыбьих» шейдеров ждём не дольше четырёх секунд: не успела — соберутся в фоне
+          if (got === 7 && (this.warmDone || i >= 40)) break;
           await wait(100);
         }
         // без видеокарты (программная отрисовка) «высокое» незачем даже собирать
         if (this.auto && !this.params.get('q') && !settings.autoQ && isSoftware(this.perf.gpu)) this.gfx.setQuality('low');
         say(0.6, 'Готовим видеокарту…');
+        this.prepared = true;
         await this.gfx.prepare(this.scene, this.camera, (k) => say(0.6 + 0.26 * k), Object.values(surfaceU).map((u) => u.value));
         if (this.auto && !this.params.get('q')) {
           say(0.86, 'Подбираем качество…');
@@ -1710,11 +1771,15 @@ class Game {
         }
         say(0.94, 'Зажигаем фонари…');
         await this.prelight();
-        // один кадр за заставкой: соберётся то, что собирается только при отрисовке (шейдеры теней), и уйдут буферы
+        // Два кадра за заставкой: соберётся то, что собирается только при отрисовке, и уйдут буферы. Кадров два, потому что
+        // шейдеры теней three.js различает по набору источников света, а в проходе теней этот набор ещё прежний —
+        // от предыдущего кадра (или от сборки шейдеров лобби): первый кадр его обновит, второй соберёт тени уже под день.
         this.manual = true;
-        if (this.noRender) window.__render = true;
-        this.frame(performance.now());
-        await yieldNow();
+        for (let k = 0; k < 2; k++) {
+          if (this.noRender) window.__render = true;
+          this.frame(performance.now());
+          await yieldNow();
+        }
       } else if (this.auto && !this.params.get('q') && settings.autoQ && settings.autoQ.gpu === this.perf.gpu) {
         this.gfx.setScale(settings.autoQ.scale || 1);
         if (settings.autoQ.refl != null && settings.autoQ.v === CALIB_V) this.gfx.setRefl(+settings.autoQ.refl);
@@ -1723,6 +1788,8 @@ class Game {
       console.warn('загрузка', e);
     }
     this.booting = false;
+    this.prepared = true;
+    this.gfx.warmFast = false; // заставка уходит: дальше текстуры новых моделей отдаём видеокарте по одной за кадр
     say(1);
     if (el) {
       el.classList.add('gone');
@@ -1732,27 +1799,53 @@ class Game {
     this.last = performance.now();
     requestAnimationFrame((t) => this.frame(t));
   }
+  /** Выполнить fn при заданном наборе света (L — горят фонари, F — подсветка героя) и вернуть всё как было. */
+  withLights(L, F, fn) {
+    const lamps = this.world.scenery.lampLights;
+    const keep = [lamps.map((l) => l.visible), this.fill.visible];
+    lamps.forEach((l) => (l.visible = L));
+    this.fill.visible = F;
+    try {
+      return fn();
+    } finally {
+      lamps.forEach((l, i) => (l.visible = keep[0][i]));
+      this.fill.visible = keep[1];
+    }
+  }
   /**
-   * Ночью горят фонари, в лобби героя подсвечивает лампа у камеры — а число источников света зашито в шейдеры всей сцены.
-   * Собираем оба набора заранее (браузер делает это в фоне): на закате и при входе в лобби рывка не будет.
+   * Ночью горят фонари, в лобби и в редакторе героя подсвечивает лампа у камеры — а число источников света зашито
+   * в шейдеры всей сцены. Наборов четыре (день/ночь × с подсветкой/без), у каждого шейдеры свои, и у каждой ступени
+   * качества тоже. Несобранный набор собрался бы в тот кадр, когда понадобился: вход в лобби ночью — и игра замирает.
+   * Дневное лобби понадобится через несколько секунд — ждём его за заставкой; остальное собирается в фоне (lightSets).
    */
   async prelight() {
-    const lamps = this.world.scenery.lampLights;
-    const withLights = (L, F, fn) => {
-      const keep = [lamps.map((l) => l.visible), this.fill.visible];
-      lamps.forEach((l) => (l.visible = L));
-      this.fill.visible = F;
-      try {
-        return fn();
-      } finally {
-        lamps.forEach((l, i) => (l.visible = keep[0][i]));
-        this.fill.visible = keep[1];
+    const tier = this.gfx.quality;
+    this.litSets.add(tier + '|false|false'); // день без подсветки собран за заставкой (prepare, calibrate)
+    await this.withLights(false, true, () => this.gfx.shaders(this.scene, this.camera));
+    this.litSets.add(tier + '|false|true');
+    this.lightSets(2500);
+  }
+  /**
+   * В фоне собрать шейдеры остальных наборов света для нынешней ступени качества (после загрузки и после смены ступени).
+   * Шейдеры теней three.js собирает только при отрисовке и различает по набору света, который видел в прошлый раз
+   * (в сборке или в кадре). Поэтому после сборки набора ближайший кадр рисуем без отражения в воде — его проход
+   * подменил бы набор — и тени под этот набор собираются в нём же, а не на закате посреди рыбалки.
+   */
+  lightSets(delay = 1500) {
+    clearTimeout(this.lightT);
+    const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
+    this.lightT = setTimeout(async () => {
+      const tier = this.gfx.quality;
+      for (const [L, F] of [[true, false], [true, true], [false, true], [false, false]]) {
+        const key = tier + '|' + L + '|' + F;
+        if (this.litSets.has(key)) continue;
+        if (this.gfx.quality !== tier) return; // ступень сменилась — её наборы соберёт свой вызов
+        await this.withLights(L, F, () => this.gfx.shaders(this.scene, this.camera));
+        this.litSets.add(key);
+        this.gfx.holdRefl = true;
+        await wait(500);
       }
-    };
-    // лобби понадобится через несколько секунд — ждём его шейдеры за заставкой (кадры в это время не рисуются)
-    await withLights(false, true, () => this.gfx.shaders(this.scene, this.camera));
-    // ночь наступит не скоро: её шейдеры отдаём собирать в фоне, когда заставка уже ушла
-    setTimeout(() => withLights(true, false, () => this.gfx.shaders(this.scene, this.camera)), 2500);
+    }, delay);
   }
   /** Цена кадра, мс: рисуем кадр и ждём, пока видеокарта его закончит, — так видно настоящее время, а не частоту экрана. */
   async frameCost(n = 8, warm = 3) {
@@ -1807,22 +1900,28 @@ class Game {
   tune(ms) {
     const g = this.gfx;
     if (this.params.get('q') || this.noRender || this.booting || document.hidden || ms > 400) return;
-    const A = (this.tuneAcc = this.tuneAcc || { sum: 0, n: 0 });
+    const A = (this.tuneAcc = this.tuneAcc || { sum: 0, n: 0, v: new Float32Array(160) });
+    if (A.n < A.v.length) A.v[A.n] = ms;
     A.sum += ms;
     A.n++;
     if (A.sum < 500) return;
     const avg = A.sum / A.n;
+    // средняя длительность не видит рывков: считаем ещё и долю кадров, пропустивших обновление экрана
+    const jit = longShare(A.v.subarray(0, Math.min(A.n, A.v.length)));
     A.sum = A.n = 0;
-    // во время заброса, поклёвки и вываживания картинку вверх не меняем: смена разрешения сама даёт рывок
+    this.lastJit = jit;
+    // во время заброса, поклёвки и вываживания картинку вверх не меняем: смена разрешения сама даёт рывок;
+    // ступень качества в это время тоже не трогаем — её смена заметна, подождёт до конца вываживания
     const st = this.fishing.state;
+    const busy = (st !== 'idle' && st !== 'wait') || !!this.benchOn;
     const out = tuneStep(this.tuner, avg, {
-      scale: g.scale, floor: g.quality === 'low' ? 0.5 : 0.62, canDrop: this.auto && g.quality !== 'low' && !this.tierBusy, drs: settings.drs !== false,
-      refl: this.auto && g.quality === 'high' && g.canPost ? g.reflLevel : 0, busy: (st !== 'idle' && st !== 'wait') || !!this.benchOn
+      scale: g.scale, floor: g.quality === 'low' ? 0.5 : 0.62, canDrop: this.auto && g.quality !== 'low' && !this.tierBusy && !busy, drs: settings.drs !== false,
+      refl: this.auto && g.quality === 'high' && g.canPost ? g.reflLevel : 0, jit, busy
     });
     if (!out) return;
-    // вверх — сразу; вниз — после проверки настоящей цены следующего кадра (см. frame)
+    // вверх — сразу; вниз — после проверки настоящей цены двух следующих кадров (см. frame)
     if (out.scale && out.scale > g.scale) this.applyTune(out);
-    else this.tunePlan = out;
+    else this.tunePlan = { out, n: 0, work: 0 };
   }
   applyTune(out) {
     const g = this.gfx;
@@ -1839,6 +1938,7 @@ class Game {
         g.setScale(0.85);
         this.tuner = newTuner();
         this.saveAuto();
+        this.lightSets(); // у новой ступени шейдеры свои: остальные наборы света — в фоне
       });
       return;
     }
@@ -1862,6 +1962,7 @@ class Game {
     this.camOverride = { p: [0.5, 3, -26], t: [-6, 2.5, 30] };
     try {
       await this.calibrate(true);
+      this.lightSets(); // ступень могла смениться: её шейдеры для ночи и лобби — в фоне
     } finally {
       this.camOverride = null;
       [this.fixedHour, this.forceWx] = keep;
@@ -1876,7 +1977,8 @@ class Game {
   perfLine() {
     const s = this.perf.stats(), g = this.gfx, r = g.renderer, i = r.info.render;
     const qn = { low: 'низкое', medium: 'среднее', high: 'высокое' }[g.quality];
-    return `${s.fps.toFixed(0)} к/с · ${s.avg.toFixed(1)} мс · худшие ${s.p99.toFixed(0)} мс<br>${qn}${this.auto ? ' (авто)' : ''} · ${r.domElement.width}×${r.domElement.height}${g.scale < 0.99 ? ` · ${Math.round(g.scale * 100)}%` : ''}<br>вызовов ${i.calls} · треугольников ${(i.triangles / 1000).toFixed(0)} тыс.`;
+    const rf = g.quality === 'high' && g.canPost ? [' · без отражений', ' · отражения ¼', ''][g.reflLevel] : '';
+    return `${s.fps.toFixed(0)} к/с · ${s.avg.toFixed(1)} мс · худшие ${s.p99.toFixed(0)} мс · неровных ${Math.round(s.long * 100)}%<br>${qn}${this.auto ? ' (авто)' : ''}${rf} · ${r.domElement.width}×${r.domElement.height}${g.scale < 0.99 ? ` · ${Math.round(g.scale * 100)}%` : ''}<br>вызовов ${i.calls} · треугольников ${(i.triangles / 1000).toFixed(0)} тыс.`;
   }
   togglePerf(on = !this.perfOn) {
     this.perfOn = on;
@@ -1934,9 +2036,14 @@ class Game {
     const res = {
       gpu: this.perf.gpu, quality: g.quality, auto: this.auto, scale: g.scale, buf: [r.domElement.width, r.domElement.height], screen: [g.w, g.h], dpr: window.devicePixelRatio || 1,
       rows, fps: 1000 / Math.max(avg, 0.1), p99: deltas[Math.floor(deltas.length * 0.99)] || 0, max: deltas[deltas.length - 1] || 0, hitches,
+      med: deltas[deltas.length >> 1] || 0, long: longShare(deltas), refl: g.quality === 'high' && g.canPost ? g.reflLevel : -1,
       cores: navigator.hardwareConcurrency || 0, mem: navigator.deviceMemory || 0, ua: navigator.userAgent
     };
-    const qn = { low: 'низкое', medium: 'среднее', high: 'высокое' }[res.quality];
+    const qn = { low: 'низкое', medium: 'среднее', high: 'высокое' }[res.quality] + (['', ', без отражений в воде', ', отражения в четверть кадра', ''][res.refl + 1] || '');
+    // чем кончился подбор при загрузке: по этой строчке видно, с чего игра начала и что намерила
+    const cb = this.calib;
+    const ru = (n) => n.replace(/^(low|medium|high)/, (t) => ({ low: 'низкое', medium: 'среднее', high: 'высокое' })[t]);
+    const cbLine = !cb ? '' : cb.from === 'measured' ? `Подбор при загрузке: ${(cb.log || []).map(([n, ms]) => `${ru(n)} ${ms} мс`).join(' → ')}` : 'Подбор при загрузке: не делался (окно было в фоне)';
     const worst = Math.max(...rows.map((x) => x.cost));
     res.verdict = res.fps >= 55 && worst < 14 ? 'Игра идёт плавно, запас есть.' : res.fps >= 50 ? 'Игра идёт плавно, но без запаса.' : res.fps >= 38 ? 'Тяжеловато: кадров меньше, чем хотелось бы.' : 'Этой машине тяжело.';
     res.text = [
@@ -1945,7 +2052,8 @@ class Game {
       `Окно ${res.screen[0]}×${res.screen[1]} (×${res.dpr}), рисуется ${res.buf[0]}×${res.buf[1]}${res.scale < 0.99 ? `, разрешение ${Math.round(res.scale * 100)}%` : ''}`,
       `Качество: ${qn}${res.auto ? ' (авто)' : ''}`,
       `Цена кадра, мс: ${rows.map((x) => `${x.name} ${x.cost.toFixed(1)}`).join(', ')}`,
-      `В игре: ${res.fps.toFixed(0)} к/с, худшие кадры ${res.p99.toFixed(0)} мс, самый долгий ${res.max.toFixed(0)} мс, рывков дольше 50 мс: ${hitches}`,
+      `В игре: ${res.fps.toFixed(0)} к/с, обычный кадр ${res.med.toFixed(1)} мс, худшие кадры ${res.p99.toFixed(0)} мс, самый долгий ${res.max.toFixed(0)} мс, неровных кадров ${Math.round(res.long * 100)}%, рывков дольше 50 мс: ${hitches}`,
+      ...(cbLine ? [cbLine] : []),
       `Вызовов отрисовки ${Math.min(...rows.map((x) => x.calls))}–${Math.max(...rows.map((x) => x.calls))}, треугольников ${(Math.min(...rows.map((x) => x.tris)) / 1e6).toFixed(2)}–${(Math.max(...rows.map((x) => x.tris)) / 1e6).toFixed(2)} млн`,
       `Процессор: потоков ${res.cores || '?'}, память ${res.mem ? res.mem + ' ГБ' : '?'}`,
       res.ua,

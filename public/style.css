@@ -166,7 +166,9 @@ kbd.g{background:#1b3566;color:#fff;box-shadow:0 .14em 0 #0a1a33}
 @keyframes shake{25%{transform:translate(2px,-1px)}75%{transform:translate(-2px,1px)}}
 .prow{display:flex;align-items:center;gap:.8em;margin-top:1.3em;font-family:var(--disp);font-weight:900;font-style:italic;font-size:1.25em}
 .pbar{flex:1;height:.85em;border-radius:.5em;background:#0a1a33;border:1px solid rgba(120,190,255,.3);overflow:hidden}
-.pbar i{display:block;height:100%;width:100%;background:var(--cy);transform-origin:0 50%;transform:scaleX(0);will-change:transform}
+.pbar i{display:block;height:100%;width:0;background:var(--cy);border-radius:.5em}
+/* полоса вываживания меняется каждый кадр — она растёт растяжением (transform), без раскладки страницы; остальные полосы — обычной шириной */
+#pfill{width:100%;border-radius:0;transform-origin:0 50%;transform:scaleX(0);will-change:transform}
 .prow b{width:2.6em;text-align:right;font-size:1.15em}
 
 /* карточка улова */

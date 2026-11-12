@@ -337,7 +337,7 @@ test('турнир: зачёт, таблица, призы и медали', () 
 });
 
 // ───── автоподбор качества (client/perf.js): чистая логика, без отрисовки ─────
-import { newTuner, tuneStep, needDrop, scaleFor, pickQuality, TARGET_MS, BUDGET_MS, Perf, isSoftware } from '../client/perf.js';
+import { newTuner, tuneStep, longShare, JIT_BAD, JIT_OK, needDrop, scaleFor, pickQuality, TARGET_MS, BUDGET_MS, Perf, isSoftware } from '../client/perf.js';
 
 test('подбор при загрузке: дорогой кадр — ступень ниже, небольшое превышение — разрешение меньше', () => {
   assert.ok(needDrop(40, 'high') && needDrop(40, 'medium') && !needDrop(40, 'low'), 'ниже «низкого» ступени нет');
@@ -477,4 +477,34 @@ test('подбор на ходу: первым делом — отражения
   let down = null;
   for (let i = 0; i < 6 && !down; i++) down = tuneStep(st, 30, q);
   assert.ok(down && down.scale < 1);
+});
+
+test('неровный ход: доля долгих кадров видна там, где средняя длительность молчит', () => {
+  const win = (n, long, base = 16.7, k = 2) => Array.from({ length: n }, (_, i) => (i < long ? base * k : base) + (i % 3) * 0.2);
+  assert.equal(longShare(win(30, 0)), 0, 'ровные 60 кадров в секунду');
+  assert.ok(Math.abs(longShare(win(30, 6)) - 0.2) < 1e-9, 'каждый пятый кадр вдвое дольше');
+  assert.equal(longShare(win(30, 1)), 1 / 30);
+  assert.equal(longShare(win(15, 0, 33.3)), 0, 'ровные 30 кадров в секунду — не рывки (медленно, но ровно)');
+  assert.equal(longShare(win(72, 0, 6.9)), 0, 'экран 144 Гц');
+  assert.ok(longShare(win(36, 8, 13.9, 1.5)) > 0.2, 'экран 144 Гц: кадры то в два, то в три обновления');
+  assert.equal(longShare([16, 17, 33]), 0, 'по трём кадрам не судим');
+  // каждый пятый кадр вдвое дольше: в среднем 20 мс — «терпимо» по средней, но на глаз игра дёргается
+  const avg = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+  const jerky = win(30, 6);
+  assert.ok(avg(jerky) < TARGET_MS * 1.2 && longShare(jerky) > JIT_BAD);
+  const st = newTuner();
+  const q = { scale: 1, floor: 0.62, canDrop: true, drs: true, refl: 2, busy: true, jit: longShare(jerky) };
+  const outs = [];
+  for (let i = 0; i < 14; i++) { const r = tuneStep(st, avg(jerky), q); if (r) { outs.push(r); if (r.refl != null) q.refl = r.refl; if (r.scale) q.scale = r.scale; } }
+  assert.deepEqual(outs.slice(0, 2), [{ refl: 1 }, { refl: 0 }], 'рывки — первым делом дешевеют отражения, даже во время вываживания');
+  assert.ok(outs[2] && Math.abs(outs[2].scale - 0.9) < 1e-9, 'потом разрешение — на шаг, а не обвалом: средняя-то в порядке');
+  // редкий долгий кадр — случайность: ничего не трогаем, но и «ровным» такой ход не считаем
+  Object.assign(st, newTuner());
+  Object.assign(q, { scale: 0.7, refl: 0, busy: false, jit: 2 / 30 });
+  assert.ok(q.jit < JIT_BAD && q.jit > JIT_OK);
+  for (let i = 0; i < 120; i++) assert.equal(tuneStep(st, 17, q), null, 'ни вниз, ни вверх');
+  q.jit = 1 / 30;
+  let up = null;
+  for (let i = 0; i < 40 && !up; i++) up = tuneStep(st, 17, q);
+  assert.ok(up && up.scale > 0.7, 'один долгий кадр из тридцати — ход ровный, разрешение возвращается');
 });

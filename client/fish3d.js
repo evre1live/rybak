@@ -342,9 +342,30 @@ function raySkin(look) {
     }
   });
 }
-/** Рыба вида sp длиной 1: голова к −X, спина к +Y. Если есть готовая модель — она встаёт на место процедурной, как только загрузится. */
+/**
+ * Рыба вида sp длиной 1: голова к −X, спина к +Y. Готовая модель уже загружена — берём сразу её (так бывает почти всегда:
+ * модели тех, кто здесь клюёт, подгружаются, пока поплавок на воде). Нет — пока показываем процедурную рыбу,
+ * а модель встаёт на её место, как только загрузится.
+ */
 export function buildFish(sp) {
-  return adopt(proceduralFish(sp), 'fish-' + sp, true);
+  const id = 'fish-' + sp;
+  if (modelReady(id)) {
+    const wrap = new THREE.Group();
+    wrap.userData = { tail: null, shape: FISH_BY_ID[sp].look.shape || 'std' };
+    return adopt(wrap, id, true);
+  }
+  return adopt(proceduralFish(sp), id, true);
+}
+/**
+ * Заготовки для сборки шейдеров: процедурная рыба и, если модель sp уже загружена, готовая. Они невидимо лежат в сцене,
+ * и шейдеры «рыбьих» материалов собираются вместе со всеми — за заставкой, при смене света и ступени качества.
+ * Иначе они собирались бы в момент подсечки: три сборки подряд — рывок в самом начале вываживания.
+ */
+export function warmFish(sp) {
+  const g = new THREE.Group();
+  g.add(proceduralFish(sp));
+  if (modelReady('fish-' + sp)) g.add(buildFish(sp));
+  return g;
 }
 const WIG_KEY = () => 'fishwig';
 /**
