@@ -1,13 +1,18 @@
 // Дождь: струи вокруг камеры. Каждая струя — узкая полоска, повёрнутая к камере; всё движение считается в шейдере.
 import * as THREE from 'three';
 import { isTouch } from './util.js';
+import { DECK_Y } from './terrain.js';
 
 const BOX = [30, 17, 30]; // коробка вокруг камеры, в которой идёт дождь, м
+// навесы, под которыми сухо: лавка скупщика и будка проката (x0, z0, x1, z1, высота кромки)
+export const ROOFS = [[-13.7, 9.7, -5.7, 16.0, DECK_Y + 3.3], [2.5, -8.9, 5.9, -3.9, DECK_Y + 3.1]];
 const VERT = /* glsl */ `
 attribute vec3 aSeed;
 uniform float uTime, uK;
 uniform vec3 uCam, uBox;
 uniform vec2 uWind;
+uniform vec4 uRoof[2]; // навесы: x0, z0, x1, z1
+uniform float uRoofY[2]; // и высота их кромки
 varying float vA;
 void main() {
   float sp = 13.0 + aSeed.x * 7.0; // скорость падения, м/с
@@ -28,6 +33,8 @@ void main() {
   // густота: чем слабее дождь, тем меньше капель видно; у краёв коробки и у самой камеры они тают
   float on = step(fract(aSeed.x * 7.13 + aSeed.z * 3.71), uK);
   vA = on * (1.0 - position.y * 0.75) * smoothstep(1.6, 5.5, d) * (1.0 - smoothstep(uBox.x * 0.36, uBox.x * 0.5, d));
+  // под крышей лавки и будки проката сухо
+  for (int i = 0; i < 2; i++) { vec4 R = uRoof[i]; if (c.x > R.x && c.x < R.z && c.z > R.y && c.z < R.w && c.y < uRoofY[i]) vA = 0.0; }
   gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
 }`;
 const FRAG = /* glsl */ `
@@ -55,7 +62,8 @@ export class Rain {
     quad.instanceCount = n;
     this.uniforms = {
       uTime: { value: 0 }, uK: { value: 0 }, uA: { value: 0.4 }, uCam: { value: new THREE.Vector3() }, uBox: { value: new THREE.Vector3(...BOX) },
-      uWind: { value: new THREE.Vector2(2, 1) }, uCol: { value: new THREE.Color('#dfeaf5') }
+      uWind: { value: new THREE.Vector2(2, 1) }, uCol: { value: new THREE.Color('#dfeaf5') },
+      uRoof: { value: ROOFS.map((r) => new THREE.Vector4(r[0], r[1], r[2], r[3])) }, uRoofY: { value: ROOFS.map((r) => r[4]) }
     };
     const mat = new THREE.ShaderMaterial({ uniforms: this.uniforms, vertexShader: VERT, fragmentShader: FRAG, transparent: true, depthWrite: false, side: THREE.DoubleSide });
     const m = (this.mesh = new THREE.Mesh(quad, mat));

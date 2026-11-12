@@ -405,6 +405,7 @@ export class World {
     this.exposure = 1;
     // погода: насколько затянуто небо, дождь, туман, ветер (0…1) — меняются плавно
     this.wx = { cover: 0, rain: 0, fog: 0, wind: 0.2 };
+    this.wet = 0;
     this.rain = new Rain(scene);
     this.setClock(12);
   }
@@ -413,6 +414,8 @@ export class World {
   setWeather(w, dt = 0) {
     const c = this.wx;
     for (const k of ['cover', 'rain', 'fog', 'wind']) c[k] = dt > 0 ? damp(c[k], w[k] || 0, 0.9, dt) : w[k] || 0;
+    // доски и камни намокают за четверть минуты, а сохнут больше минуты
+    this.wet = dt > 0 ? damp(this.wet, c.rain, c.rain > this.wet ? 0.07 : 0.014, dt) : c.rain;
   }
 
   /** Освещение на заданный час суток. */
@@ -484,6 +487,8 @@ export class World {
     surfaceU.uWaterS.value.copy(k.wS);
     surfaceU.uWaterD.value.copy(k.wD);
     surfaceU.uCaustK.value = k.glit * (dayLight ? 1 : 0.35);
+    surfaceU.uWet.value = this.wet;
+    surfaceU.uWetSky.value.copy(k.hor);
     w.uFogNear.value = this.scene.fog.near;
     w.uFogFar.value = this.scene.fog.far;
     for (const m of this.cloudMat) {

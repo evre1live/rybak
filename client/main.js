@@ -77,7 +77,13 @@ class Game {
     this.vm.setLook(fpLook(this.profile.look));
     this.vm.setVisible(false);
     // вода отражает мир; сама вода, пена у свай, руки с удочкой и трава в отражение не попадают
-    this.gfx.setReflection(this.world.water.uniforms, [this.world.water.mesh, this.world.rings, this.vm.root, this.world.grass.tufts, this.world.grass.flowers, this.world.rain.mesh].filter(Boolean));
+    this.gfx.setReflection(this.world.water.uniforms, [this.world.water.mesh, this.world.rings, this.vm.root, this.world.grass.tufts, this.world.grass.flowers, this.world.rain.mesh, ...this.world.scenery.fauna.under].filter(Boolean));
+    // живность: рыба и мальки шарахаются от шагов по воде, поплавка и лодки; всплеск играющей рыбы слышен неподалёку
+    this.fauna = this.world.scenery.fauna;
+    this.fauna.onSplash = (x, z, pw) => {
+      const d = Math.hypot(x - this.player.x, z - this.player.z);
+      if (this.state === 'world' && d < 60) this.audio.splash(0.5 + pw * 0.5, clamp(1 - d / 60, 0, 1) * 0.7);
+    };
     // погода: общая для комнаты, считается из её зерна и часов; ?w=rain|fog|cloudy|clear — насильно (для проверок)
     this.forceWx = WEATHER[q.get('w')] ? q.get('w') : null;
     this.weather = weatherAt('title', 0);
@@ -104,6 +110,7 @@ class Game {
       if (p.wade > 0.05) {
         this.audio.splash(0.3 + p.wade * 0.5, land ? 0.45 : 0.2);
         this.fx.ripple(p.x, p.z, 0.6 + p.wade, 0.9);
+        this.fauna.scare(p.x, p.z, 2.8);
       } else this.audio.step(p.onDeck, land);
     };
     this.state = 'title';
@@ -857,10 +864,13 @@ class Game {
         return this.ev('cast', { x: +d.x.toFixed(1), z: +d.z.toFixed(1) });
       case 'land':
         a.splash(0.5);
+        this.fauna.scare(d.x, d.z, 2.4);
         if (d.short) ui.toast('Недолёт: держите кнопку дольше — до белой риски', '', 2200);
         else if (d.hot) ui.toast('Прямо в косяк!', 'good', 1600);
         return this.ev('land', { x: +d.x.toFixed(1), z: +d.z.toFixed(1) });
-      case 'nibble': return a.nibble();
+      case 'nibble':
+        this.fauna.nibble();
+        return a.nibble();
       case 'early':
         return ui.toast('Рано! Ждите, пока поплавок нырнёт', '', 1500);
       case 'bite':
@@ -879,6 +889,7 @@ class Game {
         if (d.switched) ui.toast('Это была последняя наживка — дальше на хлеб', '', 2600);
         return;
       case 'hook': {
+        this.fauna.baitTaken();
         ui.alert(null);
         ui.banner('НА КРЮЧКЕ!');
         a.hook();
@@ -888,9 +899,11 @@ class Game {
       }
       case 'warn': return a.warn();
       case 'run':
+        this.fauna.scare(this.fishing.bx, this.fishing.bz, 3);
         a.splash(0.6);
         return this.rumble(180, 0.8);
       case 'jump':
+        this.fauna.scare(d.x, d.z, 3.5);
         a.splash(1);
         return this.ev('jump', { x: +d.x.toFixed(1), z: +d.z.toFixed(1) });
       case 'lost': {
@@ -952,6 +965,7 @@ class Game {
     p.remote.event(m.k, d, this.state === 'world' || this.state === 'lobby' ? this.fx : null);
     const near = p.st ? Math.hypot(p.st[S.X] - this.player.x, p.st[S.Z] - this.player.z) : 99;
     const vol = clamp(1.1 - near / 40, 0.1, 1);
+    if ((m.k === 'land' || m.k === 'jump') && d.x != null) this.fauna.scare(d.x, d.z, 2.6);
     if (m.k === 'land' || m.k === 'bite') this.audio.splash(0.4, vol);
     else if (m.k === 'jump') this.audio.splash(0.9, vol);
     else if (m.k === 'catch') {
@@ -1543,7 +1557,18 @@ class Game {
     }
     this.vendor.update(dt, { mode: 'idle', variant: ui.panel === 'sell' || ui.panel === 'shop' ? 1 : 0, talk: ui.panel === 'sell' ? 0.3 : 0 });
 
-    this.world.scenery.schools.update(hashStr(this.seed), Math.max(0, T));
+    const schools = this.world.scenery.schools;
+    schools.update(hashStr(this.seed), Math.max(0, T));
+    {
+      // живность: рыба подходит к наживке за несколько секунд до поклёвки; лодка на ходу распугивает мелочь
+      const F = this.fishing, wu = this.world.water.uniforms, bt = this.player.boat;
+      this.fauna.bait(this.state === 'world' && (F.state === 'wait' || F.state === 'bite') ? { x: F.bx, z: F.bz, left: F.biteLeft, bite: F.state === 'bite' } : null);
+      if (bt && Math.abs(bt.v) > 0.8 && (this.scareT = (this.scareT || 0) - dt) <= 0) {
+        this.scareT = 0.3;
+        this.fauna.scare(this.player.x, this.player.z, 4.5, 0.9);
+      }
+      this.fauna.update(dt, tw, Math.max(0, T), hashStr(this.seed), cam, { light: wu.uLight.value, night: this.world.night, rain: this.world.wx.rain, sun: clamp(wu.uGlitter.value, 0, 1), sunCol: wu.uSunCol.value, water: wu.uShallow.value, fx: this.fx }, schools.centers);
+    }
     this.world.update(dt, tw, cam);
     this.fx.update(dt, tw);
     if (!this.noRender || window.__render) {

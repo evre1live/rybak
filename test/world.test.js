@@ -160,6 +160,26 @@ test('домик смотрителя: под ним ровная площадк
   assert.ok(Math.hypot(C.x - T.ISLAND.x, C.z - T.ISLAND.z) + C.s < T.islandR(0) - 12, 'домик в глубине острова');
 });
 
+test('камни в воде: рыбе и лодке туда нельзя, а у пирса и над косяками вода чистая', () => {
+  // риф, опоры арки и корабль — камни; лодка туда не идёт
+  for (const [x, z] of [[T.REEF.x, T.REEF.z], [T.ARCH_LEGS[0][0], T.ARCH_LEGS[0][1]], [T.WRECK.x, T.WRECK.z]]) {
+    assert.ok(T.inRocks(x, z), `камни в ${x}, ${z}`);
+    assert.ok(!T.canSail(x, z));
+  }
+  // у головы пирса и посреди бухты камней нет
+  for (const [x, z] of [[0, -32], [-8, -14], [10, -45]]) assert.ok(!T.inRocks(x, z) && T.canSail(x, z), `чистая вода в ${x}, ${z}`);
+  // правило лодки не изменилось: там, где глубоко, нет настила и нет камней, — плыть можно
+  let n = 0;
+  for (let x = -160; x <= 160; x += 7)
+    for (let z = -180; z <= 20; z += 7) {
+      const deck = T.DECKS.some((d) => x > d.x0 - 0.7 && x < d.x1 + 0.7 && z > d.z0 - 0.7 && z < d.z1 + 0.7);
+      if (T.groundH(x, z) > -0.6 || deck) continue;
+      assert.equal(T.canSail(x, z), !T.inRocks(x, z), `в ${x}, ${z}`);
+      n++;
+    }
+  assert.ok(n > 400);
+});
+
 test('профиль: счётчик выходов на лодке появляется у старых сохранений и не ломается от мусора', () => {
   assert.equal(newProfile().boatTrips, 0);
   const old = newProfile();

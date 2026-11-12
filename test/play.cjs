@@ -679,6 +679,116 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     await hp.close();
   }
 
+  // живой мир: мальки, рыба у свай и у наживки, всплески, насекомые, мокрые доски в дождь
+  {
+    const fp = await open(browser, 'q=medium&norender&h=13&ts=3', 'fauna');
+    await fp.fill('#nm', 'Натуралист');
+    await G(fp, () => { RYBAK.profile.seenIntro = true; });
+    await fp.click('[data-a="solo"]');
+    await fp.waitForFunction(() => RYBAK.state === 'lobby');
+    await G(fp, () => RYBAK.enterWorld());
+    await fp.waitForFunction(() => RYBAK.state === 'world');
+    await G(fp, () => { const g = RYBAK; g.ui.closePanel(); g.input.locked = true; g.input.enabled = true; });
+    const st = await G(fp, () => RYBAK.fauna.stats());
+    assert.ok(st.shoals >= 12 && st.fry >= 400 && st.loners >= 8, `стайки, мальки и одиночки на месте: ${JSON.stringify(st)}`);
+    assert.ok(st.bugs[0] >= 20 && st.bugs[1] >= 40 && st.bugs[2] >= 6, `бабочки, светлячки и стрекозы: ${st.bugs}`);
+    // ни одна стайка и ни одна рыба не сидит в камнях, под настилом или на суше
+    const bad = await G(fp, () => {
+      const F = RYBAK.fauna, out = [];
+      const h = (x, z) => { RYBAK.player.place(x, z, 0); return -RYBAK.player.y; }; // глубина; на настиле и на суше — отрицательная
+      const keep = [RYBAK.player.x, RYBAK.player.z];
+      for (const s of F.shoals) if (!(h(s.x, s.z) > 0.25)) out.push(['стайка', s.x, s.z]);
+      for (const o of F.loners) if (o.ok && !(h(o.f.x, o.f.z) > 0.4)) out.push(['рыба', o.f.x, o.f.z]);
+      RYBAK.player.place(keep[0], keep[1], 0);
+      return out;
+    });
+    assert.deepEqual(bad, [], 'живность стоит в воде');
+    // косяк — настоящая рыба, а не пятна: через полминуты общих часов она выросла в полный размер
+    await fp.waitForFunction(() => RYBAK.fauna.list[0].len > 0.4, null, { timeout: 30000 });
+    // испуг: что-то плюхнулось в стайку — она шарахается в сторону, потом возвращается
+    const sc = await G(fp, async () => {
+      const F = RYBAK.fauna, s = F.shoals[0];
+      const home = () => [s.x + Math.sin(F.t * s.w1 + s.p1) * s.amp, s.z + Math.sin(F.t * s.w2 + s.p2) * s.amp];
+      F.scare(s.cx + 0.6, s.cz, 2.4);
+      const fear = s.fear;
+      await new Promise((ok) => setTimeout(ok, 500));
+      const h = home();
+      return { fear, scared: F.stats().scared, away: Math.hypot(s.cx - h[0], s.cz - h[1]), vis: s.vis };
+    });
+    assert.ok(sc.fear === 1 && sc.scared >= 1 && sc.away > 0.8 && sc.vis > 0.2, `стайка шарахнулась: ${JSON.stringify(sc)}`);
+    await fp.waitForFunction(() => RYBAK.fauna.shoals[0].fear === 0 && Math.hypot(RYBAK.fauna.shoals[0].fx, RYBAK.fauna.shoals[0].fz) < 0.6, null, { timeout: 30000 });
+    // шаги по воде пугают мелочь так же
+    assert.ok(await G(fp, () => { const F = RYBAK.fauna, s = F.shoals[0], p = RYBAK.player; const keep = [p.x, p.z]; p.place(s.cx, s.cz, 0); p.wade = 0.4; p.onStep(false); const f = s.fear; p.wade = 0; p.place(keep[0], keep[1], 0); return f; }) === 1, 'шаг по воде рядом со стайкой её пугает');
+
+    // рыба подходит к наживке: за несколько секунд до поклёвки она уже кружит у поплавка, на поклёвке — у самого крючка
+    await G(fp, () => { const g = RYBAK; g.player.place(0, -24.5, 0); g.player.pitch = -0.22; });
+    await G(fp, () => {
+      const g = RYBAK;
+      window.__seen = { come: 0, far: 99, near: 99, bite: 99 };
+      window.__fbot = setInterval(() => {
+        const f = g.fishing, i = g.input, F = g.fauna, S = F.suitor;
+        const d = Math.hypot(S.f.x - f.bx, S.f.z - f.bz);
+        if (f.state === 'idle') { i.primary = true; i.pressed.add('Primary'); }
+        else if (f.state === 'charge') { if (f.power > 0.9) i.primary = false; }
+        else if (f.state === 'wait' && S.st === 'come') { window.__seen.come++; window.__seen.far = Math.min(window.__seen.far, f.biteLeft > 3 ? d : 99); if (f.biteLeft < 1) window.__seen.near = Math.min(window.__seen.near, d); }
+        else if (f.state === 'bite') { window.__seen.bite = Math.min(window.__seen.bite, d); if (f.biteT < f.kit.hookWin * 0.45) i.pressed.add('Primary'); }
+        else i.primary = false;
+      }, 20);
+    });
+    await fp.waitForFunction(() => RYBAK.fishing.state === 'wait' && RYBAK.fauna.suitor.st === 'come' && RYBAK.fishing.biteLeft < 2.2, null, { timeout: 120000 });
+    await shot(fp, '35-fauna-suitor');
+    await fp.waitForFunction(() => RYBAK.fishing.state === 'fight' || RYBAK.fishing.state === 'landed', null, { timeout: 60000 });
+    const su = await G(fp, () => { clearInterval(window.__fbot); RYBAK.input.primary = false; return { ...window.__seen, st: RYBAK.fauna.suitor.st, len: RYBAK.fauna.suitor.f.len }; });
+    assert.ok(su.come > 3 && su.far > 1.2 && su.near < 1.4 && su.bite < 0.7, `рыба подошла издалека и взяла наживку: ${JSON.stringify(su)}`);
+    assert.ok(su.st === 'none' && su.len === 0, 'после подсечки её рисует сама рыбалка');
+
+    // рыба играет: расписание общее для комнаты — у двух игроков с одним числом комнаты всплески совпадают
+    const jp = await G(fp, async () => {
+      const F = RYBAK.fauna, cam = RYBAK.camera, cs = RYBAK.world.scenery.schools.centers;
+      const plan = (seed) => { const out = []; for (let k = 0; k < 80; k++) { F.jk = -1; F.plan = null; F.stepJumps(0, seed, k * 11 + 0.001, cs, cam); out.push(F.plan ? +F.plan.at.toFixed(2) : 0); } return out; };
+      const a = plan(777), b = plan(777), c = plan(778);
+      // а теперь настоящий всплеск рядом с игроком
+      let heard = 0;
+      const on = F.onSplash; F.onSplash = (x, z, p) => { heard++; on(x, z, p); };
+      const n0 = F.jumped;
+      F.jk = Math.floor(1e6 / 11);
+      F.plan = { at: 1e6, x: RYBAK.player.x - 4, z: RYBAK.player.z - 3, yaw: 1, len: 0.6, tint: 1 };
+      F.stepJumps(0.016, 1, 1e6 + 0.01, cs, cam);
+      const j = F.jumps.find((q) => q.on);
+      let top = -9;
+      for (let i = 0; i < 40 && j && j.on; i++) { F.stepJumps(0.02, 1, 1e6 + 0.02, cs, cam); top = Math.max(top, j.f.y); }
+      F.jk = -1;
+      return { n: a.filter(Boolean).length, same: JSON.stringify(a) === JSON.stringify(b), other: JSON.stringify(a) !== JSON.stringify(c), jumped: F.jumped - n0, top, heard, done: !!j && !j.on && j.f.len === 0 };
+    });
+    assert.ok(jp.n >= 12 && jp.n <= 60 && jp.same && jp.other, `расписание всплесков зависит только от числа комнаты и часов: ${JSON.stringify(jp)}`);
+    assert.ok(jp.jumped === 1 && jp.top > 0.5 && jp.heard === 2 && jp.done, `рыба выпрыгнула, плюхнулась и ушла: ${JSON.stringify(jp)}`);
+
+    // насекомые: днём бабочки и стрекозы, ночью светлячки, в дождь никого
+    const bg = await G(fp, async () => {
+      const g = RYBAK, u = g.fauna.bugU, w = (ms) => new Promise((ok) => setTimeout(ok, ms));
+      const day = [u.uDay.value, u.uNight.value];
+      g.fixedHour = 23.5; await w(400);
+      const night = [u.uDay.value, u.uNight.value];
+      g.fixedHour = 13; g.forceWx = 'rain'; await w(2500);
+      return { day, night, dry: u.uDry.value, shown: g.fauna.bugs.visible, rain: g.world.wx.rain };
+    });
+    assert.ok(bg.day[0] === 1 && bg.day[1] === 0 && bg.night[0] === 0 && bg.night[1] > 0.5, `день и ночь у насекомых: ${JSON.stringify(bg)}`);
+    assert.ok(bg.rain > 0.8 && bg.dry === 0 && !bg.shown, `в дождь насекомые прячутся: ${JSON.stringify(bg)}`);
+    // дождь мочит доски: намокают быстро, сохнут медленно; под навесами лавки и будки сухо
+    await fp.waitForFunction(() => RYBAK.world.wet > 0.6, null, { timeout: 60000 });
+    await shot(fp, '36-fauna-wet');
+    const wt = await G(fp, async () => {
+      const g = RYBAK, w = (ms) => new Promise((ok) => setTimeout(ok, ms));
+      const wet = g.world.wet;
+      g.forceWx = 'clear'; await w(3000);
+      return { wet, after: g.world.wet, rain: g.world.wx.rain, roofs: g.world.rain.uniforms.uRoof.value.length, roofY: g.world.rain.uniforms.uRoofY.value };
+    });
+    assert.ok(wt.rain < 0.1 && wt.after > wt.wet * 0.6 && wt.after < wt.wet, `дождь кончился, а доски ещё мокрые: ${JSON.stringify(wt)}`);
+    assert.ok(wt.roofs === 2 && wt.roofY.every((y) => y > 3.5 && y < 6), 'навесы у дождя заданы');
+    assert.ok(!fp.__err, 'ошибки на странице (живой мир)');
+    await fp.close();
+  }
+
   // старое сохранение с персонажем «из частей»: такого персонажа больше нет — игрок получает героя, остальное на месте
   {
     const old = await browser.newPage({ viewport: { width: W, height: H } });

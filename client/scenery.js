@@ -9,6 +9,7 @@ import { spot01 } from './scatter.js';
 import { rng, rockGeo, blobGeo, canvasTex, shade, sstep, TAU, fbm2 } from './util.js';
 import { DECKS, CIRCLES, DECK_Y, groundH, shoreZ, islandR, ISLAND, ARCH, ARCH_LEGS, REEF, CAPE, capeDist, FALLS, LIGHTHOUSE, COTTAGE, cottageUV, BACKWATER, deckAt, SCHOOL_HOMES } from './terrain.js';
 import { waveH } from './water.js';
+import { Fauna } from './fauna.js';
 
 const WOODS = ['#c58a4e', '#b97c42', '#d39a5d', '#a86f3a', '#c9945a'];
 const PILE_H = 2.1; // высота готовой сваи (env-pile), м: низ с водорослями приходится на кромку воды
@@ -1158,35 +1159,11 @@ function buildGulls(scene) {
 }
 
 // косяки: тёмные силуэты под водой, от них клёв лучше
-function buildSchools(scene) {
-  const tex = canvasTex(64, 32, (g) => {
-    g.fillStyle = '#fff';
-    g.beginPath();
-    g.ellipse(26, 16, 20, 8, 0, 0, TAU);
-    g.fill();
-    g.beginPath();
-    g.moveTo(44, 16);
-    g.lineTo(62, 5);
-    g.lineTo(62, 27);
-    g.closePath();
-    g.fill();
-  });
-  const geo = new THREE.PlaneGeometry(0.62, 0.3);
-  geo.rotateX(-Math.PI / 2);
-  const mat = new THREE.MeshBasicMaterial({ color: '#0a3350', map: tex, transparent: true, opacity: 0.5, depthWrite: false });
+function buildSchools(fauna) {
   const PER = 9;
   const N = 6;
-  const inst = new THREE.InstancedMesh(geo, mat, PER * N);
-  inst.frustumCulled = false;
-  inst.renderOrder = 1;
-  scene.add(inst);
   const centers = [];
   for (let i = 0; i < N; i++) centers.push({ x: 0, z: 0, on: 0 });
-  const m4 = new THREE.Matrix4();
-  const q = new THREE.Quaternion();
-  const up = new THREE.Vector3(0, 1, 0);
-  const pv = new THREE.Vector3();
-  const sv = new THREE.Vector3();
   return {
     centers,
     /** seed — число комнаты, t — секунды общих часов */
@@ -1207,14 +1184,12 @@ function buildSchools(scene) {
           const sp = 0.5 + rr() * 0.35;
           const ang = (j / PER) * TAU + t * sp * (i % 2 ? 1 : -1) + rr() * 0.8;
           const rad = 1.1 + rr() * 1.6 + Math.sin(t * 0.7 + j) * 0.25;
-          pv.set(c.x + Math.cos(ang) * rad, -0.32 - rr() * 0.25, c.z + Math.sin(ang) * rad);
-          q.setFromAxisAngle(up, -ang + (i % 2 ? -Math.PI / 2 : Math.PI / 2) + Math.PI / 2);
+          const y = -0.32 - rr() * 0.25;
           const s = (0.8 + rr() * 0.7) * (0.001 + fade);
-          m4.compose(pv, q, sv.set(s, s, s));
-          inst.setMatrixAt(i * PER + j, m4);
+          // рыба идёт по кругу: нос — по ходу
+          fauna.schoolFish(i * PER + j, c.x + Math.cos(ang) * rad, y, c.z + Math.sin(ang) * rad, ang + (i % 2 ? Math.PI / 2 : -Math.PI / 2), s);
         }
       }
-      inst.instanceMatrix.needsUpdate = true;
     },
     isHot(x, z) {
       for (const c of centers) if (c.on > 0.5 && (x - c.x) ** 2 + (z - c.z) ** 2 < 22) return true;
@@ -1251,7 +1226,8 @@ export function buildScenery(scene) {
   const falls = buildFalls(scene);
   const floaters = buildFloaters(scene);
   const gulls = buildGulls(scene);
-  const schools = buildSchools(scene);
+  const fauna = new Fauna(scene, FOAM_SPOTS);
+  const schools = buildSchools(fauna);
   buildPlaces(scene);
   upgradeProps(scene, fallback, floaters);
   const env = upgradeEnv(scene);
@@ -1261,6 +1237,7 @@ export function buildScenery(scene) {
     env,
     setBoard: shack.setBoard,
     schools,
+    fauna,
     /** Для проверок: спрятан ли запасной меш и сколько готовых моделей расставлено. */
     propsState: () => ({ fallback: fallback.visible, ...propsDone }),
     /** night: 0 днём … 1 ночью; light — общая яркость дня */

@@ -18,6 +18,8 @@ export const surfaceU = {
   uCaust: { value: null },
   uDetail: { value: 1 },
   uTimeS: { value: 0 },
+  uWet: { value: 0 }, // дождь намочил мир: 0 — сухо, 1 — льёт давно
+  uWetSky: { value: new THREE.Color(0.5, 0.55, 0.6) }, // что отражает мокрое: небо у горизонта
   uCaustK: { value: 1 },
   uCloudK: { value: 1 },
   uSunC: { value: new THREE.Color('#fff4e0') },
@@ -339,8 +341,27 @@ if (vWp.y < 0.0) {
   outgoingLight += (diffuseColor.rgb * 0.7 + 0.3) * uSunC * net * uCaustK * lit * 0.62;
   outgoingLight *= mix(vec3(1.0), uWaterS * 1.25 + 0.08, smoothstep(0.0, 2.2, dW) * 0.7);
   outgoingLight = mix(outgoingLight, uWaterD * 0.5, 1.0 - exp(-dW * 0.075));
+} else if (uWet > 0.01) {
+  // Дождь: мокрое темнее. Доски, камень и крашеное ещё и отсвечивают небом — сильнее всего то, что смотрит вверх;
+  // на ровном настиле стоят лужи. Трава и листва не зеркалят: им только лёгкий отсвет.
+  float upW = clamp(nGeo.y, 0.0, 1.0);
+  float wetK = uWet * (0.45 + 0.55 * upW);
+  float frW = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 4.0);
+  outgoingLight *= 1.0 - 0.3 * wetK;
+  #ifdef WET_GLOSS
+    float pud = 0.0;
+    #ifdef WET_PUDDLE
+      pud = smoothstep(0.54, 0.68, texture2D(uDet, vWp.xz * 0.09).r) * smoothstep(0.9, 0.97, nGeo.y) * smoothstep(0.35, 0.9, uWet);
+      outgoingLight *= 1.0 - 0.32 * pud;
+    #endif
+    outgoingLight += uWetSky * (wetK * (0.03 + 0.4 * frW) + pud * (0.04 + 0.42 * frW));
+  #else
+    outgoingLight += uWetSky * wetK * 0.22 * frW;
+  #endif
 }
 `;
+const WET_PARS = 'uniform float uWet;\nuniform vec3 uWetSky;\n';
+const WET_ROUGH = '#include <roughnessmap_fragment>\n#ifdef WET_GLOSS\nroughnessFactor *= 1.0 - 0.5 * uWet;\n#endif';
 
 /** Дополняет стандартный материал фактурой. terrain: true — рельеф (тип поверхности по цвету и уклону). */
 export function patchSurface(material, { terrain = false } = {}) {
@@ -353,11 +374,12 @@ export function patchSurface(material, { terrain = false } = {}) {
         '#include <project_vertex>\nvMat = aMat; vTex = aTex; vWp = (modelMatrix * vec4(transformed, 1.0)).xyz; vNw = normalize(mat3(modelMatrix) * objectNormal);\n#ifdef SURF_TERRAIN\nvGround = aGround;\n#endif'
       );
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', (terrain ? '#define SURF_TERRAIN\n' : '') + '#include <common>\n' + PARS_F)
+      .replace('#include <common>', (terrain ? '#define SURF_TERRAIN\n' : '#define WET_GLOSS\n#define WET_PUDDLE\n') + '#include <common>\n' + PARS_F + WET_PARS)
+      .replace('#include <roughnessmap_fragment>', WET_ROUGH)
       .replace('#include <color_fragment>', '#include <color_fragment>\n' + DETAIL_F)
       .replace('#include <opaque_fragment>', UNDER_F + '\n#include <opaque_fragment>');
   };
-  material.customProgramCacheKey = () => 'surf13' + (terrain ? 'T' : 'B');
+  material.customProgramCacheKey = () => 'surf15' + (terrain ? 'T' : 'B');
   return material;
 }
 
@@ -425,14 +447,15 @@ export function patchModel(material, { sway: k = 0, sat = 1, rock = false } = {}
       .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + (k ? sway(k) : ''))
       .replace('#include <project_vertex>', '#include <project_vertex>\n' + MODEL_WP_V);
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\n' + MODEL_PARS_F + (rock ? 'uniform sampler2D uRock;\nuniform float uDetail;\n' : ''))
+      .replace('#include <common>', (k ? '' : '#define WET_GLOSS\n') + '#include <common>\n' + MODEL_PARS_F + WET_PARS + (rock ? 'uniform sampler2D uRock;\nuniform float uDetail;\n' : ''))
+      .replace('#include <roughnessmap_fragment>', WET_ROUGH)
       .replace(
         '#include <color_fragment>',
         '#include <color_fragment>' + (sat !== 1 ? `\ndiffuseColor.rgb = mix(vec3(dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722))), diffuseColor.rgb, ${sat.toFixed(3)});` : '') + (rock ? ROCK_DETAIL_F : '')
       )
       .replace('#include <opaque_fragment>', 'vec3 nGeo = normalize(cross(dFdx(vWp), dFdy(vWp)));\n' + UNDER_F + '\n#include <opaque_fragment>');
   };
-  material.customProgramCacheKey = () => 'model' + k + '|' + sat + (rock ? 'R' : '');
+  material.customProgramCacheKey = () => 'model3' + k + '|' + sat + (rock ? 'R' : '');
   return material;
 }
 

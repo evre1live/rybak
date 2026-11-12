@@ -238,16 +238,20 @@ export function canSail(x, z) {
   if (x < WORLD.x0 || x > WORLD.x1 || z < WORLD.z0 || z > WORLD.z1) return false;
   if (groundH(x, z) > -0.6) return false;
   for (const d of DECKS) if (x > d.x0 - 0.7 && x < d.x1 + 0.7 && z > d.z0 - 0.7 && z < d.z1 + 0.7) return false;
-  for (const c of SAIL_BLOCKS) if ((x - c.x) ** 2 + (z - c.z) ** 2 < c.r * c.r) return false;
+  return !inRocks(x, z);
+}
+/** Камни в воде: риф, опоры арки, скалы в море, корабль, валуны у берегов. Лодке туда нельзя, рыбе там негде плавать. */
+export function inRocks(x, z) {
+  for (const c of SAIL_BLOCKS) if ((x - c.x) ** 2 + (z - c.z) ** 2 < c.r * c.r) return true;
   // камни у берега острова с маяком, на мысу и вдоль западного берега торчат дальше кромки воды
   const dx = x - ISLAND.x;
   const dz = z - ISLAND.z;
   const ri = Math.hypot(dx, dz);
-  if (ri < 46 && ri - islandR(Math.atan2(dz, dx)) < 6.5) return false;
-  if (capeDist(x, z) < CAPE.r + 3.6) return false;
+  if (ri < 46 && ri - islandR(Math.atan2(dz, dx)) < 6.5) return true;
+  if (capeDist(x, z) < CAPE.r + 3.6) return true;
   const dw = z - shoreZ(x);
-  if (x < -60 && x > BOUNDS.x0 + 20 && dw > -7.5 && dw < 6) return false;
-  return true;
+  if (x < -60 && x > BOUNDS.x0 + 20 && dw > -7.5 && dw < 6) return true;
+  return false;
 }
 
 /** Что за место в воде: глубина и зона ловли. null — не вода. */
