@@ -273,6 +273,16 @@ const atHead = (page) => G(page, () => { RYBAK.player.place(0.6, -20, 0.1); RYBA
     await p.waitForFunction(() => navigator.serviceWorker.controller && RYBAK.cache && RYBAK.cache.total > 100 && RYBAK.cache.done === RYBAK.cache.total, null, { timeout: 120000 });
     const c1 = await p.evaluate(async () => ({ total: RYBAK.cache.total, keys: await caches.keys(), n: (await (await caches.open((await caches.keys())[0])).keys()).length, lite: (await (await caches.open((await caches.keys())[0])).keys()).filter((r) => /\.lite\.glb/.test(r.url)).length }));
     assert.ok(c1.keys.length === 1 && c1.n > 100 && c1.lite === 0, `кэш заведён, облегчённые модели компьютеру не качаем: ${JSON.stringify(c1)}`);
+    // ответы сервера кэш страницей игры не подменяет: /health и /api/* в адресной строке остаются ответами сервера
+    {
+      const p2 = await ctx.newPage();
+      for (const u of ['/health', '/api/status']) {
+        await p2.goto(BASE + u);
+        const t = await p2.evaluate(() => ({ text: document.body.innerText, game: !!window.RYBAK, sw: !!navigator.serviceWorker.controller }));
+        assert.ok(t.sw && !t.game && /^\s*\{"ok":true/.test(t.text), `${u} под кэшем — ответ сервера, а не игра: ${JSON.stringify(t).slice(0, 160)}`);
+      }
+      await p2.close();
+    }
     // без сети: страница, код и модели — из кэша; на заставке сказано, что сервер не отвечает; одиночная рыбалка идёт
     await ctx.setOffline(true);
     await p.goto(`${BASE}/?sw=2&norender&q=low`);

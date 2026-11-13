@@ -52,6 +52,7 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
   let path = url.pathname;
+  if (path === '/health' || path.startsWith('/api/')) return; // ответы сервера: их не подменяем страницей игры, даже если адрес открыли в строке браузера
   if (path === '/' || (req.mode === 'navigate' && !/\.[a-z0-9]+$/i.test(path))) path = '/index.html';
   if (!FILES[path]) return; // /health и всё, чего нет в сборке, идёт на сервер как обычно
   e.respondWith(

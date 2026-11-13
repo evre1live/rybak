@@ -232,7 +232,7 @@ export class Cloud {
     if (!this.timer && this.db && this.s.on) {
       this.timer = setTimeout(() => {
         this.timer = null;
-        this.push();
+        if (this.s.dirty) this.push();
       }, PUSH_AFTER);
     }
   }
@@ -252,6 +252,9 @@ export class Cloud {
     const seq = this.seq;
     const mark = markOf(p);
     const tag = Math.random().toString(36).slice(2, 12);
+    // отложенная отправка больше не нужна: уходит то же самое (иначе, например, после открытия таблицы рекордов сохранение ушло бы дважды)
+    clearTimeout(this.timer);
+    this.timer = null;
     this.busy = true;
     this.s.sent = tag;
     this.write();

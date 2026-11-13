@@ -270,6 +270,18 @@ const openSave = async (page) => {
   await G(c, () => RYBAK.cloud.flush());
   await synced(c);
   const pubC = (await cloud(c)).pub;
+  // открытие таблицы отправляет несохранённое сразу — и один раз: отложенная отправка того же самого отменяется
+  {
+    await fish(c, 'karas', 0.3);
+    const c0 = await cloud(c);
+    assert.ok(c0.dirty && c0.timer, `после улова сохранение ждёт своей очереди: ${JSON.stringify(c0)}`);
+    await G(c, () => RYBAK.ui.openPanel('top'));
+    await c.waitForFunction((r) => RYBAK.cloud.s.rev === r + 1 && !RYBAK.cloud.s.dirty, c0.rev, { timeout: 20000 });
+    assert.equal((await cloud(c)).timer, false, 'отложенная отправка отменена');
+    await c.waitForTimeout(13500);
+    assert.equal((await cloud(c)).rev, c0.rev + 1, 'сохранение ушло один раз');
+    await G(c, () => { const g = RYBAK; g.ui.closePanel(); g.input.locked = true; g.input.enabled = true; });
+  }
   await G(a, () => RYBAK.ui.openPanel('pause'));
   await a.click('.center [data-p="top"]');
   await a.waitForSelector('.ttable .trow.me', { timeout: 20000 });
