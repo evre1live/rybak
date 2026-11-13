@@ -17,6 +17,7 @@ services:
     region: frankfurt
     buildCommand: npm ci --omit=dev
     startCommand: npm start
+    staticPublishPath: public # как у сервиса сейчас; серверу не нужен (файлы отдаёт сам), но так описание совпадает с тем, что есть
     envVars:
       - key: DATABASE_URL
         fromDatabase:
