@@ -1213,8 +1213,16 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     await bp.waitForTimeout(300);
     const tn = await G(bp, async () => {
       const g = RYBAK, gf = g.gfx, cv = gf.renderer.domElement;
-      // tune решает, а вниз идёт только после проверки настоящей цены кадра (в игре — на двух следующих кадрах); здесь применяем сразу
-      const feed = (ms, n) => { for (let i = 0; i < n; i++) { g.tune(ms); if (g.tunePlan) { g.applyTune(g.tunePlan.out); g.tunePlan = null; } } };
+      // tune решает, а вниз идёт только после проверки настоящей цены кадра (в игре — на двух следующих кадрах); здесь применяем сразу.
+      // Само разрешение игра меняет в начале следующего кадра, до отрисовки (иначе экран мигает пустым кадром, см. test/frames.cjs) —
+      // здесь кадры не идут, поэтому делаем то же, что она делает в начале кадра.
+      const feed = (ms, n) => {
+        for (let i = 0; i < n; i++) {
+          g.tune(ms);
+          if (g.tunePlan) { g.applyTune(g.tunePlan.out); g.tunePlan = null; }
+          if (g.scaleNext) { const k = g.scaleNext; g.scaleNext = 0; if (gf.setScale(k)) g.saveAuto(); }
+        }
+      };
       g.noRender = false; // в проверке кадры идут по команде — автоподбор включаем вручную
       gf.setScale(1);
       window.__render = true; await new Promise((ok) => setTimeout(ok, 100));

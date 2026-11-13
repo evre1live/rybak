@@ -18,6 +18,7 @@
     "test:music": "node test/music.cjs",
     "test:cloud": "node test/cloud.cjs",
     "test:sound": "node test/sound.cjs",
+    "test:frames": "node test/frames.cjs",
     "solo": "node tools/artifact.js"
   },
   "engines": {

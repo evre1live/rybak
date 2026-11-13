@@ -1871,6 +1871,13 @@ class Game {
     }
     const dt = Math.max(0, Math.min(0.1, rawMs / 1000)) * this.timeScale * slow;
     this.last = now;
+    if (this.scaleNext) {
+      // Разрешение меняем здесь, до отрисовки. Смена размера стирает холст: если менять после отрисовки (так делал
+      // автоподбор — в конце кадра), на экран уходит пустой кадр — чёрная вспышка.
+      const k = this.scaleNext;
+      this.scaleNext = 0;
+      if (this.gfx.setScale(k)) this.saveAuto();
+    }
     if (this.gfx.resize()) {
       this.camera.aspect = this.gfx.w / this.gfx.h;
       this.camera.updateProjectionMatrix();
@@ -2178,6 +2185,8 @@ class Game {
     i.endFrame();
     window.__frames = (window.__frames || 0) + 1;
     this.frameMs = this.frameMs * 0.95 + rawMs * 0.05;
+    const drawn = this.gfx.drawn;
+    this.gfx.drawn = false;
     if (!this.manual) {
       this.perf.push(rawMs);
       if (this.tunePlan) {
@@ -2201,6 +2210,8 @@ class Game {
         this.ui.perfBox(this.perfLine());
       }
     }
+    // Страховка: кадр был нарисован, а после этого холст стёрли (сменили его размер) — рисуем заново, иначе экран мигнёт чёрным
+    if (drawn && this.gfx.wiped) this.gfx.render(this.scene, cam, this.world.exposure);
   }
   /**
    * Загрузка за заставкой: модели локации, шейдеры, текстуры и подбор качества. Всё, что иначе случилось бы
@@ -2414,8 +2425,10 @@ class Game {
   applyTune(out) {
     const g = this.gfx;
     if (out.refl != null) g.setRefl(out.refl); // отражения дешевле или совсем без них: меняется один небольшой буфер
-    else if (out.scale) g.setScale(out.scale);
-    else if (!this.tierBusy) {
+    else if (out.scale) {
+      this.scaleNext = out.scale; // холст трогаем только до отрисовки — в начале следующего кадра (см. frame)
+      return;
+    } else if (!this.tierBusy) {
       // Ступень ниже. Её шейдеры сначала собираются в фоне, и только потом картинка переключается — без рывка.
       const next = g.quality === 'high' ? 'medium' : 'low';
       this.tierBusy = true;

@@ -152,6 +152,8 @@ export class Gfx {
     this.quality = null;
     this.w = this.h = 0;
     this.ratio = 0;
+    this.drawn = false; // кадр нарисован (ставит render, снимает игра в конце своего кадра)
+    this.wiped = false; // холст стёрт сменой размера после отрисовки
     this.setQuality(quality || 'high');
   }
   /** Отражения в воде включены? (уровень — reflLevel, меняется через setRefl) */
@@ -331,6 +333,7 @@ export class Gfx {
     this.ratio = ratio;
     this.renderer.setPixelRatio(ratio);
     this.renderer.setSize(w, h, false);
+    this.wiped = true; // смена размера стирает холст: пока кадр не нарисован заново, показывать нечего (см. конец frame в main.js)
     if (this.post) this.sizePost();
     return sized;
   }
@@ -472,6 +475,8 @@ export class Gfx {
     const r = this.renderer;
     r.info.reset();
     r.toneMappingExposure = exposure;
+    this.drawn = true; // в этом кадре на холсте есть картинка…
+    this.wiped = false; // …и её пока никто не стёр
     const W = this.water;
     if (this.quality !== 'high' || !this.canPost) {
       if (W) W.uReflK.value = 0;
