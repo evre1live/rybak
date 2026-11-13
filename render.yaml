@@ -1,17 +1,24 @@
-# Рецепт для бесплатного запуска на Render (render.com).
-# Render прочитает этот файл и сам поднимет игру по адресу вида https://rybak.onrender.com
+# Инфраструктура игры на Render: сервер и база данных.
+# Строку подключения к базе Render подставляет серверу сам (fromDatabase) — её нет ни в коде, ни в настройках вручную.
+databases:
+  - name: rybak-db
+    plan: basic-256mb
+    region: frankfurt
+    postgresMajorVersion: "18"
+    diskSizeGB: 1
+    databaseName: rybak
+    user: rybak
+
 services:
   - type: web
     name: rybak
     runtime: node
     plan: free
-    region: frankfurt        # ближайший к Ташкенту регион Render
+    region: frankfurt
     buildCommand: npm ci --omit=dev
     startCommand: npm start
-    healthCheckPath: /health
-    autoDeployTrigger: commit # новая версия в GitHub — игра обновится сама
     envVars:
-      - key: NODE_VERSION
-        value: "22"
-      - key: NODE_ENV
-        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: rybak-db
+          property: connectionString
