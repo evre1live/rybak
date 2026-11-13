@@ -835,7 +835,7 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     await G(bp, () => RYBAK.input.keys.delete('KeyW'));
     await shot(bp, '24-boat-prompt', 200);
     await use();
-    await bp.waitForFunction(() => RYBAK.boat.active && RYBAK.player.boat === RYBAK.boat && /ХОД.*РУЛЬ/.test(document.querySelector('#hints').textContent));
+    await bp.waitForFunction(() => RYBAK.boat.active && RYBAK.player.boat === RYBAK.boat && /Ход.*Руль/.test(document.querySelector('#hints').textContent));
     const b0 = await G(bp, () => { const g = RYBAK; return { coins: g.profile.coins, trips: g.profile.boatTrips, sit: g.player.sit && g.player.dangle, y: g.player.y, rented: g.boat.rented, net: g.boat.net }; });
     assert.equal(b0.coins, 40, 'первый выход бесплатный');
     assert.equal(b0.trips, 1);
@@ -906,7 +906,7 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     await G(bp, () => window.__run(1.2));
     await prompt(/ПРИЧАЛИТЬ И СДАТЬ ЛОДКУ — СОЛНЕЧНАЯ БУХТА/);
     await use();
-    await bp.waitForFunction(() => !RYBAK.boat.active && !RYBAK.boat.rented && RYBAK.boat.net === 0 && document.querySelector('#locName').textContent === 'СОЛНЕЧНАЯ БУХТА' && RYBAK.mapSea === false);
+    await bp.waitForFunction(() => !RYBAK.boat.active && !RYBAK.boat.rented && RYBAK.boat.net === 0 && document.querySelector('#locName').textContent === 'БУХТА' && RYBAK.mapSea === false);
     assert.ok(await G(bp, () => RYBAK.player.onDeck && Math.abs(RYBAK.player.z + 12) < 0.5), 'стоим на домашнем пирсе');
     // второй выход — за монеты; без монет лодку не дают
     await prompt(/ЛОДКА НАПРОКАТ — 30 МОНЕТ/);
@@ -944,7 +944,7 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     await G(wp, () => { const g = RYBAK; g.ui.closePanel(); g.input.locked = true; g.input.enabled = true; });
     // дождь: струи идут, на воде круги, даль съедена, небо затянуто, клёв выше — и это написано рядом с часами
     await wp.waitForFunction(() => /дождь/i.test(document.querySelector('#wxName').textContent), null, { timeout: 10000 });
-    const rain = await G(wp, () => { const g = RYBAK, w = g.world; return { kind: g.weather.kind, mesh: w.rain.mesh.visible, rings: w.water.uniforms.uRain.value, far: w.scene.fog.far, cover: w.skyU.uCover.value, bite: g.fishing.wx(), chip: document.querySelector('.chip.loc').textContent, off: document.querySelector('.chip.loc').classList.contains('wx-off') }; });
+    const rain = await G(wp, () => { const g = RYBAK, w = g.world; return { kind: g.weather.kind, mesh: w.rain.mesh.visible, rings: w.water.uniforms.uRain.value, far: w.scene.fog.far, cover: w.skyU.uCover.value, bite: g.fishing.wx(), chip: document.querySelector('.hud-tl .loc').textContent, off: document.querySelector('.hud-tl .loc').classList.contains('wx-off') }; });
     assert.ok(rain.kind === 'rain' && rain.mesh && rain.rings > 0.95 && rain.far < 700 && rain.cover > 0.95 && !rain.off, JSON.stringify(rain));
     assert.equal(rain.bite, 1.3);
     assert.match(rain.chip, /дождь.*клёв \+30%/i);
@@ -955,7 +955,7 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     await wp.waitForFunction(() => /туман/i.test(document.querySelector('#wxName').textContent));
     await shot(wp, '31-fog', 200);
     await G(wp, () => { RYBAK.forceWx = 'clear'; });
-    await wp.waitForFunction(() => RYBAK.world.wx.fog < 0.05 && RYBAK.world.scene.fog.far > 1500 && document.querySelector('.chip.loc').classList.contains('wx-off'), null, { timeout: 30000 });
+    await wp.waitForFunction(() => RYBAK.world.wx.fog < 0.05 && RYBAK.world.scene.fog.far > 1500 && document.querySelector('.hud-tl .loc').classList.contains('wx-off'), null, { timeout: 30000 });
 
     // задания: улов и продажа двигают счёт, награда приходит сразу, в углу экрана видно, что осталось
     const q0 = await G(wp, () => {
@@ -1014,7 +1014,7 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     assert.deepEqual([res.quests, res.bonus, res.stats.tours, res.stats.medals], [[true, true, true], true, 1, 1]);
     await shot(wp, '34-tour-result', 200);
     await wp.keyboard.press('Escape');
-    await wp.waitForFunction(() => /ВСЕ ВЫПОЛНЕНЫ/.test(document.querySelector('#quests').textContent));
+    await wp.waitForFunction(() => /все выполнены/i.test(document.querySelector('#quests').textContent));
     assert.ok(!wp.__err, 'ошибки на странице (погода, задания, заплыв)');
     await wp.close();
   }
@@ -1369,6 +1369,77 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     assert.ok(sea.dol.shown >= 4 && sea.dol.leaps >= 3 && sea.dol.heard === sea.dol.leaps, `дельфины идут стаей и прыгают: ${JSON.stringify(sea.dol)}`);
     assert.ok(sea.dol.top > 1.2 && sea.dol.low < -0.9, `в прыжке дельфин целиком над водой, между выходами — на глубине: ${JSON.stringify(sea.dol)}`);
     assert.deepEqual(sea.areas, ['teeth', 'gullrock', 'westrocks', 'sea', 'bay'], 'у скал в море — свои названия мест');
+
+    // экран игры по макетам (этап 19): место и погода, плашка улова и наживки, чип удочки, компас, мини-карта с маршрутом
+    await bp.waitForFunction(() => RYBAK.navReady === true, null, { timeout: 60000 });
+    const hud = await G(bp, async () => {
+      const g = RYBAK, $ = (s) => document.querySelector(s);
+      const frames = (n) => new Promise((ok) => { let k = 0; const f = () => (++k < n ? requestAnimationFrame(f) : ok()); f(); });
+      const until = async (fn, ms = 20000) => { const t0 = performance.now(); while (!fn() && performance.now() - t0 < ms) await frames(2); return !!fn(); };
+      const vis = (s) => { const e = $(s); return !!e && !e.closest('.hidden') && e.getClientRects().length > 0; };
+      g.ui.closePanel();
+      g.player.place(0.6, -20, 0);
+      await frames(6);
+      const out = {
+        place: $('#placeName').textContent, loc: $('.hud-tl .loc').textContent, cap: $('#locName').textContent, bag: $('#bagN').textContent, bait: $('#baitN').textContent, rod: $('#rodName').textContent,
+        solo: $('#onlineN').textContent, map: [$('#minimap').width, $('#minimap').height], rows: document.querySelectorAll('#hints span').length, keys: document.querySelectorAll('#hints kbd').length,
+        font: getComputedStyle($('#placeName')).fontFamily, tilt: getComputedStyle($('#fstate')).fontStyle
+      };
+      // компас с градусами на месте; в настройках его можно убрать и вернуть
+      out.compass = [vis('#compass')];
+      for (let i = 0; i < 2; i++) {
+        g.ui.openPanel('settings');
+        $('[data-a="tog"][data-id="compass"]').click();
+        g.ui.closePanel();
+        await frames(6);
+        out.compass.push(vis('#compass'));
+      }
+      // маршрут. Пешком без улова идти некуда; с уловом — пунктир к торговцу
+      out.none = g.navStep(0.02);
+      g.profile.cooler.push({ sp: 'okun', w: 0.4, len: 20 });
+      const m = g.navStep(0.02);
+      out.market = m && { kind: m.kind, sail: m.sail, len: m.len, n: m.pts.length };
+      await frames(4);
+      out.distFoot = $('#mapDist').textContent;
+      g.profile.cooler.length = 0;
+      // в лодке в открытом море: без эхолота — домой, к причалу, и путь идёт по воде
+      g.profile.coins = 999;
+      g.rentBoat();
+      await until(() => g.boat.active);
+      const b = g.boat;
+      Object.assign(b, { x: 150, z: -250, yaw: 0, v: 0 });
+      await until(() => g.area === 'sea');
+      g.navKey = '';
+      const h = g.navStep(0.02);
+      out.home = h && { kind: h.kind, sail: h.sail, len: h.len, n: h.pts.length, end: h.pts[h.pts.length - 1], direct: Math.hypot(150 - 4, -250 + 12) };
+      await frames(4);
+      out.distBoat = [$('#mapDist').textContent, vis('#mapDist')];
+      // с эхолотом — к ближайшему косяку; с полным садком — снова домой
+      g.profile.owned.sonar = true;
+      g.fishing.refreshGear();
+      const sc = g.navStep(0.02);
+      out.school = sc && { kind: sc.kind, sail: sc.sail, len: sc.len };
+      const cap = g.fishing.kit.bagCap;
+      while (g.profile.cooler.length < cap) g.profile.cooler.push({ sp: 'okun', w: 0.4, len: 20 });
+      g.ui.refreshHud();
+      const full = g.navStep(0.02);
+      out.full = full && { kind: full.kind, red: $('.tally .bag').classList.contains('full') };
+      g.profile.cooler.length = 0;
+      delete g.profile.owned.sonar;
+      g.fishing.refreshGear();
+      g.ui.refreshHud();
+      return out;
+    });
+    assert.ok(hud.place === 'Солнечная бухта' && /^\d\d:\d\d/.test(hud.loc) && hud.cap === 'БУХТА', `место, время и погода — слева вверху, где мы — над картой: ${JSON.stringify(hud)}`);
+    assert.ok(/^\d+ \/ \d+$/.test(hud.bag) && hud.bait.length > 0 && hud.rod.length > 2 && hud.solo === 'Одиночная рыбалка', `улов, наживка, удочка и команда на своих местах: ${JSON.stringify(hud)}`);
+    assert.deepEqual(hud.map, [512, 276], 'мини-карта широкая');
+    assert.ok(hud.rows >= 3 && hud.keys >= 3, `подсказки управления — по строке на действие, с клавишами: ${hud.rows}, ${hud.keys}`);
+    assert.ok(/Onest/.test(hud.font) && hud.tilt === 'normal', `экран игры набран прямым шрифтом: ${hud.font}, ${hud.tilt}`);
+    assert.deepEqual(hud.compass, [true, false, true], 'компас с градусами на месте, убирается и возвращается настройкой');
+    assert.ok(hud.none === null && hud.market && hud.market.kind === 'market' && hud.market.sail === false && hud.market.n === 2 && hud.market.len > 20 && /^\d+ м$/.test(hud.distFoot), `пешком с уловом — к торговцу: ${JSON.stringify([hud.none, hud.market, hud.distFoot])}`);
+    assert.ok(hud.home && hud.home.kind === 'home' && hud.home.sail && hud.home.n >= 2 && Math.abs(hud.home.end[0] - 4) < 0.01 && hud.home.len >= hud.home.direct - 1 && hud.home.len < hud.home.direct * 1.5, `из моря маршрут ведёт домой, по воде: ${JSON.stringify(hud.home)}`);
+    assert.ok(/^\d+ м$/.test(hud.distBoat[0]) && hud.distBoat[1], `расстояние до цели — на карте: ${hud.distBoat}`);
+    assert.ok(hud.school && hud.school.kind === 'school' && hud.school.sail && hud.full && hud.full.kind === 'home' && hud.full.red, `с эхолотом — к косяку, с полным садком — домой: ${JSON.stringify([hud.school, hud.full])}`);
     assert.ok(!bp.__err, 'ошибки на странице (загрузка и скорость)');
     await ctx.close();
   }

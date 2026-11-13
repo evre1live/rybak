@@ -13,7 +13,7 @@ const dev = watch || process.argv.includes('--dev');
 // шрифты: копируем один раз из @fontsource
 const FONTS = [
   ['sofia-sans-extra-condensed', ['800-italic', '900-italic', '800-normal']],
-  ['onest', ['400-normal', '500-normal', '700-normal']]
+  ['onest', ['400-normal', '500-normal', '600-normal', '700-normal']]
 ];
 const fdir = path.join(root, 'public/fonts');
 fs.mkdirSync(fdir, { recursive: true });

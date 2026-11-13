@@ -22,36 +22,40 @@
 <div id="ui">
   <div id="hud" class="hidden">
     <div class="hud-tl">
-      <div class="chip loc wx-off"><span class="ic" data-ic="pin"></span><b id="locName">СОЛНЕЧНАЯ БУХТА</b><i class="sep"></i><span class="ic" data-ic="sun" id="clockIc"></span><b id="clock">08:00</b><i class="sep" id="wxSep"></i><span class="ic" id="wxIc"></span><b id="wxName"></b></div>
-      <div id="crew"></div>
+      <div class="place"><h1 id="placeName">Солнечная бухта</h1><div class="loc wx-off"><b id="clock">08:00</b><i class="dot"></i><span id="wxName">Ясно</span></div></div>
       <div id="quests" class="hidden"></div>
       <div id="feed"></div>
     </div>
     <div class="hud-tc"><canvas id="compass" width="760" height="64"></canvas><div id="banner" class="hidden"></div><div id="tour" class="hidden"></div></div>
     <div class="hud-tr">
-      <div class="mapbox"><canvas id="minimap" width="256" height="256"></canvas><span class="north">С<i></i></span></div>
-      <div class="chip online"><span class="ic" data-ic="users"></span><b id="onlineN">1 РЫБАК</b></div>
-      <div class="chip coins"><span class="ic" data-ic="coin"></span><b id="coins">0</b><i class="sep"></i><span class="lv">УР.</span><b id="lvl">1</b></div>
-      <div class="chip voice click hidden" id="voiceChip"><span class="ic" data-ic="mic"></span><b id="voiceTxt">ГОЛОС</b></div>
+      <div class="crewbox gl">
+        <div class="ch"><span class="cap" id="onlineN">Одиночная рыбалка</span></div>
+        <div id="crew"></div>
+        <div class="voice click hidden" id="voiceChip"><span class="ic" data-ic="mic"></span><b id="voiceTxt">Голос</b></div>
+      </div>
+      <div class="purse gl"><span class="ic" data-ic="coin"></span><b id="coins">0</b><i class="sep"></i><span class="lv">ур.</span><b id="lvl">1</b></div>
     </div>
     <div class="hud-bl">
-      <div class="chip bag"><span class="ic" data-ic="bag"></span><b>САДОК</b><b id="bagN" class="y">0 / 8</b></div>
-      <div class="chip rodchip"><img id="rodIcon" alt=""><b id="rodName">СТАРТОВАЯ</b></div>
+      <div class="cap" id="locName">Бухта</div>
+      <div class="mapbox"><canvas id="minimap" width="512" height="276"></canvas><b class="dist hidden" id="mapDist"></b><span class="north">С</span></div>
+      <div class="tally"><span class="seg bag"><span class="ic" data-ic="bag"></span><b id="bagN">0 / 8</b></span><i class="sep"></i><span class="seg bait click" data-k="bait"><img id="baitIcon" alt=""><b id="baitN">0</b></span></div>
     </div>
     <div class="hud-bc">
       <div id="fight" class="hidden">
-        <div id="steer"><span class="st l"><kbd>A</kbd>◀</span><b id="fstate">РОВНО</b><span class="st r">▶<kbd>D</kbd></span></div>
-        <div class="fpanel">
-          <div class="ftitle"><i></i>НАТЯЖЕНИЕ ЛЕСКИ<i></i></div>
-          <div class="tbar" id="tbar"><span class="lo">СЛАБО</span><span class="ok" id="tok">НОРМА</span><span class="dg"><span class="ic" data-ic="warn"></span>ОПАСНО</span><div class="tz slack">ВЯЛО</div><div class="tz lift" id="tzLift"><i id="tzLiftK"></i><b>ДЕРЖИ</b></div><div class="tz jump" id="tzJump">ОСЛАБЬ</div><div id="tptr"></div></div>
-          <div class="prow"><span>ВЫВАЖИВАНИЕ</span><b id="fboss"></b><div class="pbar" id="pbar"><i id="pfill"></i><em class="pm" style="left:45%"></em><em class="pm" style="left:80%"></em><em class="pn" style="left:70%"></em></div><b id="ppct">0%</b></div>
-          <div id="ftip"></div>
+        <div id="steer">
+          <span class="st l"><kbd>A</kbd><i>◀</i></span>
+          <div class="fpanel gl">
+            <div class="fhead"><span class="cap">Натяжение лески</span><b id="fstate">РОВНО</b></div>
+            <div class="tline"><span class="lb">Слабо</span><div class="tbar" id="tbar"><span class="lo">СЛАБО</span><span class="ok" id="tok">НОРМА</span><span class="dg">ОПАСНО</span><div class="tz slack">ВЯЛО</div><div class="tz lift" id="tzLift"><i id="tzLiftK"></i><b>ДЕРЖИ</b></div><div class="tz jump" id="tzJump">ОСЛАБЬ</div><div id="tptr"></div></div><span class="lb">Сильно</span></div>
+            <div class="prow"><span class="cap">Улов</span><b id="ppct">0%</b><b id="fboss"></b><div class="pbar" id="pbar"><i id="pfill"></i><em class="pm" style="left:45%"></em><em class="pm" style="left:80%"></em><em class="pn" style="left:70%"></em></div></div>
+            <div id="ftip"></div>
+          </div>
+          <span class="st r"><i>▶</i><kbd>D</kbd></span>
         </div>
       </div>
-      <div id="power" class="hidden"><span>СИЛА ЗАБРОСА</span><div class="pw"><i id="pwfill"></i><em id="pwneed"></em></div></div>
-      <div id="hints" class="chip"></div>
+      <div id="power" class="hidden"><span class="cap">Сила заброса</span><div class="pw"><i id="pwfill"></i><em id="pwneed"></em></div></div>
     </div>
-    <div class="hud-br" id="hotbar"></div>
+    <div class="hud-br"><div id="hints"></div><div id="hotbar"></div></div>
     <div id="cross"><i></i></div>
     <div id="castMark" class="hidden"><div class="ring"></div><div class="lbl">ЗАБРОС СЮДА</div><div class="sub"></div></div>
     <div id="prompt" class="hidden"></div>

@@ -1,5 +1,6 @@
-// Интерфейс: HUD как на макетах, лобби, снасти и магазин, рынок, журнал, выбор героя, настройки.
-import { CATS, ITEMS, FISH, FISH_BY_ID, FIGHT_STYLES, JUNK_BY_ID, RARITY, ZONES, DAY_PARTS, RODS, MAX_PLAYERS, fmtW, fmtCoins, fmtClock, dayPart, isLure } from '../shared/data.js';
+// Интерфейс: экран игры (HUD) по макетам этапа 19 — стеклянные панели, команда с фигурками, мини-карта с маршрутом;
+// лобби, снасти и магазин, рынок, журнал, выбор героя, настройки.
+import { CATS, ITEMS, FISH, FISH_BY_ID, FIGHT_STYLES, JUNK_BY_ID, RARITY, ZONES, DAY_PARTS, RODS, MAX_PLAYERS, fmtW, fmtCoins, fmtClock } from '../shared/data.js';
 import {
   kitStats, rodBars, owns, tackleCount, priceOf, fishValue, coolerValue, levelInfo, fightGrade, T_LOW, T_DANGER, T_TIGHT, dangerAt, liftNeed,
   WEATHER, questText, questCount, questReward, QUEST_BONUS, TOURS, TOUR_LENS, tourTable, tourScoreText, tourTargets, tourPrize, medalPrize, MEDALS
@@ -38,7 +39,6 @@ const TIER = ['ЛЁГКОЕ', 'СРЕДНЕЕ', 'ТРУДНОЕ'];
 const mmss = (sec) => `${String(Math.floor(Math.max(0, sec) / 60)).padStart(2, '0')}:${String(Math.max(0, sec) % 60).padStart(2, '0')}`;
 const ic = (n, cls = '') => `<span class="ic ${cls}">${SVG[n] || ''}</span>`;
 const coin = (n) => `${ic('coin')}${fmtCoins(n)}`;
-const PART_ICON = { dawn: 'sun', day: 'sun', dusk: 'sun', night: 'moon' };
 
 export class UI {
   constructor(game) {
@@ -86,23 +86,24 @@ export class UI {
     $('#coins').textContent = fmtCoins(p.coins);
     $('#lvl').textContent = lv.lvl;
     $('#bagN').textContent = `${p.cooler.length} / ${kit.bagCap}`;
-    $('#bagN').classList.toggle('y', p.cooler.length < kit.bagCap);
-    $('#bagN').style.color = p.cooler.length >= kit.bagCap ? '#f04438' : '';
+    $('.tally .bag').classList.toggle('full', p.cooler.length >= kit.bagCap);
     const rod = ITEMS[p.equip.rod] || RODS[0];
-    $('#rodName').textContent = rod.name;
-    $('#rodIcon').src = itemIcon(rod.id);
+    // наживка или приманка на крючке и сколько её осталось — в плашке под картой; удочка — отдельным чипом справа
     const tk = p.equip.tackle;
     const n = tackleCount(p, tk);
-    $('#hotbar').innerHTML = `<div class="slot sel" data-k="rod"><img src="${itemIcon(rod.id)}" alt=""></div>
-      <div class="slot" data-k="bait"><img src="${itemIcon(tk)}" alt=""><b>${n === Infinity ? '∞' : n}</b><kbd class="x">Q</kbd></div>
-      <div class="slot" data-k="float"><img src="${itemIcon(isLure(tk) ? tk : p.equip.float)}" alt=""></div>`;
+    $('#baitIcon').src = itemIcon(tk);
+    $('#baitN').textContent = n === Infinity ? '∞' : n;
+    $('#hotbar').innerHTML = `<div class="slot rodchip sel" data-k="rod"><img src="${itemIcon(rod.id)}" alt=""><b id="rodName">${esc(rod.name)}</b></div>`;
   }
   setCrew(list) {
-    const key = JSON.stringify(list.map((p) => [p.id, p.name, p.slot, p.look, p.voice, p.muted, p.mode]));
+    const key = JSON.stringify(list.map((p) => [p.id, p.name, p.slot, p.voice, p.muted, p.mode]));
     if (key !== this.crewKey) {
       this.crewKey = key;
-      $('#crew').innerHTML = list.filter((p) => !p.me).map((p) => `<div class="crow" data-id="${p.id}"><div class="ava" style="border-color:${MARKS[p.slot % 8].color}"><img src="${faceIcon(p.look)}" alt=""></div><b>${esc(p.name)}</b>${p.mode === 'lobby' ? '<span class="st">в лобби</span>' : ''}${ic(p.voice && !p.muted ? 'mic' : 'micoff', p.voice && !p.muted ? 'mic' : 'off')}${markSvg(p.slot, 20)}</div>`).join('');
-      $('#onlineN').textContent = this.g.solo ? 'ОДИНОЧНАЯ РЫБАЛКА' : `${list.length} / ${MAX_PLAYERS} В СЕТИ`;
+      // у каждого своя фигурка и цвет — те же, что над головой в мире и на карте; огонёк горит, когда человек говорит
+      const mic = (p) => (p.voice && !p.muted ? ic('mic', 'mic') : ic('micoff', 'mic off'));
+      $('#crew').innerHTML = list.filter((p) => !p.me).map((p) => `<div class="crow${p.mode === 'lobby' ? ' away' : ''}" data-id="${p.id}">${markSvg(p.slot, 22)}<b>${esc(p.name)}</b>${p.mode === 'lobby' ? '<span class="st">в лобби</span>' : ''}<i class="dot"></i>${mic(p)}</div>`).join('');
+      $('#onlineN').textContent = this.g.solo ? 'Одиночная рыбалка' : `Команда ${list.length}/${MAX_PLAYERS}`;
+      $('.crewbox').classList.toggle('solo', !!this.g.solo);
     }
     for (const p of list) {
       const row = $(`.crow[data-id="${p.id}"]`);
@@ -148,17 +149,16 @@ export class UI {
     if (html === this.promptKey) return;
     this.promptKey = html;
     p.classList.toggle('hidden', !html);
-    p.innerHTML = html ? `<div class="chip">${html}</div>` : '';
+    p.innerHTML = html ? `<div class="hintp gl">${html}</div>` : '';
   }
-  /** Погода рядом с часами: в ясную погоду там пусто, в непогоду — значок, название и прибавка к клёву. */
+  /** Погода рядом с часами: название, а в непогоду — ещё и прибавка к клёву. */
   weather(wx) {
     const add = Math.round((wx.bite - 1) * 100);
     const key = wx.kind + '|' + add;
     if (key === this.wxKey) return;
     this.wxKey = key;
-    $('.chip.loc').classList.toggle('wx-off', wx.kind === 'clear');
-    $('#wxIc').innerHTML = SVG[WX_ICON[wx.kind]] || '';
-    $('#wxName').innerHTML = `${WEATHER[wx.kind].name}${add > 0 ? `<em>КЛЁВ +${add}%</em>` : ''}`;
+    $('.hud-tl .loc').classList.toggle('wx-off', wx.kind === 'clear');
+    $('#wxName').innerHTML = `${WEATHER[wx.kind].name}${add > 0 ? `<em>клёв +${add}%</em>` : ''}`;
   }
   /** Задания дня в углу экрана: что осталось и сколько сделано. */
   questTracker() {
@@ -167,7 +167,7 @@ export class UI {
     const left = qs ? qs.list.filter((q) => !q.done).length : 0;
     box.classList.toggle('hidden', !qs);
     if (!qs) return;
-    const html = `<div class="qh">${ic('list')}ЗАДАНИЯ ДНЯ<kbd class="g">K</kbd>${left ? '' : '<span class="y">ВСЕ ВЫПОЛНЕНЫ</span>'}</div>` +
+    const html = `<div class="qh"><span class="cap">Задания дня</span><kbd class="g">K</kbd>${left ? '' : '<span class="ok">все выполнены</span>'}</div>` +
       qs.list.filter((q) => !q.done).map((q) => `<div class="q"><span>${esc(questText(q))}</span><b>${esc(questCount(q))}</b></div>`).join('');
     if (html !== this.questKey) {
       this.questKey = html;
@@ -325,7 +325,9 @@ export class UI {
     e.style.transform = `translate(${m.x}px,${m.y}px) translate(-50%,-2.6em)`;
     e.classList.toggle('bad', !m.ok);
     e.classList.toggle('hot', !!m.hot);
-    const lbl = m.ok ? (m.hot ? 'КОСЯК РЫБЫ!' : m.clamped ? 'ДАЛЬШЕ НЕ ДОБРОСИТЬ' : 'ЗАБРОС СЮДА') : 'ТУТ НЕ ВОДА';
+    // пока просто смотрим на воду, крупной подписи нет — только строка о месте; подпись нужна на замахе, над косяком и «тут не вода»
+    e.classList.toggle('quiet', !m.aim && m.ok && !m.hot);
+    const lbl = m.ok ? (m.hot ? 'Косяк рыбы!' : m.clamped ? 'Дальше не добросить' : 'Заброс сюда') : 'Тут не вода';
     const l = e.querySelector('.lbl');
     if (l.textContent !== lbl) l.textContent = lbl;
     const sub = m.ok ? `${m.zone} · ${m.dist.toFixed(0)} м от вас · дно ${m.depth.toFixed(1).replace('.', ',')} м${m.act ? ` · клёв ${'●'.repeat(Math.max(1, Math.round(m.act * 5)))}` : ''}` : '';
@@ -337,13 +339,12 @@ export class UI {
     if (s === this.lastClock) return;
     this.lastClock = s;
     $('#clock').textContent = s;
-    const part = dayPart(h);
-    if (part !== this.lastPart) {
-      this.lastPart = part;
-      $('#clockIc').innerHTML = SVG[PART_ICON[part]];
-    }
   }
+  /** Лента компаса вверху экрана: стороны света и градусы. В настройках её можно убрать. */
   compass(yaw) {
+    const on = !!settings.compass;
+    if (on !== this.cmpOn) $('#compass').classList.toggle('hidden', !(this.cmpOn = on));
+    if (!on) return;
     const g = this.cmp;
     const W = 760;
     const H = 64;
@@ -368,29 +369,38 @@ export class UI {
       g.lineTo(x, major ? 32 : 29);
       g.stroke();
       const lab = { 0: 'С', 90: 'В', 180: 'Ю', 270: 'З' }[d];
-      g.font = lab ? 'italic 900 40px "Sofia X", sans-serif' : 'italic 800 21px "Sofia X", sans-serif';
+      g.font = lab ? '700 34px "Onest", sans-serif' : '500 19px "Onest", sans-serif';
       g.fillText(lab || String(d), x, lab ? 62 : 56);
     }
     g.globalAlpha = 1;
-    g.fillStyle = '#22d3ee';
+    g.fillStyle = '#3fe3d5';
     g.beginPath();
     g.moveTo(W / 2 - 11, 2);
     g.lineTo(W / 2 + 11, 2);
     g.lineTo(W / 2, 17);
     g.fill();
   }
-  /** view — какой квадрат мира на карте: бухта или всё море; boat — где ждёт своя лодка (если мы не в ней). */
-  minimap(me, others, schools, view = MAP_VIEW, boat = null) {
+  /**
+   * Мини-карта. view — какой прямоугольник мира на ней: бухта или всё море; boat — где ждёт своя лодка (если мы не в ней);
+   * nav — маршрут до цели: { pts: [[x, z], …], len, sail } (sail — по воде, сплошной линией; пешком — пунктиром) или null.
+   */
+  minimap(me, others, schools, view = MAP_VIEW, boat = null, nav = null) {
     const g = this.map;
+    const W = 512;
+    const H = 276;
     const sea = view !== MAP_VIEW;
     const base = sea ? this.g.seaMap() : this.mapBase;
     if (!base) return;
     g.drawImage(base, 0, 0);
-    const X = (x) => ((x - view.x0) / (view.x1 - view.x0)) * 256;
-    const Z = (z) => ((z - view.z0) / (view.z1 - view.z0)) * 256;
+    const X = (x) => ((x - view.x0) / (view.x1 - view.x0)) * W;
+    const Z = (z) => ((z - view.z0) / (view.z1 - view.z0)) * H;
+    // что за краем карты — прижимается к рамке: видно, в какой оно стороне
+    const inX = (v) => Math.max(11, Math.min(W - 11, v));
+    const inZ = (v) => Math.max(11, Math.min(H - 11, v));
+    const INK = '#12233f';
     if (schools) {
-      const k = sea ? 0.55 : 1;
-      g.fillStyle = 'rgba(8,40,70,.75)';
+      const k = sea ? 0.7 : 1.1;
+      g.fillStyle = 'rgba(18,35,63,.72)';
       for (const s of schools) {
         if (s.on < 0.5) continue;
         g.beginPath();
@@ -403,28 +413,58 @@ export class UI {
         g.fill();
       }
     }
-    g.strokeStyle = '#0a1a33';
-    g.lineWidth = 2;
-    if (!sea) {
-      g.fillStyle = '#ffd60a';
+    // маршрут: розовая линия от нас до цели, цель — точка в белом кольце
+    if (nav && nav.pts.length > 1) {
+      g.lineCap = g.lineJoin = 'round';
       g.beginPath();
-      g.arc(X(MARKET.x - 4), Z(MARKET.z), 5, 0, 7);
+      nav.pts.forEach(([x, z], i) => (i ? g.lineTo(X(x), Z(z)) : g.moveTo(X(x), Z(z))));
+      if (!nav.sail) g.setLineDash([1, 13]);
+      g.strokeStyle = 'rgba(18,35,63,.3)';
+      g.lineWidth = 10;
+      g.stroke();
+      g.strokeStyle = '#ff5fa8';
+      g.lineWidth = 6;
+      g.stroke();
+      g.setLineDash([]);
+      const [tx, tz] = nav.pts[nav.pts.length - 1];
+      g.fillStyle = '#ff5fa8';
+      g.strokeStyle = '#fff';
+      g.lineWidth = 3.5;
+      g.beginPath();
+      g.arc(inX(X(tx)), inZ(Z(tz)), 8.5, 0, 7);
       g.fill();
       g.stroke();
-      // куда можно доплыть: причалы и корабль за краем карты — жёлтые стрелки у рамки
+    }
+    const txt = nav ? (nav.len >= 995 ? `${(nav.len / 1000).toFixed(1).replace('.', ',')} км` : `${Math.max(5, Math.round(nav.len / 5) * 5)} м`) : '';
+    if (txt !== this.distTxt) {
+      this.distTxt = txt;
+      const e = $('#mapDist');
+      e.textContent = txt;
+      e.classList.toggle('hidden', !txt);
+    }
+    g.strokeStyle = INK;
+    g.lineWidth = 2.5;
+    if (!sea) {
+      // торговец — золотая точка
+      g.fillStyle = '#ffd166';
+      g.beginPath();
+      g.arc(X(MARKET.x - 4), Z(MARKET.z), 6, 0, 7);
+      g.fill();
+      g.stroke();
+      // куда можно доплыть: причалы и корабль за краем карты — белые стрелки у рамки
       for (const m of [...MOORINGS, WRECK]) {
         const mx = X(m.x);
         const mz = Z(m.z);
-        if (mx > 0 && mx < 256 && mz > 0 && mz < 256) continue;
-        const a = Math.atan2(mz - 128, mx - 128);
+        if (mx > 0 && mx < W && mz > 0 && mz < H) continue;
+        const a = Math.atan2(mz - H / 2, mx - W / 2);
         g.save();
-        g.translate(Math.max(9, Math.min(247, mx)), Math.max(9, Math.min(247, mz)));
+        g.translate(inX(mx), inZ(mz));
         g.rotate(a);
-        g.fillStyle = '#ffd60a';
+        g.fillStyle = '#fff';
         g.beginPath();
-        g.moveTo(8, 0);
-        g.lineTo(-5, -6);
-        g.lineTo(-5, 6);
+        g.moveTo(9, 0);
+        g.lineTo(-6, -7);
+        g.lineTo(-6, 7);
         g.closePath();
         g.stroke();
         g.fill();
@@ -437,17 +477,17 @@ export class UI {
       g.translate(X(boat.x), Z(boat.z));
       g.rotate(-boat.yaw);
       g.fillStyle = '#fff';
-      g.lineWidth = 1.6;
+      g.lineWidth = 2;
       g.beginPath();
-      g.ellipse(0, 0, sea ? 2.6 : 3.4, sea ? 5 : 7, 0, 0, 7);
+      g.ellipse(0, 0, sea ? 3.4 : 4.4, sea ? 6.5 : 9, 0, 0, 7);
       g.fill();
       g.stroke();
       g.restore();
     }
     const shape = (x, y, m, r) => {
       g.fillStyle = m.color;
-      g.strokeStyle = '#0a1a33';
-      g.lineWidth = 2.5;
+      g.strokeStyle = INK;
+      g.lineWidth = 3;
       g.beginPath();
       if (m.shape === 'tri') {
         g.moveTo(x, y - r);
@@ -464,26 +504,26 @@ export class UI {
       g.stroke();
       g.fill();
     };
-    // друзья за краем карты прижимаются к рамке — видно, в какой они стороне
-    for (const o of others) shape(Math.max(8, Math.min(248, X(o.x))), Math.max(8, Math.min(248, Z(o.z))), MARKS[o.slot % 8], sea ? 7 : 9);
-    // я — белая стрелка по направлению взгляда
+    for (const o of others) shape(inX(X(o.x)), inZ(Z(o.z)), MARKS[o.slot % 8], sea ? 11 : 12.5);
+    // я — белая стрелка в тёмном круге, смотрит туда же, куда я
     g.save();
-    g.translate(X(me.x), Z(me.z));
+    g.translate(inX(X(me.x)), inZ(Z(me.z)));
+    g.fillStyle = INK;
+    g.beginPath();
+    g.arc(0, 0, 16.5, 0, 7);
+    g.fill();
     g.rotate(-me.yaw);
     g.fillStyle = '#fff';
-    g.strokeStyle = '#0a1a33';
-    g.lineWidth = 3;
     g.beginPath();
-    g.moveTo(0, -12);
-    g.lineTo(9, 10);
-    g.lineTo(0, 5);
-    g.lineTo(-9, 10);
+    g.moveTo(0, -11);
+    g.lineTo(8, 8);
+    g.lineTo(0, 3.8);
+    g.lineTo(-8, 8);
     g.closePath();
-    g.stroke();
     g.fill();
     g.restore();
   }
-  /** Таблички над головами друзей: [{id, x, y, name, slot, talk, say, vis}] */
+  /** Метки над головами друзей — фигурка и имя: [{id, x, y, name, slot, talk, say, vis, far}]; у далёких — только фигурка. */
   setTags(list) {
     const box = $('#tags');
     const seen = new Set();
@@ -498,11 +538,12 @@ export class UI {
       const key = t.name + '|' + t.slot + '|' + (t.say || '');
       if (e.dataset.k !== key) {
         e.dataset.k = key;
-        e.innerHTML = `${t.say ? `<div class="say">${t.say}</div>` : ''}<div class="nm">${markSvg(t.slot, 16)}${esc(t.name)}</div>`;
+        e.innerHTML = `${t.say ? `<div class="say">${t.say}</div>` : ''}<div class="nm">${markSvg(t.slot, 30, true)}<span>${esc(t.name)}</span></div>`;
       }
       e.style.display = t.vis ? '' : 'none';
       e.style.transform = `translate(${t.x.toFixed(1)}px,${t.y.toFixed(1)}px) translate(-50%,-100%) scale(${t.scale.toFixed(2)})`;
       e.classList.toggle('talk', !!t.talk);
+      e.classList.toggle('far', !!t.far);
     }
     for (const [id, e] of this.tags) if (!seen.has(id)) {
       e.remove();
@@ -798,6 +839,7 @@ export class UI {
         <span>Графика${s.quality === 'auto' ? `<small class="sub">сейчас: ${{ low: 'низкая', medium: 'средняя', high: 'высокая' }[this.g.gfx.quality]}${this.g.gfx.scale < 0.99 ? `, разрешение ${Math.round(this.g.gfx.scale * 100)}%` : ''}</small>` : ''}</span><select data-set="quality">${[['auto', 'Авто'], ['high', 'Высокая'], ['medium', 'Средняя'], ['low', 'Низкая']].map(([v, n]) => `<option value="${v}" ${s.quality === v ? 'selected' : ''}>${n}</option>`).join('')}</select>
         <span>Плавное разрешение<small class="sub">кадры проседают — картинка чуть мельче</small></span>${tog('drs')}
         <span>Счётчик кадров (F3)</span>${tog('fps')}
+        <span>Компас вверху экрана<small class="sub">лента со сторонами света и градусами</small></span>${tog('compass')}
         <span>Общая громкость</span>${rng('master', 0, 1, 0.02)}
         <span>Море, чайки, ветер</span>${rng('amb', 0, 1, 0.02)}
         <span>Звуки рыбалки</span>${rng('sfx', 0, 1, 0.02)}

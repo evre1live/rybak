@@ -306,3 +306,38 @@ test('дельфины: дорога стай замкнута, идёт по г
     assert.ok(Math.abs(((s1 - s0 + D.WAY_LEN) % D.WAY_LEN) - D.DOLPHIN_SPEED) < 1e-6, 'за секунду стая проходит свою скорость');
   }
 });
+
+// ───── мини-карта: маршрут лодки по воде ─────
+const R = await import('../client/route.js');
+
+test('маршрут лодки: от домашнего причала по воде до причалов, корабля, косяков и скал — и обратно', () => {
+  const home = T.MOORINGS[0];
+  // сетка проходимости считается понемногу; пока она не готова, маршрута нет
+  assert.equal(R.routeReady(0), false, 'за ноль миллисекунд сетка не готова');
+  assert.equal(R.route(home.x, home.z, 150, -215), null);
+  assert.equal(R.routeReady(), true);
+  const goals = [...T.MOORINGS.slice(1).map((m) => [m.x, m.z]), [T.WRECK.x + 30, T.WRECK.z], ...T.SEA_HOMES, ...T.SCHOOL_HOMES.map((h) => [h[0], h[1]])];
+  for (const [gx, gz] of goals) {
+    for (const [ax, az, bx, bz] of [[home.x, home.z, gx, gz], [gx, gz, home.x, home.z]]) {
+      const r = R.route(ax, az, bx, bz);
+      assert.ok(r, `путь от (${ax}, ${az}) до (${bx}, ${bz}) есть`);
+      const first = r.pts[0], last = r.pts[r.pts.length - 1];
+      assert.deepEqual([first, last], [[ax, az], [bx, bz]], 'концы пути — лодка и цель');
+      const direct = Math.hypot(bx - ax, bz - az);
+      assert.ok(r.len >= direct - 0.01 && r.len < direct * 1.7 + 40, `длина пути ${r.len.toFixed(0)} м при ${direct.toFixed(0)} м по прямой`);
+      assert.ok(r.pts.length < 80, 'путь сглажен, а не идёт по клеткам');
+      // весь путь — по воде, где проходит лодка (у самых концов — причал или берег: там не спрашиваем)
+      for (let i = 1; i < r.pts.length; i++) {
+        const [x0, z0] = r.pts[i - 1], [x1, z1] = r.pts[i];
+        const n = Math.ceil(Math.hypot(x1 - x0, z1 - z0));
+        for (let k = 0; k <= n; k++) {
+          const x = x0 + ((x1 - x0) * k) / n, z = z0 + ((z1 - z0) * k) / n;
+          if (Math.hypot(x - ax, z - az) < 6 || Math.hypot(x - bx, z - bz) < 6) continue;
+          assert.ok(T.canSail(x, z), `путь до (${bx}, ${bz}) идёт не по воде у (${x.toFixed(0)}, ${z.toFixed(0)})`);
+        }
+      }
+    }
+  }
+  // за край карты и на сушу пути нет, но ближайшая вода находится сама: цель на берегу — путь ведёт к воде рядом с ней
+  assert.equal(R.route(home.x, home.z, T.WORLD.x1 + 300, 0), null, 'далеко за краем моря цели нет');
+});

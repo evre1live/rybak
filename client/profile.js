@@ -56,7 +56,7 @@ export function lockProfile() {
 }
 // drs — уменьшать разрешение, когда кадры проседают; fps — окошко со счётчиком кадров; autoQ — что подобрано на «авто» для этой видеокарты;
 // follow — при вываживании взгляд сам держится на рыбе, пока игрок не ведёт мышью; music — громкость музыки, которую сочиняет игра
-export const DEFAULT_SETTINGS = { sens: 1, invertY: false, quality: 'auto', fov: 62, master: 0.8, amb: 0.7, sfx: 0.85, voiceVol: 1, ptt: false, near: false, hints: true, drs: true, fps: false, autoQ: null, follow: true, music: 0.45 };
+export const DEFAULT_SETTINGS = { sens: 1, invertY: false, quality: 'auto', fov: 62, master: 0.8, amb: 0.7, sfx: 0.85, voiceVol: 1, ptt: false, near: false, hints: true, drs: true, fps: false, autoQ: null, follow: true, music: 0.45, compass: true };
 export const settings = Object.assign({}, DEFAULT_SETTINGS, store.get(SKEY) || {});
 export const saveSettings = () => store.set(SKEY, settings);
 export const session = {

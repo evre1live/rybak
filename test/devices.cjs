@@ -63,6 +63,16 @@ const atHead = (page) => G(page, () => { RYBAK.player.place(0.6, -20, 0.1); RYBA
     const hit = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
     const names = Object.keys(boxes);
     for (let i = 0; i < names.length; i++) for (let j = i + 1; j < names.length; j++) assert.ok(!hit(boxes[names[i]], boxes[names[j]]), `${names[i]} и ${names[j]} не пересекаются`);
+    {
+      // на телефоне плашка улова — под названием места, карта — справа вверху; касание наживки в плашке листает её
+      const lay = await G(page, () => { const q = (s) => document.querySelector(s); const r = (s) => q(s).getBoundingClientRect(); return { tally: !!q('.hud-tl .tally'), map: !!q('.hud-tr .mapbox'), t: r('.tally'), m: r('.mapbox'), place: r('.place'), bait: RYBAK.profile.equip.tackle, w: innerWidth, h: innerHeight }; });
+      assert.ok(lay.tally && lay.map && lay.t.top > lay.place.bottom - 2 && lay.t.left < lay.w * 0.3 && lay.m.left > lay.w * 0.6 && lay.m.bottom < lay.h * 0.5, `плашка улова и карта на телефоне — наверху: ${JSON.stringify(lay)}`);
+      await G(page, () => { RYBAK.profile.tackle.worm = Math.max(5, RYBAK.profile.tackle.worm || 0); });
+      await page.tap('.tally .bait');
+      await page.waitForFunction((b) => RYBAK.profile.equip.tackle !== b, lay.bait, { timeout: 10000 });
+      await page.tap('.tally .bait');
+      await page.waitForFunction((b) => RYBAK.profile.equip.tackle === b, lay.bait, { timeout: 10000 });
+    }
     await shot(page, 'd02-phone-world', 300);
 
     // джойстик: идём назад по пирсу

@@ -24,6 +24,7 @@ import { Cloud } from './cloud.js';
 import { S, FLAG, MARKS } from './proto.js';
 import { cardText, cardFile, drawCard } from './postcard.js';
 import { DECK_Y, MARKET, MOORINGS, RENT_DESK, MAP_VIEW, WRECK, SEA, ISLAND, WORLD, SKERRIES, palmR, canStand, FALLS, CAMPFIRE } from './terrain.js';
+import { route, routeReady } from './route.js';
 import { ITEMS, FISH_BY_ID, JUNK, JUNK_BY_ID, RARITY, ZONES, BAITS, LURES, clockHours, dayPart, fmtW, fmtCoins, isLure } from '../shared/data.js';
 import {
   marketState, hashStr, buy, equip, sell, kitStats, levelInfo, tackleCount, fishValue, newProfile, speciesWeights,
@@ -64,7 +65,7 @@ function setUrl(u) {
 }
 // части мира: что написать в углу экрана и чем место интересно рыбаку
 const AREAS = {
-  bay: ['СОЛНЕЧНАЯ БУХТА', ''],
+  bay: ['БУХТА', ''],
   light: ['ОСТРОВ С МАЯКОМ', 'Остров с маяком: у водопадов берут форель и лосось, а с причала — глубина: судак, скумбрия, скат'],
   palm: ['ПАЛЬМОВЫЙ ОСТРОВ', 'Пальмовый остров: в бирюзовой лагуне ходят дорада, кефаль и сарган'],
   wreck: ['ЗАТОНУВШИЙ КОРАБЛЬ', 'Затонувший корабль: морской окунь, угорь — а в трюме, говорят, живёт Старик'],
@@ -216,7 +217,7 @@ class Game {
       if (this.prepared) this.gfx.shaders(this.scene, this.camera);
     });
     this.ui = new UI(this);
-    this.ui.mapBase = drawMinimap(256);
+    this.ui.mapBase = drawMinimap(512, 276);
     // карта всего моря рисуется дольше — готовим её чуть позже, не в первый кадр
     setTimeout(() => this.seaMap(), 2500);
     this.meChar = new Character(this.profile.look);
@@ -498,7 +499,7 @@ class Game {
     chip.classList.toggle('hidden', this.solo);
     chip.classList.toggle('off', !v.joined || v.muted);
     const mk = this.input.touch.on ? '' : ' · M';
-    $('#voiceTxt').textContent = v.joining ? 'ПОДКЛЮЧАЮ…' : !v.joined ? 'ВКЛЮЧИТЬ ГОЛОС' : v.muted ? `МИКРОФОН ВЫКЛ${mk}` : `ГОЛОС ВКЛЮЧЁН${mk}`;
+    $('#voiceTxt').textContent = v.joining ? 'Подключаю…' : !v.joined ? 'Включить голос' : v.muted ? `Микрофон выключен${mk}` : `Голос включён${mk}`;
     $('#voiceChip .ic').innerHTML = (v.joined && !v.muted ? '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>' : '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M3 3l18 18" stroke="#f04438" stroke-width="2.6" stroke-linecap="round"/></svg>');
     this.rosterChanged();
   }
@@ -694,7 +695,7 @@ class Game {
 
   // ───── лодка ─────
   seaMap() {
-    return this._seaMap || (this._seaMap = drawMinimap(256, SEA_VIEW));
+    return this._seaMap || (this._seaMap = drawMinimap(512, 276, SEA_VIEW));
   }
   /** Своя лодка куплена (лавка, «Прочее»): за выходы не платят, сдавать её не нужно, на носу — вымпел цвета игрока. */
   ownBoat() {
@@ -1784,22 +1785,75 @@ class Game {
     this.useAct = act;
     if (act && i.hit('KeyE')) act.run();
   }
+  /**
+   * Маршрут на мини-карте: { pts, len, sail, kind } или null. В лодке: с эхолотом — к ближайшему косяку, с полным садком
+   * или из открытого моря — домой, к причалу; пешком с уловом — к торговцу. Путь по воде считает route.js
+   * (сетка проходимости готовится понемногу, по три миллисекунды за кадр), пересчёт — не чаще раза в полторы секунды.
+   */
+  navStep(dt) {
+    if (!(this.navReady = routeReady(3))) return null;
+    const pl = this.player;
+    const p = this.profile;
+    const kit = this.fishing.kit;
+    if (this.boat.active || this.ride) {
+      const full = p.cooler.length >= kit.bagCap;
+      let goal = null;
+      if (!full && kit.sonar) {
+        let bd = Infinity;
+        for (const c of this.world.scenery.schools.centers) {
+          const d = Math.hypot(c.x - pl.x, c.z - pl.z);
+          if (c.on > 0.5 && d < bd) {
+            bd = d;
+            goal = { x: c.x, z: c.z, kind: 'school' };
+          }
+        }
+        if (goal && bd < 14) return null; // пришли: косяк под бортом
+      }
+      if (!goal && (full || this.area !== 'bay')) goal = { x: MOORINGS[0].x, z: MOORINGS[0].z, kind: 'home' };
+      if (!goal) return null;
+      const key = `${goal.kind}|${Math.round(goal.x / 6)}|${Math.round(goal.z / 6)}`;
+      this.navT = (this.navT || 0) - dt;
+      if (key !== this.navKey || this.navT <= 0) {
+        this.navKey = key;
+        this.navT = 1.5;
+        this.navPath = route(pl.x, pl.z, goal.x, goal.z);
+      }
+      const r = this.navPath;
+      if (!r) return null;
+      // между пересчётами линия начинается там, где мы сейчас: пройденные точки отбрасываем
+      let i = 1;
+      while (i < r.pts.length - 1 && Math.hypot(r.pts[i][0] - pl.x, r.pts[i][1] - pl.z) < 9) i++;
+      const pts = [[pl.x, pl.z], ...r.pts.slice(i)];
+      let len = 0;
+      for (let k = 1; k < pts.length; k++) len += Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]);
+      return { pts, len, sail: true, kind: goal.kind };
+    }
+    this.navKey = '';
+    if (p.cooler.length && this.area === 'bay') {
+      const d = Math.hypot(MARKET.x - pl.x, MARKET.z - pl.z);
+      if (d > 7) return { pts: [[pl.x, pl.z], [MARKET.x, MARKET.z]], len: d, sail: false, kind: 'market' };
+    }
+    return null;
+  }
+
+  /** Подсказки управления справа внизу: по строке на действие — что сейчас можно сделать и чем. */
   hints() {
     const ui = this.ui;
     const f = this.fishing;
     const k = (a) => ui.key(a);
-    const sep = '<i class="sep"></i>';
+    const row = (...r) => r.filter(Boolean).map((t) => `<span>${t}</span>`).join('');
+    const pad = this.input.device === 'pad';
     switch (f.state) {
       case 'idle':
-        if (this.ride) return `<span>ВЫ ПАССАЖИР</span>${sep}<span>${k('primary')} УДЕРЖИВАЙ — ЗАБРОС, КОГДА ЛОДКА СТОИТ</span>`;
-        if (this.boat.active) return this.input.device === 'pad' ? `<span>${k('left')} ХОД И РУЛЬ</span>${sep}<span>${k('primary')} УДЕРЖИВАЙ — ЗАБРОС</span>` : `<span><kbd class="g">W</kbd><kbd class="g">S</kbd> ХОД</span>${sep}<span><kbd class="g">A</kbd><kbd class="g">D</kbd> РУЛЬ</span>${sep}<span>${k('primary')} УДЕРЖИВАЙ — ЗАБРОС</span>`;
-        return `<span>${k('primary')} УДЕРЖИВАЙ — ЗАБРОС</span>${sep}<span>${k('tackle')} СНАСТИ</span>${sep}<span>${k('run')} БЕГ</span>`;
-      case 'charge': return `<span>ОТПУСТИ — ЗАБРОС</span>${sep}<span>ДО БЕЛОЙ РИСКИ — ТОЧНО В МЕТКУ</span>`;
-      case 'cast': return '<span>ЛЕТИТ…</span>';
-      case 'wait': return f.lure ? `<span>${k('primary')} ДЕРЖИ — ВЕДИ ПРИМАНКУ</span>${sep}<span>${k('back')} СМОТАТЬ</span>` : `<span>ЖДЁМ ПОКЛЁВКУ</span>${sep}<span>${k('back')} СМОТАТЬ</span>`;
-      case 'bite': return `<span>${k('primary')} ПОДСЕКАЙ!</span>`;
-      case 'fight': return `<span>${k('primary')} МОТАТЬ</span>${sep}<span>ОТПУСТИ — ОСЛАБИТЬ</span>${sep}<span>${k('left')}${k('right')} ВЕСТИ</span>`;
-      case 'landed': return `<span>${k('primary')} В САДОК</span>${sep}<span>${k('release')} ОТПУСТИТЬ</span>${this.input.device === 'pad' ? '' : `${sep}<span><kbd class="g">P</kbd> ОТКРЫТКА</span>`}`;
+        if (this.ride) return row('Вы пассажир', `${k('primary')} Удерживай — заброс, когда лодка стоит`);
+        if (this.boat.active) return pad ? row(`${k('left')} Ход и руль`, `${k('primary')} Удерживай — заброс`) : row('<kbd class="g">W</kbd><kbd class="g">S</kbd> Ход', '<kbd class="g">A</kbd><kbd class="g">D</kbd> Руль', `${k('primary')} Удерживай — заброс`);
+        return row(`${k('primary')} Удерживай — заброс`, `${k('tackle')} Снасти`, pad ? '' : '<kbd class="g">Q</kbd> Сменить наживку', `${k('run')} Бег`);
+      case 'charge': return row('Отпусти — заброс', 'До белой риски — точно в метку');
+      case 'cast': return row('Летит…');
+      case 'wait': return f.lure ? row(`${k('primary')} Держи — веди приманку`, `${k('back')} Смотать`) : row('Ждём поклёвку', `${k('back')} Смотать`);
+      case 'bite': return row(`${k('primary')} Подсекай!`);
+      case 'fight': return row(`${k('primary')} Мотать`, 'Отпусти — ослабить', `${k('left')}${pad ? '' : k('right')} Вести`);
+      case 'landed': return row(`${k('primary')} В садок`, `${k('release')} Отпустить`, pad ? '' : '<kbd class="g">P</kbd> Открытка');
       default: return '';
     }
   }
@@ -1808,8 +1862,9 @@ class Game {
     const t = this.input.touch;
     const stick = $('#stick');
     const knob = stick.firstElementChild;
-    // садок — наверх, к названию места: внизу слева живёт джойстик
-    $('.hud-tl').insertBefore($('.chip.bag'), $('#crew'));
+    // внизу слева живёт джойстик: плашка улова и наживки переезжает наверх, под название места, а карта — в правый верхний угол
+    $('.hud-tl').insertBefore($('.tally'), $('#quests'));
+    $('.hud-tr').prepend($('#locName'), $('.mapbox'));
     let sid = null;
     let lid = null;
     let lx = 0;
@@ -1895,11 +1950,14 @@ class Game {
     hold('#tMenu', () => this.input.pressed.add('Escape'));
     hold('#tSit', () => this.input.pressed.add('KeyX'));
     hold('#tChat', () => this.input.pressed.add('Enter'));
-    // панель снастей: касание наживки листает её, остальное открывает снасти
+    // чип удочки открывает снасти; наживка в плашке улова листается касанием
     $('#hotbar').addEventListener('touchstart', (e) => {
       e.preventDefault();
-      const slot = e.target.closest('.slot');
-      this.input.pressed.add(slot && slot.dataset.k === 'bait' ? 'KeyQ' : 'Tab');
+      this.input.pressed.add('Tab');
+    }, { passive: false });
+    $('.tally .bait').addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      this.input.pressed.add('KeyQ');
     }, { passive: false });
     $('#rotate button').addEventListener('click', () => document.body.classList.add('anyway'));
   }
@@ -1944,6 +2002,9 @@ class Game {
     }
     const dt = Math.max(0, Math.min(0.1, rawMs / 1000)) * this.timeScale * slow;
     this.last = now;
+    // стеклянные панели размывают картинку под собой только там, где на это есть запас: на «высоком» качестве и не на телефоне
+    const blur = this.gfx.quality === 'high' && !this.input.touch.on;
+    if (blur !== this.blurOn) document.body.classList.toggle('blur', (this.blurOn = blur));
     if (this.scaleNext) {
       // Разрешение меняем здесь, до отрисовки. Смена размера стирает холст: если менять после отрисовки (так делал
       // автоподбор — в конце кадра), на экран уходит пустой кадр — чёрная вспышка.
@@ -2081,12 +2142,12 @@ class Game {
         const pl = this.player;
         const mg = this.mapSea ? 8 : 0;
         this.mapSea = pl.x < MAP_VIEW.x0 + mg || pl.x > MAP_VIEW.x1 - mg || pl.z < MAP_VIEW.z0 + mg || pl.z > MAP_VIEW.z1 - mg;
-        ui.minimap(pl, [...this.players.values()].filter((p) => p.mode === 'world' && p.st).map((p) => ({ x: p.st[S.X], z: p.st[S.Z], slot: p.slot })), kit.sonar ? this.world.scenery.schools.centers : null, this.mapSea ? SEA_VIEW : MAP_VIEW, boat.rented && !boat.active ? boat : null);
+        ui.minimap(pl, [...this.players.values()].filter((p) => p.mode === 'world' && p.st).map((p) => ({ x: p.st[S.X], z: p.st[S.Z], slot: p.slot })), kit.sonar ? this.world.scenery.schools.centers : null, this.mapSea ? SEA_VIEW : MAP_VIEW, boat.rented && !boat.active ? boat : null, this.navStep(dt));
       }
       const aim = f.aim;
       if (!ui.panel && ((f.state === 'idle' && i.enabled && (i.grab || i.touch.on)) || f.state === 'charge')) {
         v3.set(aim.x, 0.05, aim.z).project(cam);
-        ui.castMark({ x: (v3.x * 0.5 + 0.5) * this.gfx.w, y: (-v3.y * 0.5 + 0.5) * this.gfx.h, ok: aim.ok, hot: aim.spot && aim.spot.hot, clamped: aim.clamped, dist: aim.dist, zone: aim.spot ? ZONES[aim.spot.zone].name : '', depth: aim.spot ? aim.spot.depth : 0, act: aim.act });
+        ui.castMark({ x: (v3.x * 0.5 + 0.5) * this.gfx.w, y: (-v3.y * 0.5 + 0.5) * this.gfx.h, aim: f.state === 'charge', ok: aim.ok, hot: aim.spot && aim.spot.hot, clamped: aim.clamped, dist: aim.dist, zone: aim.spot ? ZONES[aim.spot.zone].name : '', depth: aim.spot ? aim.spot.depth : 0, act: aim.act });
       } else ui.castMark(null);
       ui.power(f.state === 'charge' ? f.power : null, aim.dist / kit.cast);
       $('#cross').className = !i.grab && !i.touch.on ? 'off' : f.state === 'idle' && !aim.ok ? 'bad' : '';
@@ -2166,8 +2227,9 @@ class Game {
         r.head(v3);
         const d = v3.distanceTo(cam.position);
         v3.project(cam);
-        const vis = v3.z < 1 && d < 70 && Math.abs(v3.x) < 1.1 && Math.abs(v3.y) < 1.1;
-        tags.push({ id: p.id, x: (v3.x * 0.5 + 0.5) * this.gfx.w, y: (-v3.y * 0.5 + 0.5) * this.gfx.h, name: p.card.name, slot: p.slot, talk: r.talk > 0.08, say: r.sayT > 0 ? r.say : '', vis, scale: clamp(1.25 - d / 40, 0.62, 1.1) });
+        // фигурку друга видно издалека (по ней его и находят), имя — только вблизи
+        const vis = v3.z < 1 && d < 170 && Math.abs(v3.x) < 1.1 && Math.abs(v3.y) < 1.1;
+        tags.push({ id: p.id, x: (v3.x * 0.5 + 0.5) * this.gfx.w, y: (-v3.y * 0.5 + 0.5) * this.gfx.h, name: p.card.name, slot: p.slot, talk: r.talk > 0.08, say: r.sayT > 0 ? r.say : '', vis, far: d > 42, scale: clamp(1.25 - d / 40, 0.62, 1.1) });
       } else if (showPlates && p.mode !== 'world') {
         v3.set(lineX(p.slot), DECK_Y - 0.04, LINE_Z).project(cam);
         plates.push({ id: p.id, x: (v3.x * 0.5 + 0.5) * this.gfx.w, y: (-v3.y * 0.5 + 0.5) * this.gfx.h, name: p.card.name, slot: p.slot, host: p.id === this.hostId, mode: p.mode, talk: r.talk > 0.08 });

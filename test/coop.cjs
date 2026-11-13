@@ -105,6 +105,14 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
   await shot(a, 'c02-friend-fishing', 400);
   assert.ok(await G(a, () => document.querySelectorAll('.tag').length === 1), 'табличка с именем');
   assert.ok(await G(a, () => document.querySelectorAll('#crew .crow').length === 1), 'список друзей');
+  {
+    // команда справа вверху: счёт игроков, у друга своя фигурка, огонёк и микрофон; та же фигурка — над его головой
+    const crew = await G(a, () => { const q = (s) => document.querySelector(s); return { head: q('#onlineN').textContent, name: q('#crew .crow b').textContent, mark: q('#crew .crow .mark').outerHTML, dot: !!q('#crew .crow .dot'), mic: !!q('#crew .crow .ic'), tag: q('.tag .mark').outerHTML, tagName: q('.tag .nm span').textContent, box: q('.crewbox').getBoundingClientRect().left > innerWidth / 2 }; });
+    const shapeOf = (svg) => (/<(circle|rect|path d="[^"]*")/.exec(svg) || [])[0];
+    assert.ok(crew.head === 'Команда 2/8' && crew.name === 'Нори' && crew.dot && crew.mic && crew.box, `команда справа вверху: ${JSON.stringify(crew)}`);
+    assert.ok(shapeOf(crew.mark) && shapeOf(crew.mark) === shapeOf(crew.tag) && crew.tagName === 'Нори', `фигурка друга в списке и над головой одна и та же: ${shapeOf(crew.mark)} / ${shapeOf(crew.tag)}`);
+    assert.ok(/fill="none"/.test(crew.mark) && !/fill="none"/.test(crew.tag), 'в списке фигурка контуром, над головой — залитая');
+  }
 
   // чат и жесты
   await G(b, () => RYBAK.sendChat('Клюёт?'));

@@ -623,71 +623,84 @@ export class World {
   }
 }
 
-/** Квадрат, в который помещается всё море: для карты, когда игрок в лодке. */
+/**
+ * Прямоугольник той же формы, что карта бухты, в который помещается всё море: для карты, когда игрок в лодке.
+ * Юг большого острова (куда лодке не доплыть) в него не входит — так море на карте крупнее.
+ */
 export const SEA_VIEW = (() => {
-  const w = Math.max(WORLD.x1 - WORLD.x0, WORLD.z1 - WORLD.z0) + 40;
+  const k = (MAP_VIEW.x1 - MAP_VIEW.x0) / (MAP_VIEW.z1 - MAP_VIEW.z0);
+  const z0 = WORLD.z0 - 20;
+  const z1 = 130;
+  const w = Math.max((z1 - z0) * k, WORLD.x1 - WORLD.x0 + 40);
   const cx = (WORLD.x0 + WORLD.x1) / 2;
-  const cz = (WORLD.z0 + WORLD.z1) / 2;
-  return { x0: cx - w / 2, x1: cx + w / 2, z0: cz - w / 2, z1: cz + w / 2 };
+  const cz = (z0 + z1) / 2;
+  return { x0: cx - w / 2, x1: cx + w / 2, z0: cz - w / k / 2, z1: cz + w / k / 2 };
 })();
-/** Мини-карта: вид сверху, рисуется один раз. view — какой квадрат мира показать (по умолчанию бухта). */
-export function drawMinimap(size = 256, view = MAP_VIEW) {
+/**
+ * Мини-карта: вид сверху, рисуется один раз. view — какой прямоугольник мира показать (по умолчанию бухта).
+ * Краски мягкие, как на макетах: светлая бирюза на мели, синева на глубине, песок, зелень.
+ */
+export function drawMinimap(w = 512, h = 276, view = MAP_VIEW) {
   const sea = view !== MAP_VIEW;
   const c = document.createElement('canvas');
-  c.width = c.height = size;
+  c.width = w;
+  c.height = h;
   const g = c.getContext('2d');
-  const img = g.createImageData(size, size);
+  const img = g.createImageData(w, h);
   const { x0, x1, z0, z1 } = view;
-  const px = (x1 - x0) / size; // метров в точке
+  const px = (x1 - x0) / w; // метров в точке
   const col = (r, gg, b, i) => {
     img.data[i] = r;
     img.data[i + 1] = gg;
     img.data[i + 2] = b;
     img.data[i + 3] = 255;
   };
-  for (let j = 0; j < size; j++)
-    for (let i = 0; i < size; i++) {
-      const x = x0 + ((i + 0.5) / size) * (x1 - x0);
-      const z = z0 + ((j + 0.5) / size) * (z1 - z0);
-      const h = groundH(x, z);
-      const k = (j * size + i) * 4;
+  for (let j = 0; j < h; j++)
+    for (let i = 0; i < w; i++) {
+      const x = x0 + ((i + 0.5) / w) * (x1 - x0);
+      const z = z0 + ((j + 0.5) / h) * (z1 - z0);
+      // за краем моря — дальние острова: на карте моря они видны у рамки
+      const far = sea && (x < WORLD.x0 || x > WORLD.x1 || z < WORLD.z0);
+      const hh = far ? Math.max(groundH(x, z), farH(x, z)) : groundH(x, z);
+      const k = (j * w + i) * 4;
       const n = fbm2(x * 0.2, z * 0.2, 2);
-      if (h < -0.1) {
-        const t = sstep(-0.1, -11, h);
-        col(lerp(72, 16, t), lerp(224, 112, t), lerp(214, 196, t), k);
-      } else if (h < 0.8) col(240, 224, 176, k);
-      else if (palmR(x, z) < 1) col(236 - n * 16, 226 - n * 10, 170, k);
+      if (hh < -0.1) {
+        const t = sstep(-0.1, -11, hh);
+        col(lerp(160, 70, t), lerp(228, 166, t), lerp(224, 198, t), k);
+      } else if (hh < 0.8) col(245, 236, 208, k);
+      else if (far) col(140 + n * 22, 198 + n * 16, 132 + n * 12, k);
+      else if (palmR(x, z) < 1) col(240 - n * 14, 232 - n * 10, 196, k);
       else {
         const e = Math.max(1.2, px);
-        const hx = groundH(x + e, z) - h;
-        const hz = groundH(x, z + e) - h;
+        const hx = groundH(x + e, z) - hh;
+        const hz = groundH(x, z + e) - hh;
         const steep = Math.hypot(hx, hz) / e;
-        if (steep > 1.08) col(150 + n * 20, 158 + n * 20, 170 + n * 20, k);
-        else col(96 + n * 36 + (hx / e) * 36, 188 + n * 30 + (hx / e) * 36, 78 + n * 20, k);
+        if (steep > 1.08) col(178 + n * 16, 186 + n * 16, 194 + n * 16, k);
+        else col(130 + n * 26 + (hx / e) * 26, 198 + n * 20 + (hx / e) * 26, 122 + n * 16, k);
       }
     }
   g.putImageData(img, 0, 0);
-  const X = (x) => ((x - x0) / (x1 - x0)) * size;
-  const Z = (z) => ((z - z0) / (z1 - z0)) * size;
-  g.fillStyle = '#c58a4e';
-  g.strokeStyle = '#7a5230';
+  const X = (x) => ((x - x0) / (x1 - x0)) * w;
+  const Z = (z) => ((z - z0) / (z1 - z0)) * h;
+  g.fillStyle = '#d9b48a';
+  g.strokeStyle = '#8a6a4a';
   g.lineWidth = 1;
   for (const d of DECKS) {
     g.fillRect(X(d.x0), Z(d.z0), Math.max(1.5, X(d.x1) - X(d.x0)), Math.max(1.5, Z(d.z1) - Z(d.z0)));
     if (!sea) g.strokeRect(X(d.x0), Z(d.z0), X(d.x1) - X(d.x0), Z(d.z1) - Z(d.z0));
   }
   if (!sea) {
-    g.fillStyle = '#b5533c';
+    g.fillStyle = '#e07a5f';
     g.fillRect(X(-13), Z(10.4), X(-7.2) - X(-13), Z(15.4) - Z(10.4));
   }
   g.fillStyle = '#fff';
-  g.strokeStyle = '#d8402f';
+  g.strokeStyle = '#e05a4a';
   g.lineWidth = sea ? 1.6 : 2.5;
   g.beginPath();
   g.arc(X(LIGHTHOUSE.x), Z(LIGHTHOUSE.z), sea ? 2.6 : 4.5, 0, TAU);
   g.fill();
   g.stroke();
-  g.fillStyle = '#8d95a1';
+  g.fillStyle = '#9aa3ae';
   g.beginPath();
   const ak = sea ? 0.45 : 1;
   g.ellipse(X(ARCH.x), Z(ARCH.z), 4 * ak, 9 * ak, -0.35, 0, TAU);
@@ -696,21 +709,21 @@ export function drawMinimap(size = 256, view = MAP_VIEW) {
     // затонувший корабль: тёмный корпус с мачтой
     const wx = X(WRECK.x);
     const wz = Z(WRECK.z);
-    g.fillStyle = '#4a3320';
-    g.strokeStyle = '#f1e7cf';
+    g.fillStyle = '#5b4330';
+    g.strokeStyle = '#f6efdc';
     g.lineWidth = 1.2;
     g.beginPath();
     g.ellipse(wx, wz, 6, 2.6, -0.5, 0, TAU);
     g.fill();
     g.stroke();
   }
-  // причалы для лодки — тёмные кружки с жёлтой каймой
+  // причалы для лодки — белые точки с тёмной каймой
   for (const m of MOORINGS) {
-    g.fillStyle = '#0e2140';
-    g.strokeStyle = '#ffd60a';
-    g.lineWidth = 1.5;
+    g.fillStyle = '#fff';
+    g.strokeStyle = '#16284a';
+    g.lineWidth = 2;
     g.beginPath();
-    g.arc(X(m.x), Z(m.z), sea ? 4.2 : 4.6, 0, TAU);
+    g.arc(X(m.x), Z(m.z), sea ? 3.6 : 4.4, 0, TAU);
     g.fill();
     g.stroke();
   }
