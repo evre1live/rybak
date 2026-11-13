@@ -13,10 +13,14 @@ services:
   - type: web
     name: rybak
     runtime: node
-    plan: free
+    # Starter: сервер не засыпает без посетителей (на бесплатном тарифе — через 15 минут, и первый вход потом ждёт до минуты)
+    plan: starter
     region: frankfurt
     buildCommand: npm ci --omit=dev
-    startCommand: npm start
+    # node напрямую, без npm: сигнал остановки при выкладке доходит до сервера, и он успевает записать комнаты в базу
+    startCommand: node server/index.js
+    # новая версия получает посетителей, только когда уже отвечает
+    healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
         fromDatabase:
