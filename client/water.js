@@ -1,7 +1,8 @@
 // Вода бухты: бирюзовая на мели, синяя на глубине, с бликами, сеткой света и пеной у берега.
 import * as THREE from 'three';
-import { groundH, BOUNDS, WORLD, BACKWATER } from './terrain.js';
+import { groundH, BOUNDS, WORLD, BACKWATER, SEA } from './terrain.js';
 import { surfaceU } from './surface.js';
+import { farH, farBounds } from './farisles.js';
 
 // три волны: направление (x, z), частота, высота, скорость
 const WAVES = [
@@ -9,16 +10,38 @@ const WAVES = [
   [-0.4, 0.92, 0.45, 0.05, 1.3],
   [0.95, -0.3, 0.9, 0.022, 1.9]
 ];
+// Зыбь открытого моря: за пределами бухты к мелким волнам прибавляются две длинные (33 и 20 метров от гребня до гребня).
+// Лодку и поплавок на них заметно качает; в бухте зыби нет, у берегов островов она гаснет вместе с остальными волнами.
+const SWELL = [
+  [0.86, 0.51, 0.19, 0.3, 1.02],
+  [-0.35, 0.94, 0.31, 0.16, 1.45]
+];
+const SWELL_A = SWELL.reduce((s, w) => s + w[3], 0);
+// где начинается зыбь: от середины бухты (SEA) — ноль до SWELL_R0 метров и в полную силу с SWELL_R1
+const SWELL_R0 = SEA.r - 25;
+const SWELL_R1 = SEA.r + 70;
+/** Сила зыби: 0 — штиль, около 0,75 — ясный день, 1,35 — дождь с ветром. Ставит мир по погоде (world.js). */
+export const sea = { k: 0.75 };
+/** Насколько точка в открытом море: 0 — бухта, 1 — море. */
+export const seaK = (x, z) => {
+  const t = Math.max(0, Math.min(1, (Math.hypot(x - SEA.x, z - SEA.z) - SWELL_R0) / (SWELL_R1 - SWELL_R0)));
+  return t * t * (3 - 2 * t);
+};
 // у берега и в заводи волна гаснет
 export const waveAmp = (x, z) => {
   const t = Math.max(0, Math.min(1, (-groundH(x, z) - 0.4) / 5.6));
   return 0.12 + 0.88 * t * t * (3 - 2 * t);
 };
+/** Высота воды в точке: мелкие волны везде, в открытом море — ещё и зыбь. */
 export function waveH(x, z, t) {
   let h = 0;
   for (const [dx, dz, k, a, w] of WAVES) h += a * Math.sin((x * dx + z * dz) * k + t * w);
+  const s = seaK(x, z) * sea.k;
+  if (s > 0.001) for (const [dx, dz, k, a, w] of SWELL) h += s * a * Math.sin((x * dx + z * dz) * k + t * w);
   return h * waveAmp(x, z);
 }
+/** Наибольшая высота зыби в точке (без мелких волн) — на столько вода здесь поднимается и опускается. */
+export const swellMax = (x, z) => seaK(x, z) * sea.k * SWELL_A;
 
 function tileNoise(x, y, period) {
   const ix = Math.floor(x);
@@ -111,14 +134,14 @@ function causticTexture(size = 256, cells = 7) {
   return t;
 }
 // карта глубин: по ней вода знает, где мель, где берег
-/** Карта глубин участка B: по ней вода знает, где мель, берег и пена. */
-function depthTexture(B, w, h) {
+/** Карта глубин участка B: по ней вода знает, где мель, берег и пена. floor(x, z) — высота дна и суши. */
+function depthTexture(B, w, h, floor = groundH) {
   const data = new Uint8Array(w * h * 4);
   for (let j = 0; j < h; j++)
     for (let i = 0; i < w; i++) {
       const x = B.x0 + ((i + 0.5) / w) * (B.x1 - B.x0);
       const z = B.z0 + ((j + 0.5) / h) * (B.z1 - B.z0);
-      const d = Math.max(0, Math.min(16, -groundH(x, z)));
+      const d = Math.max(0, Math.min(16, -floor(x, z)));
       const k = (j * w + i) * 4;
       data[k] = data[k + 1] = data[k + 2] = Math.sqrt(d / 16) * 255;
       data[k + 3] = 255;
@@ -130,8 +153,12 @@ function depthTexture(B, w, h) {
   t.needsUpdate = true;
   return t;
 }
-// всё море — грубее: шаг около 2,5 м
-const FAR = { x0: WORLD.x0 - 60, x1: WORLD.x1 + 60, z0: WORLD.z0 - 60, z1: WORLD.z1 + 60 };
+// всё море и дальние острова за его краем — грубее: шаг около 2,5 м
+const SEA_B = { x0: WORLD.x0 - 60, x1: WORLD.x1 + 60, z0: WORLD.z0 - 60, z1: WORLD.z1 + 60 };
+const FB = farBounds();
+const FAR = { x0: Math.min(SEA_B.x0, FB.x0), x1: Math.max(SEA_B.x1, FB.x1), z0: Math.min(SEA_B.z0, FB.z0), z1: Math.max(SEA_B.z1, FB.z1) };
+/** Дно и суша для грубой карты: в море, по которому ходит лодка, — рельеф бухты и островов, за его краем — дальние острова. */
+const farFloor = (x, z) => Math.max(x > SEA_B.x0 && x < SEA_B.x1 && z > SEA_B.z0 && z < SEA_B.z1 ? groundH(x, z) : -14, farH(x, z));
 const boundsVec = (B) => new THREE.Vector4(B.x0, B.z0, 1 / (B.x1 - B.x0), 1 / (B.z1 - B.z0));
 // глубина в точке: в бухте — по подробной карте, дальше — по грубой, у границы плавный переход
 const DEPTH_GLSL = /* glsl */ `
@@ -149,9 +176,17 @@ float depthAt(vec2 p) {
 const waveGLSL = WAVES.map(([dx, dz, k, a, w], i) => `
   { float ph = dot(p, vec2(${dx.toFixed(3)}, ${dz.toFixed(3)})) * ${k.toFixed(3)} + uTime * ${w.toFixed(3)};
     h += ${a.toFixed(4)} * sin(ph); g += vec2(${dx.toFixed(3)}, ${dz.toFixed(3)}) * (${(a * k).toFixed(5)} * cos(ph)); }`).join('');
+// зыбь: sk — её сила в точке (0 в бухте), hs — высота, gs — уклон. Те же числа, что в waveH.
+const swellGLSL = `
+  float sk = uSwell * smoothstep(${SWELL_R0.toFixed(1)}, ${SWELL_R1.toFixed(1)}, distance(p, vec2(${SEA.x.toFixed(1)}, ${SEA.z.toFixed(1)})));
+  float hs = 0.0; vec2 gs = vec2(0.0);
+  if (sk > 0.001) {${SWELL.map(([dx, dz, k, a, w]) => `
+    { float ph = dot(p, vec2(${dx.toFixed(3)}, ${dz.toFixed(3)})) * ${k.toFixed(3)} + uTime * ${w.toFixed(3)};
+      hs += ${a.toFixed(4)} * sin(ph); gs += vec2(${dx.toFixed(3)}, ${dz.toFixed(3)}) * (${(a * k).toFixed(5)} * cos(ph)); }`).join('')}
+  }`;
 
 const VERT = /* glsl */ `
-uniform float uTime;
+uniform float uTime, uSwell;
 ${DEPTH_GLSL}
 varying vec3 vWorld;
 varying float vAmp;
@@ -159,16 +194,19 @@ void main() {
   vec4 wp = modelMatrix * vec4(position, 1.0);
   vec2 p = wp.xz; float h = 0.0; vec2 g = vec2(0.0);
   ${waveGLSL}
+  ${swellGLSL}
   float dv = depthAt(p);
   float t = clamp((dv * dv * 16.0 - 0.4) / 5.6, 0.0, 1.0);
   vAmp = 0.12 + 0.88 * t * t * (3.0 - 2.0 * t);
-  wp.y += h * vAmp;
+  // вдали сетка воды редкая и длинную волну не передаёт — там зыбь остаётся только в свете (уклон считает фрагментный шейдер)
+  float nearK = 1.0 - smoothstep(110.0, 240.0, distance(cameraPosition.xz, p));
+  wp.y += (h + hs * sk * nearK) * vAmp;
   vWorld = wp.xyz;
   gl_Position = projectionMatrix * viewMatrix * wp;
 }`;
 const FRAG = /* glsl */ `
 precision highp float;
-uniform float uTime, uGlitter, uFogNear, uFogFar;
+uniform float uTime, uGlitter, uFogNear, uFogFar, uSwell, uWind;
 uniform sampler2D uNormal, uCaustic, uDet;
 uniform float uCloudK;
 ${DEPTH_GLSL}
@@ -199,14 +237,18 @@ float rainRings(vec2 p, float t) {
 void main() {
   vec2 p = vWorld.xz; float h = 0.0; vec2 g = vec2(0.0);
   ${waveGLSL}
-  g *= vAmp;
+  ${swellGLSL}
+  g = (g + gs * sk) * vAmp;
+  float open = sk * vAmp; // насколько здесь открытое море с зыбью: 0 — бухта и берега
   float dv = depthAt(p);
   float depth = dv * dv * 16.0;
   vec3 n1 = texture2D(uNormal, p * 0.045 + uTime * vec2(0.012, 0.008)).xyz * 2.0 - 1.0;
   vec3 n2 = texture2D(uNormal, p * 0.13 + uTime * vec2(-0.017, 0.012)).xyz * 2.0 - 1.0;
   float dist = length(cameraPosition - vWorld);
   float calm = 1.0 / (1.0 + dist * 0.012);
-  vec3 N = normalize(vec3(-g.x - (n1.x + n2.x * 0.7) * 0.2 * calm, 1.0, -g.y - (n1.y + n2.y * 0.7) * 0.2 * calm));
+  // в открытом море рябь крупнее: гладкой как зеркало воды там не бывает
+  float chop = 0.2 * calm * (1.0 + 1.3 * open);
+  vec3 N = normalize(vec3(-g.x - (n1.x + n2.x * 0.7) * chop, 1.0, -g.y - (n1.y + n2.y * 0.7) * chop));
   vec3 V = normalize(cameraPosition - vWorld);
   float ndv = max(dot(N, V), 0.0);
   float fres = 0.025 + 0.975 * pow(1.0 - ndv, 5.0);
@@ -216,12 +258,14 @@ void main() {
   float body = 1.0 - exp(-path * 0.16);
   vec3 c = mix(uShallow, uDeep, ss(1.0, 14.0, depth));
   c = mix(uShallow * 1.1 + vec3(0.04, 0.06, 0.04), c, ss(0.0, 2.2, depth));
+  // открытое море темнее и синее бухты: под лодкой — глубина
+  c = mix(c, uDeep * vec3(0.62, 0.8, 1.0), 0.45 * min(open, 1.0) * ss(8.0, 14.0, depth));
 
   // сетка света на поверхности — как на мелководье в ясный день
   vec2 warp = (texture2D(uNormal, p * 0.012 + uTime * 0.003).xy - 0.5) * 0.32;
   float c1 = texture2D(uCaustic, p * 0.075 + uTime * vec2(0.011, 0.007) + n1.xy * 0.035 + warp).r;
   float c2 = texture2D(uCaustic, p * 0.11 - uTime * vec2(0.009, 0.013) + n2.xy * 0.03 - warp * 1.3).r;
-  float net = max(c1 * 0.75, c2 * 0.55) * (1.0 - 0.55 * ss(3.0, 12.0, depth));
+  float net = max(c1 * 0.75, c2 * 0.55) * (1.0 - 0.55 * ss(3.0, 12.0, depth)) * (1.0 - 0.7 * min(open, 1.0));
   c += uSunCol * net * 0.27 * uGlitter * (0.35 + 0.65 * body) / (1.0 + dist * 0.016);
 
   vec3 R = reflect(-V, N);
@@ -229,7 +273,8 @@ void main() {
   if (uReflK > 0.001) {
     // отражение мира: точка воды → место в буфере, снятом зеркальной камерой; рябь сдвигает выборку
     vec4 rc = uReflM * vec4(vWorld.x, 0.0, vWorld.z, 1.0);
-    vec2 ruv = rc.xy / max(rc.w, 1e-4) + N.xz * (0.05 * calm + 0.012);
+    // на зыби отражение ломается на полосы, а не стоит зеркалом
+    vec2 ruv = rc.xy / max(rc.w, 1e-4) + N.xz * (0.05 * calm + 0.012) * (1.0 + 2.2 * min(open, 1.0));
     sky = mix(sky, texture2D(uRefl, clamp(ruv, 0.003, 0.997)).rgb, uReflK);
   }
   c = mix(c, sky, fres * 0.8);
@@ -241,6 +286,20 @@ void main() {
   float rs = max(dot(R, uSunDir), 0.0);
   c += uSunCol * (pow(rs, 380.0) * 3.0 + pow(rs, 28.0) * 0.1) * uGlitter;
 
+  // Барашки: на гребнях зыби вода срывается в пену. Пена лежит вдоль гребня рваной полосой: где ей быть, решают
+  // крупные пятна шума (uDet; рисунок крупный, чтобы не расплывался вдали), которые медленно сносит ветром, —
+  // гребень проходит, полоса вспыхивает и тает. В тихую погоду барашки редкие, на ветру — по всему морю.
+  float caps = 0.0;
+  if (open > 0.02) {
+    float crest = hs / ${SWELL_A.toFixed(3)}; // −1…1: впадина … гребень
+    vec4 blot = texture2D(uDet, p * 0.0062 + uTime * vec2(0.0011, 0.0007)); // где вдоль гребня есть пена: пятна в десятки метров
+    vec4 clot = texture2D(uDet, p * 0.047 - uTime * vec2(0.004, 0.0025)); // сами клочья: от полуметра до двух
+    float tuft = ss(0.5 - 0.06 * uWind, 0.56 - 0.06 * uWind, blot.r * 0.6 + blot.a * 0.4);
+    float lace = ss(0.47, 0.55, clot.r * 0.65 + clot.a * 0.35);
+    // пена — только у самой макушки гребня: узкая рваная полоса, а не половина волны. Чем сильнее ветер, тем ниже порог
+    float top = 0.9 - 0.3 * uWind;
+    caps = ss(top, top + 0.08, crest + (clot.a - 0.5) * 0.16) * tuft * lace * min(open, 1.0) * (1.0 - 0.6 * ss(180.0, 520.0, dist));
+  }
   // Прибой. Кромка воды «дышит»: волна накатывает на берег и отходит (тем же ходом темнеет мокрый песок — surface.js).
   // С глубины к берегу идут пенные валы: резкий передний край, за ним тающий след; на мели вал рассыпается в кружево.
   float swash = sin(uTime * 0.9 + p.x * 0.35 + n1.y * 2.0);
@@ -250,18 +309,19 @@ void main() {
   float crest = ss(0.0, 0.035, ph) * pow(1.0 - ph, 6.0);
   float lace = ss(0.45, 0.85, n1.z * 0.45 + c1 * 0.8 + c2 * 0.35);
   // в тихой заводи прибоя нет: туда волна с моря не доходит
-  float open = ss(uCalm.z, uCalm.z + 12.0, distance(p, uCalm.xy));
+  float surf = ss(uCalm.z, uCalm.z + 12.0, distance(p, uCalm.xy));
   // На крутом берегу (скала, обрыв) валу негде сложиться: там он шёл по линии глубины тонкой ниткой — убираем.
   // Крутизна дна — насколько глубина меняется на метр, по соседним точкам кадра.
   float slope = length(vec2(dFdx(depth), dFdy(depth))) / max(length(vec2(dFdx(p.x), dFdy(p.x))) + length(vec2(dFdx(p.y), dFdy(p.y))), 1e-4) * 1.6;
   float gentle = 1.0 - ss(0.3, 0.75, slope);
-  float band = crest * mix(1.0, lace, ss(0.03, 0.3, ph)) * ss(0.05, 0.2, depth) * (1.0 - ss(1.0, 2.3, depth)) * open * gentle;
+  float band = crest * mix(1.0, lace, ss(0.03, 0.3, ph)) * ss(0.05, 0.2, depth) * (1.0 - ss(1.0, 2.3, depth)) * surf * gentle;
   // у самого берега после наката остаётся тонкое кружево пены — узкой полоской, без молочной каши на мели
-  float wash = lace * (1.0 - ss(0.0, 0.13, depth)) * (0.5 + 0.4 * swash) * open;
-  float foam = clamp(edge + band + wash * 0.35, 0.0, 1.0) * step(0.004, dv);
+  float wash = lace * (1.0 - ss(0.0, 0.13, depth)) * (0.5 + 0.4 * swash) * surf;
+  float foam = clamp(edge + band + wash * 0.35 + caps * 0.85, 0.0, 1.0) * step(0.004, dv);
   // пена не светится сама: в сумерках, под тучами и в тумане она сереет вместе со всем миром
   vec3 foamCol = mix(vec3(1.0), uSkyHor, 0.25) * (0.35 + 0.65 * clamp(uGlitter + 0.25, 0.0, 1.0)) * mix(0.5, 1.0, uLight);
-  c = mix(c, foamCol, foam * 0.85);
+  // барашки под тучами не белые, а в тон воде: серая пена на серой воде смотрелась песчаной отмелью
+  c = mix(c, mix(foamCol, mix(c, foamCol, 0.5), caps * (1.0 - uLight)), foam * 0.85);
 
   float alpha = max(max(body, 0.1), max(fres * 0.92, foam));
   alpha = max(alpha, ss(70.0, 170.0, dist)); // вдали вода сплошная: дна всё равно не разглядеть
@@ -296,7 +356,7 @@ export function createWater() {
   geo.setIndex(idx);
   const uniforms = {
     uTime: { value: 0 }, uGlitter: { value: 1 }, uFogNear: { value: 150 }, uFogFar: { value: 1400 },
-    uDepth: { value: depthTexture(BOUNDS, 400, 400) }, uDepthFar: { value: depthTexture(FAR, Math.round((FAR.x1 - FAR.x0) / 2.5), Math.round((FAR.z1 - FAR.z0) / 2.5)) },
+    uDepth: { value: depthTexture(BOUNDS, 400, 400) }, uDepthFar: { value: depthTexture(FAR, Math.round((FAR.x1 - FAR.x0) / 2.5), Math.round((FAR.z1 - FAR.z0) / 2.5), farFloor) },
     uNormal: { value: normalTexture() }, uCaustic: { value: causticTexture() }, uDet: surfaceU.uDet, uCloudK: surfaceU.uCloudK,
     uBounds: { value: boundsVec(BOUNDS) }, uBoundsFar: { value: boundsVec(FAR) },
     uShallow: { value: new THREE.Color('#35e0d4') }, uDeep: { value: new THREE.Color('#1273c4') },
@@ -306,7 +366,9 @@ export function createWater() {
     uRefl: { value: null }, uReflM: { value: new THREE.Matrix4() }, uReflK: { value: 0 },
     uCalm: { value: new THREE.Vector3(BACKWATER.x, BACKWATER.z, BACKWATER.r) }, // тихая заводь: прибоя в ней нет
     uRain: { value: 0 }, // дождь: круги на воде
-    uLight: { value: 1 } // сколько света от солнца: 1 — ясный день
+    uLight: { value: 1 }, // сколько света от солнца: 1 — ясный день
+    uSwell: { value: sea.k }, // сила зыби в открытом море — та же, что у waveH (sea.k)
+    uWind: { value: 0.2 } // ветер 0…1: сколько барашков
   };
   const material = new THREE.ShaderMaterial({ uniforms, vertexShader: VERT, fragmentShader: FRAG, transparent: true, depthWrite: false });
   const m = new THREE.Mesh(geo, material);
@@ -320,7 +382,7 @@ export function createWater() {
 }
 
 const RING_VERT = /* glsl */ `
-uniform float uTime;
+uniform float uTime, uSwell;
 ${DEPTH_GLSL}
 attribute float aSeed;
 varying vec2 vUv;
@@ -330,9 +392,10 @@ void main() {
   vec4 wp = vec4(position, 1.0);
   vec2 p = wp.xz; float h = 0.0; vec2 g = vec2(0.0);
   ${waveGLSL}
+  ${swellGLSL}
   float dv = depthAt(p);
   float t = clamp((dv * dv * 16.0 - 0.4) / 5.6, 0.0, 1.0);
-  wp.y += h * (0.12 + 0.88 * t * t * (3.0 - 2.0 * t)) + 0.012;
+  wp.y += (h + hs * sk) * (0.12 + 0.88 * t * t * (3.0 - 2.0 * t)) + 0.012;
   vUv = uv; vSeed = aSeed;
   vDist = length(cameraPosition - wp.xyz);
   gl_Position = projectionMatrix * viewMatrix * wp;
@@ -385,7 +448,7 @@ export function createFoamRings(spots, wU) {
   geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   geo.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
   geo.setIndex(idx);
-  const uniforms = { uTime: wU.uTime, uDepth: wU.uDepth, uBounds: wU.uBounds, uDepthFar: wU.uDepthFar, uBoundsFar: wU.uBoundsFar, uNormal: wU.uNormal, uGlitter: wU.uGlitter, uSkyHor: wU.uSkyHor };
+  const uniforms = { uTime: wU.uTime, uSwell: wU.uSwell, uDepth: wU.uDepth, uBounds: wU.uBounds, uDepthFar: wU.uDepthFar, uBoundsFar: wU.uBoundsFar, uNormal: wU.uNormal, uGlitter: wU.uGlitter, uSkyHor: wU.uSkyHor };
   const m = new THREE.Mesh(geo, new THREE.ShaderMaterial({ uniforms, vertexShader: RING_VERT, fragmentShader: RING_FRAG, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
   m.frustumCulled = false;
   m.renderOrder = 3;

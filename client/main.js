@@ -23,7 +23,7 @@ import { loadProfile, saveProfile, saveProfileNow, lockProfile, hooks as profile
 import { Cloud } from './cloud.js';
 import { S, FLAG, MARKS } from './proto.js';
 import { cardText, cardFile, drawCard } from './postcard.js';
-import { DECK_Y, MARKET, MOORINGS, RENT_DESK, MAP_VIEW, WRECK, SEA, ISLAND, WORLD, palmR, canStand, FALLS, CAMPFIRE } from './terrain.js';
+import { DECK_Y, MARKET, MOORINGS, RENT_DESK, MAP_VIEW, WRECK, SEA, ISLAND, WORLD, SKERRIES, palmR, canStand, FALLS, CAMPFIRE } from './terrain.js';
 import { ITEMS, FISH_BY_ID, JUNK, JUNK_BY_ID, RARITY, ZONES, BAITS, LURES, clockHours, dayPart, fmtW, fmtCoins, isLure } from '../shared/data.js';
 import {
   marketState, hashStr, buy, equip, sell, kitStats, levelInfo, tackleCount, fishValue, newProfile, speciesWeights,
@@ -39,6 +39,8 @@ import { initCache, wakeServer } from './offline.js';
 const SPAWNS = [[-2, 9], [0.6, 9.4], [-4, 8.2], [2.6, 8.6], [-1, 11], [1.6, 11.4], [-3.6, 11], [3.6, 10.4]];
 const LINE_Z = 7;
 const BUMP_FAR = 80; // с какого расстояния слышен удар чужой лодки о преграду, м
+const FLOCK_FAR = 130; // с какого расстояния слышны чайки над морским косяком, м
+const DOLPHIN_FAR = 110; // с какого расстояния слышен всплеск дельфина после прыжка, м
 const WARM_FISH = 'plotva'; // на этой модели собираются шейдеры для всей рыбы (у моделей рыб материалы устроены одинаково)
 // почему рыбу друга сейчас не взять подсаком (ответ его игры на нашу просьбу; правила — assistBlock в logic.js)
 const ASSIST_NO = {
@@ -66,7 +68,11 @@ const AREAS = {
   light: ['ОСТРОВ С МАЯКОМ', 'Остров с маяком: у водопадов берут форель и лосось, а с причала — глубина: судак, скумбрия, скат'],
   palm: ['ПАЛЬМОВЫЙ ОСТРОВ', 'Пальмовый остров: в бирюзовой лагуне ходят дорада, кефаль и сарган'],
   wreck: ['ЗАТОНУВШИЙ КОРАБЛЬ', 'Затонувший корабль: морской окунь, угорь — а в трюме, говорят, живёт Старик'],
-  sea: ['ОТКРЫТОЕ МОРЕ', 'Открытое море: скумбрия, тунец, а если повезёт — рыба-меч']
+  sea: ['ОТКРЫТОЕ МОРЕ', 'Открытое море: скумбрия, тунец, а если повезёт — рыба-меч. Косяк ищите по чайкам: где кружит стая — там рыба'],
+  // скалы в открытом море (SKERRIES в terrain.js)
+  teeth: ['СКАЛЫ ЗУБЬЯ', 'Зубья: под скалами отмель — у камней держится рифовая рыба, а вокруг ходит морская'],
+  gullrock: ['ЧАЯЧИЙ КАМЕНЬ', 'Чаячий камень: отмель на востоке — у камней рифовая рыба, вокруг морская'],
+  westrocks: ['ЗАПАДНЫЕ КАМНИ', 'Западные камни: отмель у самого края моря — сюда редко кто доходит']
 };
 const VENDOR = ['Свежая рыба — хорошая цена. Показывай улов!', 'Клюёт сегодня? У меня глаз намётан: вижу — клюёт.', 'Старика под аркой видел кто? Сорок лет ловят — не поймали.', 'Бери плетёнку, не пожалеешь. Карп стартовую леску рвёт как нитку.', 'На рассвете в заводи, говорят, золотой кои ходит.', 'Ночью угорь под сваями берёт на червя. Проверено.'];
 
@@ -121,6 +127,16 @@ class Game {
     this.fauna.onSplash = (x, z, pw) => {
       const d = Math.hypot(x - this.player.x, z - this.player.z);
       if (this.state === 'world' && d < 60) this.audio.splash(0.5 + pw * 0.5, clamp(1 - d / 60, 0, 1) * 0.7);
+    };
+    // мелочь плещется над морским косяком: вблизи слышны короткие лёгкие всплески
+    this.fauna.onBoil = (x, z) => {
+      const d = Math.hypot(x - this.player.x, z - this.player.z);
+      if (this.state === 'world' && d < 45) this.audio.splash(0.2, clamp(1 - d / 45, 0, 1) * 0.4);
+    };
+    // дельфин после прыжка уходит в воду: тяжёлый всплеск слышен издалека
+    this.fauna.dolphins.onLeap = (x, z) => {
+      const d = Math.hypot(x - this.player.x, z - this.player.z);
+      if (this.state === 'world' && d < DOLPHIN_FAR) this.audio.splash(1, clamp(1 - d / DOLPHIN_FAR, 0, 1) * 0.75);
     };
     // погода: общая для комнаты, считается из её зерна и часов; ?w=rain|fog|cloudy|clear — насильно (для проверок)
     this.forceWx = WEATHER[q.get('w')] ? q.get('w') : null;
@@ -916,6 +932,7 @@ class Game {
     if (Math.hypot(x - WRECK.x, z - WRECK.z) < WRECK.r + 14) return 'wreck';
     // остров с маяком и его причал, вынесенный на запад
     if (Math.hypot(x - ISLAND.x, z - ISLAND.z) < 44 || (x > -24 && x < -2 && z > -82 && z < -62)) return 'light';
+    for (const s of SKERRIES) if (Math.hypot(x - s.x, z - s.z) < s.r + 24) return s.id;
     return Math.hypot(x - SEA.x, z - SEA.z) > SEA.r ? 'sea' : 'bay';
   }
 
@@ -1996,6 +2013,26 @@ class Game {
         const fall = FALLS.reduce((a, b) => (Math.hypot(a.bx - pl.x, a.bz - pl.z) < Math.hypot(b.bx - pl.x, b.bz - pl.z) ? a : b));
         hear('waterfall', fall.bx, fall.bz, 60, 0.55);
         hear('fire', CAMPFIRE.x, CAMPFIRE.z, 16, 0.5);
+        // чайки над морским косяком: чем ближе стая, тем чаще и громче крики — и с той стороны, где она кружит
+        this.flockT = (this.flockT || 2) - dt;
+        if (this.flockT <= 0) {
+          let best = null, bd = FLOCK_FAR;
+          for (const c of this.world.scenery.schools.sea) {
+            const d = Math.hypot(c.x - pl.x, c.z - pl.z);
+            if (c.on > 0.5 && d < bd) {
+              bd = d;
+              best = c;
+            }
+          }
+          const k = best ? 1 - bd / FLOCK_FAR : 0;
+          this.flockT = best ? 0.9 + Math.random() * 3.2 * (1.25 - k) : 1.5;
+          if (best) this.audio.gullAt((0.05 + 0.2 * k * k) * (1 - 0.7 * this.world.night), bd > 0.01 ? (((best.x - pl.x) * Math.cos(pl.yaw) - (best.z - pl.z) * Math.sin(pl.yaw)) / bd) * 0.8 : 0);
+          // дельфины рядом: скажем об этом один раз за игру
+          if (!this.dolphinsSeen && this.fauna.dolphins.state(Math.max(0, T)).pods.some((q) => Math.hypot(q.x - pl.x, q.z - pl.z) < 75)) {
+            this.dolphinsSeen = true;
+            ui.toast('Рядом дельфины: стаи ходят по открытому морю своей дорогой', 'gold', 5200);
+          }
+        }
       }
       if (!ui.panel || !this.editing) {
         const noLook = !!ui.panel;

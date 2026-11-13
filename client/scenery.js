@@ -7,8 +7,9 @@ import { buildPlaces } from './places.js';
 import { ENV, upgradeEnv, envNight, envState } from './envmodels.js';
 import { spot01 } from './scatter.js';
 import { rng, rockGeo, blobGeo, canvasTex, shade, sstep, TAU, fbm2 } from './util.js';
-import { DECKS, CIRCLES, DECK_Y, groundH, shoreZ, islandR, ISLAND, ARCH, ARCH_LEGS, REEF, CAPE, capeDist, FALLS, LIGHTHOUSE, COTTAGE, cottageUV, BACKWATER, deckAt, SCHOOL_HOMES } from './terrain.js';
-import { waveH } from './water.js';
+import { DECKS, CIRCLES, DECK_Y, groundH, shoreZ, islandR, ISLAND, ARCH, ARCH_LEGS, REEF, CAPE, capeDist, FALLS, LIGHTHOUSE, COTTAGE, cottageUV, BACKWATER, deckAt, SCHOOL_HOMES, SEA_HOMES, SKERRIES, BUOYS, MARKS } from './terrain.js';
+import { waveH, swellMax } from './water.js';
+import { FAR_ISLES, farTrees, farCliffs } from './farisles.js';
 import { Fauna } from './fauna.js';
 import { small, cullSmall, smallState } from './smalls.js';
 
@@ -425,8 +426,9 @@ function upgradeProps(scene, fallback, floaters) {
           o.scale.setScalar(4.1);
           f.y = -0.26;
         } else {
-          o.scale.setScalar(1.85);
-          f.y = -0.42;
+          // веха в открытом море — буй покрупнее: его видно издалека
+          o.scale.setScalar(f.big ? 2.7 : 1.85);
+          f.y = f.big ? -0.6 : -0.42;
         }
         f.o.clear();
         f.o.add(o);
@@ -821,6 +823,23 @@ function buildRocks(scene, r) {
     as = 'env-rock1';
     for (let k = 0; k < 4; k++) rock(x + (r() - 0.5) * s * 2.2, -0.2, z + (r() - 0.5) * s * 2.2, 1.5 + r() * 2, 1 + r(), 1.5 + r() * 2);
   }
+  // Скалы в открытом море (SKERRIES) — тем же способом: высокие — шпили, пониже — столбы и глыбы, вокруг валуны.
+  // Случайные числа у них свои: общий счётчик r на время подменяется, и остальной мир не сдвигается.
+  {
+    const main = r;
+    r = rng(8181);
+    let n = 0;
+    for (const sk of SKERRIES)
+      for (const [ox, oz, w, tall] of sk.rocks) {
+        const x = sk.x + ox;
+        const z = sk.z + oz;
+        as = tall > 2.3 ? 'env-rock3' : n++ % 2 ? 'env-cliff2' : 'env-rock2';
+        rock(x, w * tall * 0.3, z, w, w * tall, w, true);
+        as = 'env-rock1';
+        for (let k = 0; k < 3; k++) rock(x + (r() - 0.5) * w * 2.4, -0.3, z + (r() - 0.5) * w * 2.4, 1.3 + r() * 1.7, 0.9 + r() * 0.9, 1.3 + r() * 1.7);
+      }
+    r = main;
+  }
   as = null;
   // Арка. Запасной вид — половина тора, помятая шумом, тех же габаритов, что и готовая модель (envmodels.js).
   const AB = new Batch();
@@ -869,42 +888,49 @@ function buildRocks(scene, r) {
   scene.add(B.build(), mS, mT);
   ENV.fallback.rocks.push(mS);
   ENV.fallback.trees.push(mT);
-  // Дальние острова на горизонте — из того же, что и ближние: серая скала, зелень поверху (мох кладёт шейдер),
-  // рощи на макушках. У каждого острова два-три холма: силуэт выходит живым, а не одной зелёной каплей.
-  // Свои случайные числа (r2): общий счётчик r тратится ровно как раньше, и остальной мир не сдвигается.
-  const fb = new Batch();
-  fb.mat = 2;
-  const groves = new Batch();
-  groves.far = true;
-  const r2 = rng(4711);
-  const v3 = new THREE.Vector3();
-  const n3 = new THREE.Vector3();
-  const nm = new THREE.Matrix3();
-  for (const [x, z, sx, sy, sz] of [[-420, -560, 130, 46, 90], [260, -720, 170, 60, 110], [640, -330, 120, 40, 150], [-700, -150, 150, 70, 180], [40, -980, 220, 50, 120]]) {
-    const ry = r() * 3;
-    const hills = [[0, 0, 1, 1, geos[4]]];
-    for (let i = 1 + Math.floor(r2() * 2); i > 0; i--) hills.push([(r2() < 0.5 ? -1 : 1) * (0.55 + r2() * 0.35), (r2() - 0.5) * 0.7, 0.42 + r2() * 0.26, 0.5 + r2() * 0.4, geos[Math.floor(r2() * 4)]]);
-    for (const [ou, ov, k, kh, geo] of hills) {
-      const hx = x + ou * sx * Math.cos(ry) + ov * sz * Math.sin(ry);
-      const hz = z - ou * sx * Math.sin(ry) + ov * sz * Math.cos(ry);
-      // камень — приплюснутый шар; самое широкое место опущено под воду, иначе край острова нависает над морем
-      const m = M(hx, -sy * kh * 0.08, hz, sx * k, sy * kh * 1.3, sz * k, 0, ry + (k < 1 ? r2() * 2 : 0), 0);
-      fb.add(geo, shade(GREYS[Math.floor(r2() * GREYS.length)], -0.04 + (r2() - 0.5) * 0.08), m, { top: [GRASS, 0.5], grad: [0.74, 1.04], soft: true });
-      // рощи: комья листвы на пологих местах макушки
-      const p = geo.attributes.position;
-      const nn = geo.attributes.normal;
-      nm.getNormalMatrix(m);
-      for (let i = 0; i < p.count; i++) {
-        n3.fromBufferAttribute(nn, i).applyMatrix3(nm).normalize();
-        if (n3.y < 0.8 || r2() > 0.42) continue;
-        v3.fromBufferAttribute(p, i).applyMatrix4(m);
-        if (v3.y < 10) continue;
-        const w = 11 + r2() * 11;
-        groves.add(BLOBS_FAR[Math.floor(r2() * BLOBS_FAR.length)], shade(['#3f8f4a', '#4a9c4e', '#35804a'][Math.floor(r2() * 3)], (r2() - 0.5) * 0.1), M(v3.x, v3.y + w * 0.16, v3.z, w, w * (0.5 + r2() * 0.2), w, 0, r2() * 3, 0), { grad: [0.6, 1.12], mat: 3 });
-      }
+  // Дальние острова за краем моря. Их рельеф кладёт world.js (farisles.js); здесь — лес и утёсы у воды.
+  // Раньше на каждый из пяти островов-холмов тратилось по одному числу общего счётчика r — тратим так же,
+  // чтобы остальной мир не сдвинулся.
+  for (let i = 0; i < 5; i++) r();
+  for (const I of FAR_ISLES) {
+    const forest = new Batch();
+    const fr = rng(I.seed * 31 + 3);
+    for (const t of farTrees(I)) (t.pine ? farPine : farCrown)(forest, t, fr);
+    if (!forest.empty) {
+      const m = forest.build(BATCH_MAT, false);
+      m.name = 'far-forest-' + I.id;
+      scene.add(m);
     }
+    // утёсы — места для готовых моделей; без моделей берег остаётся каменным склоном
+    for (const c of farCliffs(I)) ENV.rocks[c.wall ? 'env-cliff1' : 'env-cliff2'].push({ x: c.x, y: -2.5, z: c.z, w: c.w, h: c.h + 2.5, d: c.d, ry: c.ry, tilt: false });
   }
-  scene.add(fb.build(BATCH_MAT, false), groves.build(BATCH_MAT, false));
+}
+
+// Деревья дальних островов: до них сотни метров, поэтому крона — два конуса или один комок листвы, без ствола.
+const FAR_CONE = (() => {
+  const pos = [];
+  for (let i = 0; i < 6; i++) {
+    const a0 = (i / 6) * TAU, a1 = ((i + 1) / 6) * TAU;
+    pos.push(0, 0.5, 0, Math.cos(a1) * 0.5, -0.5, Math.sin(a1) * 0.5, Math.cos(a0) * 0.5, -0.5, Math.sin(a0) * 0.5);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  return g;
+})();
+const FAR_CROWNS = [blobGeo(5, 0, 0.14), blobGeo(19, 0, 0.14)];
+function farPine(B, t, r) {
+  const base = ['#2f8f4e', '#2a8246', '#37a058'][Math.floor(r() * 3)];
+  const h = t.h;
+  B.add(FAR_CONE, shade(base, -0.04), M(t.x, t.y + 0.3 * h, t.z, 0.52 * h, 0.66 * h, 0.52 * h, 0, r() * 3, 0), { grad: [0.55, 1.1], mat: 3 });
+  B.add(FAR_CONE, shade(base, 0.06), M(t.x, t.y + 0.72 * h, t.z, 0.36 * h, 0.56 * h, 0.36 * h, 0, r() * 3, 0), { grad: [0.68, 1.14], mat: 3 });
+}
+function farCrown(B, t, r) {
+  const base = ['#62b84e', '#74c75a', '#57a947', '#86cf63'][Math.floor(r() * 4)];
+  const h = t.h * 0.8;
+  const w = h * (0.5 + r() * 0.16);
+  // комок листвы стоит на земле (низ чуть утоплен): издали это купа деревьев, а не шар, повисший над лугом
+  B.add(FAR_CROWNS[Math.floor(r() * FAR_CROWNS.length)], shade(base, -0.06 + (r() - 0.5) * 0.12), M(t.x, t.y + 0.4 * h, t.z, w, h * 0.56, w, 0, r() * 3, 0), { grad: [0.5, 1.12], mat: 3 });
 }
 
 function buildLighthouse(scene, r) {
@@ -1111,7 +1137,19 @@ function buildFloaters(scene) {
   // буйки
   const red = new THREE.MeshStandardMaterial({ color: '#e2452f', roughness: 0.6 });
   const white = new THREE.MeshStandardMaterial({ color: '#f8fafc', roughness: 0.6 });
-  for (const [x, z] of [[-12, -43], [15, -37], [45, -31], [-27, -12]]) {
+  // буйки в бухте и вехи в открытом море: у вех наверху огонь — ночью он мигает
+  const lights = [];
+  const lightTex = canvasTex(64, 64, (g) => {
+    const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,255,255,1)');
+    gr.addColorStop(0.18, 'rgba(255,214,190,0.6)');
+    gr.addColorStop(0.5, 'rgba(255,120,80,0.16)');
+    gr.addColorStop(1, 'rgba(255,90,60,0)');
+    g.fillStyle = gr;
+    g.fillRect(0, 0, 64, 64);
+  });
+  for (const [i, [x, z]] of [...BUOYS, ...MARKS].entries()) {
+    const mark = i >= BUOYS.length;
     const b = new THREE.Group();
     const body = new THREE.Mesh(G.sph(12, 8), red);
     body.scale.set(0.9, 0.7, 0.9);
@@ -1127,11 +1165,24 @@ function buildFloaters(scene) {
     b.position.set(x, 0, z);
     b.traverse((o) => (o.castShadow = true));
     scene.add(b);
-    list.push({ o: b, y: 0.05, roll: 0.12, kind: 'buoy' });
+    const f = { o: b, y: 0.05, roll: 0.12, kind: 'buoy', big: mark };
+    list.push(f);
+    if (mark) {
+      // огонь стоит отдельно от буя (у готовой модели буй подменяется целиком) и качается вместе с ним
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: lightTex, color: '#ff7a5a', transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+      s.scale.setScalar(2.6);
+      s.position.set(x, 2.4, z);
+      s.visible = false;
+      scene.add(s);
+      lights.push({ s, f, ph: i * 1.9 });
+    }
   }
+  list.lights = lights;
   return list;
 }
 
+const FLOCKS = 2; // столько морских косяков — и стай над ними
+const FLOCK = 7; // птиц в стае
 function buildGulls(scene) {
   // Все чайки — один меш с копиями: тело и два крыла слиты в одну геометрию, взмах считает шейдер
   // (aWing: −1 и +1 — левое и правое крыло, 0 — тело; aFlap — угол взмаха у каждой чайки свой).
@@ -1164,7 +1215,12 @@ function buildGulls(scene) {
   geo.setAttribute('aWing', new THREE.Float32BufferAttribute(wing, 1));
   geo.computeVertexNormals();
   const centers = [[20, 34, -98, 28], [0, 16, -20, 20], [-30, 22, -40, 30], [50, 26, -50, 24], [5, 13, 4, 14]];
-  const flap = new THREE.InstancedBufferAttribute(new Float32Array(centers.length), 1);
+  // на Чаячьем камне птицы живут: три кружат над скалой всегда
+  const GR = SKERRIES.find((s) => s.id === 'gullrock');
+  centers.push([GR.x, 15, GR.z, 13], [GR.x + 3, 11, GR.z - 2, 8], [GR.x - 2, 19, GR.z + 3, 18]);
+  // кроме них — стаи над морскими косяками (FLOCKS стай по FLOCK птиц): пока косяка нет, птицы спрятаны
+  const N = centers.length + FLOCKS * FLOCK;
+  const flap = new THREE.InstancedBufferAttribute(new Float32Array(N), 1);
   geo.setAttribute('aFlap', flap);
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side: THREE.DoubleSide });
   mat.onBeforeCompile = (sh) => {
@@ -1173,16 +1229,23 @@ function buildGulls(scene) {
       .replace('#include <begin_vertex>', '#include <begin_vertex>\n{ float a = aFlap * aWing; float c = cos(a), s = sin(a); transformed.xy = vec2(transformed.x * c - transformed.y * s, transformed.x * s + transformed.y * c); }');
   };
   mat.customProgramCacheKey = () => 'gull1';
-  const mesh = new THREE.InstancedMesh(geo, mat, centers.length);
+  const mesh = new THREE.InstancedMesh(geo, mat, N);
   mesh.frustumCulled = false; // чайки летают по всей бухте
   mesh.name = 'gulls';
   mesh.layers.set(1); // в отражении воды их нет
   scene.add(mesh);
   const o = new THREE.Object3D();
   const list = centers.map(([cx, cy, cz, rad], i) => ({ cx, cy, cz, rad, ph: i * 1.7, sp: 0.16 + i * 0.03, dir: i % 2 ? 1 : -1 }));
+  const hide = new THREE.Matrix4().makeScale(0, 0, 0);
+  for (let i = centers.length; i < N; i++) mesh.setMatrixAt(i, hide);
   return {
     mesh,
-    update(t) {
+    /**
+     * flocks — морские косяки [{ x, z, on }]: над каждым кружит стая и по очереди ныряет к воде.
+     * Издалека птицы рисуются крупнее настоящих — иначе стаю, по которой ищут косяк, с лодки не разглядеть.
+     */
+    update(t, flocks = [], camera = null) {
+      o.scale.setScalar(1);
       list.forEach((b, i) => {
         const a = b.ph + t * b.sp * b.dir;
         o.position.set(b.cx + Math.cos(a) * b.rad, b.cy + Math.sin(t * 0.3 + b.ph) * 2.5, b.cz + Math.sin(a) * b.rad);
@@ -1191,6 +1254,32 @@ function buildGulls(scene) {
         mesh.setMatrixAt(i, o.matrix);
         flap.setX(i, Math.sin(t * 5.5 + b.ph * 3) * 0.55 * (0.4 + 0.6 * Math.max(0, Math.sin(t * 0.4 + b.ph))));
       });
+      for (let k = 0; k < FLOCKS; k++) {
+        const c = flocks[k];
+        const far = c && camera ? Math.hypot(c.x - camera.position.x, c.z - camera.position.z) : 0;
+        const big = 1.45 * Math.min(3.4, Math.max(1, far / 75));
+        for (let j = 0; j < FLOCK; j++) {
+          const i = centers.length + k * FLOCK + j;
+          if (!c || !(c.on > 0.02)) {
+            mesh.setMatrixAt(i, hide);
+            continue;
+          }
+          // круг над косяком: у каждой птицы свой радиус, высота и скорость, половина кружит в другую сторону
+          const dir = j % 2 ? 1 : -1;
+          const ph = k * 2.3 + j * 1.31;
+          const a = ph + t * (0.34 + j * 0.035) * dir;
+          const rad = 4.5 + j * 1.5 + Math.sin(t * 0.23 + ph) * 1.2;
+          // нырок: раз в четверть минуты птица падает к самой воде и уходит обратно вверх
+          const dive = Math.max(0, Math.sin(t * 0.42 + ph * 1.7) - 0.82) / 0.18;
+          const y = (6.5 + j * 1.0 + Math.sin(t * 0.5 + ph) * 1.1) * (1 - 0.86 * dive * dive);
+          o.position.set(c.x + Math.cos(a) * rad, y, c.z + Math.sin(a) * rad);
+          o.rotation.set(dive * 0.5, -a + (dir > 0 ? Math.PI : 0), -dir * (0.3 + 0.2 * dive));
+          o.scale.setScalar(big * c.on);
+          o.updateMatrix();
+          mesh.setMatrixAt(i, o.matrix);
+          flap.setX(i, Math.sin(t * 6.2 + ph * 3) * 0.6 * (0.5 + 0.5 * Math.max(dive, Math.max(0, Math.sin(t * 0.6 + ph)))));
+        }
+      }
       mesh.instanceMatrix.needsUpdate = true;
       flap.needsUpdate = true;
     }
@@ -1198,31 +1287,44 @@ function buildGulls(scene) {
 }
 function buildSchools(fauna) {
   const PER = 9;
-  const N = 6;
+  const N = 6; // обычные косяки: стоят где угодно — в бухте, у островов, в море
+  const SEA_N = FLOCKS; // морские: всегда в открытом море, над ними чайки
   const centers = [];
-  for (let i = 0; i < N; i++) centers.push({ x: 0, z: 0, on: 0 });
+  for (let i = 0; i < N + SEA_N; i++) centers.push({ x: 0, z: 0, on: 0, sea: i >= N });
   return {
     centers,
+    sea: centers.slice(N),
     /** seed — число комнаты, t — секунды общих часов */
     update(seed, t) {
       const period = 240;
       const k = Math.floor(t / period);
       const ph = (t - k * period) / period;
       const fade = Math.min(1, ph * 12, (1 - ph) * 12);
-      for (let i = 0; i < N; i++) {
-        const rr = rng((seed ^ Math.imul(k + 1, 2654435761) ^ Math.imul(i + 1, 40503)) >>> 0);
-        const home = SCHOOL_HOMES[Math.floor(rr() * SCHOOL_HOMES.length)];
+      // морские косяки меняют место реже и не разом с остальными; второй никогда не встаёт туда же, где первый
+      const periodS = 300;
+      const kS = Math.floor((t + 150) / periodS);
+      const phS = (t + 150 - kS * periodS) / periodS;
+      const fadeS = Math.min(1, phS * 12, (1 - phS) * 12);
+      const rs = rng((seed ^ Math.imul(kS + 3, 2246822519)) >>> 0);
+      const first = Math.floor(rs() * SEA_HOMES.length);
+      const seaHome = [first, (first + 1 + Math.floor(rs() * (SEA_HOMES.length - 1))) % SEA_HOMES.length];
+      for (let i = 0; i < N + SEA_N; i++) {
+        const sea = i >= N;
+        const rr = rng((seed ^ Math.imul((sea ? kS : k) + 1, 2654435761) ^ Math.imul(i + 1, 40503)) >>> 0);
+        const pick = rr();
+        const home = sea ? SEA_HOMES[seaHome[i - N]] : SCHOOL_HOMES[Math.floor(pick * SCHOOL_HOMES.length)];
         const a = rr() * TAU;
         const c = centers[i];
         c.x = home[0] + Math.sin(t / 37 + a) * 4;
         c.z = home[1] + Math.cos(t / 43 + a * 2) * 4;
-        c.on = fade;
+        c.on = sea ? fadeS : fade;
         for (let j = 0; j < PER; j++) {
           const sp = 0.5 + rr() * 0.35;
           const ang = (j / PER) * TAU + t * sp * (i % 2 ? 1 : -1) + rr() * 0.8;
           const rad = 1.1 + rr() * 1.6 + Math.sin(t * 0.7 + j) * 0.25;
-          const y = -0.32 - rr() * 0.25;
-          const s = (0.8 + rr() * 0.7) * (0.001 + fade);
+          // в открытом море рыба ходит глубже — на высоту зыби: иначе во впадине волны спины торчали бы из воды
+          const y = -0.32 - rr() * 0.25 - swellMax(c.x, c.z);
+          const s = (0.8 + rr() * 0.7) * (0.001 + c.on) * (sea ? 1.25 : 1);
           // рыба идёт по кругу: нос — по ходу
           fauna.schoolFish(i * PER + j, c.x + Math.cos(ang) * rad, y, c.z + Math.sin(ang) * rad, ang + (i % 2 ? Math.PI / 2 : -Math.PI / 2), s);
         }
@@ -1262,6 +1364,7 @@ export function buildScenery(scene) {
   const lh = buildLighthouse(scene, r);
   const falls = buildFalls(scene);
   const floaters = buildFloaters(scene);
+  let dark = 0; // насколько стемнело: по нему горят огни вех
   const gulls = buildGulls(scene);
   const fauna = new Fauna(scene, FOAM_SPOTS);
   const schools = buildSchools(fauna);
@@ -1283,6 +1386,7 @@ export function buildScenery(scene) {
     propsState: () => ({ fallback: fallback.visible, ...propsDone }),
     /** night: 0 днём … 1 ночью; light — общая яркость дня */
     setNight(night, light) {
+      dark = Math.max(0, night * 1.25 - 0.25);
       // Днём фонари горят «нулём», но остаются среди источников света: число источников зашито в шейдеры всей сцены,
       // и смена набора — это не только сборка новых шейдеров, но и первый показ с ними; на Apple M4 кадр с новым
       // набором шёл 0,7–0,85 с. Пять погашенных фонарей стоят там же 0,8 мс на кадр (6 %) — это дешевле рывка.
@@ -1308,7 +1412,15 @@ export function buildScenery(scene) {
         f.o.rotation.z = Math.sin(t * 0.9 + p.x) * f.roll;
         f.o.rotation.x = Math.cos(t * 0.7 + p.z) * f.roll * 0.7;
       }
-      gulls.update(t);
+      // огни вех: ночью мигают — короткая вспышка раз в две с половиной секунды, у каждой вехи в свой момент
+      for (const l of floaters.lights) {
+        const blink = Math.max(0, Math.sin(t * 2.5 + l.ph)) ** 6;
+        const o = dark * (0.12 + 0.88 * blink);
+        l.s.material.opacity = o;
+        l.s.visible = o > 0.02;
+        l.s.position.y = l.f.o.position.y + (l.f.y < -0.5 ? 2.95 : 2.3);
+      }
+      gulls.update(t, schools.sea, camera);
     }
   };
 }

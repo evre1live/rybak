@@ -1,8 +1,9 @@
 // Мир «Солнечной бухты»: рельеф, небо, облака, свет по времени суток — и сборка всего остального.
 import * as THREE from 'three';
 import { clamp, lerp, sstep, damp, fbm2, canvasTex, rng, TAU, isTouch } from './util.js';
-import { groundH, shoreZ, BOUNDS, WORLD, PALM, WRECK, palmR, capeDist, CAPE, ISLAND, islandR, MAP_VIEW, DECKS, DECK_Y, LIGHTHOUSE, ARCH, MOORINGS } from './terrain.js';
-import { createWater, createFoamRings } from './water.js';
+import { groundH, shoreZ, BOUNDS, WORLD, PALM, WRECK, palmR, capeDist, CAPE, ISLAND, islandR, MAP_VIEW, DECKS, DECK_Y, LIGHTHOUSE, ARCH, MOORINGS, SKERRIES } from './terrain.js';
+import { createWater, createFoamRings, sea } from './water.js';
+import { FAR_ISLES, farH, farWood } from './farisles.js';
 import { buildScenery, FOAM_SPOTS } from './scenery.js';
 import { patchSurface, surfaceU, detailTexture, loadPaint, detail } from './surface.js';
 import { ENV } from './envmodels.js';
@@ -201,6 +202,64 @@ function shadeUnderTrees(terrain) {
     col.needsUpdate = true;
   }
 }
+const forestFloor = C('#5f9440');
+/**
+ * Дальний остров (farisles.js) тем же материалом, что и большой: трава, камень на крутых склонах, песок у воды.
+ * Сетка — квадрат вокруг острова; то, что целиком под водой глубже двух метров, не рисуется: вдали вода непрозрачна.
+ */
+function buildFarIsle(I) {
+  const R = I.R * 1.38;
+  const n = Math.ceil((2 * R) / I.cell);
+  const geo = new THREE.PlaneGeometry(2 * R, 2 * R, n, n);
+  geo.rotateX(-Math.PI / 2);
+  geo.translate(I.x, 0, I.z);
+  const p = geo.attributes.position;
+  for (let i = 0; i < p.count; i++) p.setY(i, Math.max(-5, farH(p.getX(i), p.getZ(i))));
+  geo.deleteAttribute('uv');
+  geo.computeVertexNormals();
+  const nor = geo.attributes.normal;
+  const colors = new Float32Array(p.count * 3);
+  const ground = new Float32Array(p.count * 4);
+  const c = new THREE.Color();
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i), ny = nor.getY(i);
+    // пятна крупнее, чем на большом острове: сетка здесь в шесть–восемь метров, мелкий шум на ней рябит
+    const n1 = fbm2(x * 0.021 + I.seed, z * 0.021, 3);
+    const n2 = fbm2(x * 0.06 + 9, z * 0.06 + 4 + I.seed, 2);
+    let w0 = 0, w1 = 0, w2 = 1;
+    if (y < -0.1) c.lerpColors(sandWet, seabed, sstep(-0.3, -4.5, y)).multiplyScalar(0.94 + n2 * 0.1);
+    else if (ny < 0.62) {
+      c.lerpColors(rockA, rockB, n2).multiplyScalar(0.86 + n1 * 0.22);
+      w1 = 1;
+      w2 = 0;
+    } else if (y < 0.9 + n1 * 0.9 && ny > 0.84) c.lerpColors(sandWet, sandWhite, sstep(-0.1, 0.6, y)).multiplyScalar(0.95 + n2 * 0.08);
+    else {
+      // луга дальних островов чуть темнее и спокойнее, чем у большого: издали сплошной яркий луг смотрелся кислотным
+      c.lerpColors(grassA, grassB, sstep(0.25, 0.65, n1)).multiplyScalar(0.9);
+      c.lerp(grassC, sstep(0.6, 0.9, n2) * 0.3);
+      // под лесом трава темнее: кроны стоят не на ярком лугу, а на своей тени
+      c.lerp(forestFloor, 0.2 + farWood(I, x, z) * 0.6);
+      w0 = 1;
+      w2 = 0;
+    }
+    colors[i * 3] = c.r;
+    colors[i * 3 + 1] = c.g;
+    colors[i * 3 + 2] = c.b;
+    ground[i * 4] = w0;
+    ground[i * 4 + 1] = w1;
+    ground[i * 4 + 2] = w2;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geo.setAttribute('aGround', new THREE.BufferAttribute(ground, 4));
+  const idx = geo.index.array;
+  const keep = [];
+  for (let t = 0; t < idx.length; t += 3) if (p.getY(idx[t]) > -2 || p.getY(idx[t + 1]) > -2 || p.getY(idx[t + 2]) > -2) keep.push(idx[t], idx[t + 1], idx[t + 2]);
+  geo.setIndex(keep);
+  geo.computeBoundingSphere();
+  const m = new THREE.Mesh(geo, TERRAIN_MAT);
+  m.name = 'far-' + I.id;
+  return m;
+}
 function buildTerrain() {
   const { x0, x1, z0, z1 } = BOUNDS;
   const g = new THREE.Group();
@@ -209,6 +268,8 @@ function buildTerrain() {
   // Пальмовый остров с отмелью и отмель с кораблём — отдельными кусками (без нахлёста на большой остров)
   g.add(buildGround(BOUNDS.x1, PALM.x + 126, PALM.z - 90, PALM.z + 90, 142, 112));
   g.add(buildGround(WRECK.x - 60, WRECK.x + 60, WRECK.z - 60, BOUNDS.z0, 50, 44));
+  // отмели под скалами в открытом море
+  for (const s of SKERRIES) g.add(buildGround(s.x - s.r * 2.3, s.x + s.r * 2.3, s.z - s.r * 2.3, s.z + s.r * 2.3, 44, 44));
   // ровное дно под всем остальным морем: без него сквозь воду за краем подробного рельефа просвечивает пустота
   const far = new THREE.PlaneGeometry(4000, 4000);
   far.rotateX(-Math.PI / 2);
@@ -220,6 +281,8 @@ function buildTerrain() {
   far.setAttribute('aGround', new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0]), 4));
   far.deleteAttribute('uv');
   g.add(new THREE.Mesh(far, TERRAIN_MAT));
+  // дальние острова за краем моря
+  for (const I of FAR_ISLES) g.add(buildFarIsle(I));
   return g;
 }
 
@@ -503,6 +566,11 @@ export class World {
     surfaceU.uWetSky.value.copy(k.hor);
     w.uFogNear.value = this.scene.fog.near;
     w.uFogFar.value = this.scene.fog.far;
+    // зыбь в открытом море — по ветру: в ясный день пологая, в дождь лодку качает всерьёз. Одно число и для картинки,
+    // и для лодки с поплавком (waveH)
+    sea.k = 0.55 + W.wind;
+    w.uSwell.value = sea.k;
+    w.uWind.value = W.wind;
     for (const m of this.cloudMat) {
       m.color.copy(k.cloud);
       m.opacity = m.userData.op * (1 - 0.45 * cov) * (1 - fogK);

@@ -4,11 +4,12 @@
 import * as THREE from 'three';
 import { groundH, deckAt, inRocks, BACKWATER, PALM, REEF, ARCH, WRECK } from './terrain.js';
 import { rng, TAU, clamp, damp, angDiff } from './util.js';
-import { waveH } from './water.js';
+import { waveH, seaK, swellMax } from './water.js';
+import { buildDolphins } from './dolphins.js';
 
 const MAX_SHOALS = 24;
 const PER_SHOAL = 40;
-export const SCHOOL_FISH = 54; // первые места в общем меше — рыба косяков, её расставляет scenery.js
+export const SCHOOL_FISH = 72; // первые места в общем меше — рыба косяков (восемь по девять), её расставляет scenery.js
 const LONERS = 12;
 const SUITOR = SCHOOL_FISH + LONERS; // рыба, которая подходит к наживке
 const JUMPERS = 2;
@@ -249,6 +250,7 @@ export class Fauna {
   constructor(scene, piles = []) {
     this.t = 0;
     this.onSplash = null; // (x, z, сила) — рыба сыграла: звук ставит игра
+    this.onBoil = null; // (x, z) — мелочь плеснула над морским косяком
     this.fx = null;
     this.light = { value: 1 };
     const shared = { uWater: { value: new THREE.Color('#2aa6b0') }, uSunCol: { value: new THREE.Color('#fff4d6') }, uLight: this.light, uSun: { value: 1 } };
@@ -257,6 +259,7 @@ export class Fauna {
     this.buildFry(scene, piles, shared, fog);
     this.buildFish(scene, shared, fog);
     this.buildBugs(scene);
+    this.dolphins = buildDolphins(scene); // две стаи в открытом море
     this.meshes = [this.fry, this.fish, this.bugs];
     this.under = [this.fry, this.fish]; // в отражении воды их нет
   }
@@ -580,7 +583,8 @@ export class Fauna {
     }
     // у самой наживки рыба ходит под поверхностью и расходятся круги — их видно и с двадцати метров
     const close = S.st === 'come' && S.r < 1.7;
-    f.y = (close ? -0.17 : -0.3) + waveH(f.x, f.z, this.t) * 0.5;
+    // в бухте рыба идёт за волной вполсилы; на зыби открытого моря — вместе с водой, иначе во впадине волны окажется над ней
+    f.y = (close ? -0.17 : -0.3) + waveH(f.x, f.z, this.t) * (0.5 + 0.5 * seaK(f.x, f.z));
     if (close && this.fx && (S.rip = (S.rip || 0) - dt) <= 0) {
       S.rip = 0.7 + this.rnd() * 0.5;
       this.fx.ripple(f.x, f.z, 0.34, 1.0);
@@ -622,7 +626,7 @@ export class Fauna {
       const nx = f.x + Math.cos(f.yaw) * v * dt, nz = f.z + Math.sin(f.yaw) * v * dt;
       const dep = depthAt(nx, nz);
       if (dep > 0.55 && !inRocks(nx, nz)) { f.x = nx; f.z = nz; } else { o.timer = 0; o.flee = 0; } // упёрлась в мель или камень — выбирает новый путь
-      f.y = -clamp(Math.max(dep, 0.55) * 0.45, 0.28, 0.62) + Math.sin(this.t * 0.4 + f.ph * 0.01) * 0.04;
+      f.y = -clamp(Math.max(dep, 0.55) * 0.45, 0.28, 0.62) + Math.sin(this.t * 0.4 + f.ph * 0.01) * 0.04 - swellMax(f.x, f.z);
       f.amp = 0.1;
       f.ph += dt * (3 + v * 6);
     }
@@ -679,6 +683,26 @@ export class Fauna {
     if (this.fx) this.fx.splash(x, z, p);
     if (this.onSplash) this.onSplash(x, z, p);
   }
+  /**
+   * «Котёл» над морским косяком: мелочь выпрыгивает из воды, по ней бьют чайки — вода под стаей рябит кругами
+   * и брызгами. Рисуется, только если камера не дальше полутора сотен метров.
+   */
+  stepBoil(dt, centers, camera) {
+    if (!this.fx) return;
+    for (const c of centers || []) {
+      if (!c.sea || c.on < 0.5) continue;
+      c.boil = (c.boil || 0) - dt;
+      if (c.boil > 0) continue;
+      c.boil = 0.16 + Math.random() * 0.42;
+      if (Math.hypot(c.x - camera.position.x, c.z - camera.position.z) > 150) continue;
+      const a = Math.random() * TAU, d = Math.sqrt(Math.random()) * 4.4;
+      const x = c.x + Math.cos(a) * d, z = c.z + Math.sin(a) * d;
+      if (Math.random() < 0.3) {
+        this.fx.splash(x, z, 0.12 + Math.random() * 0.2);
+        if (this.onBoil) this.onBoil(x, z);
+      } else this.fx.ripple(x, z, 0.28 + Math.random() * 0.4, 0.9);
+    }
+  }
 
   /**
    * t — время кадра, T и seed — общие часы и число комнаты (всплески у всех одни и те же), centers — косяки.
@@ -719,6 +743,8 @@ export class Fauna {
     this.stepLoners(dt);
     this.stepSuitor(dt);
     this.stepJumps(dt, seed, T, centers, camera);
+    this.stepBoil(dt, centers, camera);
+    this.dolphins.update(dt, t, T, camera, waveH, this.fx);
     // всё в один буфер
     const m = this._m, q = this._q, q2 = this._q2, p = this._p, sv = this._s;
     for (let i = 0; i < MAX_FISH; i++) {

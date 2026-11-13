@@ -318,6 +318,11 @@ export class Audio2 {
     };
     setTimeout(loop, 2500);
   }
+  /** Крик чайки из стаи над косяком: vol — громкость, pan — с какой стороны. Только запись. */
+  gullAt(vol, pan = 0) {
+    if (!this.ctx || vol < 0.01) return;
+    this.one('gull', { vol, rate: rnd(0.94, 1.14), pan, amb: true });
+  }
   gull(t) {
     const c = this.ctx;
     // запись: один-два крика где-то в стороне, каждый раз чуть другой высоты

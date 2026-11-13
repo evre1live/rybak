@@ -188,3 +188,121 @@ test('профиль: счётчик выходов на лодке появля
   assert.equal(fixProfile({ ...newProfile(), boatTrips: 'много' }).boatTrips, 0);
   assert.equal(fixProfile({ ...newProfile(), boatTrips: 3 }).boatTrips, 3);
 });
+
+// ───── открытое море: скалы, вехи, зыбь, дальние острова, дельфины ─────
+const W = await import('../client/water.js');
+const FI = await import('../client/farisles.js');
+const D = await import('../client/dolphins.js');
+
+test('морские косяки и вехи стоят на глубокой воде, и лодка к ним проходит', () => {
+  for (const [x, z] of T.SEA_HOMES) {
+    assert.equal(T.spotAt(x, z).zone, 'sea', `косяк (${x}, ${z}) — в открытом море`);
+    assert.ok(fits(x, z, 0) && fits(x, z, 1.2), `к косяку (${x}, ${z}) можно подойти на лодке`);
+  }
+  // два морских косяка не встают в одну точку: мест хватает
+  assert.ok(T.SEA_HOMES.length >= 4);
+  for (const [x, z] of T.MARKS) {
+    assert.ok(-T.groundH(x, z) > 2.5, `веха (${x}, ${z}) — на воде, а не на мели`); // одна стоит у входа в лагуну Пальмового острова
+    assert.ok(Math.hypot(x - T.SEA.x, z - T.SEA.z) > T.SEA.r, 'вехи стоят в открытом море, а не в бухте');
+    assert.ok(!T.canSail(x, z), 'в веху лодка упирается');
+    assert.ok(T.canSail(x + 6, z) && T.canSail(x - 6, z) && T.canSail(x, z + 6) && T.canSail(x, z - 6), 'а рядом с ней — чистая вода');
+  }
+});
+
+test('скалы в море: камни над водой, под ними отмель с рифовой рыбой, вокруг — море и проход', () => {
+  for (const s of T.SKERRIES) {
+    const [ox, oz, w, tall] = s.rocks[0];
+    assert.ok(tall >= 1, 'главная скала не ниже своего поперечника');
+    assert.ok(!T.canSail(s.x + ox, s.z + oz), `${s.id}: в скалу лодка упирается`);
+    assert.ok(T.groundH(s.x + ox, s.z + oz) > -1.5, `${s.id}: под скалой дно у самой поверхности`);
+    assert.ok(w > 3, 'главная скала — не камешек');
+    // отмель: у камней мелко, рыба рифовая
+    let wet = 0;
+    for (let k = 0; k < 12; k++) {
+      const a = (k / 12) * Math.PI * 2;
+      const near = T.spotAt(s.x + Math.cos(a) * s.r * 0.6, s.z + Math.sin(a) * s.r * 0.6);
+      if (!near) continue; // здесь стоит камень
+      wet++;
+      assert.equal(near.zone, 'reef', `${s.id}: у камней рифовая зона`);
+      assert.ok(near.depth < 8, `${s.id}: у камней отмель, а не глубина (${near.depth.toFixed(1)} м)`);
+    }
+    assert.ok(wet >= 8, `${s.id}: отмель — это вода с камнями, а не остров (${wet} из 12)`);
+    // в сорока метрах за краем отмели — снова открытое море, и туда можно дойти со всех сторон
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2;
+      const x = s.x + Math.cos(a) * (s.r + 40), z = s.z + Math.sin(a) * (s.r + 40);
+      if (x < T.WORLD.x0 + 6 || x > T.WORLD.x1 - 6 || z < T.WORLD.z0 + 6 || z > T.WORLD.z1 - 6) continue; // Западные камни — у самого края карты
+      assert.equal(T.spotAt(x, z).zone, 'sea', `${s.id}: вокруг отмели открытое море`);
+      assert.ok(T.canSail(x, z), `${s.id}: вокруг отмели лодка ходит`);
+    }
+    // скалы — в открытом море, не в бухте и не у других островов
+    assert.ok(Math.hypot(s.x - T.SEA.x, s.z - T.SEA.z) > T.SEA.r + 60, `${s.id}: далеко от бухты`);
+  }
+});
+
+test('зыбь: в бухте её нет вовсе, в открытом море она есть и растёт с ветром', () => {
+  for (const [x, z] of [[T.SPAWN.x, T.SPAWN.z], [0, -40], [T.REEF.x, T.REEF.z], [T.MOORINGS[0].x, T.MOORINGS[0].z]]) {
+    assert.equal(W.seaK(x, z), 0, `в бухте (${x}, ${z}) зыби нет`);
+    assert.equal(W.swellMax(x, z), 0);
+  }
+  assert.equal(W.seaK(300, -300), 1, 'в море зыбь в полную силу');
+  W.sea.k = 0.6;
+  const calm = W.swellMax(300, -300);
+  // высота волны в бухте от силы зыби не зависит
+  const bay = W.waveH(0, -40, 7.3);
+  W.sea.k = 1.4;
+  assert.ok(W.swellMax(300, -300) > calm * 2, 'в ветер зыбь выше');
+  assert.equal(W.waveH(0, -40, 7.3), bay, 'бухту ветер в море не качает');
+  assert.ok(W.swellMax(300, -300) < 0.9, 'но лодку волна не накрывает');
+  W.sea.k = 0.75;
+});
+
+test('дальние острова: настоящая суша далеко за краем моря, до неё не доплыть', () => {
+  assert.ok(FI.FAR_ISLES.length >= 5);
+  // всюду, куда доходит лодка, и ещё на полтораста метров дальше — дальних островов нет
+  let nearest = Infinity;
+  for (let x = T.WORLD.x0 - 400; x <= T.WORLD.x1 + 400; x += 8) {
+    for (let z = T.WORLD.z0 - 400; z <= T.WORLD.z1; z += 8) {
+      if (FI.farH(x, z) < 0) continue;
+      const dx = Math.max(T.WORLD.x0 - x, 0, x - T.WORLD.x1), dz = Math.max(T.WORLD.z0 - z, 0, z - T.WORLD.z1);
+      nearest = Math.min(nearest, Math.hypot(dx, dz));
+    }
+  }
+  assert.ok(nearest > 150, `от края моря до ближайшего дальнего берега ${nearest.toFixed(0)} м`);
+  assert.ok(nearest < 400, 'но острова не за горизонтом: их видно с лодки');
+  for (const I of FI.FAR_ISLES) {
+    assert.ok(FI.farH(I.x, I.z) > 3, `${I.id}: в середине острова суша`);
+    const trees = FI.farTrees(I);
+    assert.ok(trees.length >= 3, `${I.id}: на острове лес`);
+    for (const t of trees) assert.ok(FI.farH(t.x, t.z) > 0.3, `${I.id}: дерево стоит на суше`);
+  }
+  const all = FI.FAR_ISLES.reduce((n, I) => n + FI.farTrees(I).length, 0);
+  assert.ok(all < 1600, `лес на дальних островах не дороже полутора тысяч деревьев (${all})`);
+});
+
+test('дельфины: дорога стай замкнута, идёт по глубокой воде мимо скал, вех и островов', () => {
+  assert.ok(D.WAY_LEN > 1200 && D.WAY_LEN < 2600, `длина петли ${D.WAY_LEN.toFixed(0)} м`);
+  const a = D.wayAt(0), b = D.wayAt(D.WAY_LEN - 0.5);
+  assert.ok(Math.hypot(a.x - b.x, a.z - b.z) < 1, 'петля замкнута');
+  for (let s = 0; s < D.WAY_LEN; s += 2) {
+    const w = D.wayAt(s);
+    assert.ok(Math.abs(Math.hypot(w.dx, w.dz) - 1) < 1e-6, 'направление — единичный вектор');
+    for (const side of [-4, 0, 4]) {
+      const x = w.x - w.dz * side, z = w.z + w.dx * side;
+      assert.ok(-T.groundH(x, z) > 6, `на дороге мелко у (${x.toFixed(0)}, ${z.toFixed(0)})`);
+      assert.ok(T.canSail(x, z), `дорога упирается в преграду у (${x.toFixed(0)}, ${z.toFixed(0)})`);
+      assert.ok(Math.hypot(x - T.SEA.x, z - T.SEA.z) > T.SEA.r + 15, 'в бухту дельфины не заходят');
+      for (const [mx, mz] of T.MARKS) assert.ok(Math.hypot(x - mx, z - mz) > 14, 'веху обходят');
+    }
+  }
+  // стаи идут с одной скоростью и не сходятся; место стаи зависит только от общих часов
+  assert.equal(D.DOLPHINS, D.PODS.reduce((n, p) => n + p.n, 0));
+  for (let T0 = 0; T0 < D.WAY_LEN / D.DOLPHIN_SPEED; T0 += 2) {
+    const [p, q] = D.PODS.map((pod) => D.wayAt(D.podS(pod, T0)));
+    assert.ok(Math.hypot(p.x - q.x, p.z - q.z) > 50, 'стаи не сходятся: одна идёт внешней дорогой, другая — внутренней');
+  }
+  for (const T0 of [0, 1234.5, 98765]) {
+    const s0 = D.podS(D.PODS[0], T0), s1 = D.podS(D.PODS[0], T0 + 1);
+    assert.ok(Math.abs(((s1 - s0 + D.WAY_LEN) % D.WAY_LEN) - D.DOLPHIN_SPEED) < 1e-6, 'за секунду стая проходит свою скорость');
+  }
+});

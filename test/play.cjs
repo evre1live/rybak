@@ -1323,8 +1323,52 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
       return { near, far, back: sc.smallState(), gulls: gulls && gulls.isInstancedMesh ? gulls.count : 0, mirror, both, cam: g.camera.layers.mask, calls: g.gfx.renderer.info.render.calls };
     });
     assert.ok(sm.near.n > 15 && sm.far.shown < sm.near.n * 0.5 && sm.back.shown > sm.far.shown, `издали мелочь не рисуется, вблизи возвращается: ${JSON.stringify(sm)}`);
-    assert.ok(sm.gulls === 5 && sm.mirror > 15 && sm.both > 40 && sm.cam === 3, `чайки одним мешем, мелочь на своём слое: ${JSON.stringify(sm)}`);
+    // чаек 22: пять над бухтой, три живут на Чаячьем камне и две стаи по семь над морскими косяками
+    assert.ok(sm.gulls === 22 && sm.mirror > 15 && sm.both > 40 && sm.cam === 3, `чайки одним мешем, мелочь на своём слое: ${JSON.stringify(sm)}`);
     assert.ok(sm.calls > 20 && sm.calls < 230, `вызовов отрисовки на «низком» у причала: ${sm.calls}`);
+
+    // открытое море: дальние острова — настоящая суша с лесом, над морскими косяками стаи чаек, по морю ходят дельфины
+    await bp.waitForFunction(() => RYBAK.world.scenery.schools.sea.every((c) => c.on > 0.9), null, { timeout: 90000 });
+    const sea = await G(bp, async () => {
+      const g = RYBAK, sc = g.world.scenery, w = (ms) => new Promise((ok) => setTimeout(ok, ms));
+      const names = ['far-crag', 'far-forest-crag', 'far-peak', 'dolphins'].map((n) => { const o = g.scene.getObjectByName(n); return o ? (o.isInstancedMesh ? o.count : o.geometry.attributes.position.count) : 0; });
+      // стаи чаек: над каждым морским косяком птицы есть и держатся рядом с ним
+      const gulls = g.scene.getObjectByName('gulls');
+      const m = new (Object.getPrototypeOf(gulls.matrixWorld).constructor)();
+      const flock = sc.schools.sea.map((c, k) => {
+        let n = 0, far = 0;
+        for (let j = 0; j < 7; j++) {
+          gulls.getMatrixAt(8 + k * 7 + j, m);
+          const e = m.elements;
+          if (Math.hypot(e[0], e[1], e[2]) > 0.5) n++;
+          far = Math.max(far, Math.hypot(e[12] - c.x, e[14] - c.z));
+        }
+        return { n, far, zone: g.areaAt(c.x, c.z) };
+      });
+      // дельфины: минуту общих часов идём рядом с первой стаей
+      const D = g.fauna.dolphins;
+      const keep = D.onLeap, leaps0 = D.state(0).leaps;
+      let heard = 0, top = -9, low = 9, shown = 0;
+      D.onLeap = () => heard++;
+      const cam = { position: { x: 0, y: 2, z: 0 } };
+      for (let T = 1000; T < 1060; T += 0.05) {
+        const p = D.state(T).pods[0];
+        cam.position.x = p.x + 20;
+        cam.position.z = p.z;
+        D.update(0.05, T, T, cam, () => 0, null);
+        shown = Math.max(shown, D.state(T).shown);
+        for (let i = 0; i < 4; i++) { const q = D.poseAt(i, T); top = Math.max(top, q.y); low = Math.min(low, q.y); }
+      }
+      D.onLeap = keep;
+      const areas = [g.areaAt(96 + 30, -348), g.areaAt(338, 22 + 40), g.areaAt(-262 + 20, -52), g.areaAt(300, -300), g.areaAt(-2, -30)];
+      await w(200);
+      return { names, flock, dol: { n: D.state(0).n, shown, leaps: D.state(0).leaps - leaps0, heard, top, low }, areas };
+    });
+    assert.ok(sea.names.every((n) => n > 0) && sea.names[3] === 7, `дальние острова с лесом и дельфины стоят в сцене: ${JSON.stringify(sea.names)}`);
+    assert.ok(sea.flock.length === 2 && sea.flock.every((f) => f.n === 7 && f.far < 25 && f.zone === 'sea'), `над каждым морским косяком кружит стая: ${JSON.stringify(sea.flock)}`);
+    assert.ok(sea.dol.shown >= 4 && sea.dol.leaps >= 3 && sea.dol.heard === sea.dol.leaps, `дельфины идут стаей и прыгают: ${JSON.stringify(sea.dol)}`);
+    assert.ok(sea.dol.top > 1.2 && sea.dol.low < -0.9, `в прыжке дельфин целиком над водой, между выходами — на глубине: ${JSON.stringify(sea.dol)}`);
+    assert.deepEqual(sea.areas, ['teeth', 'gullrock', 'westrocks', 'sea', 'bay'], 'у скал в море — свои названия мест');
     assert.ok(!bp.__err, 'ошибки на странице (загрузка и скорость)');
     await ctx.close();
   }

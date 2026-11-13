@@ -122,7 +122,9 @@ const view = (page) => G(page, () => {
       assert.ok(!p.__err, `${what}, ${name}: ошибок на странице нет`);
     }
     // связь работает в обе стороны: положения, чат, события
-    const x0 = await G(b, () => [...RYBAK.players.values()][0].st && [...RYBAK.players.values()][0].st[0]);
+    // сначала дожидаемся первого положения друга после возвращения: без него сравнивать не с чем
+    await b.waitForFunction(() => { const st = [...RYBAK.players.values()][0].st; return st && Number.isFinite(st[0]); }, null, { timeout: 20000 });
+    const x0 = await G(b, () => [...RYBAK.players.values()][0].st[0]);
     await G(a, () => { const pl = RYBAK.player; pl.place(pl.x + 1.5, pl.z, pl.yaw); });
     await b.waitForFunction((x) => { const st = [...RYBAK.players.values()][0].st; return st && Math.abs(st[0] - x) > 1; }, x0, { timeout: 20000 });
     const stamp = what + ' ' + Date.now();
@@ -184,8 +186,9 @@ const view = (page) => G(page, () => {
   // ───── все ушли: комната ждёт четверть часа и в базе; сервер перезапустили — по ссылке она находится ─────
   await G(a, () => RYBAK.net.send({ t: 'tour', a: 'stop' }));
   await b.waitForFunction(() => !RYBAK.tour, null, { timeout: 20000 });
-  await a.close();
+  // первой уходит гостья: уйди первым хозяин — комната успела бы перейти к ней, и ждали бы после перезапуска уже её
   await b.close();
+  await a.close();
   await new Promise((r) => setTimeout(r, 2600));
   server.kill('SIGTERM');
   await server.exited;
