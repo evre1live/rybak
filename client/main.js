@@ -13,17 +13,17 @@ import { ViewModel } from './viewmodel.js';
 import { Input, Player } from './player.js';
 import { Fishing } from './fishing.js';
 import { Fx } from './fx.js';
-import { Boat, BOAT_PRICE, Ride, BOAT_SEATS } from './boat.js';
+import { Boat, BOAT_PRICE, Ride, BOAT_SEATS, VMAX } from './boat.js';
 import { Remote } from './remote.js';
 import { Net } from './net.js';
 import { createVoice } from './voice.js';
-import { Audio2 } from './audio.js';
+import { Audio2, MOTOR_FAR } from './audio.js';
 import { UI } from './ui.js';
 import { loadProfile, saveProfile, saveProfileNow, lockProfile, hooks as profileHooks, settings, saveSettings, session } from './profile.js';
 import { Cloud } from './cloud.js';
 import { S, FLAG, MARKS } from './proto.js';
 import { cardText, cardFile, drawCard } from './postcard.js';
-import { DECK_Y, MARKET, MOORINGS, RENT_DESK, MAP_VIEW, WRECK, SEA, ISLAND, palmR, canStand, FALLS, CAMPFIRE } from './terrain.js';
+import { DECK_Y, MARKET, MOORINGS, RENT_DESK, MAP_VIEW, WRECK, SEA, ISLAND, WORLD, palmR, canStand, FALLS, CAMPFIRE } from './terrain.js';
 import { ITEMS, FISH_BY_ID, JUNK, JUNK_BY_ID, RARITY, ZONES, BAITS, LURES, clockHours, dayPart, fmtW, fmtCoins, isLure } from '../shared/data.js';
 import {
   marketState, hashStr, buy, equip, sell, kitStats, levelInfo, tackleCount, fishValue, newProfile, speciesWeights,
@@ -38,6 +38,7 @@ import { initCache, wakeServer } from './offline.js';
 
 const SPAWNS = [[-2, 9], [0.6, 9.4], [-4, 8.2], [2.6, 8.6], [-1, 11], [1.6, 11.4], [-3.6, 11], [3.6, 10.4]];
 const LINE_Z = 7;
+const BUMP_FAR = 80; // с какого расстояния слышен удар чужой лодки о преграду, м
 const WARM_FISH = 'plotva'; // на этой модели собираются шейдеры для всей рыбы (у моделей рыб материалы устроены одинаково)
 // почему рыбу друга сейчас не взять подсаком (ответ его игры на нашу просьбу; правила — assistBlock в logic.js)
 const ASSIST_NO = {
@@ -131,15 +132,11 @@ class Game {
     this.fx = new Fx(this.scene);
     // лодка напрокат: стоит у пирса, пока её не возьмут
     this.boat = new Boat(this.scene, this.fx);
-    this.boat.onBump = (sp, edge) => {
-      // 1,2 м/с — порог удара, от 7 м/с и выше — в полную силу. У края карты преграды нет: там лодку разворачивает волна
-      if (edge) {
-        this.audio.splash(0.8);
-        this.audio.thud(0);
-      } else this.audio.thud(clamp((sp - 1.2) / 6, 0, 1));
-      this.player.shake = Math.max(this.player.shake, Math.min(1, sp / 8));
-      this.rumble(120, 0.7);
+    this.boat.onBump = (sp, edge, x, z) => {
+      this.boatBump(sp, edge, x, z, true);
       if (edge) this.ui.toast('Дальше — только океан. Поворачиваем назад', '', 2600);
+      // удар слышат и чувствуют пассажиры, слышат все, кто рядом
+      this.ev('boat', { k: 'bump', s: Math.round(sp * 10) / 10, e: edge ? 1 : 0, x: Math.round(x * 10) / 10, z: Math.round(z * 10) / 10 });
     };
     // мягкий свет от камеры на экране команды и в редакторе: лица не должны тонуть в тени, когда солнце сзади
     // Погашенная, она остаётся среди источников света: набор источников у сцены один на всю игру (см. setNight в scenery.js)
@@ -751,6 +748,7 @@ class Game {
     this.ride = null;
     this.player.boat = null;
     this.audio.motor(-1);
+    this.audio.hush();
   }
 
   // ───── общая лодка: друг берёт пассажиров ─────
@@ -833,6 +831,50 @@ class Game {
     this.audio.step(true, true);
     this.ev('boat', { k: 'off' });
     this.ui.toast(forced ? `Лодка ушла из-под вас — вы на причале: ${m.name}` : `${m.name}. Вы на причале`, forced ? '' : 'good', 3200);
+  }
+  /** Мотор чужой лодки слышен неподалёку — ближайшей из тех, где сидит хозяин; лодка, в которой едем сами, уже звучит. */
+  hearBoats() {
+    const pl = this.player;
+    let bd = MOTOR_FAR, bx = 0, bz = 0, bk = -1;
+    for (const p of this.players.values()) {
+      const r = p.remote;
+      if (p.mode !== 'world' || !p.st || !r.boat || (p.st[S.BOAT] | 0) !== 1 || (this.ride && this.ride.id === p.id)) continue;
+      const g = r.boat.group.position;
+      const d = Math.hypot(g.x - pl.x, g.z - pl.z);
+      if (d < bd) {
+        bd = d;
+        bx = g.x - pl.x;
+        bz = g.z - pl.z;
+        bk = Math.abs(r.bv) / VMAX;
+      }
+    }
+    this.audio.motorNear(bk, bd, bk >= 0 && bd > 0.01 ? (bx * Math.cos(pl.yaw) - bz * Math.sin(pl.yaw)) / bd : 0);
+  }
+  /**
+   * Лодка ударилась о преграду: на ходу sp (м/с), местом x, z; edge — у края карты, где преграды нет, а лодку разворачивает волна.
+   * aboard — мы в этой лодке, за рулём или пассажиром: удар в полную силу, камеру встряхивает, геймпад и телефон вздрагивают.
+   * Со стороны он тем тише и глуше, чем дальше, и слышен с той стороны, где случился. from — чья лодка (0 — своя).
+   */
+  boatBump(sp, edge, x, z, aboard, from = 0) {
+    // 1,2 м/с — порог удара, от 7 м/с и выше — в полную силу
+    const p = edge ? 0 : clamp((sp - 1.2) / 6, 0, 1);
+    const pl = this.player;
+    const dx = x - pl.x, dz = z - pl.z;
+    const d = Math.hypot(dx, dz);
+    const o = { vol: 1, pan: 0, from };
+    if (!aboard) {
+      const k = clamp(1.1 - d / BUMP_FAR, 0, 1);
+      o.vol = k * k;
+      // взгляд игрока — вдоль (−sin yaw, −cos yaw); справа от него — (cos yaw, −sin yaw)
+      o.pan = d > 0.01 ? ((dx * Math.cos(pl.yaw) - dz * Math.sin(pl.yaw)) / d) * Math.min(1, d / 6) * 0.75 : 0;
+    }
+    const hit = this.audio.thud(p, o);
+    if (edge && hit && o.vol > 0.02) this.audio.splash(0.8, o.vol);
+    // брызги от удара видны всем, кто смотрит: у края карты — от волны, у преграды — только от сильного удара
+    if (hit && (edge || hit === 2) && d < 160) this.fx.splash(x, z, edge ? 0.8 : 0.35 + 0.5 * p);
+    if (!aboard) return;
+    pl.shake = Math.max(pl.shake, Math.min(1, sp / 8));
+    this.rumble(120, 0.7);
   }
   /** Каждый кадр, пока мы пассажир: лодку хозяина ставим раньше своей камеры, чтобы сидеть в ней без отставания. */
   rideStep(dt, pnow, tw) {
@@ -1421,6 +1463,16 @@ class Game {
         this.audio.step(true, true);
       } else if (host) this.ui.feed(`${name} садится в лодку к <b>${esc(host.card.name)}</b>`);
     } else if (m.k === 'boat' && d.k === 'off') this.ui.feed(`${name} сходит на причал`);
+    else if (m.k === 'boat' && d.k === 'bump' && this.state === 'world' && p.mode === 'world') {
+      // чужая лодка ударилась о преграду: место берём из сообщения, а если его нет — там, где сейчас сама лодка
+      const sp = clamp(Number(d.s) || 0, 0, VMAX);
+      const g = p.remote.boat ? p.remote.boat.group.position : null;
+      const x = Number.isFinite(d.x) ? clamp(d.x, WORLD.x0, WORLD.x1) : g ? g.x : null;
+      const z = Number.isFinite(d.z) ? clamp(d.z, WORLD.z0, WORLD.z1) : g ? g.z : null;
+      const aboard = !!this.ride && this.ride.id === p.id;
+      if (sp > 1.2 && x != null && z != null) this.boatBump(sp, !!d.e, x, z, aboard, p.id);
+      if (aboard && d.e) this.ui.toast('Дальше — только океан. Лодка поворачивает назад', '', 2600);
+    }
   }
 
   // ───── помощь друга: подсачить чужую рыбу ─────
@@ -1919,6 +1971,7 @@ class Game {
       if (this.ride) this.rideStep(dt, pnow, tw);
       // мотор слышно и пассажиру — пока хозяин в лодке
       this.audio.motor(boat.active ? Math.abs(boat.k) : this.ride && this.ride.moored < 0 ? Math.abs(this.ride.k) : -1);
+      this.hearBoats();
       // в лодке время от времени поскрипывает дерево
       if (boat.active || this.ride) {
         this.creakT = (this.creakT || 4) - dt;

@@ -206,7 +206,51 @@ const db = (v) => 20 * Math.log10(v + 1e-9);
     await page.waitForTimeout(1800);
     const back = await page.evaluate(() => RYBAK.audio.back.gain.value);
     assert.ok(back > 0.97, `после удара море и музыка возвращаются — ${back}`);
+    // удар чужой лодки: со стороны он тише, глуше и слышен с той стороны, где случился; удары подряд у каждой лодки считаются отдельно
+    const vias = () => page.evaluate(() => {
+      const a = RYBAK.audio;
+      if (!a.__vias) {
+        a.__vias = [];
+        const v0 = a.via;
+        a.via = function (vol, pan, lp) { a.__vias.push([vol, pan, lp]); return v0.apply(this, arguments); };
+      }
+      return a.__vias.splice(0);
+    });
+    const backNow = (ms) => page.evaluate((ms) => new Promise((ok) => setTimeout(() => ok(RYBAK.audio.back.gain.value), ms)), ms);
+    await reset();
+    await page.evaluate(() => { RYBAK.audio.thudFrom = {}; });
+    await vias();
+    const far = await played('return a.thud(0.9, { vol: 0.25, pan: -0.6, from: 7 })');
+    const farVia = await vias();
+    assert.equal(far.ret, 2, `чужая лодка: первый сильный удар — сильный: ${JSON.stringify(far)}`);
+    assert.deepEqual(far.out.map(base), ['bump', 'splash', 'splash'], `чужая лодка: тот же состав звука — ${JSON.stringify(far)}`);
+    assert.ok(far.synth.tone === 1 && far.ones[0][1].dest, `чужая лодка: всё играет в отдельный выход — ${JSON.stringify(far)}`);
+    assert.deepEqual(farVia, [[0.25, -0.6, 2850]], `чужая лодка: выход тише, левее и глуше — ${JSON.stringify(farVia)}`);
+    const farDip = await backNow(80);
+    assert.ok(farDip > 0.97, `дальний удар не заслоняет море и музыку — ${farDip}`);
+    const own = await played('return a.thud(0.9)');
+    assert.ok(own.ret === 2 && !own.ones[0][1].dest && (await vias()).length === 0, `свой удар сразу за чужим — в полную силу и в общий выход: ${JSON.stringify(own)}`);
+    const far2 = await played('return a.thud(0.9, { vol: 0.25, pan: -0.6, from: 7 })');
+    assert.ok(far2.ret === 0 && far2.out.length === 0 && far2.synth.tone + far2.synth.burst === 0, `та же чужая лодка упирается: удар сразу за ударом не слышен — ${JSON.stringify(far2)}`);
+    const far3 = await played('return a.thud(0.9, { vol: 0.25, pan: 0.4, from: 8 })');
+    assert.equal(far3.ret, 2, `другая лодка — свой счёт ударов: ${JSON.stringify(far3)}`);
+    await page.evaluate(() => { RYBAK.audio.thudFrom[7].thudHeard -= 1.2; });
+    const far4 = await played('return a.thud(0.9, { vol: 0.25, pan: -0.6, from: 7 })');
+    assert.ok(far4.ret === 1 && far4.ones[0][1].lp > 0 && far4.ones[0][1].dest, `чужая лодка упирается дальше: редкий глухой толчок — ${JSON.stringify(far4)}`);
+    await vias();
+    const none = await played('return a.thud(0.9, { vol: 0.002, pan: 0.5, from: 9 })');
+    assert.ok(none.ret === 0 && none.out.length === 0 && (await vias()).length === 0, `удар за пределами слышимости не играет ничего — ${JSON.stringify(none)}`);
+    await page.waitForTimeout(1800);
+    const near = await played('return a.thud(0.9, { vol: 0.6, pan: 0, from: 10 })');
+    const nearVia = await vias();
+    const nearDip = await backNow(80);
+    assert.ok(near.ret === 2 && nearVia.length === 1 && nearVia[0][2] === 6000, `удар неподалёку: чуть глуше — ${JSON.stringify(nearVia)}`);
+    assert.ok(nearDip > 0.62 && nearDip < 0.9, `удар неподалёку заслоняет море слабее своего — ${nearDip}`);
+    const ride = await played('return a.thud(0.9, { vol: 1, pan: 0, from: 11 })');
+    assert.ok(ride.ret === 2 && !ride.ones[0][1].dest && (await vias()).length === 0, `пассажиру удар слышен как рулевому: в полную силу, без отдельного выхода — ${JSON.stringify(ride)}`);
+    await page.waitForTimeout(1800);
     console.log(`  удар лодки: в каждой из ${man.sfx.bump.length} записей один удар; сильный — с низким толчком, брызгами и откатом волны, повторный и слабый — глухие`);
+    console.log('  удар чужой лодки: со стороны — тише, глуше и с нужной стороны; счёт ударов подряд у каждой лодки свой; пассажиру — в полную силу');
   }
   // составные: заброс (запись и щелчки катушки), монеты горстью, улов без подсака (два шлепка), чайка
   const cast = await played('a.cast()');
@@ -244,6 +288,29 @@ const db = (v) => 20 * Math.log10(v + 1e-9);
   if (man.loops.motor) {
     const p = await page.evaluate(() => { const s = RYBAK.audio.beds.motor.src; return { loop: s.loop, ls: s.loopStart, le: s.loopEnd }; });
     assert.deepEqual(p, { loop: true, ls: man.loops.motor.start, le: man.loops.motor.end }, 'у петли мотора — точки из описи');
+  }
+  // мотор чужой лодки: вторая такая же петля — играет сама по себе, рядом со своим мотором, запись у них одна
+  if (man.loops.motor) {
+    await page.evaluate(() => { RYBAK.hearBoats = () => {}; RYBAK.audio.motorNear(0.5, 14, 1); }); // игра сама зовёт motorNear каждый кадр — на время проверки отключаем
+    await page.waitForFunction(() => RYBAK.audio.beds.motor2 && RYBAK.audio.beds.motor2.st === 2, null, { timeout: 15000 });
+    await page.evaluate(() => RYBAK.audio.motorNear(0.5, 14, 1));
+    await page.waitForTimeout(1500);
+    const m2 = await page.evaluate(() => { const a = RYBAK.audio; const L = a.beds.motor2; return { on: !!L.src, own: !!a.beds.motor.src, same: L.buf === a.beds.motor.buf, two: L.src !== a.beds.motor.src, gain: L.g.gain.value, pan: L.pan ? L.pan.pan.value : null, rate: L.src.playbackRate.value, loop: L.src.loop, files: Object.keys(a.loopBuf).length, beds: Object.keys(a.beds).length }; });
+    // 14 м из 70: (1 − 0,2)² × (0,3 + 0,45 × 0,5) = 0,336; справа, дальше шести метров — 0,75
+    assert.ok(m2.on && m2.own && m2.same && m2.two && m2.loop, `мотор чужой лодки — отдельная петля из той же записи: ${JSON.stringify(m2)}`);
+    assert.ok(Math.abs(m2.gain - 0.336) < 0.02 && Math.abs(m2.pan - 0.75) < 0.02 && Math.abs(m2.rate - 1.03) < 0.02, `мотор чужой лодки: громкость по расстоянию, сторона и высота по ходу — ${JSON.stringify(m2)}`);
+    assert.ok(m2.files < m2.beds, `две петли из одного файла грузят его один раз: файлов ${m2.files}, петель ${m2.beds}`);
+    await page.evaluate(() => RYBAK.audio.motorNear(1, 69, -1));
+    await page.waitForTimeout(1500);
+    const edge = await page.evaluate(() => RYBAK.audio.beds.motor2.g.gain.value);
+    assert.ok(edge < 0.002, `на краю слышимости чужой мотор почти не слышен — ${edge}`);
+    await page.evaluate(() => RYBAK.audio.motorNear(0.5, 14, 1));
+    await page.waitForTimeout(1200);
+    await page.evaluate(() => RYBAK.audio.hush());
+    await page.waitForTimeout(1500);
+    const hush = await page.evaluate(() => { const a = RYBAK.audio; return { m2: a.beds.motor2.g.gain.value, fall: a.beds.waterfall ? a.beds.waterfall.g.gain.value : 0, fire: a.beds.fire ? a.beds.fire.g.gain.value : 0 }; });
+    assert.ok(hush.m2 < 0.01 && hush.fall < 0.01 && hush.fire < 0.01, `ушли из мира — чужой мотор и звуки мест смолкли: ${JSON.stringify(hush)}`);
+    console.log('  мотор чужой лодки: отдельная петля из той же записи, громкость по расстоянию, смолкает при выходе из мира');
   }
   await page.evaluate(() => { const a = RYBAK.audio; a.motor(-1); a.rain(0, 0.2); a.night = 0; });
   assert.ok(!page.__err, 'ошибок на странице нет');

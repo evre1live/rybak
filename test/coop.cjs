@@ -282,6 +282,96 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
   assert.ok(await G(b, () => Math.hypot(RYBAK.player.x + 17.5, RYBAK.player.z + 70.7) < 2));
   console.log('  общая лодка: посадка, ход, заброс с борта, высадка у маяка, сдача лодки хозяином');
 
+  // удар лодки о преграду: рулевой слышит и чувствует его сам, пассажирка — так же, подруга на берегу — тише и со своей стороны
+  {
+    // у обоих записываем, что дошло до звука, брызг, тряски и вибрации
+    const spy = (page) => G(page, () => {
+      const g = RYBAK;
+      g.__bumps = [];
+      g.__motor = [];
+      const bb = g.boatBump.bind(g);
+      g.boatBump = (sp, edge, x, z, aboard, from) => {
+        const rec = { sp, edge, x, z, aboard, from: from || 0, thud: null, hit: -1, splash: 0, rumble: 0, shake0: g.player.shake };
+        const a = g.audio, t0 = a.thud, f0 = g.fx.splash, r0 = g.rumble;
+        a.thud = function (p, o) { rec.thud = { p, ...(o || {}) }; return (rec.hit = t0.apply(this, arguments)); };
+        g.fx.splash = function () { rec.splash++; return f0.apply(this, arguments); };
+        g.rumble = function () { rec.rumble++; };
+        try { bb(sp, edge, x, z, aboard, from); } finally { a.thud = t0; g.fx.splash = f0; g.rumble = r0; }
+        rec.shake = g.player.shake;
+        rec.me = [g.player.x, g.player.z, g.player.yaw];
+        g.__bumps.push(rec);
+      };
+      const m0 = g.audio.motorNear.bind(g.audio);
+      g.audio.motorNear = (k, d, side) => { g.__motor = [k, d, side]; return m0(k, d, side); };
+    });
+    await spy(a);
+    await spy(b);
+    await G(a, () => { const g = RYBAK; g.profile.coins = Math.max(g.profile.coins, 500); g.fishing.reelIn(true); g.player.place(0.9, -12, -Math.PI / 2); });
+    await a.waitForFunction(() => /ЛОДКА НАПРОКАТ/.test(document.querySelector('#prompt').textContent), null, { timeout: 20000 });
+    await G(a, () => RYBAK.input.pressed.add('KeyE'));
+    await a.waitForFunction(() => RYBAK.boat.active);
+    await G(b, () => { const g = RYBAK; g.fishing.reelIn(true); g.player.place(0.9, -12, -Math.PI / 2); });
+    await b.waitForFunction(() => /СЕСТЬ В ЛОДКУ — ЖАМШИД/.test(document.querySelector('#prompt').textContent), null, { timeout: 20000 });
+    await G(b, () => RYBAK.input.pressed.add('KeyE'));
+    await b.waitForFunction(() => RYBAK.ride && RYBAK.player.boat === RYBAK.ride);
+    // пока едем в лодке друга, её мотор — «свой»: отдельного чужого мотора рядом нет
+    await b.waitForFunction(() => RYBAK.__motor[0] === -1, null, { timeout: 10000 });
+    // куда править, чтобы метрах в двадцати–шестидесяти упереться в берег, а до него шла чистая вода
+    const aim = await G(a, () => {
+      const b = RYBAK.boat;
+      for (let d = 20; d <= 60; d += 2) for (let k = 0; k < 36; k++) {
+        const yaw = (k / 36) * Math.PI * 2;
+        const at = (e) => b.fits(b.x - Math.sin(yaw) * e, b.z - Math.cos(yaw) * e, yaw);
+        if (at(d)) continue;
+        let free = true;
+        for (let e = 1; e <= d - 2; e += 1) free = free && at(e);
+        if (free) return { yaw, d };
+      }
+      return null;
+    });
+    assert.ok(aim, 'нашли, во что упереться');
+    const ram = () => G(a, (yaw) => { const g = RYBAK; g.boat.yaw = yaw; g.boat.v = 9; g.input.keys.add('KeyW'); }, aim.yaw);
+    await ram();
+    await a.waitForFunction(() => RYBAK.__bumps.length > 0, null, { timeout: 40000 });
+    await b.waitForFunction(() => RYBAK.__bumps.length > 0, null, { timeout: 20000 });
+    await G(a, () => RYBAK.input.keys.delete('KeyW'));
+    const [ha, hb] = [await G(a, () => RYBAK.__bumps[0]), await G(b, () => RYBAK.__bumps[0])];
+    assert.ok(ha.aboard && ha.from === 0 && !ha.edge && ha.sp > 7 && ha.hit === 2 && ha.thud.p > 0.9 && ha.thud.vol === 1 && ha.splash === 1 && ha.rumble === 1 && ha.shake > 0.8, `рулевой: сильный удар, брызги, тряска и вибрация — ${JSON.stringify(ha)}`);
+    assert.ok(hb.aboard && hb.from === aId && !hb.edge && Math.abs(hb.sp - ha.sp) < 0.06 && hb.hit === 2 && hb.thud.vol === 1 && hb.thud.pan === 0 && hb.splash === 1 && hb.rumble === 1 && hb.shake > 0.8, `пассажирка: тот же удар в полную силу, брызги, тряска и вибрация — ${JSON.stringify(hb)}`);
+    assert.ok(Math.hypot(hb.x - ha.x, hb.z - ha.z) < 0.11, `место удара у пассажирки то же: ${JSON.stringify([ha.x, ha.z, hb.x, hb.z])}`);
+    // удар пришёлся носом: метрах в двух перед серединой лодки, по курсу
+    const bow = await G(a, () => [RYBAK.boat.x, RYBAK.boat.z]);
+    assert.ok(Math.hypot(ha.x - bow[0], ha.z - bow[1]) < 6, `удар — у носа лодки: ${JSON.stringify([ha.x, ha.z, bow])}`);
+
+    // пассажирка сходит домой и слышит следующий удар уже со стороны
+    await a.waitForFunction(() => Math.abs(RYBAK.boat.v) < 1.5, null, { timeout: 20000 });
+    await G(b, () => RYBAK.leaveRide(0));
+    await b.waitForFunction(() => !RYBAK.ride && RYBAK.player.onDeck);
+    await G(b, () => RYBAK.player.place(-2, 9, 0)); // и отходит на пляж, метров на двадцать от места удара
+    // теперь лодка друга — чужая: её мотор слышен отсюда, пока она в пределах слышимости
+    await b.waitForFunction(() => RYBAK.__motor[0] >= 0 && RYBAK.__motor[1] < 70, null, { timeout: 20000 });
+    await a.waitForTimeout(2700); // звук считает удары подряд по настоящим часам: ждём, пока прошлый «забудется»
+    await G(a, () => { RYBAK.__bumps.length = 0; });
+    await G(b, () => { RYBAK.__bumps.length = 0; });
+    await ram();
+    await a.waitForFunction(() => RYBAK.__bumps.length > 0, null, { timeout: 40000 });
+    await b.waitForFunction(() => RYBAK.__bumps.length > 0, null, { timeout: 20000 });
+    await G(a, () => RYBAK.input.keys.delete('KeyW'));
+    const hc = await G(b, () => RYBAK.__bumps[0]);
+    const dx = hc.x - hc.me[0], dz = hc.z - hc.me[1];
+    const dist = Math.hypot(dx, dz);
+    const k = Math.max(0, Math.min(1, 1.1 - dist / 80));
+    const side = ((dx * Math.cos(hc.me[2]) - dz * Math.sin(hc.me[2])) / dist) * 0.75;
+    assert.ok(!hc.aboard && hc.from === aId && dist > 10 && dist < 75, `подруга на берегу, удар в стороне: ${JSON.stringify(hc)}`);
+    assert.ok(Math.abs(hc.thud.vol - k * k) < 0.01 && hc.thud.vol > 0.02 && hc.thud.vol < 0.98, `со стороны удар тише — по расстоянию ${dist.toFixed(1)} м: ${hc.thud.vol} (ждали ${(k * k).toFixed(3)})`);
+    assert.ok(Math.abs(hc.thud.pan - side) < 0.01, `и слышен с той стороны, где случился: ${hc.thud.pan} (ждали ${side.toFixed(3)})`);
+    assert.ok(hc.hit === 2 && hc.splash === 1 && hc.rumble === 0 && hc.shake === hc.shake0, `на берегу — звук и брызги, без тряски и вибрации: ${JSON.stringify(hc)}`);
+    // хозяин сдаёт лодку — чужого мотора больше не слышно
+    await G(a, () => RYBAK.goHome());
+    await b.waitForFunction(() => RYBAK.__motor[0] === -1, null, { timeout: 20000 });
+    console.log(`  удар лодки: рулевой и пассажирка — в полную силу, с тряской; с берега за ${dist.toFixed(0)} м — громкость ${hc.thud.vol.toFixed(2)}, сторона ${hc.thud.pan.toFixed(2)}; мотор чужой лодки слышен рядом`);
+  }
+
   // турнир: объявляет хозяин комнаты, улов гостьи идёт в зачёт у обоих, по итогам — приз
   await G(b, () => RYBAK.input.pressed.add('KeyT'));
   await b.waitForSelector('.tourp');

@@ -36,6 +36,7 @@ const HULLS = {
 export const BOAT_SEATS = 2; // сколько пассажиров берёт лодка
 export const VMAX = 12.5; // полный ход, м/с
 const VREV = 3.2; // задний ход
+const BUMP_AT = 2.1; // от середины лодки до места, которым она ударяется о преграду, м
 
 /** Простой корпус, пока модель не загрузилась (и в пробной версии без моделей). */
 function fallbackHull() {
@@ -387,7 +388,9 @@ export class Boat {
       const edge = nx < WORLD.x0 + 4 || nx > WORLD.x1 - 4 || nz < WORLD.z0 + 4 || nz > WORLD.z1 - 4;
       if (sp > 1.2 && this.bump <= 0) {
         this.bump = 0.6;
-        this.onBump(sp, edge);
+        // куда пришёлся удар: носом на переднем ходу, кормой — на заднем
+        const s = Math.sign(this.v) * BUMP_AT;
+        this.onBump(sp, edge, this.x - Math.sin(this.yaw) * s, this.z - Math.cos(this.yaw) * s);
       }
       this.v = -this.v * 0.3;
     }

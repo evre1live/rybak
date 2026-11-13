@@ -19,6 +19,7 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 const THUD_HARD = 0.3; // удар лодки сильнее этого — «столкновение», слабее — глухой толчок
 const THUD_AGAIN = 2.5; // секунд после удара следующие считаются «всё ещё упираемся» и звучат глухо
 const THUD_GAP = 1.1; // …и не чаще, чем раз в столько секунд
+export const MOTOR_FAR = 70; // с какого расстояния слышен мотор чужой лодки, м
 // где в записи трещотки начинаются отдельные щелчки (секунды) — из неё же берутся одиночные щелчки подмотки
 const REEL_CLICKS = [0.021, 0.064, 0.107, 0.16, 0.213, 0.267, 0.32, 0.373, 0.416, 0.48, 0.565, 0.629, 0.704];
 
@@ -58,7 +59,9 @@ export class Audio2 {
     this.mus.connect(this.back);
     this.buf = {};
     this.beds = {}; // петли: имя → { st, buf, src, g, pan, idle }
+    this.loopBuf = {}; // записи петель: файл → обещание записи; две петли из одного файла грузят его один раз
     this.lastV = {}; // какой вариант звука играл в прошлый раз — чтобы не повторять подряд
+    this.thudFrom = {}; // удары чужих лодок: номер игрока → когда был последний и когда его было слышно
     this.loadSamples();
     const len = c.sampleRate * 2;
     this.noise = c.createBuffer(1, len, c.sampleRate);
@@ -114,10 +117,10 @@ export class Audio2 {
   /**
    * Короткий звук name из общей дорожки. vol — громкость, rate — скорость (и высота), delay — через сколько, pan — левее (−1)
    * или правее (1), amb — играть как звук окружения (его громкость — ползунок «Море, чайки, ветер»), v — номер варианта,
-   * lp — срезать всё выше стольких герц (звук становится глухим).
+   * lp — срезать всё выше стольких герц (звук становится глухим), dest — куда играть вместо общего выхода (см. via).
    * Вариантов несколько — берётся случайный, но не тот, что в прошлый раз. Нет записи — false: тогда вызывающий играет синтез.
    */
-  one(name, { vol = 1, rate = 1, delay = 0, pan = 0, amb = false, v = -1, lp = 0 } = {}) {
+  one(name, { vol = 1, rate = 1, delay = 0, pan = 0, amb = false, v = -1, lp = 0, dest = null } = {}) {
     const list = SFX[name];
     const b = this.ctx && this.buf.sfx;
     if (!list || !b) return false;
@@ -148,23 +151,50 @@ export class Audio2 {
       out.pan.value = pan;
       g.connect(out);
     }
-    out.connect(amb ? this.amb : this.sfx);
+    out.connect(dest || (amb ? this.amb : this.sfx));
     s.start(c.currentTime + delay, at, dur);
     return true;
+  }
+  /**
+   * Выход для звука со стороны: vol — громкость, pan — левее (−1) или правее (1), lp — срезать всё выше стольких герц
+   * (0 — не срезать). Дальний звук тише и глуше. Всё, что сыграно в этот выход (dest у one, play, tone и burst), звучит как одно целое.
+   */
+  via(vol = 1, pan = 0, lp = 0) {
+    const c = this.ctx;
+    const g = c.createGain();
+    g.gain.value = vol;
+    let out = g;
+    if (lp) {
+      const f = c.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = lp;
+      f.Q.value = 0.5;
+      out.connect(f);
+      out = f;
+    }
+    if (pan && c.createStereoPanner) {
+      const sp = c.createStereoPanner();
+      sp.pan.value = pan;
+      out.connect(sp);
+      out = sp;
+    }
+    out.connect(this.sfx);
+    return g;
   }
   /**
    * Петля name: vol — громкость (0 — молчит), rate — скорость, pan — левее или правее, sfx — играть как звук рыбалки
    * (иначе — как звук окружения), tc — за сколько секунд громкость дойдёт до заданной. Запись подгружается, когда петля
    * впервые понадобилась. Пока записи нет (или её нет вовсе) — false: тогда вызывающий играет синтез.
+   * key — имя второй такой же петли, которая звучит сама по себе (мотор чужой лодки рядом со своим): запись у них общая.
    */
-  bed(name, vol, { rate = 1, pan = 0, sfx = false, tc = 0.4 } = {}) {
+  bed(name, vol, { rate = 1, pan = 0, sfx = false, tc = 0.4, key = name } = {}) {
     const m = LOOPS[name];
     if (!m || !this.ctx) return false;
-    const L = this.beds[name] || (this.beds[name] = { st: 0, buf: null, src: null, g: null, pan: null, idle: 0 });
+    const L = this.beds[key] || (this.beds[key] = { st: 0, buf: null, src: null, g: null, pan: null, idle: 0 });
     if (L.st === 0) {
       if (vol <= 0.001) return false;
       L.st = 1;
-      this.fetchBuf('audio/' + m.file).then((b) => {
+      (this.loopBuf[m.file] || (this.loopBuf[m.file] = this.fetchBuf('audio/' + m.file))).then((b) => {
         L.buf = b;
         L.st = b ? 2 : 3;
       });
@@ -208,9 +238,10 @@ export class Audio2 {
   }
   /**
    * Сыграть запись name. vol — громкость, rate — скорость (и высота), at/dur — кусок записи (секунды), delay — через сколько,
-   * fin — за сколько секунд звук нарастает (0 — сразу в полную силу). Нет записи — false: тогда вызывающий играет синтез.
+   * fin — за сколько секунд звук нарастает (0 — сразу в полную силу), dest — куда играть вместо общего выхода (см. via).
+   * Нет записи — false: тогда вызывающий играет синтез.
    */
-  play(name, { vol = 1, rate = 1, at = 0, dur = 0, delay = 0, fin = 0 } = {}) {
+  play(name, { vol = 1, rate = 1, at = 0, dur = 0, delay = 0, fin = 0, dest = null } = {}) {
     const b = this.ctx && this.buf[name];
     if (!b) return false;
     const c = this.ctx;
@@ -221,7 +252,7 @@ export class Audio2 {
     const g = c.createGain();
     g.gain.value = vol;
     s.connect(g);
-    g.connect(this.sfx);
+    g.connect(dest || this.sfx);
     if (fin) {
       // плавное начало: звук нарастает, а не ударяет
       g.gain.setValueAtTime(0.0001, t);
@@ -340,7 +371,7 @@ export class Audio2 {
     }
   }
   // короткий тон
-  tone(freq, dur, type = 'sine', vol = 0.2, to = null, delay = 0) {
+  tone(freq, dur, type = 'sine', vol = 0.2, to = null, delay = 0, dest = null) {
     if (!this.ctx) return;
     const c = this.ctx;
     const t = c.currentTime + delay;
@@ -353,11 +384,11 @@ export class Audio2 {
     g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     o.connect(g);
-    g.connect(this.sfx);
+    g.connect(dest || this.sfx);
     o.start(t);
     o.stop(t + dur + 0.02);
   }
-  burst(dur, type, f0, f1, vol = 0.3, q = 1, delay = 0) {
+  burst(dur, type, f0, f1, vol = 0.3, q = 1, delay = 0, dest = null) {
     if (!this.ctx) return;
     const c = this.ctx;
     const t = c.currentTime + delay;
@@ -373,7 +404,7 @@ export class Audio2 {
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     s.connect(f);
     f.connect(g);
-    g.connect(this.sfx);
+    g.connect(dest || this.sfx);
     s.start(t, Math.random());
     s.stop(t + dur + 0.02);
   }
@@ -574,31 +605,40 @@ export class Audio2 {
    * Сильный удар — один и тяжёлый: запись, под ней низкий толчок, следом брызги и откат волны; море и музыка на миг
    * отступают. Слабый — тот же звук, но глухо и тихо. Если лодку и дальше толкают в ту же преграду, удары подряд —
    * только глухие и редкие: одинаковые громкие удары один за другим слышатся как стук в дверь.
+   * Чужая лодка: vol — насколько удар слышен отсюда (1 — мы в ней, меньше — он в стороне: тише и глуше), pan — с какой он
+   * стороны, from — чья лодка: удары подряд у каждой считаются отдельно.
+   * Возвращает 2 — прозвучал сильный удар, 1 — глухой, 0 — тишина.
    */
-  thud(p = 1) {
-    if (!this.ctx) return;
+  thud(p = 1, { vol = 1, pan = 0, from = 0 } = {}) {
+    if (!this.ctx) return 0;
     const t = this.ctx.currentTime;
-    const again = t - (this.thudAt ?? -9) < THUD_AGAIN;
-    this.thudAt = t;
-    if (again && t - (this.thudHeard ?? -9) < THUD_GAP) return; // всё ещё упираемся: толчки слышны не чаще, чем раз в секунду с небольшим
-    this.thudHeard = t;
+    const S = from ? this.thudFrom[from] || (this.thudFrom[from] = {}) : this;
+    const again = t - (S.thudAt ?? -9) < THUD_AGAIN;
+    S.thudAt = t;
+    if (again && t - (S.thudHeard ?? -9) < THUD_GAP) return 0; // всё ещё упираемся: толчки слышны не чаще, чем раз в секунду с небольшим
+    S.thudHeard = t;
+    if (vol <= 0.004) return 0;
+    // со стороны: всё вместе тише, глуше и с той стороны, где лодка
+    const dest = vol < 0.995 || pan ? this.via(vol, pan, vol < 0.9 ? 600 + 9000 * vol : 0) : null;
     if (p > THUD_HARD && !again) {
-      const rec = this.one('bump', { vol: 0.5 + 0.5 * p, rate: 1.04 - 0.12 * p });
+      const rec = this.one('bump', { vol: 0.5 + 0.5 * p, rate: 1.04 - 0.12 * p, dest });
       // низкий толчок под записью: маленькие динамики его не передадут, а в наушниках и колонках удар от него «весит»
-      this.tone(74 - 14 * p, 0.42, 'sine', (rec ? 0.3 : 0.45) * (0.55 + 0.45 * p), 34, 0.005);
-      if (!rec) this.burst(0.2, 'lowpass', 300, 80, 0.6 * p, 1.2);
+      this.tone(74 - 14 * p, 0.42, 'sine', (rec ? 0.3 : 0.45) * (0.55 + 0.45 * p), 34, 0.005, dest);
+      if (!rec) this.burst(0.2, 'lowpass', 300, 80, 0.6 * p, 1.2, 0, dest);
       // вода — та же запись всплеска. Брызги идут с самого громкого её места и сразу вместе с ударом: гаснут хвостом за ним,
       // а не всплёскивают отдельно. Следом волна откатывается от борта: ниже, медленнее и с плавным началом — без второго «удара».
-      if (this.play('splash', { vol: 0.16 + 0.3 * p, rate: rnd(0.74, 0.84), at: 0.14, delay: 0.01 })) this.play('splash', { vol: 0.08 + 0.16 * p, rate: rnd(0.54, 0.62), delay: rnd(0.2, 0.28), fin: 0.22 });
-      else this.burst(0.4, 'bandpass', 1500, 400, 0.14 * p, 0.8, 0.05);
-      this.duck(0.72 - 0.24 * p, 0.5);
-      return;
+      if (this.play('splash', { vol: 0.16 + 0.3 * p, rate: rnd(0.74, 0.84), at: 0.14, delay: 0.01, dest })) this.play('splash', { vol: 0.08 + 0.16 * p, rate: rnd(0.54, 0.62), delay: rnd(0.2, 0.28), fin: 0.22, dest });
+      else this.burst(0.4, 'bandpass', 1500, 400, 0.14 * p, 0.8, 0.05, dest);
+      // чем дальше удар, тем меньше он заслоняет остальное
+      if (vol > 0.3) this.duck(1 - (0.28 + 0.24 * p) * vol, 0.5);
+      return 2;
     }
     // слабый удар и удары подряд: тот же звук, но глухо и тихо
     const v = (again ? 0.14 : 0.22) + 0.34 * p;
-    if (this.one('bump', { vol: v, rate: 0.9, lp: 420 + 600 * p })) return;
-    this.burst(0.14, 'lowpass', 240, 90, 0.5 * v, 1.2);
-    this.tone(95, 0.2, 'sine', 0.3 * v, 48);
+    if (this.one('bump', { vol: v, rate: 0.9, lp: 420 + 600 * p, dest })) return 1;
+    this.burst(0.14, 'lowpass', 240, 90, 0.5 * v, 1.2, 0, dest);
+    this.tone(95, 0.2, 'sine', 0.3 * v, 48, 0, dest);
+    return 1;
   }
   /** Море, ветер и музыка на миг отступают (до доли k) и возвращаются за dur секунд: громкое событие слышно отчётливее. */
   duck(k = 0.6, dur = 0.5) {
@@ -609,6 +649,23 @@ export class Audio2 {
     g.setValueAtTime(g.value, t);
     g.linearRampToValueAtTime(k, t + 0.03);
     g.setTargetAtTime(1, t + 0.12, dur / 3);
+  }
+  /**
+   * Мотор чужой лодки неподалёку: k — её ход от 0 (холостой) до 1 (полный), меньше нуля — рядом никого; d — сколько до неё
+   * метров, side — левее (−1) или правее (1) от взгляда. Та же запись, что у своего мотора, но звучит сама по себе.
+   * Без записи чужой мотор не слышен.
+   */
+  motorNear(k, d = 0, side = 0) {
+    if (!this.ctx) return;
+    const a = k < 0 ? 0 : Math.max(0, 1 - d / MOTOR_FAR);
+    const kk = Math.max(0, Math.min(1, k));
+    this.bed('motor', a * a * (0.3 + 0.45 * kk), { key: 'motor2', rate: 0.78 + 0.5 * kk, pan: side * Math.min(1, d / 6) * 0.75, sfx: true, tc: 0.25 });
+  }
+  /** Игрок ушёл из мира — в лобби или в меню: звуки мест и чужих лодок смолкают. */
+  hush() {
+    if (!this.ctx) return;
+    for (const k of ['waterfall', 'fire']) this.bed(k, 0, { tc: 0.3 });
+    this.motorNear(-1);
   }
   /** Подвесной мотор: k от 0 (холостой ход) до 1 (полный); k < 0 — заглушить. */
   motor(k) {
