@@ -7,6 +7,9 @@
 // records — лучший вес по каждому виду рыбы (зеркало журнала из сохранения).
 // history — запас: каким сохранение было в начале каждого игрового дня (30 дней). Нужен, чтобы вернуть
 //           прогресс, если его затёрли по ошибке.
+// rooms   — комнаты игры вдвоём и компанией: кто в комнате, её часы, турнир. Сервер держит комнаты в памяти,
+//           а сюда записывает, чтобы после перезапуска игроки вернулись в ту же комнату. Жетоны мест лежат
+//           здесь только отпечатками (sha256): по записи в базе чужое место не занять.
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS players (
@@ -47,6 +50,11 @@ const SCHEMA = [
     save jsonb NOT NULL,
     saved_at timestamptz NOT NULL,
     PRIMARY KEY (player_id, day)
+  )`,
+  `CREATE TABLE IF NOT EXISTS rooms (
+    code text PRIMARY KEY,
+    data jsonb NOT NULL,
+    seen bigint NOT NULL DEFAULT 0
   )`
 ];
 const MS = (col) => `(extract(epoch from ${col}) * 1000)::float8`;
@@ -135,6 +143,33 @@ export function createStore(query) {
     /** Запас сохранений игрока по дням (новые сверху) — для восстановления вручную. */
     async history(id) {
       return rows(`SELECT day::text AS day, rev, xp, ${MS('saved_at')} AS at FROM history WHERE player_id = $1 ORDER BY day DESC`, [id]);
+    },
+
+    // ───── комнаты ─────
+    /** Записать комнату. seen — когда в ней в последний раз кто-то был (часы сервера, мс). */
+    async saveRoom(code, data, seen) {
+      await query(
+        `INSERT INTO rooms (code, data, seen) VALUES ($1, $2::jsonb, $3::bigint)
+        ON CONFLICT (code) DO UPDATE SET data = EXCLUDED.data, seen = EXCLUDED.seen`,
+        [code, JSON.stringify(data), Math.round(seen) || 0]
+      );
+    },
+    /** Комната по коду, если в ней кто-то был не раньше since (мс): { data, seen } или null. */
+    async loadRoom(code, since = 0) {
+      const r = (await rows('SELECT data, seen::float8 AS seen FROM rooms WHERE code = $1 AND seen >= $2::bigint', [code, Math.round(since) || 0]))[0];
+      return r ? { data: r.data, seen: r.seen } : null;
+    },
+    /** В этих комнатах сейчас есть люди — отмечаем время. */
+    async touchRooms(codes, seen) {
+      if (codes.length) await query('UPDATE rooms SET seen = $2::bigint WHERE code = ANY($1::text[])', [codes, Math.round(seen) || 0]);
+    },
+    async dropRoom(code) {
+      await query('DELETE FROM rooms WHERE code = $1', [code]);
+    },
+    /** Убрать комнаты, где никого не было с before (мс), и вернуть коды оставшихся. */
+    async roomCodes(before = 0) {
+      await query('DELETE FROM rooms WHERE seen < $1::bigint', [Math.round(before) || 0]);
+      return (await rows('SELECT code FROM rooms ORDER BY code')).map((r) => r.code);
     }
   };
 }
@@ -176,12 +211,28 @@ export async function selfCheck(store) {
     await store.forget(id);
   }
   must((await store.load(id)) === null, 'стирание');
+  // комнаты: в коде служебной комнаты есть ноль — у настоящих его не бывает
+  const code = '0' + Math.random().toString(36).slice(2, 5).toUpperCase();
+  try {
+    const t = Date.now();
+    await store.saveRoom(code, { v: 1, seed: 'a', players: [{ id: 1, th: 'x' }] }, t - 1000);
+    await store.saveRoom(code, { v: 1, seed: 'b', players: [{ id: 1, th: 'x' }, { id: 2, th: 'y' }] }, t - 1000);
+    const r = await store.loadRoom(code, t - 2000);
+    must(r && r.data && r.data.seed === 'b' && r.data.players.length === 2 && r.seen === t - 1000, 'комната: запись и чтение');
+    must((await store.loadRoom(code, t)) === null, 'комната: давно пустую не возвращаем');
+    await store.touchRooms([code], t + 5);
+    must(((await store.loadRoom(code, t)) || {}).seen === t + 5, 'комната: отметка времени');
+  } finally {
+    await store.dropRoom(code);
+  }
+  must((await store.loadRoom(code, 0)) === null, 'комната: стирание');
 }
 
 /**
  * Открыть хранилище по настройкам окружения:
  *   DATABASE_URL — Postgres (на Render строку подставляет сам Render, см. render.yaml);
- *   RYBAK_DB=memory — Postgres в памяти процесса (PGlite) для разработки и проверок: с перезапуском всё пропадает.
+ *   RYBAK_DB=memory — Postgres в памяти процесса (PGlite) для разработки и проверок: с перезапуском всё пропадает;
+ *   RYBAK_DB=dir:<папка> — тот же PGlite, но с файлами в папке: переживает перезапуск (так проверяется возвращение комнат).
  * Ничего не задано — null: игра работает как раньше, сохранения только в браузере.
  */
 export async function openStore(env = process.env) {
@@ -199,12 +250,13 @@ export async function openStore(env = process.env) {
     }
     return Object.assign(store, { kind: 'postgres', close: () => pool.end() });
   }
-  if (env.RYBAK_DB === 'memory') {
+  const dir = /^dir:(.+)$/.exec(env.RYBAK_DB || '');
+  if (env.RYBAK_DB === 'memory' || dir) {
     const { PGlite } = await import('@electric-sql/pglite');
-    const db = new PGlite();
+    const db = dir ? new PGlite(dir[1]) : new PGlite();
     const store = createStore((text, params) => db.query(text, params));
     await store.init();
-    return Object.assign(store, { kind: 'memory', close: () => db.close() });
+    return Object.assign(store, { kind: dir ? 'files' : 'memory', close: () => db.close() });
   }
   return null;
 }

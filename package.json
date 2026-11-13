@@ -9,7 +9,7 @@
     "start": "node server/index.js",
     "build": "node tools/build.js",
     "dev": "node tools/build.js --watch",
-    "test": "node --test test/logic.test.js test/net.test.js test/world.test.js test/cloud.test.js",
+    "test": "node --test test/logic.test.js test/net.test.js test/world.test.js test/cloud.test.js test/rooms.test.js",
     "test:play": "node test/play.cjs",
     "test:coop": "node test/coop.cjs",
     "balance": "node tools/balance.js",
@@ -19,6 +19,7 @@
     "test:cloud": "node test/cloud.cjs",
     "test:sound": "node test/sound.cjs",
     "test:frames": "node test/frames.cjs",
+    "test:restart": "node test/restart.cjs",
     "solo": "node tools/artifact.js"
   },
   "engines": {

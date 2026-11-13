@@ -3,7 +3,7 @@ import { session } from './profile.js';
 
 export class Net {
   constructor(on) {
-    this.on = on; // { joined, in, out, card, mode, sts, ev, chat, host, error, down, up, voice(msg), bin(buf) }
+    this.on = on; // { joined, in, out, card, mode, sts, ev, chat, host, error, down(n, restart), voice(msg), bin(buf) }
     this.ws = null;
     this.room = null; // { code, id, token, seed, t0, host }
     this.offset = 0; // serverNow − clientNow
@@ -12,6 +12,7 @@ export class Net {
     this.want = null; // что хотим: { t:'create'|'join', code, card }
     this.closed = true;
     this.pingT = null;
+    this.restart = false; // сервер сам предупредил, что перезапускается: комната вернётся вместе с ним
   }
   now() {
     return Date.now() + this.offset;
@@ -54,14 +55,16 @@ export class Net {
       }
       this.handle(m);
     };
-    ws.onclose = () => {
+    ws.onclose = (e) => {
       clearInterval(this.pingT);
       if (this.ws !== ws) return;
       this.ws = null;
       if (this.closed) return;
-      // связь оборвалась — пробуем вернуться на своё место
+      // связь оборвалась — пробуем вернуться на своё место. Код 1012 — сервер перезапускается (выкладка новой версии):
+      // комнату он записал и поднимет её снова, как только запустится
+      if (e && e.code === 1012) this.restart = true;
       if (this.room) {
-        this.on.down();
+        this.on.down(this.retry, this.restart);
         this.want = { t: 'join', code: this.room.code, token: this.room.token };
       }
       if (this.want && this.retry < 40) {
@@ -88,6 +91,7 @@ export class Net {
         this.room = { code: m.code, id: m.id, token: m.token, seed: m.seed, t0: m.t0, host: m.host, slot: m.slot };
         this.offset = this.rtt ? this.offset : m.now - Date.now();
         this.retry = 0;
+        this.restart = false;
         this.want = null;
         session.set({ code: m.code, token: m.token, at: Date.now() });
         return this.on.joined(m, back);

@@ -431,7 +431,7 @@ class Game {
       error: (m) => {
         if (m.req === 'vjoin') return this.voice.joinError(m.message);
         if (m.req === 'join' || m.req === 'create' || m.code === 'REPLACED' || m.code === 'NET') {
-          // комнаты больше нет (сервер перезапускался) или связь не вернуть — в меню, прогресс цел
+          // комнаты больше нет (в ней давно никого не было) или связь не вернуть — в меню, прогресс цел
           const was = this.state !== 'title';
           this.voice.leave(true);
           for (const p of this.players.values()) p.remote.dispose();
@@ -442,7 +442,11 @@ class Game {
           if (m.req === 'tour') this.ui.rerender();
         }
       },
-      down: () => this.ui.toast('Связь пропала — возвращаюсь…', 'bad', 4000),
+      // n — какая это попытка вернуться подряд: говорим сразу и потом изредка, а не на каждую
+      down: (n, restart) => {
+        if (n % 5) return;
+        this.ui.toast(restart ? (n ? 'Сервер ещё запускается — комната вернётся вместе с ним' : 'Сервер обновляется — через минуту вернёмся в ту же комнату') : n ? 'Связи всё ещё нет — пробую снова…' : 'Связь пропала — возвращаюсь…', restart ? '' : 'bad', 5000);
+      },
       voice: (m) => this.voice.handle(m),
       bin: (b) => this.voice.handleBinary(b)
     };
