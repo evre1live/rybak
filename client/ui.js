@@ -13,32 +13,70 @@ import { settings, saveSettings } from './profile.js';
 import { showCode, saveSummary, agoText, plural } from '../shared/cloud.js';
 import { $, $$, el, esc, clamp } from './util.js';
 
+// Значки: линейные — толщиной 2, со скруглёнными концами (L); остальные залиты. Все в один цвет (currentColor), монеты — янтарные.
+const L = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const SVG = {
   pin: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.6A2.6 2.6 0 1 1 12 6.4a2.6 2.6 0 0 1 0 5.2z"/></svg>',
   sun: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="5"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
   moon: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>',
   users: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="8" cy="8" r="3.6"/><circle cx="16.8" cy="8.6" r="3"/><path d="M1.5 20c0-4 2.9-6.4 6.5-6.4s6.5 2.4 6.5 6.4zM15.6 20c0-2-.6-3.8-1.7-5.1a6 6 0 0 1 2.9-.7c3.1 0 5.7 2 5.7 5.8z"/></svg>',
   lock: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 9V7A5 5 0 0 0 7 7v2H5v12h14V9zm-8-2a3 3 0 0 1 6 0v2H9zm3 9.5a1.6 1.6 0 1 1 0-3.2 1.6 1.6 0 0 1 0 3.2z"/></svg>',
-  coin: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor"/><circle cx="12" cy="12" r="7" fill="none" stroke="#0a1a33" stroke-opacity=".35" stroke-width="1.6"/><path d="M9 16l3-8 3 8M10 13.4h4" stroke="#0a1a33" stroke-opacity=".6" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>',
-  bag: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 12c4-6 11-7 16-3l3-2-1 5 1 5-3-2c-5 4-12 3-16-3zm5.5-1.4a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4z"/></svg>',
+  // стопка монет
+  coin: '<svg viewBox="0 0 24 24"><g fill="currentColor"><ellipse cx="12" cy="17.2" rx="8.6" ry="3.7"/><rect x="3.4" y="13.2" width="17.2" height="4"/><ellipse cx="12" cy="13.2" rx="8.6" ry="3.7"/><rect x="3.4" y="9" width="17.2" height="4.2"/><ellipse cx="12" cy="9" rx="8.6" ry="3.7"/></g><g fill="none" stroke="#8a5a08" stroke-opacity=".6" stroke-width="1.1"><path d="M3.4 13.2c0 2 3.9 3.7 8.6 3.7s8.6-1.7 8.6-3.7M3.4 9c0 2 3.9 3.7 8.6 3.7s8.6-1.7 8.6-3.7"/><ellipse cx="12" cy="9" rx="5.2" ry="1.9"/></g></svg>',
+  fish: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 12c4-6 11-7 16-3l3-2-1 5 1 5-3-2c-5 4-12 3-16-3zm5.5-1.4a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4z"/></svg>',
   mic: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>',
   micoff: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M3 3l18 18" stroke="#f04438" stroke-width="2.6" stroke-linecap="round"/></svg>',
   warn: '<svg viewBox="0 0 24 24"><path d="M12 2L1 21h22z" fill="currentColor"/><path d="M12 9v6M12 17.5v1" stroke="#0a1a33" stroke-width="2.4" stroke-linecap="round"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg>',
   crown: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 8l5 4 5-7 5 7 5-4-2 11H4z"/></svg>',
   link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>',
-  rod: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 21L20 4M20 4v9"/><circle cx="8" cy="16" r="2.4" fill="currentColor"/></svg>',
   cloud: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 19a5 5 0 0 1-.6-9.96A6.5 6.5 0 0 1 19 10.2 4.4 4.4 0 0 1 18.5 19z"/></svg>',
   rain: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 15a4.5 4.5 0 0 1-.5-8.97A6 6 0 0 1 18 7.2 4 4 0 0 1 17.6 15z"/><path d="M8 18l-1.2 3M12.5 18l-1.2 3M17 18l-1.2 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>',
   fog: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 8h12M8 12h13M3 16h14M9 20h9"/></svg>',
   cup: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 3h10v2h4v3a5 5 0 0 1-4.4 4.96A5.5 5.5 0 0 1 13 15.9V18h3.5v3h-9v-3H11v-2.1a5.5 5.5 0 0 1-3.6-2.94A5 5 0 0 1 3 8V5h4zm10 4v3.7A3 3 0 0 0 19 8V7zM5 7v1a3 3 0 0 0 2 2.7V7z"/></svg>',
-  list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6.5l1.6 1.6L8 5M3.5 12.5l1.6 1.6L8 11M3.5 18.5l1.6 1.6L8 17M11.5 7h9M11.5 13h9M11.5 19h9"/></svg>'
+  list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6.5l1.6 1.6L8 5M3.5 12.5l1.6 1.6L8 11M3.5 18.5l1.6 1.6L8 17M11.5 7h9M11.5 13h9M11.5 19h9"/></svg>',
+  star: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z"/></svg>',
+  play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15a1 1 0 0 0 1.5.9l12.5-7.5a1 1 0 0 0 0-1.8L8.5 3.6A1 1 0 0 0 7 4.5z"/></svg>',
+  dots: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2.2"/><circle cx="12" cy="12" r="2.2"/><circle cx="19" cy="12" r="2.2"/></svg>',
+  rod: L('<path d="M3.5 20.5L20 4M20 4v8.5"/><circle cx="8.2" cy="15.8" r="2.3" fill="currentColor" stroke="none"/><path d="M6.5 14l-2-2"/>'),
+  hook: L('<path d="M14.5 5.5v8a4.5 4.5 0 0 1-9 0v-2l2.6 2.6"/><circle cx="14.5" cy="3.7" r="1.7"/>'),
+  lure: L('<path d="M3 13.5c2.5-5.5 8-8.5 15.5-8-.5 7.5-3.5 13-9 15.5l-1.5-5z"/><path d="M8 15.5l6.5-6.5M3 21l3.5-3.5"/>'),
+  reel: L('<circle cx="10.5" cy="12.5" r="6.5"/><circle cx="10.5" cy="12.5" r="2.2"/><path d="M15.5 8l4-3.5M19.5 4.5l1.5 2"/>'),
+  spool: L('<ellipse cx="12" cy="6.5" rx="7.5" ry="3"/><path d="M4.5 6.5v11c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-11M4.5 12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3"/>'),
+  float: L('<path d="M12 2v4.5M12 17.5V22"/><ellipse cx="12" cy="12" rx="4.2" ry="5.5"/><path d="M7.9 11h8.2"/>'),
+  basket: L('<path d="M4.5 8.5h15l-1.8 11.5H6.3z"/><path d="M3 8.5h18M9.5 8.5l.8 11.5M14.5 8.5l-.8 11.5M5.3 14h13.4M8 8.5l2.5-5M16 8.5l-2.5-5"/>'),
+  arrow: L('<path d="M4 12h15M13 6l6 6-6 6"/>'),
+  gear: L('<circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.7M12 18.5v2.7M2.8 12h2.7M18.5 12h2.7M5.5 5.5l1.9 1.9M16.6 16.6l1.9 1.9M5.5 18.5l1.9-1.9M16.6 7.4l1.9-1.9"/><circle cx="12" cy="12" r="6.6"/>'),
+  exit: L('<path d="M10 4H5.5v16H10M14 8l4 4-4 4M9.5 12H18"/>'),
+  user: L('<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>'),
+  help: L('<circle cx="12" cy="12" r="9.3"/><path d="M9.2 9.4a2.9 2.9 0 1 1 4.4 2.5c-.9.6-1.6 1.2-1.6 2.4M12 17.5v.3"/>'),
+  wave: L('<path d="M3 9c2-2 4-2 6 0s4 2 6 0 4-2 6 0M3 15c2-2 4-2 6 0s4 2 6 0 4-2 6 0"/>'),
+  image: L('<rect x="3" y="5" width="18" height="14" rx="2.2"/><circle cx="8.8" cy="10" r="1.5"/><path d="M4 17l5-4 3 2.5 4-4 4 4.5"/>'),
+  share: L('<circle cx="6" cy="12" r="2.6"/><circle cx="17.5" cy="6" r="2.6"/><circle cx="17.5" cy="18" r="2.6"/><path d="M8.3 10.8l6.9-3.6M8.3 13.2l6.9 3.6"/>'),
+  download: L('<path d="M12 3.5v11M7 10l5 5 5-5M4.5 20h15"/>'),
+  cart: L('<path d="M3 4h2.5l2.2 11h10.6l2.2-8H6.5"/><circle cx="9.5" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/>'),
+  mouse: L('<rect x="6.5" y="2.5" width="11" height="19" rx="5.5"/><path d="M12 6.5v4"/>'),
+  keys: L('<rect x="2.5" y="6" width="19" height="12" rx="2.2"/><path d="M6 10h.01M9.5 10h.01M13 10h.01M16.5 10h.01M6 14h.01M18 14h.01M9 14h6"/>'),
+  timer: L('<circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.5 2M9.5 2.5h5M12 2.5V6"/>'),
+  anchor: L('<circle cx="12" cy="5" r="2.2"/><path d="M12 7.2V21M5 13c0 4.4 3.1 8 7 8s7-3.6 7-8M8.5 10.5h7"/>'),
+  bait: L('<path d="M3.5 15.5c0-4.5 3-6.5 5.2-4.5s1.8 6 4.8 5 2.2-7.5 6.5-7.5"/><circle cx="20.5" cy="8.5" r=".9" fill="currentColor" stroke="none"/><path d="M6 19.5c1.2.6 2.5.6 3.7 0"/>')
 };
+SVG.bag = SVG.fish; // улов в садке — та же рыбка
+// значок раздела снастей
+const CAT_ICON = { rod: 'rod', tackle: 'bait', lure: 'lure', reel: 'reel', line: 'spool', hook: 'hook', float: 'float', bag: 'basket', extra: 'dots' };
 const WX_ICON = { clear: 'sun', cloudy: 'cloud', rain: 'rain', fog: 'fog' };
 const TIER = ['ЛЁГКОЕ', 'СРЕДНЕЕ', 'ТРУДНОЕ'];
 const mmss = (sec) => `${String(Math.floor(Math.max(0, sec) / 60)).padStart(2, '0')}:${String(Math.max(0, sec) % 60).padStart(2, '0')}`;
 const ic = (n, cls = '') => `<span class="ic ${cls}">${SVG[n] || ''}</span>`;
-const coin = (n) => `${ic('coin')}${fmtCoins(n)}`;
+const coin = (n) => `${ic('coin', 'coin')}${fmtCoins(n)}`;
+// логотип: пальма, название, подпись (пальма нарисована в стилях — маской)
+const LOGO = '<div class="logo"><span class="palm"></span>РЫБАК<small>РЫБАЛКА С ДРУЗЬЯМИ</small></div>';
+// место рыбалки на карточке в лобби: вид сверху запечён заранее (tools/bake-place.cjs), pin — где на нём причал, в процентах
+const PLACE = { name: 'Солнечная бухта', img: 'img/place-bay.webp', pin: [55.8, 68] };
+// в пробной версии одним файлом картинки лежат внутри страницы (tools/artifact.js)
+const imgUrl = (f) => (window.RYBAK_IMG && window.RYBAK_IMG[f]) || f;
+// цвет редкости для подписи на светлом стекле: тот же тон, но светлее — читается на любом фоне
+const rarTint = (rar) => `color-mix(in srgb, ${RARITY[rar].color} 58%, #fff)`;
 
 export class UI {
   constructor(game) {
@@ -151,13 +189,14 @@ export class UI {
     p.classList.toggle('hidden', !html);
     p.innerHTML = html ? `<div class="hintp gl">${html}</div>` : '';
   }
-  /** Погода рядом с часами: название, а в непогоду — ещё и прибавка к клёву. */
+  /** Погода рядом с часами: значок и название, а в непогоду — ещё и прибавка к клёву. Ясной ночью вместо солнца — месяц. */
   weather(wx) {
     const add = Math.round((wx.bite - 1) * 100);
-    const key = wx.kind + '|' + add;
+    const night = this.g.world.night > 0.6;
+    const key = wx.kind + '|' + add + '|' + night;
     if (key === this.wxKey) return;
     this.wxKey = key;
-    $('.hud-tl .loc').classList.toggle('wx-off', wx.kind === 'clear');
+    $('#wxIc').innerHTML = SVG[wx.kind === 'clear' && night ? 'moon' : WX_ICON[wx.kind]];
     $('#wxName').innerHTML = `${WEATHER[wx.kind].name}${add > 0 ? `<em>клёв +${add}%</em>` : ''}`;
   }
   /** Задания дня в углу экрана: что осталось и сколько сделано. */
@@ -213,19 +252,28 @@ export class UI {
     const val = fishValue(c, this.g.market());
     const bd = [];
     const jn = this.g.profile.journal[c.sp];
-    if (f && (!jn || jn.n === 0)) bd.push('<span class="bd cy">НОВЫЙ ВИД!</span>');
-    else if (f && jn && c.w > jn.best) bd.push('<span class="bd gr">ЛИЧНЫЙ РЕКОРД!</span>');
+    if (f && (!jn || jn.n === 0)) bd.push('<span class="bd cy">НОВЫЙ ВИД</span>');
+    else if (f && jn && c.w > jn.best) bd.push('<span class="bd gr">ЛИЧНЫЙ РЕКОРД</span>');
     if (c.trophy) bd.push('<span class="bd">ТРОФЕЙ</span>');
     if (c.stalked) bd.push('<span class="bd gr">ВЫСЛЕЖЕНА</span>');
     if (c.help) bd.push(`<span class="bd cy">ПОДСАЧИЛ: ${esc(String(c.help).toUpperCase())}</span>`);
     if (f && this.g.market().hot.includes(c.sp)) bd.push('<span class="bd">В ЦЕНЕ ×1,6</span>');
     box.style.setProperty('--rc', rar.color);
+    // кнопки карточки — те же действия, что на клавишах; на телефоне их дублируют кнопки под пальцем, клавиши там не пишем
+    const touch = this.g.input.touch.on;
+    const key = (a) => (touch ? '' : this.key(a));
+    const cb = (cls, k, icon, text, tail = '') => `<div class="cb ${cls}">${k}${icon ? ic(icon) : ''}<span>${text}</span>${tail}</div>`;
+    // в нижнем ряду тесно: где есть клавиша, значок не рисуем
+    const small = (k, icon, text) => cb('', k, k ? '' : icon, text);
+    const card = small(touch || this.g.input.device === 'pad' ? '' : '<kbd class="g">P</kbd>', 'image', 'ОТКРЫТКА');
     box.innerHTML = `<div class="rar">${rar.name}</div><h2>${esc((f || j).name)}</h2>
-      <div class="w">${fmtW(c.w)}${c.len ? `<small>${c.len} см</small>` : ''}</div>
+      <div class="wl"><div><b>${fmtW(c.w)}</b><small>ВЕС</small></div>${c.len ? `<i class="sep"></i><div><b>${c.len} см</b><small>ДЛИНА</small></div>` : ''}</div>
       <div class="badges">${bd.join('')}</div>
       <p>${esc((f || j).desc)}</p>
-      <div class="val">${coin(val)} <span style="font-size:.6em;opacity:.7;margin-left:.4em">НА РЫНКЕ</span></div>
-      <div class="acts">${d.full ? `<span class="bd red" style="font-size:1em">САДОК ПОЛОН</span><span>${this.key('primary')} ОТПУСТИТЬ</span>` : `<span>${this.key('primary')} В САДОК</span><span>${this.key('release')} ОТПУСТИТЬ</span>`}</div>`;
+      <div class="val">${coin(val)}<small>НА РЫНКЕ</small></div>
+      <div class="acts">${d.full
+        ? `${cb('full', '', 'warn', 'САДОК ПОЛОН')}<div class="row">${small(key('primary'), 'wave', 'ОТПУСТИТЬ')}${card}</div>`
+        : `${cb('pri', key('primary'), 'basket', 'В САДОК', ic('arrow'))}<div class="row">${small(key('release'), 'wave', 'ОТПУСТИТЬ')}${card}</div>`}</div>`;
     box.classList.remove('hidden');
   }
   /** Счётчики вываживания. f — состояние боя или null. */
@@ -372,7 +420,7 @@ export class UI {
       g.fillText(lab || String(d), x, lab ? 62 : 56);
     }
     g.globalAlpha = 1;
-    g.fillStyle = '#3fe3d5';
+    g.fillStyle = '#2ef2de';
     g.beginPath();
     g.moveTo(W / 2 - 11, 2);
     g.lineTo(W / 2 + 11, 2);
@@ -421,12 +469,12 @@ export class UI {
       g.strokeStyle = 'rgba(18,35,63,.3)';
       g.lineWidth = 10;
       g.stroke();
-      g.strokeStyle = '#ff5fa8';
+      g.strokeStyle = '#ff2e93';
       g.lineWidth = 6;
       g.stroke();
       g.setLineDash([]);
       const [tx, tz] = nav.pts[nav.pts.length - 1];
-      g.fillStyle = '#ff5fa8';
+      g.fillStyle = '#ff2e93';
       g.strokeStyle = '#fff';
       g.lineWidth = 3.5;
       g.beginPath();
@@ -584,23 +632,37 @@ export class UI {
     this.screen.innerHTML = '';
     this.panel = null;
     this.view = null;
+    this.shown = null;
+  }
+  /** Экран сменился (а не перерисовался) — панели всплывают: на полсекунды ставим класс enter (см. стили). key — что показываем. */
+  enter(key) {
+    if (key === this.shown) return;
+    this.shown = key;
+    const s = this.screen;
+    s.classList.remove('enter');
+    void s.offsetWidth; // чтобы движение началось заново
+    s.classList.add('enter');
+    clearTimeout(this.enterT);
+    this.enterT = setTimeout(() => s.classList.remove('enter'), 520);
   }
   showTitle(err = '') {
     this.view = 'title';
     this.panel = null;
+    this.enter('title');
     const p = this.g.profile;
     const code = this.g.urlCode || '';
+    const go = (a, text, cls = 'pri') => `<button class="btn ${cls}" data-a="${a}"><span>${text}</span>${cls === 'pri' ? ic('arrow') : ''}</button>`;
     this.screen.innerHTML = `<div class="title">
-      <div class="logo">РЫБАК<small>РЫБАЛКА С ДРУЗЬЯМИ</small></div>
+      ${LOGO}
       <div class="tcard">
         <label for="nm">Как вас зовут</label>
         <input class="in" id="nm" maxlength="16" placeholder="Имя" value="${esc(p.name || '')}" autocomplete="off">
         <div class="err" id="terr">${esc(err)}</div>
-        ${this.g.offline ? `<button class="btn pri" data-a="solo"><span>НАЧАТЬ РЫБАЛКУ</span></button>
-        <div class="note">Пробная версия для одного. Комнаты для друзей и голосовой чат работают в полной игре на сервере.</div>` : `${code ? `<button class="btn pri" data-a="join"><span>ВОЙТИ В КОМНАТУ ${esc(code)}</span></button>` : '<button class="btn pri" data-a="create"><span>СОЗДАТЬ КОМНАТУ ДЛЯ ДРУЗЕЙ</span></button>'}
-        <div class="row"><input class="in code" id="code" maxlength="4" placeholder="КОД" value="${esc(code)}" autocomplete="off"><button class="btn cy" data-a="joincode"><span>ВОЙТИ ПО КОДУ</span></button></div>
+        ${this.g.offline ? `${go('solo', 'НАЧАТЬ РЫБАЛКУ')}
+        <div class="note">Пробная версия для одного. Комнаты для друзей и голосовой чат работают в полной игре на сервере.</div>` : `${code ? go('join', `ВОЙТИ В КОМНАТУ ${esc(code)}`) : go('create', 'СОЗДАТЬ КОМНАТУ ДЛЯ ДРУЗЕЙ')}
+        <div class="row"><input class="in code" id="code" maxlength="4" placeholder="КОД" value="${esc(code)}" autocomplete="off">${go('joincode', 'ВОЙТИ ПО КОДУ', 'cy')}</div>
         <div class="or">или</div>
-        <button class="btn ghost" data-a="solo"><span>РЫБАЧИТЬ В ОДИНОЧКУ</span></button>`}
+        ${go('solo', 'РЫБАЧИТЬ В ОДИНОЧКУ', 'ghost')}`}
       </div>
       <div class="tnote${this.g.serverUp === false ? '' : ' hidden'}" id="srvNote">Сервер просыпается — комнаты заработают через минуту. В одиночку можно рыбачить уже сейчас.</div>
       <div class="tfoot">${this.g.offline ? 'Прогресс хранится в этом браузере' : `Голосовой чат включается в комнате · <span id="saveNote">${this.saveNote()}</span>`}<br><a data-a="help">Как играть</a>${this.g.offline ? '' : ' · <a data-a="open" data-p="top">Рекорды</a>'} · <a data-a="settings">Настройки</a></div>
@@ -617,33 +679,47 @@ export class UI {
     if (st === 'ok' || st === 'pending') return 'прогресс хранится в браузере и на сервере';
     return 'прогресс хранится в этом браузере';
   }
+  /** Лобби: вверху логотип, разделы и монеты; справа карточка места с видом сверху; внизу слева — игрок и его команда. */
   showLobby() {
     this.view = 'lobby';
     this.panel = null;
+    this.enter('lobby');
     const g = this.g;
-    const n = g.roster().length;
+    const p = g.profile;
+    const crew = g.roster();
+    const n = crew.length;
     const word = (k) => (k % 10 === 1 && k % 100 !== 11 ? 'РЫБАК ГОТОВ' : k % 10 >= 2 && k % 10 <= 4 && (k % 100 < 10 || k % 100 >= 20) ? 'РЫБАКА ГОТОВЫ' : 'РЫБАКОВ ГОТОВЫ');
     const v = g.voiceState();
+    const lv = levelInfo(p.xp);
+    const left = p.quests ? p.quests.list.filter((q) => !q.done).length : 0;
+    const tab = (panel, name, extra = '') => `<button class="tab" data-a="open" data-p="${panel}">${name}${extra}</button>`;
+    const round = (panel, icon, title) => `<button class="rbtn" data-a="open" data-p="${panel}" title="${title}" aria-label="${title}">${ic(icon)}</button>`;
+    const friend = (r) => `<div class="ava sm${r.mode === 'world' ? ' away' : ''}" title="${esc(r.name)}${r.mode === 'world' ? ' — уже рыбачит' : ''}"><img src="${faceIcon(r.look)}" alt="${esc(r.name)}"></div>`;
     this.screen.innerHTML = `
-      <div class="lob-tl"><div class="chip">${ic('users')}<b>ТВОЯ КОМАНДА</b><i class="sep"></i><small>${g.solo ? 'ОДИНОЧНАЯ РЫБАЛКА' : `${ic('lock')}КОД · <span class="y">${esc(g.code)}</span> · ${n}/${MAX_PLAYERS}`}</small></div>
-        ${g.solo ? '' : `<button class="btn sm cy" data-a="copy"><span>${ic('link')} ССЫЛКА ДЛЯ ДРУЗЕЙ</span></button>`}</div>
-      <div class="nav"><button class="tab on" data-a="lobby">ИГРА</button><button class="tab" data-a="open" data-p="tackle">СНАСТИ</button><button class="tab" data-a="open" data-p="editor">ПЕРСОНАЖ</button><button class="tab" data-a="open" data-p="journal">ЖУРНАЛ</button><button class="tab" data-a="open" data-p="quests">ЗАДАНИЯ${(() => { const qs = g.profile.quests; const n = qs ? qs.list.filter((q) => !q.done).length : 0; return n ? `<em class="dot">${n}</em>` : ''; })()}</button></div>
+      <div class="lob-top">${LOGO}<span class="sp"></span>
+        <div class="nav"><button class="tab on" data-a="lobby">ИГРА</button>${tab('tackle', 'СНАСТИ')}${tab('editor', 'ПЕРСОНАЖ')}${tab('journal', 'ЖУРНАЛ')}${tab('quests', 'ЗАДАНИЯ', left ? `<em class="dot">${left}</em>` : '')}</div>
+        <span class="sp"></span><div class="coinbox">${coin(p.coins)}</div></div>
       <div class="lcard">
-        <h2>${ic('pin')}СОЛНЕЧНАЯ БУХТА</h2>
+        <h2>${ic('pin')}${PLACE.name}</h2>
         <div class="mode">СВОБОДНАЯ РЫБАЛКА</div>
-        ${g.shot ? `<img class="shot" src="${g.shot}" alt="">` : '<div class="shot"></div>'}
-        <div class="ready">${ic('users')}${n} ${word(n)}</div>
-        <button class="btn pri big" data-a="start"><kbd class="g">↵</kbd><span>НАЧАТЬ РЫБАЛКУ</span></button>
-        ${g.solo ? '' : `<div class="sub"><button class="btn ${v.on ? (v.muted ? 'ghost' : 'cy') : 'ghost'}" data-a="voice"><span>${ic(v.on && !v.muted ? 'mic' : 'micoff')} ${v.joining ? 'ПОДКЛЮЧАЮ…' : v.on ? (v.muted ? 'МИКРОФОН ВЫКЛ' : 'ГОЛОС ВКЛЮЧЁН') : 'ВКЛЮЧИТЬ ГОЛОС'}</span></button></div>
+        <div class="shotbox" style="--px:${PLACE.pin[0]}%;--py:${PLACE.pin[1]}%"><img class="shot" src="${imgUrl(PLACE.img)}" alt="${PLACE.name}: вид сверху"><i class="ring"></i>${ic('pin', 'pinm')}</div>
+        ${g.solo ? '' : `<div class="ready">${ic('users')}${n} ${word(n)}</div>`}
+        <button class="btn pri big" data-a="start"><span>НАЧАТЬ РЫБАЛКУ</span>${ic('arrow')}</button>
+        ${g.solo ? '' : `<div class="sub"><button class="btn ${v.on && !v.muted ? 'cy' : 'ghost'}" data-a="voice">${ic(v.on && !v.muted ? 'mic' : 'micoff')}<span>${v.joining ? 'ПОДКЛЮЧАЮ…' : v.on ? (v.muted ? 'МИКРОФОН ВЫКЛ' : 'ГОЛОС ВКЛЮЧЁН') : 'ВКЛЮЧИТЬ ГОЛОС'}</span></button></div>
         <div class="hint">${v.on ? 'Друзья вас слышат. Клавиша M — выключить и включить микрофон.' : 'Нажмите «Включить голос» и разрешите микрофон — будете слышать друг друга прямо в игре.'}</div>`}
       </div>
-      <div class="lob-bl"><button class="btn sm ghost" data-a="leave"><kbd class="b">ESC</kbd><span>${g.solo ? 'В МЕНЮ' : 'ВЫЙТИ ИЗ КОМНАТЫ'}</span></button></div>`;
+      <div class="lob-bl">
+        <div class="mechip"><div class="ava"><img src="${faceIcon(p.look)}" alt=""><i class="on"></i></div><div><div class="nm">${esc(p.name || 'Рыбак')}</div><div class="lv">Уровень ${lv.lvl}<div class="pbar"><i style="width:${Math.round((lv.cur / lv.need) * 100)}%"></i></div></div></div></div>
+        ${g.solo ? '' : `<div class="crewrow">${crew.filter((r) => !r.me).map(friend).join('')}<button class="plus" data-a="copy" title="Позвать друзей — скопировать ссылку" aria-label="Позвать друзей">+</button><button class="codepill" data-a="copy" title="Скопировать ссылку для друзей">${ic('link')}<span>КОД ${esc(g.code)}</span><i class="sep"></i><span>${n}/${MAX_PLAYERS}</span></button></div>`}
+      </div>
+      <div class="lob-br">${g.offline ? '' : round('top', 'cup', 'Рекорды бухты')}${round('help', 'help', 'Как играть')}${round('settings', 'gear', 'Настройки')}<button class="btn sm ghost" data-a="leave"><kbd class="b">ESC</kbd><span>${g.solo ? 'В МЕНЮ' : 'ВЫЙТИ ИЗ КОМНАТЫ'}</span></button></div>`;
   }
 
   openPanel(name, opts = {}) {
     const prev = this.panel;
     this.panel = name;
     this.popts = opts;
+    this.enter('p:' + name);
     if (name === 'tackle' || name === 'shop') {
       this.tk = this.tk || { cat: 'rod', sel: null };
       this.tk.shop = name === 'shop';
@@ -671,6 +747,10 @@ export class UI {
   footKeys(act) {
     return `<span class="sp"></span><div class="keys">${act ? `<span>${this.key('use')} ${act}</span>` : ''}<span>${this.key('esc')} НАЗАД</span></div>`;
   }
+  /** Шапка панели: заголовок с росчерком, монеты и крестик; extra — кнопка рядом с заголовком. */
+  panelHead(title, extra = '') {
+    return `<div class="ptitle"><h1>${title}</h1>${extra}<span class="sp"></span><div class="coinbox">${coin(this.g.profile.coins)}</div><button class="xbtn" data-a="close" aria-label="Закрыть">×</button></div>`;
+  }
 
   renderTackle() {
     const p = this.g.profile;
@@ -690,15 +770,16 @@ export class UI {
       return `<div class="tile ${i.id === t.sel ? 'sel' : ''} ${own ? '' : 'lock'}" data-a="pick" data-id="${i.id}">${tag}<img src="${itemIcon(i.id)}" alt=""><div class="nm">${esc(i.name)}</div></div>`;
     }).join('');
     const kit = kitStats(p);
+    const left = tackleCount(p, p.equip.tackle);
     this.screen.innerHTML = `<div class="dim"></div><div class="panel">
-      <div class="ptitle"><h1>${t.shop ? 'МАГАЗИН' : 'СНАСТИ'}</h1>${t.shop ? '<button class="btn sm cy" data-a="open" data-p="sell"><span>← ПРОДАТЬ УЛОВ</span></button>' : ''}<span class="sp"></span><div class="coinbox">${coin(p.coins)}</div><button class="xbtn" data-a="close">×</button></div>
-      <div class="tabs2">${CATS.map((c) => `<button class="tab ${c.key === cat.key ? 'on' : ''}" data-a="cat" data-id="${c.key}">${c.name}</button>`).join('')}</div>
+      ${this.panelHead(t.shop ? 'МАГАЗИН' : 'СНАСТИ', t.shop ? `<button class="btn sm cy" data-a="open" data-p="sell">${ic('fish')}<span>ПРОДАТЬ УЛОВ</span></button>` : '')}
+      <div class="tabs2">${CATS.map((c) => `<button class="tab ${c.key === cat.key ? 'on' : ''}" data-a="cat" data-id="${c.key}">${ic(CAT_ICON[c.key])}${c.name}</button>`).join('')}</div>
       <div class="grid">${tiles}</div>
       <div class="detail">${this.itemDetail(it)}</div>
       <div class="loadout"><span class="hd">ТЕКУЩИЙ НАБОР</span>
         <div class="it"><img src="${itemIcon(p.equip.rod)}" alt="">${esc(ITEMS[p.equip.rod].name)}</div>
-        <div class="it"><img src="${itemIcon(p.equip.tackle)}" alt="">${esc(ITEMS[p.equip.tackle].name)} <span class="y">${tackleCount(p, p.equip.tackle) === Infinity ? '∞' : tackleCount(p, p.equip.tackle)}</span></div>
-        <div class="it">ЗАБРОС <span class="y">${kit.cast} М</span></div><div class="it">ЛЕСКА <span class="y">${kit.lineKg.toFixed(1).replace('.', ',')} КГ</span></div><div class="it">САДОК <span class="y">${p.cooler.length}/${kit.bagCap}</span></div>
+        <div class="it"><img src="${itemIcon(p.equip.tackle)}" alt="">${esc(ITEMS[p.equip.tackle].name)} <span class="y">${left === Infinity ? '∞' : '×' + left}</span></div>
+        <div class="it">Заброс <span class="y">${kit.cast} м</span></div><div class="it">Леска <span class="y">${kit.lineKg.toFixed(1).replace('.', ',')} кг</span></div><div class="it">Садок <span class="y">${p.cooler.length}/${kit.bagCap}</span></div>
         ${this.footKeys(this.actionOf(it).label)}</div></div>`;
   }
   actionOf(it) {
@@ -715,6 +796,7 @@ export class UI {
     if (this.tk.shop) return { a: 'buy', label: `КУПИТЬ ЗА ${fmtCoins(price)}`, dis: p.coins < price };
     return { a: null, label: '' };
   }
+  /** Карточка выбранной снасти: картинка, название с росчерком, что она даёт, и что с ней можно сделать. */
   itemDetail(it) {
     const p = this.g.profile;
     const own = owns(p, it.id);
@@ -724,27 +806,31 @@ export class UI {
     if (it.cat === 'rod') {
       const b = rodBars(it);
       const row = (name, v, txt) => `<div class="stat"><span>${name}<em>${txt}</em></span><div class="bar"><i style="width:${Math.round(clamp(v, 0.04, 1) * 100)}%"></i></div></div>`;
-      body = `<div class="stats">${row('ДАЛЬНОСТЬ ЗАБРОСА', b.cast, it.cast + ' м')}${row('ПРОЧНОСТЬ ЛЕСКИ', b.line, String(it.line).replace('.', ',') + ' кг')}${row('СКОРОСТЬ КАТУШКИ', b.reel, '×' + it.reel.toFixed(2).replace('.', ','))}</div>`;
+      body = `<div class="stats">${row('Дальность', b.cast, it.cast + ' м')}${row('Прочность', b.line, String(it.line).replace('.', ',') + ' кг')}${row('Скорость', b.reel, '×' + it.reel.toFixed(2).replace('.', ','))}</div>`;
     } else {
       const fx = [];
+      let chips = '';
       if (it.cat === 'tackle' || it.cat === 'lure') {
-        const likes = FISH.filter((f) => (it.cat === 'lure' ? f.lure >= 1.2 : (f.baits[it.id] || 0) >= 1.25)).sort((a, b) => b.rar - a.rar).slice(0, 6).map((f) => f.name);
-        if (likes.length) fx.push('Любят: ' + likes.join(', ').toLowerCase());
+        // кто на это клюёт — плашками с рыбкой
+        const likes = FISH.filter((f) => (it.cat === 'lure' ? f.lure >= 1.2 : (f.baits[it.id] || 0) >= 1.25)).sort((a, b) => b.rar - a.rar).slice(0, 6);
+        if (likes.length) chips = `<div class="chips">${likes.map((f) => `<span class="chipf">${ic('fish')}${esc(f.name)}</span>`).join('')}</div>`;
         if (it.rare > 1) fx.push(`Редкая рыба клюёт охотнее: ×${String(it.rare).replace('.', ',')}`);
         if (it.size > 1) fx.push('Рыба попадается крупнее');
         if (it.cat === 'lure') fx.push('Не расходуется, но теряется при обрыве лески', 'После заброса удерживайте кнопку — приманка должна двигаться');
         else if (it.id !== 'bread') fx.push('Расходуется при каждой поклёвке');
       }
       if (it.cat === 'bag') fx.push(`Вместимость: ${it.cap} рыб`);
-      body = fx.length ? `<ul class="fx">${fx.map((s) => `<li>${esc(s)}</li>`).join('')}</ul>` : '<div></div>';
+      body = `<div class="more">${chips}${fx.length ? `<ul class="fx">${fx.map((s) => `<li>${esc(s)}</li>`).join('')}</ul>` : ''}</div>`;
     }
+    const price = (note = '') => `<div class="price">${coin(priceOf(it.id))}${note ? `<small>${note}</small>` : ''}</div>`;
     let actHtml = '';
-    if (act.a === 'buy') actHtml = `<button class="btn pri" data-a="buy" data-id="${it.id}" ${act.dis ? 'disabled' : ''}><span>${act.label}</span></button>${act.also ? `<button class="btn cy" data-a="equip" data-id="${it.id}"><span>ВЗЯТЬ</span></button>` : ''}${act.dis ? `<small>Не хватает ${fmtCoins(priceOf(it.id) - p.coins)} монет — продайте улов</small>` : ''}`;
-    else if (act.a === 'equip') actHtml = `<button class="btn pri" data-a="equip" data-id="${it.id}"><span>ВЗЯТЬ</span></button>`;
-    else if (eq) actHtml = `${ic('check')}ВЫБРАНО`;
-    else if (own) actHtml = `${ic('check')}КУПЛЕНО`;
-    else actHtml = `<span class="y" style="display:inline-flex;gap:.3em;align-items:center">${coin(priceOf(it.id))}</span><small>Продаётся на рынке — лавка с полосатым навесом у берега</small>`;
-    return `<img class="big" src="${itemIcon(it.id)}" alt=""><h2>${esc(it.name)}</h2><p class="desc">${esc(it.desc)}</p>${body}<div class="act">${actHtml}</div>`;
+    if (act.a === 'buy') {
+      actHtml = `${price(it.cat === 'tackle' ? `ЗА ${it.pack} ШТ.` : '')}<button class="btn pri" data-a="buy" data-id="${it.id}" ${act.dis ? 'disabled' : ''}><span>КУПИТЬ</span>${ic('arrow')}</button>${act.also ? `<button class="btn cy" data-a="equip" data-id="${it.id}"><span>ВЗЯТЬ</span></button>` : ''}${act.dis ? `<small class="need">Не хватает ${fmtCoins(priceOf(it.id) - p.coins)} монет — продайте улов</small>` : ''}`;
+    } else if (act.a === 'equip') actHtml = `<button class="btn pri" data-a="equip" data-id="${it.id}"><span>ВЗЯТЬ</span>${ic('arrow')}</button>`;
+    else if (eq) actHtml = `<div class="state">${ic('check')}ВЫБРАНО</div>`;
+    else if (own) actHtml = `<div class="state">${ic('check')}КУПЛЕНО</div>`;
+    else actHtml = `${price('НА РЫНКЕ')}<div class="note">Купить можно в лавке у берега —<br>под полосатым навесом.</div>`;
+    return `<img class="big${it.cat === 'rod' ? ' rodpic' : ''}" src="${itemIcon(it.id)}" alt=""><h2>${esc(it.name)}</h2><p class="desc">${esc(it.desc)}</p>${body}<div class="act">${actHtml}</div>`;
   }
 
   renderSell() {
@@ -756,22 +842,22 @@ export class UI {
       const f = FISH_BY_ID[c.sp];
       const v = fishValue(c, m);
       const k = f ? m.mult[c.sp] : 1;
-      return `<div class="tile" data-a="sell1" data-id="${i}" title="Продать"><span class="pr ${k >= 1.15 ? 'up' : k <= 0.92 ? 'dn' : ''}">${coin(v)}</span>${c.trophy ? '<span class="tg">ТРОФЕЙ</span>' : ''}<img src="${f ? fishIcon(c.sp) : itemIcon(c.sp)}" alt=""><div class="nm" style="color:${f ? RARITY[f.rar].color : '#fff'}">${esc((f || JUNK_BY_ID[c.sp]).name)}</div><div class="wt">${fmtW(c.w)}</div></div>`;
+      return `<div class="tile" data-a="sell1" data-id="${i}" title="Продать"><span class="pr ${k >= 1.15 ? 'up' : k <= 0.92 ? 'dn' : ''}">${coin(v)}</span>${c.trophy ? '<span class="tg">ТРОФЕЙ</span>' : ''}<img src="${f ? fishIcon(c.sp) : itemIcon(c.sp)}" alt=""><div class="nm" style="color:${f ? rarTint(f.rar) : '#fff'}">${esc((f || JUNK_BY_ID[c.sp]).name)}</div><div class="wt">${fmtW(c.w)}</div></div>`;
     }).join('');
     const total = coolerValue(p, m);
     const mins = Math.max(1, Math.ceil(m.nextIn / 60));
     this.screen.innerHTML = `<div class="dim"></div><div class="panel">
-      <div class="ptitle"><h1>РЫНОК</h1><button class="btn sm cy" data-a="open" data-p="shop"><span>МАГАЗИН СНАСТЕЙ →</span></button><span class="sp"></span><div class="coinbox">${coin(p.coins)}</div><button class="xbtn" data-a="close">×</button></div>
-      <div class="tabs2"><button class="tab on">ТВОЙ УЛОВ · ${p.cooler.length}/${kit.bagCap}</button></div>
+      ${this.panelHead('РЫНОК', `<button class="btn sm cy" data-a="open" data-p="shop">${ic('cart')}<span>МАГАЗИН СНАСТЕЙ</span></button>`)}
+      <div class="tabs2"><button class="tab on">${ic('basket')}Твой улов · ${p.cooler.length}/${kit.bagCap}</button></div>
       <div class="grid">${tiles || '<div class="empty">Садок пуст.<br>Поймайте что-нибудь — торговец купит всё, даже старый ботинок.</div>'}</div>
       <div class="sellside">
-        <h2>СЕГОДНЯ В ЦЕНЕ</h2>
+        <h2>Сегодня в цене</h2>
         <div class="hotlist">${m.hot.map((id) => `<div><img src="${fishIcon(id)}" alt="">${esc(FISH_BY_ID[id].name)}<em>×1,6</em></div>`).join('')}</div>
         <p>Цены меняются каждые 10 минут — следующая смена через ${mins} мин. Стрелка у цены показывает, дороже рыба обычного или дешевле. Нажмите на рыбу, чтобы продать только её.</p>
-        <div class="total"><span>ЗА ВЕСЬ УЛОВ</span><b>${coin(total)}</b></div>
-        <button class="btn pri big" data-a="sellall" ${p.cooler.length ? '' : 'disabled'}><span>ПРОДАТЬ ВСЁ</span></button>
+        <div class="total"><span>За весь улов</span><b>${coin(total)}</b></div>
+        <button class="btn pri big" data-a="sellall" ${p.cooler.length ? '' : 'disabled'}><span>ПРОДАТЬ ВСЁ</span>${ic('arrow')}</button>
       </div>
-      <div class="loadout"><span class="hd">ТОРГОВЕЦ</span><div class="it" style="border:0;text-transform:none;font-family:var(--body);font-style:normal;font-weight:500">«${esc(g.vendorLine())}»</div>${this.footKeys(p.cooler.length ? 'ПРОДАТЬ ВСЁ' : '')}</div></div>`;
+      <div class="loadout"><span class="hd">ТОРГОВЕЦ</span><div class="it say">«${esc(g.vendorLine())}»</div>${this.footKeys(p.cooler.length ? 'ПРОДАТЬ ВСЁ' : '')}</div></div>`;
   }
 
   renderJournal() {
@@ -782,7 +868,7 @@ export class UI {
     const got = Object.keys(p.journal).length;
     const tiles = FISH.map((x) => {
       const jj = p.journal[x.id];
-      return `<div class="tile ${x.id === this.js ? 'sel' : ''} ${jj ? '' : 'unk lock'}" data-a="jpick" data-id="${x.id}">${jj ? `<span class="tg cnt">×${jj.n}</span>` : ''}<img src="${fishIcon(x.id)}" alt=""><div class="nm" style="color:${jj ? RARITY[x.rar].color : '#9fb4d3'}">${jj ? esc(x.name) : '???'}</div></div>`;
+      return `<div class="tile ${x.id === this.js ? 'sel' : ''} ${jj ? '' : 'unk lock'}" data-a="jpick" data-id="${x.id}">${jj ? `<span class="tg cnt">×${jj.n}</span>` : ''}<img src="${fishIcon(x.id)}" alt=""><div class="nm" style="color:${jj ? rarTint(x.rar) : 'rgba(255,255,255,.7)'}">${jj ? esc(x.name) : '???'}</div></div>`;
     }).join('');
     const zones = Object.entries(f.zones).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([z]) => ZONES[z].name.toLowerCase()).join(', ');
     const baits = [...Object.entries(f.baits).filter(([, v]) => v >= 1).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([b]) => ITEMS[b].name.toLowerCase()), ...(f.lure >= 1 ? ['блёсны и воблеры'] : [])].join(', ');
@@ -790,19 +876,19 @@ export class UI {
     const lv = levelInfo(p.xp);
     const s = p.stats;
     this.screen.innerHTML = `<div class="dim"></div><div class="panel">
-      <div class="ptitle"><h1>ЖУРНАЛ</h1><span class="sp"></span><div class="coinbox">${coin(p.coins)}</div><button class="xbtn" data-a="close">×</button></div>
+      ${this.panelHead('ЖУРНАЛ')}
       <div class="jstats"><div><b>${lv.lvl}</b>уровень · ${esc(lv.title)}</div><div><b>${got}/${FISH.length}</b>видов открыто</div><div><b>${s.caught}</b>поймано</div><div><b>${fmtCoins(s.earned)}</b>заработано</div><div><b>${s.best ? fmtW(s.best.w) : '—'}</b>${s.best ? esc(FISH_BY_ID[s.best.sp].name) + ' — рекорд' : 'самый тяжёлый улов'}</div><div><b>${s.snaps}</b>обрывов лески</div>${s.stalked ? `<div><b>${s.stalked}</b>выслежено</div>` : ''}${s.assists ? `<div><b>${s.assists}</b>подсачено друзьям</div>` : ''}</div>
-      <div class="grid" style="grid-template-columns:repeat(5,1fr)">${tiles}</div>
-      <div class="detail" style="grid-row:3/4">
-        <img class="big ${j ? '' : 'unk'}" src="${fishIcon(f.id)}" alt="" style="${j ? '' : 'filter:brightness(0) opacity(.5)'}">
-        <div class="rarc" style="color:${RARITY[f.rar].color}">${RARITY[f.rar].name}</div>
-        <h2 style="margin-top:-.1em">${j ? esc(f.name) : '???'}</h2>
+      <div class="grid g5">${tiles}</div>
+      <div class="detail jdetail">
+        <img class="big ${j ? '' : 'unk'}" src="${fishIcon(f.id)}" alt="">
+        <div class="rarc" style="color:${rarTint(f.rar)}">${RARITY[f.rar].name}</div>
+        <h2>${j ? esc(f.name) : '???'}</h2>
         <p class="desc">${j ? esc(f.desc) : 'Эту рыбу вы ещё не ловили. Подсказки ниже помогут её найти.'}</p>
-        <div class="kv" style="grid-column:1/-1"><span>Где</span><span>${zones}</span><span>На что</span><span>${baits || '—'}</span><span>Когда</span><span>${times}</span>
+        <div class="kv"><span>Где</span><span>${zones}</span><span>На что</span><span>${baits || '—'}</span><span>Когда</span><span>${times}</span>
           <span>Манера</span><span>${esc(FIGHT_STYLES[f.style].name)}: ${esc(FIGHT_STYLES[f.style].tip.charAt(0).toLowerCase() + FIGHT_STYLES[f.style].tip.slice(1))}${f.rar >= 4 ? '. Легенда: дважды собирается с силами' : ''}</span>
           <span>Вес</span><span>${fmtW(f.w[0])} – ${fmtW(f.w[1])}</span>${j ? `<span>Поймано</span><span>${j.n}</span><span>Рекорд</span><span class="y">${fmtW(j.best)}</span>` : ''}</div>
       </div>
-      <div class="loadout"><span class="hd">ДО УРОВНЯ ${lv.lvl + 1}</span><div class="it" style="border:0;flex:1;max-width:30em"><div class="pbar" style="flex:1;height:1em"><i style="width:${Math.round((lv.cur / lv.need) * 100)}%;background:var(--ye)"></i></div>&nbsp;${lv.cur} / ${lv.need}</div>${this.footKeys('')}</div></div>`;
+      <div class="loadout"><span class="hd">ДО УРОВНЯ ${lv.lvl + 1}</span><div class="it bar"><div class="pbar"><i style="width:${Math.round((lv.cur / lv.need) * 100)}%"></i></div>${lv.cur} / ${lv.need}</div>${this.footKeys('')}</div></div>`;
   }
 
   /** Экран «Персонаж»: выбор героя. Других персонажей в игре нет — собрать своего из частей больше нельзя. */
@@ -819,9 +905,9 @@ export class UI {
       : `<p class="ednote">${heroes.ready ? 'В этой версии игры готовых героев нет.' : 'Герои загружаются…'}</p>`;
     this.screen.innerHTML = `<div class="editor">
       <div class="ptitle"><h1>ПЕРСОНАЖ</h1></div>
-      <div class="hinfo">${cur ? `<h2>${esc(cur.name)}</h2>${cur.about ? `<p>${esc(cur.about)}</p>` : ''}${heroTemplate(cur.id) ? '' : '<p class="load">Модель загружается…</p>'}` : ''}</div>
+      <div class="hinfo">${cur ? `<h2>${esc(cur.name)}</h2>${cur.tag ? `<div class="htag">${esc(cur.tag)}</div>` : ''}<i class="hsw"></i>${cur.about ? `<p>${esc(cur.about)}</p>` : ''}${heroTemplate(cur.id) ? '' : '<p class="load">Модель загружается…</p>'}` : ''}</div>
       <div class="opts"><h3>Выберите героя</h3>${list}</div>
-      <div class="edfoot"><button class="btn ghost" data-a="edcancel"><kbd class="b">ESC</kbd><span>ОТМЕНА</span></button><span class="sp"></span><span class="edhint">${this.g.input.touch.on ? 'Ведите пальцем — герой повернётся' : 'Зажмите мышь и ведите — герой повернётся'}</span><span class="sp"></span><button class="btn pri big" data-a="edsave" style="height:2.2em"><span>ГОТОВО</span></button></div></div>`;
+      <div class="edfoot"><button class="btn ghost" data-a="edcancel"><kbd class="b">ESC</kbd><span>ОТМЕНА</span></button><span class="sp"></span><span class="edhint">${this.g.input.touch.on ? 'Ведите пальцем — герой повернётся' : 'Зажмите мышь и ведите — герой повернётся'}</span><span class="sp"></span><button class="btn pri big" data-a="edsave"><span>ГОТОВО</span>${ic('arrow')}</button></div></div>`;
   }
 
   renderSettings() {
@@ -830,6 +916,7 @@ export class UI {
     const tog = (k) => `<span class="tog ${s[k] ? 'on' : ''} click" data-a="tog" data-id="${k}"></span>`;
     this.screen.innerHTML = `<div class="dim"></div><div class="center wide">
       <h1>НАСТРОЙКИ</h1>
+      <div class="cbody">
       <div class="set">
         <span>Чувствительность мыши</span>${rng('sens', 0.3, 3, 0.05)}
         <span>Перевернуть мышь по вертикали</span>${tog('invertY')}
@@ -849,9 +936,9 @@ export class UI {
         <span>Подсказки клавиш внизу</span>${tog('hints')}
       </div>
       ${this.g.cache && this.g.cache.on ? `<div class="hint cachenote">Игра сохранена на этом устройстве${this.g.cache.total ? `: ${this.g.cache.done} из ${this.g.cache.total} файлов` : ''} — открывается сразу и не ждёт сервер.</div>` : ''}
-      <button class="btn pri" data-a="close"><span>ГОТОВО</span></button>
       <div class="row2">${this.g.installPrompt ? '<button class="btn sm" data-a="install"><span>УСТАНОВИТЬ КАК ПРИЛОЖЕНИЕ</span></button>' : ''}<button class="btn sm" data-a="bench"><span>ПРОВЕРКА КОМПЬЮТЕРА</span></button><button class="btn sm ${this.g.cloud.clash ? 'red' : ''}" data-a="open" data-p="save"><span>СОХРАНЕНИЕ И ПЕРЕНОС</span></button></div>
-      <div class="hint savenote" id="saveLine">${this.saveLine()}</div></div>`;
+      <div class="hint savenote" id="saveLine">${this.saveLine()}</div>
+      <button class="btn pri" data-a="close"><span>ГОТОВО</span>${ic('arrow')}</button></div></div>`;
   }
   /** Одна строка: где сейчас лежит прогресс и когда он в последний раз ушёл на сервер. */
   saveLine() {
@@ -881,13 +968,14 @@ export class UI {
     const typed = (this.screen.querySelector('#cloudcode') || {}).value || '';
     this.screen.innerHTML = `<div class="dim"></div><div class="center wide savep">
       <h1>СОХРАНЕНИЕ</h1>
+      <div class="cbody">
       <div class="hint savenote" id="saveLine">${this.saveLine()}</div>
       ${this.cloudBlock()}
       <h3>ФАЙЛ СОХРАНЕНИЯ</h3>
       <div class="hint savenote">Запасная копия прогресса одним файлом: её можно убрать в надёжное место или открыть на другом устройстве.</div>
       <div class="row2"><button class="btn sm" data-a="savefile"><span>СОХРАНИТЬ В ФАЙЛ</span></button><button class="btn sm" data-a="loadfile"><span>ЗАГРУЗИТЬ ИЗ ФАЙЛА</span></button><button class="btn ghost sm" data-a="reset"><span>НАЧАТЬ ЗАНОВО — СТЕРЕТЬ ПРОГРЕСС</span></button></div>
       <input type="file" id="savein" accept=".json,application/json" hidden>
-      <button class="btn pri" data-a="open" data-p="settings"><span>ГОТОВО</span></button></div>`;
+      <button class="btn pri" data-a="open" data-p="settings"><span>ГОТОВО</span>${ic('arrow')}</button></div></div>`;
     const inp0 = this.screen.querySelector('#cloudcode');
     if (inp0 && typed) inp0.value = typed;
     const found = g.pendingCode;
@@ -979,17 +1067,19 @@ export class UI {
     const d = t.data;
     const mine = g.cloud.s.on ? g.cloud.s.pub : '';
     const p = g.profile;
+    // первые три места — в кружках: золото, серебро, бронза
+    const place = (i) => (i < 3 ? `<i class="r${i + 1}">${i + 1}</i>` : `<i>${i + 1}</i>`);
     let body = '';
     if (!d) {
       body = `<p class="topnote">${t.why ? ({ NO_DB: 'Сервер сейчас не ведёт таблицу рекордов.', SLOW_DOWN: 'Слишком часто — подождите несколько секунд и откройте снова.' }[t.why] || 'Сервер не отвечает: он просыпается или нет связи. Попробуйте через минуту.') : 'Загружаю таблицу…'}</p>`;
     } else if (t.tab === 'anglers') {
       const rows = d.anglers.map((r, i) => {
         const lv = levelInfo(r.xp);
-        return `<div class="trow ${r.pub === mine ? 'me' : ''}"><i>${i + 1}</i><span class="nm">${esc(r.name)}${r.pub === mine ? ' <em>вы</em>' : ''}</span><span class="lv"><b>${lv.lvl}</b> ${esc(lv.title)}</span><span>${r.species}/${FISH.length}</span><span>${r.legends || '—'}</span><span>${r.medals || '—'}</span><span>${r.caught}</span></div>`;
+        return `<div class="trow ${r.pub === mine ? 'me' : ''}">${place(i)}<span class="nm">${esc(r.name)}${r.pub === mine ? ' <em>вы</em>' : ''}</span><span class="lv">${ic('star')}<b>${lv.lvl}</b> ${esc(lv.title)}</span><span>${r.species}/${FISH.length}</span><span>${r.legends || '—'}</span><span>${r.medals || '—'}</span><span>${r.caught}</span></div>`;
       }).join('');
       const out = d.me && !d.anglers.some((r) => r.pub === mine);
       body = d.anglers.length
-        ? `<div class="ttable"><div class="trow hd"><i>№</i><span class="nm">Рыбак</span><span class="lv">Уровень</span><span>Видов</span><span>Легенд</span><span>Медалей</span><span>Улов</span></div>${rows}</div>
+        ? `<div class="ttable"><div class="trow hd"><i>Место</i><span class="nm">Рыбак</span><span class="lv">Уровень</span><span>Видов</span><span>Легенд</span><span>Медалей</span><span>Улов</span></div>${rows}</div>
           ${out ? `<p class="topnote">Ваше место — <b class="y">${d.me.place}</b> из ${d.total}.</p>` : ''}`
         : '<p class="topnote">Таблица пока пуста. Поймайте первую рыбу — и откроете её собой.</p>';
     } else {
@@ -998,18 +1088,20 @@ export class UI {
         const r = rec.get(f.id);
         const j = p.journal[f.id];
         const hold = r && r.pub === mine;
-        return `<div class="trow ${hold ? 'me' : ''}"><img class="${j ? '' : 'unk'}" src="${fishIcon(f.id)}" alt=""><span class="nm" style="color:${j ? RARITY[f.rar].color : '#9fb4d3'}">${j ? esc(f.name) : '???'}</span><span class="w">${r ? fmtW(r.w) : '—'}</span><span class="who">${r ? `${esc(r.name)}${hold ? ' <em>вы</em>' : ''}` : 'ещё никто не поймал'}</span><span class="my">${j ? fmtW(j.best) : '—'}</span></div>`;
+        return `<div class="trow ${hold ? 'me' : ''}"><img class="${j ? '' : 'unk'}" src="${fishIcon(f.id)}" alt=""><span class="nm" style="color:${j ? rarTint(f.rar) : 'rgba(255,255,255,.7)'}">${j ? esc(f.name) : '???'}</span><span class="w">${r ? fmtW(r.w) : '—'}</span><span class="who">${r ? `${esc(r.name)}${hold ? ' <em>вы</em>' : ''}` : 'ещё никто не поймал'}</span><span class="my">${j ? fmtW(j.best) : '—'}</span></div>`;
       }).join('');
       body = `<div class="ttable rec"><div class="trow hd"><i></i><span class="nm">Рыба</span><span class="w">Рекорд</span><span class="who">Чей</span><span class="my">Ваш вес</span></div>${rows}</div>`;
     }
     const c = g.cloud;
     const foot = c.state === 'off' ? 'Вас в таблице нет: сохранение на сервере выключено (Настройки → Сохранение и перенос).' : !c.s.listed ? 'Вас в таблице нет: вы скрыли себя (Настройки → Сохранение и перенос).' : c.s.rev > 0 ? 'Таблицу видят все игроки. Скрыть себя можно в настройках: «Сохранение и перенос».' : 'Вы появитесь в таблице после первого улова. Таблицу видят все игроки.';
+    const seg = (id, icon, name) => `<button class="btn sm ${t.tab === id ? 'cy' : ''}" data-a="toptab" data-id="${id}">${ic(icon)}<span>${name}</span></button>`;
     this.screen.innerHTML = `<div class="dim"></div><div class="center toppanel">
-      <div class="tophead"><h1>РЕКОРДЫ БУХТЫ</h1>${d ? `<span class="cnt">${d.total} ${plural(d.total, 'рыбак', 'рыбака', 'рыбаков')}</span>` : ''}</div>
-      <div class="opt3"><button class="btn sm ${t.tab === 'anglers' ? 'pri' : 'ghost'}" data-a="toptab" data-id="anglers"><span>РЫБАКИ</span></button><button class="btn sm ${t.tab === 'records' ? 'pri' : 'ghost'}" data-a="toptab" data-id="records"><span>РЕКОРДЫ ПО ВИДАМ</span></button></div>
+      <div class="tophead"><h1>РЕКОРДЫ БУХТЫ</h1><span class="sp"></span>${d ? `<span class="cnt">${ic('users')}${d.total} ${plural(d.total, 'рыбак', 'рыбака', 'рыбаков')}</span>` : ''}</div>
+      <div class="cbody">
+      <div class="seg">${seg('anglers', 'fish', 'РЫБАКИ')}${seg('records', 'cup', 'РЕКОРДЫ ПО ВИДАМ')}</div>
       ${body}
       <div class="hint savenote">${foot}</div>
-      <button class="btn ${g.inWorld ? 'ghost' : 'pri'}" data-a="${g.inWorld ? 'back' : 'close'}"><span>НАЗАД</span></button></div>`;
+      <button class="btn ghost" data-a="${g.inWorld ? 'back' : 'close'}">${this.key('esc')}<span>НАЗАД</span></button></div></div>`;
   }
   /** Открытка с уловом (или с видом бухты): картинка и что с ней сделать. */
   renderCard() {
@@ -1018,22 +1110,24 @@ export class UI {
     const share = typeof navigator.share === 'function' && typeof navigator.canShare === 'function';
     this.screen.innerHTML = `<div class="dim"></div><div class="center cardview">
       <h1>ОТКРЫТКА</h1>
+      <div class="cbody">
       <img class="cardimg" src="${k.url}" alt="Открытка: ${esc(k.t.head)}${k.t.sub ? ', ' + esc(k.t.sub) : ''}">
-      <div class="row2"><button class="btn pri" data-a="cardsave"><span>СКАЧАТЬ</span></button>${share ? '<button class="btn cy" data-a="cardshare"><span>ПОДЕЛИТЬСЯ</span></button>' : ''}<button class="btn ghost" data-a="close"><span>НАЗАД</span></button></div>
-      <div class="hint">Отправьте друзьям — пусть завидуют.${this.g.fishing.state === 'landed' ? ' Рыба подождёт: решить, в садок её или отпустить, можно после.' : ''}</div></div>`;
+      <div class="row2">${share ? `<button class="btn sq" data-a="cardshare" title="Поделиться" aria-label="Поделиться">${ic('share')}</button>` : ''}<button class="btn pri" data-a="cardsave">${ic('download')}<span>СКАЧАТЬ</span></button><button class="btn ghost" data-a="close"><span>НАЗАД</span></button></div>
+      <div class="hint">Отправьте друзьям — пусть завидуют.${this.g.fishing.state === 'landed' ? ' Рыба подождёт: решить, в садок её или отпустить, можно после.' : ''}</div></div></div>`;
   }
   /** Проверка компьютера: идёт замер — полоса, кончился — итог, который можно скопировать и прислать. */
   renderBench() {
     const r = this.g.lastBench;
     const run = this.benchRun;
-    this.screen.innerHTML = `<div class="dim${run ? ' clear' : ''}"></div><div class="center bench">
+    this.screen.innerHTML = `<div class="dim${run ? ' clear' : ''}"></div><div class="center bench${run ? ' run' : ''}">
       <h1>ПРОВЕРКА КОМПЬЮТЕРА</h1>
+      <div class="cbody">
       ${run ? `<div class="hint">Смотрим четыре вида бухты: ${esc(run.name || '…')}</div><div class="bbar"><i style="transform:scaleX(${(run.k || 0).toFixed(2)})"></i></div>`
         : r ? `<div class="verdict">${esc(r.verdict)}</div><pre class="report">${esc(r.text)}</pre>
       <div class="hint">Если игра тормозит — скопируйте этот текст и пришлите: по нему видно, что именно мешает.</div>
       <button class="btn pri" data-a="benchcopy"><span>СКОПИРОВАТЬ</span></button>
       ${settings.quality === 'auto' ? '<button class="btn sm" data-a="recalib"><span>ПОДОБРАТЬ КАЧЕСТВО ЗАНОВО</span></button>' : ''}` : ''}
-      ${run ? '' : '<button class="btn ghost sm" data-a="open" data-p="settings"><span>НАЗАД</span></button>'}</div>`;
+      ${run ? '' : '<button class="btn ghost sm" data-a="open" data-p="settings"><span>НАЗАД</span></button>'}</div></div>`;
   }
   async runBench(recalib = false) {
     if (this.benchRun) return;
@@ -1062,20 +1156,29 @@ export class UI {
     }
     el.innerHTML = html;
   }
+  /** Пауза: список слева, бухта за ним видна целиком. Первой строкой — вернуться в игру. */
   renderPause() {
     const g = this.g;
-    this.screen.innerHTML = `<div class="dim"></div><div class="center">
+    const item = (attrs, icon, text, cls = '') => `<button class="pi ${cls}" ${attrs}>${ic(icon)}<span>${text}</span></button>`;
+    const open = (panel, icon, text) => item(`data-a="open" data-p="${panel}"`, icon, text);
+    const home = g.ride ? 'СОЙТИ И ВЕРНУТЬСЯ В БУХТУ' : g.ownBoat() ? (g.boat.active || g.boat.moor !== 0 ? 'В БУХТУ ВМЕСТЕ С ЛОДКОЙ' : '') : g.boat.rented ? 'В БУХТУ · СДАТЬ ЛОДКУ' : '';
+    this.screen.innerHTML = `<div class="dim"></div><div class="center pausep">
       <h1>ПАУЗА</h1>
-      <button class="btn pri" data-a="close"><span>ВЕРНУТЬСЯ К РЫБАЛКЕ</span></button>
-      <button class="btn" data-a="open" data-p="tackle"><span>СНАСТИ</span></button>
-      <div class="row2"><button class="btn" data-a="open" data-p="journal"><span>ЖУРНАЛ РЫБ</span></button>${g.offline ? '' : `<button class="btn" data-a="open" data-p="top"><span>${ic('crown')} РЕКОРДЫ</span></button>`}</div>
-      <div class="row2"><button class="btn" data-a="open" data-p="quests"><span>${ic('list')} ЗАДАНИЯ ДНЯ</span></button><button class="btn" data-a="open" data-p="tour"><span>${ic('cup')} ТУРНИР</span></button></div>
-      <button class="btn" data-a="open" data-p="editor"><span>ПЕРСОНАЖ</span></button>
-      <button class="btn" data-a="open" data-p="help"><span>КАК ИГРАТЬ</span></button>
-      <button class="btn" data-a="open" data-p="settings"><span>НАСТРОЙКИ</span></button>
-      ${g.solo ? '' : `<button class="btn cy" data-a="copy"><span>${ic('link')} ССЫЛКА ДЛЯ ДРУЗЕЙ · ${esc(g.code)}</span></button>`}
-      ${g.ride ? '<button class="btn" data-a="home"><span>СОЙТИ И ВЕРНУТЬСЯ В БУХТУ</span></button>' : g.ownBoat() ? (g.boat.active || g.boat.moor !== 0 ? '<button class="btn" data-a="home"><span>ВЕРНУТЬСЯ В БУХТУ ВМЕСТЕ С ЛОДКОЙ</span></button>' : '') : g.boat.rented ? '<button class="btn" data-a="home"><span>ВЕРНУТЬСЯ В БУХТУ · СДАТЬ ЛОДКУ</span></button>' : ''}
-      <button class="btn ghost" data-a="tolobby"><span>${g.solo ? 'В ЛОББИ' : 'В ЛОББИ К КОМАНДЕ'}</span></button></div>`;
+      <div class="cbody plist">
+      ${item('data-a="close"', 'play', 'ВЕРНУТЬСЯ В ИГРУ', 'pri')}
+      ${open('tackle', 'rod', 'СНАСТИ')}
+      ${open('journal', 'fish', 'ЖУРНАЛ РЫБ')}
+      ${open('quests', 'list', 'ЗАДАНИЯ ДНЯ')}
+      ${open('tour', 'timer', g.solo ? 'ЗАПЛЫВ НА ВРЕМЯ' : 'ТУРНИР')}
+      ${g.offline ? '' : open('top', 'cup', 'РЕКОРДЫ')}
+      ${open('editor', 'user', 'ПЕРСОНАЖ')}
+      ${open('help', 'help', 'КАК ИГРАТЬ')}
+      ${open('settings', 'gear', 'НАСТРОЙКИ')}
+      ${g.solo ? '' : item('data-a="copy"', 'link', `ПОЗВАТЬ ДРУЗЕЙ · ${esc(g.code)}`)}
+      ${home ? item('data-a="home"', 'anchor', home) : ''}
+      ${item('data-a="tolobby"', 'exit', g.solo ? 'В ЛОББИ' : 'В ЛОББИ К КОМАНДЕ')}
+      </div>
+      <div class="pfoot">${this.key('esc')}<span>НАЗАД</span></div></div>`;
   }
   renderQuests() {
     const g = this.g;
@@ -1090,11 +1193,12 @@ export class UI {
         <div class="qr"><span>${esc(questCount(q)) || (q.done ? 'готово' : 'ещё не сделано')}</span><span class="rw">${coin(r.coins)}<i class="sep"></i>ОПЫТ +${r.xp}</span></div></div>`;
     }).join('');
     const all = qs && qs.list.every((q) => q.done);
-    this.screen.innerHTML = `<div class="dim"></div><div class="center" style="width:min(41em,94vw)">
+    this.screen.innerHTML = `<div class="dim"></div><div class="center questp">
       <h1>ЗАДАНИЯ ДНЯ</h1>
+      <div class="cbody">
       ${cards || '<p>Задания появятся, как только вы выйдете на рыбалку.</p>'}
       <p>${all ? 'Все три выполнены — премия получена. ' : `За все три — премия: <b class="y">${fmtCoins(Math.round((QUEST_BONUS * Math.min(6, 1 + 0.15 * (lv - 1))) / 5) * 5)} монет</b>. `}Задания у всех рыбаков в этот день одинаковые — их удобно делать вместе. Новые появятся в полночь.</p>
-      <button class="btn pri" data-a="close"><span>ПОНЯТНО</span></button></div>`;
+      <button class="btn pri" data-a="close"><span>ПОНЯТНО</span>${ic('arrow')}</button></div></div>`;
   }
   renderTour() {
     const g = this.g;
@@ -1123,29 +1227,48 @@ export class UI {
       const hostName = host ? '' : (g.players.get(g.hostId) || { card: { name: 'хозяин комнаты' } }).card.name;
       const tg = tourTargets(sel.kind, sel.len, g.fishing.kit);
       const n = Math.max(2, g.roster().length);
+      // выбранное — бирюзовое, как всюду в меню
       body += `<p>${g.solo ? 'Заплыв на время: наловите на медаль, пока идут часы. Пороги зависят от вашей снасти.' : 'Соревнование для всей комнаты: кто больше наловит за отведённое время. Очки считаются сами, по улову.'}</p>
         <h3>ВО ЧТО ИГРАЕМ</h3>
-        <div class="opt3">${Object.keys(TOURS).map((k) => `<button class="btn sm ${k === sel.kind ? 'pri' : 'ghost'}" data-a="tkind" data-id="${k}"><span>${TOURS[k].name}</span></button>`).join('')}</div>
+        <div class="opt3">${Object.keys(TOURS).map((k) => `<button class="btn sm ${k === sel.kind ? 'cy' : 'ghost'}" data-a="tkind" data-id="${k}"><span>${TOURS[k].name}</span></button>`).join('')}</div>
         <p>${TOURS[sel.kind].hint}. Хлам не считается.</p>
         <h3>СКОЛЬКО ВРЕМЕНИ</h3>
-        <div class="opt3">${TOUR_LENS.map((l) => `<button class="btn sm ${l === sel.len ? 'pri' : 'ghost'}" data-a="tlen" data-id="${l}"><span>${l / 60} МИН</span></button>`).join('')}</div>
+        <div class="opt3">${TOUR_LENS.map((l) => `<button class="btn sm ${l === sel.len ? 'cy' : 'ghost'}" data-a="tlen" data-id="${l}"><span>${l / 60} МИН</span></button>`).join('')}</div>
         <p>${g.solo ? `Медали: бронза — ${n1(tg[0])}${unit(sel.kind)}, серебро — ${n1(tg[1])}${unit(sel.kind)}, золото — ${n1(tg[2])}${unit(sel.kind)}. Призы: ${[1, 2, 3].map((m) => medalPrize(m, sel.len)).join(', ')} монет.` : `Призы на ${n} рыбаков: первое место — ${tourPrize(1, n, sel.len)} монет, второе — ${tourPrize(2, n, sel.len)}${n > 2 ? `, третье — ${tourPrize(3, n, sel.len)}` : ''}. Остальным, кто что-то поймал, — по 10.`}</p>
-        ${g.state !== 'world' ? '<p class="y">Турнир запускается на рыбалке: начните её и откройте это меню клавишей T.</p>' : host ? `<button class="btn pri" data-a="tstart"><span>${ic('cup')} ${g.solo ? 'НАЧАТЬ ЗАПЛЫВ' : 'ОБЪЯВИТЬ ТУРНИР'}</span></button>` : `<p class="y">Турнир запускает хозяин комнаты — ${esc(hostName)}.</p>`}`;
+        ${g.state !== 'world' ? '<p class="y">Турнир запускается на рыбалке: начните её и откройте это меню клавишей T.</p>' : host ? `<button class="btn pri" data-a="tstart">${ic('cup')}<span>${g.solo ? 'НАЧАТЬ ЗАПЛЫВ' : 'ОБЪЯВИТЬ ТУРНИР'}</span>${ic('arrow')}</button>` : `<p class="y">Турнир запускает хозяин комнаты — ${esc(hostName)}.</p>`}`;
     }
-    this.screen.innerHTML = `<div class="dim"></div><div class="center tourp" style="width:min(43em,94vw)">
-      <h1>${g.solo ? 'ЗАПЛЫВ НА ВРЕМЯ' : 'ТУРНИР'}</h1>${body}
-      <button class="btn ${t || this.popts.result ? 'pri' : 'ghost'}" data-a="close"><span>${t ? 'К РЫБАЛКЕ' : this.popts.result ? 'ПОНЯТНО' : 'НАЗАД'}</span></button></div>`;
+    this.screen.innerHTML = `<div class="dim"></div><div class="center tourp">
+      <h1>${g.solo ? 'ЗАПЛЫВ НА ВРЕМЯ' : 'ТУРНИР'}</h1>
+      <div class="cbody">${body}
+      <button class="btn ${t || this.popts.result ? 'pri' : 'ghost'}" data-a="close"><span>${t ? 'К РЫБАЛКЕ' : this.popts.result ? 'ПОНЯТНО' : 'НАЗАД'}</span></button></div></div>`;
   }
+  /** Как играть: «Основы» — четыре шага рыбалки карточками, «Управление» — все клавиши списком. */
   renderHelp() {
+    const g = this.g;
+    const touch = g.input.touch.on;
+    const tab = this.helpTab === 'keys' ? 'keys' : 'basics';
     const k = (s, c = '') => `<kbd class="${c}">${s}</kbd>`;
-    if (this.g.input.touch.on) {
-      this.screen.innerHTML = `<div class="dim"></div><div class="center" style="width:min(44em,94vw)">
-      <h1>КАК ИГРАТЬ</h1>
-      <div class="help">
+    const seg = (id, icon, name) => `<button class="btn sm ${tab === id ? 'cy' : ''}" data-a="helptab" data-id="${id}">${ic(icon)}<span>${name}</span></button>`;
+    const lmb = k('ЛКМ');
+    let body = '';
+    if (tab === 'basics') {
+      const card = (n, title, text, img) => `<div class="hcard"><img src="${img}" alt=""><div><h2><em>${n}</em>${title}</h2><p>${text}</p></div></div>`;
+      body = `<div class="hcards">
+        ${card('01', 'ЗАБРОС', touch ? 'Зажми жёлтую кнопку и отпусти.' : `Зажми ${lmb} и отпусти.`, itemIcon('rod1'))}
+        ${card('02', 'ПОДСЕЧКА', touch ? 'Клюёт? Жми кнопку.' : `Клюёт? Нажми ${lmb}.`, itemIcon('float1'))}
+        ${card('03', 'ВЫВАЖИВАНИЕ', touch ? 'Держи кнопку, следи за леской.' : `Держи ${lmb}, следи за леской.`, itemIcon('reel1'))}
+        ${card('04', 'УЛОВ', 'В садок или на волю.', fishIcon('shuka'))}
+      </div>
+      <div class="hkeys">${touch
+        ? `<span>${k('ДЖОЙСТИК', 'g')} Ходьба и бег</span><i></i><span>${k('ПАЛЕЦ ПО ЭКРАНУ', 'g')} Осмотреться</span><i></i><span>${k('☰', 'g')} Меню</span>`
+        : `<span>${k('W')}${k('A')}${k('S')}${k('D')} Ходьба</span><i></i><span>${k('SHIFT')} Бег</span><i></i><span>${k('E')} Взаимодействие</span><i></i><span>${k('TAB')} Снасти</span>`}</div>
+      <p>Чем лучше удочка — тем дальше заброс: до рифа, водопада и арки стартовой не достать. Тёмные тени под водой — косяки: там клюёт чаще и крупнее. В непогоду, особенно в дождь, рыба берёт охотнее.</p>`;
+    } else if (touch) {
+      body = `<div class="help">
         <span>${k('ДЖОЙСТИК', 'g')}</span><span>Слева — ходить; отведите до упора — бег. Палец по экрану — смотреть по сторонам.</span>
         <span>${k('ЗАБРОС')}</span><span>Наведите прицел на воду, зажмите жёлтую кнопку — шкала силы растёт — и отпустите. Белая риска показывает, сколько силы нужно до метки.</span>
         <span>${k('ПОДСЕКАЙ')}</span><span>Поплавок нырнул и кнопка замигала — жмите сразу.</span>
-        <span>${k('МОТАЙ')}</span><span><b>Вываживание:</b> держите кнопку — мотаете, отпускаете — леска слабеет. Стрелка натяжения должна быть в голубой зоне. Рыба рванула вбок — ведите джойстик в другую сторону. У каждой рыбы своя манера — подсказка под шкалой: прыгнула свечой — отпустите кнопку, залегла на дно — держите стрелку в рамке.</span>
+        <span>${k('МОТАЙ')}</span><span><b>Вываживание:</b> держите кнопку — мотаете, отпускаете — леска слабеет. Стрелка натяжения должна быть в бирюзовой зоне. Рыба рванула вбок — ведите джойстик в другую сторону. У каждой рыбы своя манера — подсказка под шкалой: прыгнула свечой — отпустите кнопку, залегла на дно — держите стрелку в рамке.</span>
         <span>${k('СМОТАТЬ', 'g')}</span><span>Вернуть снасть. После улова рядом появится «ОТПУСТИТЬ» — за это дают больше опыта.</span>
         <span>${k('РЫНОК')}</span><span>Кнопка появляется у лавки на берегу: продать улов, купить удочки, леску, наживку.</span>
         <span>${k('ЛОДКА')}</span><span>Подойдите к лодке у пирса — её дают напрокат. Джойстик вперёд — ход, в стороны — руль. Рыбачить можно прямо с борта: в открытом море, у затонувшего корабля, в лагуне Пальмового острова. К другу в лодку можно сесть пассажиром.</span>
@@ -1153,32 +1276,29 @@ export class UI {
         <span>${k('☰', 'g')}</span><span>Меню: журнал рыб, задания дня, турнир, персонаж, настройки. Плашка «ГОЛОС» справа сверху включает и выключает микрофон.</span>
         <span>${k('ОТКРЫТКА', 'g')}</span><span>Появляется с уловом в руках: кадр с подписью, который можно сохранить и отправить друзьям.</span>
         <span>${k('ПОДСАК')}</span><span>Друг рядом вываживает рыбу — подойдите: когда она пройдёт 70 % пути, кнопка даст взять её подсаком. Рыбаку — улов, вам — четверть опыта.</span>
-      </div>
-      <p>Чем лучше удочка — тем дальше заброс: до рифа, водопада и арки стартовой не достать. Тёмные тени под водой — косяки, там клюёт чаще и крупнее.</p>
-      ${this.g.offline ? '' : '<p>Прогресс сохраняется сам — в этом браузере и на сервере игры. Чтобы открыть его на другом устройстве, возьмите код в «Настройках → Сохранение и перенос».</p>'}
-      <button class="btn pri" data-a="${this.popts && this.popts.first ? 'close' : 'back'}"><span>ПОНЯТНО</span></button></div>`;
-      return;
-    }
-    this.screen.innerHTML = `<div class="dim"></div><div class="center" style="width:min(44em,94vw)">
-      <h1>КАК ИГРАТЬ</h1>
-      <div class="help">
+      </div>`;
+    } else {
+      body = `<div class="help">
         <span>${k('W')}${k('A')}${k('S')}${k('D')}</span><span>Ходить. ${k('SHIFT', 'g')} — бег, ${k('ПРОБЕЛ', 'g')} — прыжок, ${k('X', 'g')} — сесть (на краю причала ноги свесятся).</span>
-        <span>${k('ЛКМ')}</span><span><b>Заброс:</b> наведите прицел на воду, зажмите кнопку — шкала силы растёт — и отпустите. Белая риска на шкале показывает, сколько силы нужно до метки.</span>
-        <span>${k('ЛКМ')}</span><span><b>Подсечка:</b> поплавок нырнул и появилось «КЛЮЁТ!» — жмите сразу.</span>
-        <span>${k('ЛКМ')}${k('A', 'g')}${k('D', 'g')}</span><span><b>Вываживание:</b> держите кнопку — мотаете, отпускаете — леска слабеет. Стрелка натяжения должна быть в голубой зоне. В красной леска рвётся, в жёлтой рыба сходит. Рванула вбок — ведите удочку в другую сторону. У каждой рыбы своя манера — подсказка под шкалой: прыгнула свечой — отпустите кнопку, залегла на дно — держите стрелку в рамке.</span>
+        <span>${lmb}</span><span><b>Заброс:</b> наведите прицел на воду, зажмите кнопку — шкала силы растёт — и отпустите. Белая риска на шкале показывает, сколько силы нужно до метки.</span>
+        <span>${lmb}</span><span><b>Подсечка:</b> поплавок нырнул и появилось «КЛЮЁТ!» — жмите сразу.</span>
+        <span>${lmb}${k('A', 'g')}${k('D', 'g')}</span><span><b>Вываживание:</b> держите кнопку — мотаете, отпускаете — леска слабеет. Стрелка натяжения должна быть в бирюзовой зоне. В красной леска рвётся, в жёлтой рыба сходит. Рванула вбок — ведите удочку в другую сторону. У каждой рыбы своя манера — подсказка под шкалой: прыгнула свечой — отпустите кнопку, залегла на дно — держите стрелку в рамке.</span>
         <span>${k('ПКМ', 'x')} / ${k('R', 'b')}</span><span>Смотать леску. После улова ${k('R', 'b')} — отпустить рыбу (за это дают больше опыта).</span>
         <span>${k('E')}</span><span>Говорить с торговцем у лавки «Рынок»: продать улов, купить удочки, леску, наживку.</span>
-        <span>${k('E')}</span><span><b>Лодка:</b> подойдите к лодке у пирса — её дают напрокат (а в лавке, в «Прочем», продаётся своя). ${k('W', 'g')}${k('S', 'g')} — ход, ${k('A', 'g')}${k('D', 'g')} — руль. Рыбачить можно прямо с борта: в открытом море, у затонувшего корабля, в лагуне Пальмового острова. Причалить можно у маяка и на острове. В лодку друга тоже можно сесть — в ней два места для пассажиров.</span>
+        <span>${k('E')}</span><span><b>Лодка:</b> подойдите к лодке у пирса — её дают напрокат (а в лавке, в «Разном», продаётся своя). ${k('W', 'g')}${k('S', 'g')} — ход, ${k('A', 'g')}${k('D', 'g')} — руль. Рыбачить можно прямо с борта: в открытом море, у затонувшего корабля, в лагуне Пальмового острова. Причалить можно у маяка и на острове. В лодку друга тоже можно сесть — в ней два места для пассажиров.</span>
         <span>${k('TAB', 'x')} ${k('Q', 'x')}</span><span>Снасти и набор. ${k('Q', 'x')} — быстро сменить наживку.</span>
         <span>${k('J', 'g')} ${k('C', 'g')} ${k('K', 'g')} ${k('T', 'g')}</span><span>Журнал рыб, выбор героя, задания дня (за них дают монеты и опыт) и турнир — в одиночку это заплыв на медаль.</span>
         <span>${k('M', 'g')} ${k('V', 'g')} ${k('ENTER', 'g')}</span><span>Микрофон вкл/выкл, говорить по кнопке, написать в чат.</span>
         <span>${k('1', 'g')}${k('2', 'g')}${k('3', 'g')}${k('4', 'g')}</span><span>Жесты: привет, класс, ура, танец.</span>
         <span>${k('P', 'g')}</span><span><b>Открытка:</b> кадр с подписью — с уловом в руках на ней будут вид, вес и ваше имя. Её можно скачать и отправить друзьям.</span>
         <span>${k('E')}</span><span><b>Вдвоём:</b> друг рядом вываживает рыбу — подойдите: когда она пройдёт 70 % пути, её можно взять подсаком. Рыбаку — улов, вам — четверть опыта.</span>
-      </div>
-      <p>Чем лучше удочка — тем дальше заброс: до рифа, водопада и арки стартовой не достать. Тёмные тени под водой — косяки, там клюёт чаще и крупнее. В непогоду, особенно в дождь, рыба берёт охотнее.</p>
-      ${this.g.offline ? '' : '<p>Прогресс сохраняется сам — в этом браузере и на сервере игры. Чтобы открыть его на другом устройстве, возьмите код в «Настройках → Сохранение и перенос».</p>'}
-      <button class="btn pri" data-a="${this.popts && this.popts.first ? 'close' : 'back'}"><span>ПОНЯТНО</span></button></div>`;
+      </div>`;
+    }
+    this.screen.innerHTML = `<div class="dim"></div><div class="center helpp">
+      <div class="helphead"><h1>КАК ИГРАТЬ</h1><span class="sp"></span><div class="seg">${seg('basics', touch ? 'rod' : 'mouse', 'ОСНОВЫ')}${seg('keys', 'keys', touch ? 'КНОПКИ' : 'УПРАВЛЕНИЕ')}</div></div>
+      <div class="cbody">${body}
+      ${g.offline || tab === 'basics' ? '' : '<p>Прогресс сохраняется сам — в этом браузере и на сервере игры. Чтобы открыть его на другом устройстве, возьмите код в «Настройках → Сохранение и перенос».</p>'}</div>
+      <div class="cfoot"><button class="btn pri big" data-a="${this.popts && this.popts.first ? 'close' : 'back'}"><span>ПОНЯТНО</span>${ic('arrow')}</button></div></div>`;
   }
 
   // ───── обработка нажатий ─────
@@ -1244,6 +1364,9 @@ export class UI {
         return this.renderTour();
       case 'tstart': return g.startTour(this.tr.kind, this.tr.len);
       case 'tstop': return g.stopTour();
+      case 'helptab':
+        this.helpTab = id;
+        return this.renderHelp();
       case 'hero':
         this.ed.look = { hero: id };
         g.editLook(this.ed.look);
@@ -1359,7 +1482,6 @@ export class UI {
       else this.closePanel();
     }
   }
-  /** Перерисовать открытую панель после покупки, продажи и т. п. */
   /** Короткая цветная вспышка по экрану — редкий улов. */
   flash(color) {
     const d = document.createElement('div');
@@ -1368,6 +1490,7 @@ export class UI {
     $('#ui').appendChild(d);
     setTimeout(() => d.remove(), 800);
   }
+  /** Перерисовать открытую панель после покупки, продажи и т. п. */
   rerender() {
     if (this.panel === 'tackle' || this.panel === 'shop') this.renderTackle();
     else if (this.panel === 'sell') this.renderSell();

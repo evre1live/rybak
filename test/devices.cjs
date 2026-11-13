@@ -238,7 +238,7 @@ const atHead = (page) => G(page, () => { RYBAK.player.place(0.6, -20, 0.1); RYBA
     await page.goto(`http://127.0.0.1:${srv.address().port}/?q=low&norender&ts=3&h=13`);
     await page.waitForFunction(() => window.RYBAK && window.__frames > 3, null, { timeout: 60000 });
     await G(page, () => document.fonts.ready);
-    assert.ok(await G(page, () => document.fonts.check('italic 900 20px "Sofia X"', 'РЫБАК') && document.fonts.check('400 16px "Onest"', 'Имя')), 'шрифты загрузились из самой страницы');
+    assert.ok(await G(page, () => document.fonts.check('italic 800 20px "Fira Sans Condensed"', 'РЫБАК') && document.fonts.check('400 16px "Onest"', 'Имя') && [...document.fonts].filter((f) => f.status === 'loaded').length >= 2), 'шрифты загрузились из самой страницы');
     assert.equal(await page.locator('[data-a="create"]').count(), 0);
     assert.equal(await page.locator('#code').count(), 0);
     assert.match(await page.textContent('.tcard .note'), /Пробная версия/);

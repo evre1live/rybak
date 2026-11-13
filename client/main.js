@@ -1860,7 +1860,7 @@ class Game {
       case 'wait': return f.lure ? row(`${k('primary')} Держи — веди приманку`, `${k('back')} Смотать`) : row('Ждём поклёвку', `${k('back')} Смотать`);
       case 'bite': return row(`${k('primary')} Подсекай!`);
       case 'fight': return row(`${k('primary')} Мотать`, 'Отпусти — ослабить', `${k('left')}${pad ? '' : k('right')} Вести`);
-      case 'landed': return row(`${k('primary')} В садок`, `${k('release')} Отпустить`, pad ? '' : '<kbd class="g">P</kbd> Открытка');
+      case 'landed': return ''; // что делать с уловом и какими клавишами — написано на самой карточке улова
       default: return '';
     }
   }
@@ -2011,6 +2011,9 @@ class Game {
     // стеклянные панели размывают картинку под собой только там, где на это есть запас: на «высоком» качестве и не на телефоне
     const blur = this.gfx.quality === 'high' && !this.input.touch.on;
     if (blur !== this.blurOn) document.body.classList.toggle('blur', (this.blurOn = blur));
+    // под открытым меню игра размыта — надписи и панели читаются на любом фоне; на «низком» качестве размытия нет, фон там просто темнее
+    const veil = this.gfx.quality !== 'low';
+    if (veil !== this.veilOn) document.body.classList.toggle('veil', (this.veilOn = veil));
     if (this.scaleNext) {
       // Разрешение меняем здесь, до отрисовки. Смена размера стирает холст: если менять после отрисовки (так делал
       // автоподбор — в конце кадра), на экран уходит пустой кадр — чёрная вспышка.
@@ -2257,7 +2260,8 @@ class Game {
       // в редакторе удочку убираем, чтобы не закрывала лицо
       if (this.meChar.rod) this.meChar.rod.group.visible = !this.editing;
       this.meChar.update(dt, { mode: this.editing ? 'idle' : 'hold', variant: this.editing ? 0 : 1, talk: this.voice.state.selfSpeaking ? 0.5 : 0 });
-      if (showPlates) {
+      // табличка под ногами нужна, чтобы отличать своих в строю; когда рыбак один, она лишняя
+      if (showPlates && !this.solo) {
         v3.set(lineX(this.me.slot), DECK_Y - 0.04, LINE_Z).project(cam);
         plates.push({ id: 0, x: (v3.x * 0.5 + 0.5) * this.gfx.w, y: (-v3.y * 0.5 + 0.5) * this.gfx.h, name: this.profile.name, slot: this.me.slot, host: this.me.id === this.hostId && !this.solo, me: true, mode: 'lobby', talk: this.voice.state.selfSpeaking });
       }
@@ -2335,14 +2339,6 @@ class Game {
       window.__render = false;
       this.gfx.render(this.scene, cam, this.world.exposure);
       window.__rendered = (window.__rendered || 0) + 1;
-    }
-    if (!this.shot && (this.state === 'title' || this.state === 'lobby') && !this.noRender && (this.shotTries = (this.shotTries || 0) + 1) < 40) {
-      this.takeShot();
-      if (this.shot) {
-        // снимок делался с другой точки — возвращаем кадр на место, чтобы картинка не мигнула
-        this.world.update(0, tw, cam);
-        this.gfx.render(this.scene, cam, this.world.exposure);
-      }
     }
     i.endFrame();
     window.__frames = (window.__frames || 0) + 1;
@@ -2440,10 +2436,6 @@ class Game {
         this.warmShown = this.warmDraw();
         await yieldNow();
         await one();
-        if (!this.noRender && !this.shot) {
-          this.takeShot();
-          await one();
-        }
         // ждём видеокарту: всё начатое должно закончиться за заставкой, а не в первых кадрах игры
         const gl = this.gfx.renderer.getContext();
         gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
@@ -2723,39 +2715,6 @@ class Game {
       res.verdict
     ].join('\n');
     return (this.lastBench = res);
-  }
-  /** Картинка бухты для карточки места в лобби — снимаем один раз с готового кадра. */
-  takeShot() {
-    // окно ещё не получило размер (страница открыта в фоне) — снимем на следующем кадре
-    if (this.gfx.renderer.domElement.width < 64 || this.gfx.renderer.domElement.height < 64) return;
-    const c = document.createElement('canvas');
-    c.width = 560;
-    c.height = 350;
-    const cam = this.camera;
-    const keep = [cam.position.clone(), cam.rotation.clone(), cam.fov];
-    cam.position.set(-9, 3.4, 1.5);
-    cam.rotation.set(0.02, -0.36, 0, 'YXZ');
-    cam.fov = 50;
-    cam.aspect = 1.6;
-    cam.updateProjectionMatrix();
-    this.world.update(0, performance.now() / 1000, cam);
-    // Рисуем тем же путём, что и игру (gfx.render): у прямой отрисовки на экран на «высоком» свои шейдеры — весь набор
-    // пришлось бы собирать ради одной картинки. Отражение для новой точки gfx снимет сам (камера повернулась).
-    this.gfx.render(this.scene, cam, this.world.exposure);
-    try {
-      const src = this.gfx.renderer.domElement;
-      const k = Math.max(c.width / src.width, c.height / src.height);
-      c.getContext('2d').drawImage(src, (c.width - src.width * k) / 2, (c.height - src.height * k) / 2, src.width * k, src.height * k);
-      this.shot = c.toDataURL('image/jpeg', 0.86);
-    } catch {
-      this.shot = null; // попробуем ещё раз на следующем кадре
-    }
-    if (this.shot && this.state === 'lobby') this.ui.rerender();
-    cam.position.copy(keep[0]);
-    cam.rotation.copy(keep[1]);
-    cam.fov = keep[2];
-    cam.aspect = this.gfx.w / this.gfx.h;
-    cam.updateProjectionMatrix();
   }
   lobbyCamera(dt, t) {
     const cam = this.camera;

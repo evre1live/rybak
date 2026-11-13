@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="theme-color" content="#0e2140">
+<meta name="theme-color" content="#15161a">
 <title>Рыбак — рыбалка с друзьями</title>
 <meta name="description" content="Рыбалка с друзьями от первого лица: голосовой чат, рынок, снасти и свой персонаж.">
 <meta property="og:title" content="Рыбак — рыбалка с друзьями">
@@ -22,7 +22,7 @@
 <div id="ui">
   <div id="hud" class="hidden">
     <div class="hud-tl">
-      <div class="place"><h1 id="placeName">Солнечная бухта</h1><div class="loc wx-off"><b id="clock">08:00</b><i class="dot"></i><span id="wxName">Ясно</span></div></div>
+      <div class="place"><span class="ic" data-ic="pin"></span><div><h1 id="placeName">Солнечная бухта</h1><div class="loc"><b id="clock">08:00</b><i class="dot"></i><span class="ic" id="wxIc" data-ic="sun"></span><span id="wxName">Ясно</span></div></div></div>
       <div id="quests" class="hidden"></div>
       <div id="feed"></div>
     </div>
@@ -78,7 +78,7 @@
     <button id="tMenu" type="button" aria-label="Меню">☰</button>
   </div>
   <div id="rotate"><svg viewBox="0 0 64 64" width="64" height="64"><rect x="20" y="6" width="24" height="44" rx="5" fill="none" stroke="currentColor" stroke-width="4"/><path d="M8 40a26 26 0 0 0 22 18m-4-7 5 7-8 3" fill="none" stroke="#ffd60a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg><b>ПОВЕРНИТЕ ТЕЛЕФОН</b><p>Рыбачить удобнее, когда экран лежит на боку.</p><button type="button" class="btn ghost"><span>ИГРАТЬ ТАК</span></button></div>
-  <div id="loading"><div class="logo">РЫБАК</div><p>Наполняем бухту водой…</p></div>
+  <div id="loading"><div class="logo"><span class="palm"></span>РЫБАК</div><p>Наполняем бухту водой…</p></div>
 </div>
 <script src="app.js"></script>
 </body>

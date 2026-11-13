@@ -54,7 +54,9 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
   await a.waitForFunction(() => { const r = [...RYBAK.players.values()][0].remote; return r.char.hero && r.char.hero.tpl.info.id === 'hero-kai'; }, null, { timeout: 60000 });
   console.log('  герой друга загружен');
   assert.equal(await G(b, () => [...RYBAK.players.values()][0].card.name), 'Жамшид');
-  assert.match(await a.textContent('.lob-tl'), /2\/8/);
+  // в лобби: плашка с кодом комнаты и счётом «2/8», рядом — портрет друга
+  assert.match(await a.textContent('.codepill'), new RegExp(`КОД ${code}.*2/8`));
+  assert.equal(await a.locator('.crewrow .ava').count(), 1);
   await a.waitForFunction(() => document.querySelectorAll('.plate').length === 2);
   await shot(a, 'c01-lobby-two', 300);
 

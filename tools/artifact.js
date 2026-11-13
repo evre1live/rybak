@@ -1,4 +1,4 @@
-// Пробная версия одним файлом: вся игра (код, стили, шрифты) внутри одной страницы, без сервера.
+// Пробная версия одним файлом: вся игра (код, стили, шрифты, звуки, картинки мест) внутри одной страницы, без сервера.
 // Нужна там, где страницу показывают в рамке без сети — например, как артефакт Claude.
 // В ней только одиночная рыбалка: комнаты и голос живут на сервере.
 // Запуск: node tools/artifact.js [куда положить]  → dist/rybak-solo.html
@@ -34,8 +34,11 @@ swap('<link rel="manifest" href="manifest.webmanifest">\n<link rel="apple-touch-
 // записи звуков (отдельные файлы, общая дорожка коротких звуков и петли) — тоже внутрь: из сети пробная версия ничего не берёт
 const audio = {};
 for (const f of readdirSync(join(pub, 'audio')).filter((f) => f.endsWith('.webm')).sort()) audio[f.replace(/\.webm$/, '')] = readFileSync(join(pub, 'audio', f)).toString('base64');
-swap('<script src="app.js"></script>', `<script>window.RYBAK_OFFLINE = true; window.RYBAK_AUDIO = ${JSON.stringify(audio)};</script>\n<script>${js}</script>`);
+// картинки мест (вид сверху на карточке в лобби) — туда же
+const img = {};
+for (const f of readdirSync(join(pub, 'img')).sort()) img[`img/${f}`] = `data:image/${f.split('.').pop()};base64,${readFileSync(join(pub, 'img', f)).toString('base64')}`;
+swap('<script src="app.js"></script>', `<script>window.RYBAK_OFFLINE = true; window.RYBAK_AUDIO = ${JSON.stringify(audio)}; window.RYBAK_IMG = ${JSON.stringify(img)};</script>\n<script>${js}</script>`);
 
 mkdirSync(dirname(out), { recursive: true });
 writeFileSync(out, html);
-console.log(`${out}: ${(Buffer.byteLength(html) / 1024).toFixed(0)} КБ, шрифтов внутри: ${fonts}, записей звука: ${Object.keys(audio).length}`);
+console.log(`${out}: ${(Buffer.byteLength(html) / 1024).toFixed(0)} КБ, шрифтов внутри: ${fonts}, записей звука: ${Object.keys(audio).length}, картинок: ${Object.keys(img).length}`);

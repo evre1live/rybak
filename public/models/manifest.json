@@ -3,6 +3,7 @@
     {
       "id": "hero-yellow",
       "name": "Санни",
+      "tag": "Всегда на волне",
       "about": "Жёлтая куртка, очки на козырьке. На пирс прибегает первым.",
       "file": "models/hero-yellow.glb",
       "lite": "models/hero-yellow.lite.glb",
@@ -24,6 +25,7 @@
     {
       "id": "hero-finn",
       "name": "Финн",
+      "tag": "Знает каждую мель",
       "about": "Бирюзовая куртка, шорты и вечная улыбка. Знает в бухте каждую мель.",
       "file": "models/hero-finn.glb",
       "lite": "models/hero-finn.lite.glb",
@@ -43,6 +45,7 @@
     {
       "id": "hero-nori",
       "name": "Нори",
+      "tag": "Ловит на спор",
       "about": "Розовая кепка и жилет с сотней карманов. Ловит на спор — и выигрывает.",
       "file": "models/hero-nori.glb",
       "lite": "models/hero-nori.lite.glb",
@@ -63,6 +66,7 @@
     {
       "id": "hero-pip",
       "name": "Пип",
+      "tag": "Душа рыбалки",
       "about": "Борода, панама и фиолетовое худи. Душа любой рыбалки.",
       "file": "models/hero-pip.glb",
       "lite": "models/hero-pip.lite.glb",
@@ -82,6 +86,7 @@
     {
       "id": "hero-black",
       "name": "Блэк",
+      "tag": "Бросает дальше всех",
       "about": "Весь в чёрном. Говорит мало, забрасывает далеко.",
       "file": "models/hero-black.glb",
       "lite": "models/hero-black.lite.glb",
@@ -102,6 +107,7 @@
     {
       "id": "hero-archie",
       "name": "Арчи",
+      "tag": "Шестьдесят лет у воды",
       "about": "Усы, очки и шляпа с мушками. Рыбачит шестьдесят лет и помнит каждую рыбу.",
       "file": "models/hero-archie.glb",
       "lite": "models/hero-archie.lite.glb",
@@ -123,6 +129,7 @@
     {
       "id": "hero-bjorn",
       "name": "Бьорн",
+      "tag": "Тянет, как якорь",
       "about": "Рыжая борода в косу, оранжевый комбинезон. Рыбу тянет, как якорь.",
       "file": "models/hero-bjorn.glb",
       "lite": "models/hero-bjorn.lite.glb",
@@ -145,6 +152,7 @@
     {
       "id": "hero-gosha",
       "name": "Гоша",
+      "tag": "Он в отпуске",
       "about": "Гавайская рубашка, панама, сандалии с носками. Он в отпуске.",
       "file": "models/hero-gosha.glb",
       "lite": "models/hero-gosha.lite.glb",
@@ -166,6 +174,7 @@
     {
       "id": "hero-kai",
       "name": "Кай",
+      "tag": "Рыбачит под музыку",
       "about": "Красная куртка и наушники. Рыбачит под музыку.",
       "file": "models/hero-kai.glb",
       "lite": "models/hero-kai.lite.glb",

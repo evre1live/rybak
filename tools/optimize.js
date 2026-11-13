@@ -348,7 +348,7 @@ function hardSimplify(doc, target, error) {
   }
 }
 
-/** Сведения о герое, которые игра берёт из manifest.json: about — строка на экране «Персонаж», tall — рост относительно обычного, eye — высота глаз (м). */
+/** Сведения о герое, которые игра берёт из manifest.json: tag — девиз под именем на экране «Персонаж», about — строка о герое там же, tall — рост относительно обычного, eye — высота глаз (м). */
 const heroMeta = (m) => ({ ...(m.fp ? { fp: m.fp } : {}), ...(m.tint ? { tint: m.tint } : {}), ...(m.npc ? { npc: true } : {}), ...(m.hands ? { hands: m.hands } : {}), ...(m.tall ? { tall: m.tall } : {}), ...(m.eye ? { eye: m.eye } : {}) });
 const META = process.argv.includes('--meta');
 const want = process.argv.slice(2).filter((a) => !a.startsWith('--'));
@@ -359,7 +359,7 @@ for (const m of spec.models) {
     const i = manifest.heroes.findIndex((h) => h.id === m.id);
     if (m.group !== 'hero' || i < 0) continue;
     const h = manifest.heroes[i];
-    manifest.heroes[i] = { id: h.id, name: m.name, ...(m.about ? { about: m.about } : {}), file: h.file, lite: h.lite, tris: h.tris, kb: h.kb, clips: h.clips, ...heroMeta(m), ...(h.face ? { face: h.face } : {}) };
+    manifest.heroes[i] = { id: h.id, name: m.name, ...(m.tag ? { tag: m.tag } : {}), ...(m.about ? { about: m.about } : {}), file: h.file, lite: h.lite, tris: h.tris, kb: h.kb, clips: h.clips, ...heroMeta(m), ...(h.face ? { face: h.face } : {}) };
     continue;
   }
   const base = path.join(RAW, m.group === 'hero' ? `${m.id}-rig.glb` : `${m.id}.glb`);
@@ -436,7 +436,7 @@ for (const m of spec.models) {
     const i = manifest.heroes.findIndex((h) => h.id === m.id);
     const prev = i >= 0 ? manifest.heroes[i] : {};
     // face — запечённый портрет (tools/bake-icons.cjs --faces)
-    const entry = { id: m.id, name: m.name, ...(m.about ? { about: m.about } : {}), file: `models/${m.id}.glb`, lite: lite.file, tris, kb, clips: Object.keys(clips), ...heroMeta(m), ...(prev.face ? { face: prev.face } : {}) };
+    const entry = { id: m.id, name: m.name, ...(m.tag ? { tag: m.tag } : {}), ...(m.about ? { about: m.about } : {}), file: `models/${m.id}.glb`, lite: lite.file, tris, kb, clips: Object.keys(clips), ...heroMeta(m), ...(prev.face ? { face: prev.face } : {}) };
     if (i >= 0) manifest.heroes[i] = entry;
     else manifest.heroes.push(entry);
   } else {

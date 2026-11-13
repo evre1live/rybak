@@ -44,6 +44,34 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
   await page.click('[data-a="solo"]');
   await page.waitForFunction(() => RYBAK.state === 'lobby');
   await shot(page, '02-lobby', 300);
+  {
+    // меню — по макетам от 13 ноября (этап 20): заголовки и кнопки — жирным наклонным шрифтом, панели — тёмный графит, главная кнопка — закатный градиент;
+    // на карточке места — запечённый вид бухты сверху с булавкой; слева внизу — игрок с уровнем; рыбак один — таблички под ногами нет
+    const st = await G(page, async () => {
+      const cs = (q) => getComputedStyle(document.querySelector(q));
+      const b = cs('.lcard .btn.pri'), t = cs('.nav .tab.on'), h = cs('.lcard h2');
+      const img = document.querySelector('.lcard .shot');
+      await img.decode().catch(() => {});
+      await document.fonts.ready;
+      return {
+        font: b.fontFamily, style: b.fontStyle, weight: Number(b.fontWeight), bg: b.backgroundImage, tab: t.backgroundImage, h2: h.fontStyle, shot: [img.naturalWidth, img.naturalHeight],
+        pin: !!document.querySelector('.shotbox .pinm svg'), palm: getComputedStyle(document.querySelector('.lob-top .logo .palm'), '::before').maskImage || getComputedStyle(document.querySelector('.lob-top .logo .palm'), '::before').webkitMaskImage,
+        me: document.querySelector('.mechip .nm').textContent, lvl: document.querySelector('.mechip .lv').textContent, plates: document.querySelectorAll('.plate').length,
+        loaded: document.fonts.check('italic 800 20px "Fira Sans Condensed"', 'РЫБАК'), old: [...document.fonts].filter((f) => /Sofia/.test(f.family)).length,
+        glass: getComputedStyle(document.documentElement).getPropertyValue('--gfill'), card: getComputedStyle(document.querySelector('.lcard')).backgroundImage, edge: getComputedStyle(document.querySelector('.lcard')).borderTopColor, enter: document.querySelector('#screen').classList.contains('enter'), shown: RYBAK.ui.shown
+      };
+    });
+    const coral = /rgb\(255, 46, 147\)/; // закатный градиент главных кнопок начинается с розового
+    assert.ok(/Fira Sans Condensed/.test(st.font) && st.style === 'italic' && st.weight >= 800 && coral.test(st.bg) && coral.test(st.tab) && st.h2 === 'italic' && st.loaded && st.old === 0, `меню в новом стиле: ${JSON.stringify(st)}`);
+    assert.ok(st.shot[0] >= 900 && st.shot[1] >= 480 && st.pin && /svg/.test(st.palm), `карточка места: вид сверху, булавка, логотип с пальмой: ${JSON.stringify(st)}`);
+    assert.ok(st.me === 'Жамшид' && /^Уровень 1$/.test(st.lvl) && st.plates === 0, `плашка игрока и строй без таблички: ${JSON.stringify(st)}`);
+    // стекло панелей — дымчатый графит (а не голубоватое): заливка серая, рамка прозрачная — кромку рисует слой стекла;
+    // при смене экрана панели всплывают (класс enter), при перерисовке того же экрана — нет
+    assert.ok(/rgba\(84, ?88, ?98/.test(st.glass) && /rgba\(84, 88, 98/.test(st.card) && /rgba\(255, 255, 255, 0\.92\)/.test(st.card) && /rgba\(0, 0, 0, 0\)|transparent/.test(st.edge) && st.shown === 'lobby',
+      `стекло: ${JSON.stringify({ glass: st.glass.slice(0, 90), card: st.card.slice(-200), edge: st.edge, enter: st.enter, shown: st.shown })}`);
+    await G(page, () => RYBAK.ui.showLobby());
+    assert.equal(await G(page, () => RYBAK.ui.shown), 'lobby');
+  }
 
   // лобби → снасти, журнал, редактор
   await page.click('.nav [data-p="tackle"]');
@@ -944,18 +972,18 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     await G(wp, () => { const g = RYBAK; g.ui.closePanel(); g.input.locked = true; g.input.enabled = true; });
     // дождь: струи идут, на воде круги, даль съедена, небо затянуто, клёв выше — и это написано рядом с часами
     await wp.waitForFunction(() => /дождь/i.test(document.querySelector('#wxName').textContent), null, { timeout: 10000 });
-    const rain = await G(wp, () => { const g = RYBAK, w = g.world; return { kind: g.weather.kind, mesh: w.rain.mesh.visible, rings: w.water.uniforms.uRain.value, far: w.scene.fog.far, cover: w.skyU.uCover.value, bite: g.fishing.wx(), chip: document.querySelector('.hud-tl .loc').textContent, off: document.querySelector('.hud-tl .loc').classList.contains('wx-off') }; });
+    const rain = await G(wp, () => { const g = RYBAK, w = g.world; return { kind: g.weather.kind, mesh: w.rain.mesh.visible, rings: w.water.uniforms.uRain.value, far: w.scene.fog.far, cover: w.skyU.uCover.value, bite: g.fishing.wx(), chip: document.querySelector('.hud-tl .loc').textContent, off: !document.querySelector('#wxIc svg') }; });
     assert.ok(rain.kind === 'rain' && rain.mesh && rain.rings > 0.95 && rain.far < 700 && rain.cover > 0.95 && !rain.off, JSON.stringify(rain));
     assert.equal(rain.bite, 1.3);
     assert.match(rain.chip, /дождь.*клёв \+30%/i);
     await shot(wp, '30-rain', 300);
-    // туман ложится плавно; распогодилось — надпись у часов пропадает
+    // туман ложится плавно; распогодилось — у часов снова «Ясно» со своим значком (погода у часов видна всегда)
     await G(wp, () => { RYBAK.forceWx = 'fog'; });
     await wp.waitForFunction(() => RYBAK.world.wx.fog > 0.9 && RYBAK.world.wx.rain < 0.1 && RYBAK.world.scene.fog.far < 260 && !RYBAK.world.rain.mesh.visible, null, { timeout: 30000 });
     await wp.waitForFunction(() => /туман/i.test(document.querySelector('#wxName').textContent));
     await shot(wp, '31-fog', 200);
     await G(wp, () => { RYBAK.forceWx = 'clear'; });
-    await wp.waitForFunction(() => RYBAK.world.wx.fog < 0.05 && RYBAK.world.scene.fog.far > 1500 && document.querySelector('.hud-tl .loc').classList.contains('wx-off'), null, { timeout: 30000 });
+    await wp.waitForFunction(() => RYBAK.world.wx.fog < 0.05 && RYBAK.world.scene.fog.far > 1500 && /^Ясно$/.test(document.querySelector('#wxName').textContent) && !!document.querySelector('#wxIc svg'), null, { timeout: 30000 });
 
     // задания: улов и продажа двигают счёт, награда приходит сразу, в углу экрана видно, что осталось
     const q0 = await G(wp, () => {
@@ -1365,7 +1393,8 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
       return { names, flock, dol: { n: D.state(0).n, shown, leaps: D.state(0).leaps - leaps0, heard, top, low }, areas };
     });
     assert.ok(sea.names.every((n) => n > 0) && sea.names[3] === 7, `дальние острова с лесом и дельфины стоят в сцене: ${JSON.stringify(sea.names)}`);
-    assert.ok(sea.flock.length === 2 && sea.flock.every((f) => f.n === 7 && f.far < 25 && f.zone === 'sea'), `над каждым морским косяком кружит стая: ${JSON.stringify(sea.flock)}`);
+    // косяк ходит по морю и может оказаться у шхер (там место называется по камню, а не «открытое море») — важно, что он не в бухте
+    assert.ok(sea.flock.length === 2 && sea.flock.every((f) => f.n === 7 && f.far < 25 && f.zone !== 'bay'), `над каждым морским косяком кружит стая: ${JSON.stringify(sea.flock)}`);
     assert.ok(sea.dol.shown >= 4 && sea.dol.leaps >= 3 && sea.dol.heard === sea.dol.leaps, `дельфины идут стаей и прыгают: ${JSON.stringify(sea.dol)}`);
     assert.ok(sea.dol.top > 1.2 && sea.dol.low < -0.9, `в прыжке дельфин целиком над водой, между выходами — на глубине: ${JSON.stringify(sea.dol)}`);
     assert.deepEqual(sea.areas, ['teeth', 'gullrock', 'westrocks', 'sea', 'bay'], 'у скал в море — свои названия мест');
@@ -1383,7 +1412,9 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
       const out = {
         place: $('#placeName').textContent, loc: $('.hud-tl .loc').textContent, cap: $('#locName').textContent, bag: $('#bagN').textContent, bait: $('#baitN').textContent, rod: $('#rodName').textContent,
         solo: $('#onlineN').textContent, map: [$('#minimap').width, $('#minimap').height], rows: document.querySelectorAll('#hints span').length, keys: document.querySelectorAll('#hints kbd').length,
-        font: getComputedStyle($('#placeName')).fontFamily, tilt: getComputedStyle($('#fstate')).fontStyle
+        font: getComputedStyle($('#placeName')).fontFamily, tilt: getComputedStyle($('#placeName')).fontStyle, body: getComputedStyle($('#clock')).fontFamily, bodyTilt: getComputedStyle($('#fstate')).fontStyle,
+        pin: !!$('.place > .ic svg'), wxIcon: !!$('#wxIc svg'), glass: getComputedStyle($('.place')).backgroundImage,
+        veil: [document.body.classList.contains('veil'), g.gfx.quality]
       };
       // карта — в правом верхнем углу (над ней — где мы, под ней — команда и кошелёк), плашка улова — слева внизу
       const box = (s) => { const r = $(s).getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
@@ -1474,7 +1505,9 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
       assert.ok(/255,\s*255,\s*255/.test(A.ptr), `указатель над подписью белый, не голубой: ${A.ptr}`);
     }
     assert.ok(hud.rows >= 3 && hud.keys >= 3, `подсказки управления — по строке на действие, с клавишами: ${hud.rows}, ${hud.keys}`);
-    assert.ok(/Onest/.test(hud.font) && hud.tilt === 'normal', `экран игры набран прямым шрифтом: ${hud.font}, ${hud.tilt}`);
+    // название места — наклонным шрифтом заголовков, с булавкой; время, погода (со значком) и состояние боя — прямым; плашка — из того же стекла, что меню
+    assert.ok(/Fira Sans Condensed/.test(hud.font) && hud.tilt === 'italic' && /Onest/.test(hud.body) && hud.bodyTilt === 'normal' && hud.pin && hud.wxIcon && /rgba\((84, 88, 98|72, 76, 86)/.test(hud.glass), `экран игры: шрифты, значки и стекло: ${JSON.stringify({ font: hud.font, tilt: hud.tilt, body: hud.body, bodyTilt: hud.bodyTilt, pin: hud.pin, wxIcon: hud.wxIcon, glass: hud.glass.slice(-120) })}`);
+    assert.equal(hud.veil[0], hud.veil[1] !== 'low', `под меню игра размыта везде, кроме «низкого» качества: ${hud.veil}`);
     assert.deepEqual(hud.compass, [true, false, true], 'компас с градусами на месте, убирается и возвращается настройкой');
     assert.ok(hud.pal.a[0] === 'tropic' && hud.pal.a[1] < 0.12 && hud.pal.a[2] > 20 && Math.abs(hud.pal.b[0] - 0.16) < 1e-6 && hud.pal.b[1] === 14 && hud.pal.back === 'tropic' && Math.abs(hud.pal.c[0] - hud.pal.a[1]) < 1e-6 && hud.pal.c[1] === hud.pal.a[2] && Math.abs(hud.pal.c[2] - hud.pal.a[3]) < 1, `палитра игры — «Тропики», меняется на ходу и возвращается: ${JSON.stringify(hud.pal)}`);
     assert.ok(hud.none === null && hud.market && hud.market.kind === 'market' && hud.market.sail === false && hud.market.n === 2 && hud.market.len > 20 && /^\d+ м$/.test(hud.distFoot), `пешком с уловом — к торговцу: ${JSON.stringify([hud.none, hud.market, hud.distFoot])}`);
