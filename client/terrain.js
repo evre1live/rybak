@@ -175,6 +175,8 @@ export const FALLS = [Math.PI / 2 + 0.5, Math.PI / 2 - 0.42].map((th) => {
   return { x: ISLAND.x + nx * (R - 0.6), z: ISLAND.z + nz * (R - 0.6), nx, nz, bx: ISLAND.x + nx * (R + 2.2), bz: ISLAND.z + nz * (R + 2.2), top: groundH(ISLAND.x + nx * (R - 5.5), ISLAND.z + nz * (R - 5.5)) };
 });
 export const LIGHTHOUSE = { x: ISLAND.x + 8, z: ISLAND.z - 3 };
+// костёр на Пальмовом острове (его ставит places.js; здесь — чтобы звук знал, где он трещит)
+export const CAMPFIRE = { x: 262.6, z: -187.4 };
 
 export function deckAt(x, z, m = 0) {
   for (const d of DECKS) if (x >= d.x0 + m && x <= d.x1 - m && z >= d.z0 + m && z <= d.z1 - m) return d;

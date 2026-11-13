@@ -9,22 +9,26 @@
     "start": "node server/index.js",
     "build": "node tools/build.js",
     "dev": "node tools/build.js --watch",
-    "test": "node --test test/logic.test.js test/net.test.js test/world.test.js",
+    "test": "node --test test/logic.test.js test/net.test.js test/world.test.js test/cloud.test.js",
     "test:play": "node test/play.cjs",
     "test:coop": "node test/coop.cjs",
     "balance": "node tools/balance.js",
     "test:devices": "node test/devices.cjs",
     "test:warm": "node test/warm.cjs",
     "test:music": "node test/music.cjs",
+    "test:cloud": "node test/cloud.cjs",
+    "test:sound": "node test/sound.cjs",
     "solo": "node tools/artifact.js"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
+    "pg": "^8.23.1",
     "ws": "^8.22.2"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.16",
     "@fontsource/fira-sans-extra-condensed": "^5.3.0",
     "@fontsource/onest": "^5.3.1",
     "@fontsource/oswald": "^5.3.0",

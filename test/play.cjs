@@ -371,7 +371,7 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
   }
   // ── звук: записи вместо синтеза там, где они есть; трещотка фрикциона; музыка, которую сочиняет игра ──
   {
-    await page.waitForFunction(() => { const a = RYBAK.audio; return a.ctx && Object.keys(a.buf).length === 4; }, null, { timeout: 15000 });
+    await page.waitForFunction(() => { const a = RYBAK.audio; return a.ctx && ['splash', 'plop', 'reel', 'snap'].every((k) => k in a.buf); }, null, { timeout: 15000 });
     const snd = await G(page, () => { const a = RYBAK.audio; return { state: a.ctx.state, buf: Object.fromEntries(Object.entries(a.buf).map(([k, b]) => [k, b ? +b.duration.toFixed(2) : null])), music: !!a.music, mus: a.mus.gain.value }; });
     console.log('  звук:', JSON.stringify(snd));
     assert.ok(snd.music && Math.abs(snd.mus - 0.45) < 1e-6, 'музыка есть, громкость по умолчанию: ' + JSON.stringify(snd));
@@ -1405,6 +1405,8 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
 
     // сохранение — файлом: скачали, чужой файл не принят, свой (с другими монетами) заменяет прогресс после подтверждения
     await G(pp, () => RYBAK.ui.openPanel('settings'));
+    await pp.click('.center [data-p="save"]');
+    await pp.waitForSelector('.savep');
     const [sv] = await Promise.all([pp.waitForEvent('download'), pp.click('[data-a="savefile"]')]);
     assert.match(sv.suggestedFilename(), /^rybak-Жамшид-\d{4}-\d\d-\d\d\.json$/);
     const data = JSON.parse(fs.readFileSync(await sv.path(), 'utf8'));

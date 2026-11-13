@@ -1,5 +1,6 @@
 // РЫБАК — сервер: раздаёт игру, держит комнаты, передаёт друзьям положение, события, чат и голос.
 // Рыбалка считается в браузере каждого игрока; сервер — общие часы бухты, рынок (по зерну комнаты) и связь.
+// Ещё он хранит сохранения игроков и таблицу рекордов (server/api.js, server/store.js), если ему дали базу.
 import http from 'node:http';
 import zlib from 'node:zlib';
 import fs from 'node:fs';
@@ -8,6 +9,8 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { Voice, bucket } from './voice.js';
+import { createApi } from './api.js';
+import { openStore, selfCheck } from './store.js';
 import { MAX_PLAYERS } from '../shared/data.js';
 import { TOURS, TOUR_LENS, TOUR_COUNTDOWN, tourBlank, tourAdd, tourTable } from '../shared/logic.js';
 
@@ -20,7 +23,7 @@ const TICK_MS = 80;
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.ico': 'image/x-icon',
-  '.json': 'application/json; charset=utf-8', '.glb': 'model/gltf-binary', '.mp3': 'audio/mpeg', '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8',
+  '.json': 'application/json; charset=utf-8', '.glb': 'model/gltf-binary', '.mp3': 'audio/mpeg', '.webm': 'audio/webm', '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8',
   '.webmanifest': 'application/manifest+json'
 };
 const LONG_CACHE = new Set(['.mp3', '.png', '.webp', '.jpg', '.woff2', '.ico']);
@@ -68,9 +71,12 @@ function cleanState(a) {
   return out;
 }
 
-export function createServer({ now = () => Date.now() } = {}) {
+/** store — хранилище сохранений (server/store.js); его можно дать и позже, через setStore: игра работает и без него. */
+export function createServer({ now = () => Date.now(), store = null } = {}) {
   const rooms = new Map(); // код → комната
   const sockets = new Map(); // ws → { roomCode, playerId, chat, ev }
+  const db = { store };
+  const api = createApi({ getStore: () => db.store, now });
 
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://local');
@@ -78,9 +84,10 @@ export function createServer({ now = () => Date.now() } = {}) {
       let players = 0;
       for (const r of rooms.values()) for (const p of r.players.values()) if (p.ws) players++;
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, rooms: rooms.size, players }));
+      res.end(JSON.stringify({ ok: true, rooms: rooms.size, players, db: !!db.store }));
       return;
     }
+    if (url.pathname.startsWith('/api/')) return api(req, res, url);
     let rel = decodeURIComponent(url.pathname);
     if (rel === '/' || !path.extname(rel)) rel = '/index.html';
     const file = path.normalize(path.join(PUBLIC_DIR, rel));
@@ -413,11 +420,32 @@ export function createServer({ now = () => Date.now() } = {}) {
   }, 30 * 1000);
   sweep.unref();
 
-  return { server, wss, rooms, voice, close: () => (clearInterval(tick), clearInterval(sweep), wss.close(), server.close()) };
+  return { server, wss, rooms, voice, setStore: (s) => (db.store = s), close: () => (clearInterval(tick), clearInterval(sweep), wss.close(), server.close()) };
+}
+
+// База может быть не готова в момент запуска (перезапускается, сеть моргнула) — игра от этого не зависит:
+// сервер поднимается сразу, а к базе стучится, пока не получится.
+async function connectStore(srv) {
+  try {
+    const store = await openStore();
+    if (!store) return console.log('Сохранения на сервере выключены: база не задана (DATABASE_URL)');
+    try {
+      await selfCheck(store);
+    } catch (e) {
+      await store.close().catch(() => {});
+      throw e;
+    }
+    srv.setStore(store);
+    console.log(`Сохранения на сервере: ${store.kind === 'postgres' ? 'Postgres' : 'память — до перезапуска'}, самопроверка пройдена, сохранений в базе — ${await store.count()}`);
+  } catch (e) {
+    console.error(`Сохранения на сервере: база не готова (${e && e.message}) — попробую снова через 30 секунд`);
+    setTimeout(() => connectStore(srv), 30000);
+  }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const port = Number(process.env.PORT) || 3000;
-  const { server } = createServer();
-  server.listen(port, () => console.log(`Рыбак слушает порт ${port}`));
+  const srv = createServer();
+  srv.server.listen(port, () => console.log(`Рыбак слушает порт ${port}`));
+  connectStore(srv);
 }

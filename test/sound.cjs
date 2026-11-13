@@ -1,0 +1,195 @@
+// Записи звуков в настоящем браузере: общая дорожка коротких звуков и петли (public/audio, опись — sounds.json).
+// Послушать их тут некому, поэтому проверяется то, что видно по числам: браузер читает файлы; каждый звук лежит там,
+// где сказано в описи, и не задевает соседей; у петель нет шва; игра на каждое событие играет нужный кусок дорожки,
+// а чего в описи нет — играет синтезом и не падает.
+// Запуск: PORT=3111 node test/sound.cjs
+const { chromium } = require(process.env.PLAYWRIGHT || '/opt/npm-tools/node_modules/playwright');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const root = path.join(__dirname, '..');
+const BASE = `http://127.0.0.1:${process.env.PORT || 3111}`;
+const man = JSON.parse(fs.readFileSync(path.join(root, 'public/audio/sounds.json'), 'utf8'));
+const db = (v) => 20 * Math.log10(v + 1e-9);
+
+(async () => {
+  const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  page.on('pageerror', (e) => { console.log('PAGEERROR', e.message.slice(0, 400)); page.__err = (page.__err || 0) + 1; });
+  const names = Object.keys(man.sfx);
+  const loops = Object.keys(man.loops);
+  console.log(`в описи: коротких звуков ${names.length} (с вариантами — ${names.reduce((n, k) => n + man.sfx[k].length, 0)}), петель ${loops.length}`);
+
+  // ───── файлы: читаются браузером, звуки на своих местах ─────
+  await page.goto(`${BASE}/?q=low&norender&h=13`);
+  await page.waitForFunction(() => window.RYBAK && window.__frames > 3, null, { timeout: 90000 });
+  const decode = (file) => page.evaluate(async (file) => {
+    const r = await fetch(file);
+    if (!r.ok) return { ok: false, http: r.status };
+    const ctx = new OfflineAudioContext(2, 48000, 48000);
+    const buf = await ctx.decodeAudioData(await r.arrayBuffer());
+    const ch = [];
+    for (let c = 0; c < buf.numberOfChannels; c++) ch.push(buf.getChannelData(c));
+    window.__dec = window.__dec || {};
+    window.__dec[file] = { buf, ch };
+    return { ok: true, dur: buf.duration, ch: buf.numberOfChannels, type: r.headers.get('content-type') };
+  }, file);
+  // громкость куска [a, b) в секундах: пик и средняя
+  const level = (file, a, b) => page.evaluate(({ file, a, b }) => {
+    const { buf, ch } = window.__dec[file];
+    const i0 = Math.max(0, Math.round(a * buf.sampleRate)), i1 = Math.min(buf.length, Math.round(b * buf.sampleRate));
+    let peak = 0, e = 0;
+    for (let i = i0; i < i1; i++) { let v = 0; for (const c of ch) v += c[i]; v /= ch.length; peak = Math.max(peak, Math.abs(v)); e += v * v; }
+    return { peak, rms: Math.sqrt(e / Math.max(1, i1 - i0)) };
+  }, { file, a, b });
+
+  if (names.length) {
+    const f = await decode('audio/sfx.webm');
+    assert.ok(f.ok && f.ch === 1 && /audio\/webm/.test(f.type), `общая дорожка читается: ${JSON.stringify(f)}`);
+    assert.ok(Math.abs(f.dur - man.sfxLen) < 0.08, `длина дорожки ${f.dur.toFixed(3)} с, в описи ${man.sfxLen}`);
+    const all = names.flatMap((k) => man.sfx[k].map(([a, d], i) => ({ k, i, a, d }))).sort((x, y) => x.a - y.a);
+    for (let n = 0; n < all.length; n++) {
+      const s = all[n];
+      assert.ok(s.a >= 0.04 && s.d > 0.05 && s.a + s.d <= f.dur + 0.01, `${s.k}: место в дорожке ${s.a}+${s.d}`);
+      if (n) assert.ok(s.a - (all[n - 1].a + all[n - 1].d) >= 0.06, `${s.k}: между звуками есть тишина`);
+      const body = await level('audio/sfx.webm', s.a, s.a + s.d);
+      const before = await level('audio/sfx.webm', s.a - 0.03, s.a - 0.012);
+      const after = await level('audio/sfx.webm', s.a + s.d + 0.004, s.a + s.d + 0.03);
+      // звук слышен, не перегружен; перед ним и за ним — тишина: при игре с другой скоростью соседа не зацепить
+      assert.ok(body.peak > 0.35 && body.peak <= 1.02 && db(body.rms) > -34, `${s.k}${s.i + 1}: громкость ${JSON.stringify(body)}`);
+      assert.ok(db(before.peak) < -30 && db(after.peak) < -40, `${s.k}${s.i + 1}: тишина по краям — до ${db(before.peak).toFixed(0)} дБ, после ${db(after.peak).toFixed(0)} дБ`);
+    }
+    console.log(`  общая дорожка: ${f.dur.toFixed(2)} с, ${fs.statSync(path.join(root, 'public/audio/sfx.webm')).size} байт — все ${all.length} звуков на своих местах, слышны, с тишиной по краям`);
+  }
+  for (const k of loops) {
+    const m = man.loops[k];
+    const f = await decode('audio/' + m.file);
+    assert.ok(f.ok && f.ch === m.ch, `петля ${k} читается: ${JSON.stringify(f)}`);
+    assert.ok(m.start >= 0.2 && m.end - m.start > 2 && m.end + 0.2 <= f.dur + 0.03, `петля ${k}: точки ${m.start}…${m.end} внутри записи ${f.dur.toFixed(2)} с`);
+    // шов: 40 мс вокруг стыка против таких же кусков по всей петле — не тише и не громче обычного
+    const lv = [];
+    for (let t = m.start; t + 0.04 <= m.end; t += 0.04) lv.push((await level('audio/' + m.file, t, t + 0.04)).rms);
+    const wrapA = await level('audio/' + m.file, m.end - 0.02, m.end);
+    const wrapB = await level('audio/' + m.file, m.start, m.start + 0.02);
+    const seam = Math.sqrt((wrapA.rms ** 2 + wrapB.rms ** 2) / 2);
+    const lo = Math.min(...lv), hi = Math.max(...lv);
+    assert.ok(seam > lo * 0.5 && seam < hi * 2, `петля ${k}: шов ${db(seam).toFixed(1)} дБ при обычных ${db(lo).toFixed(1)}…${db(hi).toFixed(1)} дБ`);
+    // запас за краями петли повторяет её начало и конец: по нему кодек и браузер не слышат обрыва
+    const tail = await level('audio/' + m.file, m.end, m.end + 0.15);
+    const head = await level('audio/' + m.file, m.start, m.start + 0.15);
+    assert.ok(Math.abs(db(tail.rms) - db(head.rms)) < 1.5, `петля ${k}: за концом — её же начало (${db(tail.rms).toFixed(1)} и ${db(head.rms).toFixed(1)} дБ)`);
+    console.log(`  петля ${k.padEnd(10)} ${(m.end - m.start).toFixed(2)} с · ${f.ch} кан. · ${fs.statSync(path.join(root, 'public/audio', m.file)).size} байт · шов ${db(seam).toFixed(1)} дБ (обычно ${db(lo).toFixed(1)}…${db(hi).toFixed(1)})`);
+  }
+
+  // ───── игра: на события играют нужные куски дорожки ─────
+  await page.evaluate(() => {
+    window.__plays = [];
+    const orig = AudioBufferSourceNode.prototype.start;
+    AudioBufferSourceNode.prototype.start = function (when, offset, duration) {
+      window.__plays.push({ buf: this.buffer, offset: offset || 0, duration: duration || 0, rate: this.playbackRate.value, loop: this.loop, ls: this.loopStart, le: this.loopEnd });
+      return orig.apply(this, arguments);
+    };
+  });
+  await page.fill('#nm', 'Звук');
+  await page.evaluate(() => { RYBAK.profile.seenIntro = true; });
+  await page.click('[data-a="solo"]');
+  await page.waitForFunction(() => RYBAK.state === 'lobby');
+  await page.evaluate(() => RYBAK.enterWorld());
+  await page.waitForFunction(() => RYBAK.state === 'world' && RYBAK.audio.ctx);
+  await page.waitForFunction((want) => Object.keys(RYBAK.audio.buf).length >= want, names.length ? 5 : 4, { timeout: 30000 });
+  const got = await page.evaluate(() => Object.fromEntries(Object.entries(RYBAK.audio.buf).map(([k, b]) => [k, b ? +b.duration.toFixed(2) : null])));
+  assert.ok(got.splash && got.plop && got.reel && got.snap, `прежние записи загружены: ${JSON.stringify(got)}`);
+  if (names.length) assert.ok(got.sfx, `общая дорожка загружена игрой: ${JSON.stringify(got)}`);
+  // что сыграло из общей дорожки с прошлого вызова: имена звуков по месту в ней
+  const played = (fn, arg) => page.evaluate(({ fn, arg, sfx }) => {
+    const a = RYBAK.audio;
+    window.__plays.length = 0;
+    const synth = { tone: 0, burst: 0 };
+    const t0 = a.tone, b0 = a.burst;
+    a.tone = function () { synth.tone++; return t0.apply(this, arguments); };
+    a.burst = function () { synth.burst++; return b0.apply(this, arguments); };
+    let ret;
+    try {
+      ret = new Function('a', 'arg', fn)(a, arg);
+    } finally {
+      a.tone = t0;
+      a.burst = b0;
+    }
+    const out = [], rates = [];
+    let noise = 0;
+    for (const p of window.__plays) {
+      if (p.buf === a.noise) { noise++; continue; } // шум синтеза идёт тем же способом, но это не запись
+      rates.push(+p.rate.toFixed(3));
+      if (p.buf !== a.buf.sfx) { out.push(p.loop ? 'loop' : Object.keys(a.buf).find((k) => a.buf[k] === p.buf) || '?'); continue; }
+      let hit = '?';
+      for (const [k, list] of Object.entries(sfx)) list.forEach(([at, d], i) => { if (Math.abs(p.offset - at) < 1e-6 && Math.abs(p.duration - d) < 1e-6) hit = list.length > 1 ? `${k}#${i}` : k; });
+      out.push(hit);
+    }
+    return { out, synth, noise, ret: ret === undefined ? null : ret, rates };
+  }, { fn, arg, sfx: man.sfx });
+  const has = (k) => !!man.sfx[k];
+  const base = (x) => x.replace(/#\d+$/, '');
+  // [что вызвать, какой звук дорожки должен сыграть, играет ли при записи ещё и синтез]
+  const CASES = [
+    ['a.ui()', 'ui', false], ['a.error()', 'error', false], ['a.buy()', 'buy', false], ['a.shutter()', 'shutter', false], ['a.page()', 'page', false],
+    ['a.nibble()', 'nibble', false], ['a.bite()', 'bite', true], ['a.hook()', 'hook', true], ['a.keep()', 'keep', false], ['a.wrap()', 'scrape', false],
+    ['a.thrash(0.6)', 'thrash', false], ['a.landed(true)', 'net', false], ['a.thud(0.8)', 'bump', false], ['a.stuck()', 'bubbles', true],
+    ['a.step(true, false)', 'step_wood', false], ['a.step(false, false)', 'step_sand', false], ['a.step(true, true)', 'land', false],
+    ['a.jingle()', 'jingle', false], ['a.bell()', 'bell', false], ['a.horn()', 'horn', false], ['a.creak()', 'creak', false]
+  ];
+  let rec = 0, syn = 0;
+  for (const [fn, name, alsoSynth] of CASES) {
+    const r = await played(fn);
+    const fromTape = r.out.filter((x) => x !== 'loop' && !['splash', 'plop', 'reel', 'snap'].includes(x)).map(base);
+    if (has(name)) {
+      rec++;
+      assert.deepEqual(fromTape, [name], `${fn}: играет запись «${name}» — ${JSON.stringify(r)}`);
+      if (!alsoSynth) assert.equal(r.synth.tone + r.synth.burst, 0, `${fn}: при записи синтез молчит — ${JSON.stringify(r.synth)}`);
+    } else {
+      syn++;
+      assert.deepEqual(fromTape, [], `${fn}: записи «${name}» нет — из дорожки ничего не играет: ${JSON.stringify(r)}`);
+    }
+  }
+  // составные: заброс (запись и щелчки катушки), монеты горстью, улов без подсака (два шлепка), чайка
+  const cast = await played('a.cast()');
+  assert.equal(cast.out.filter((x) => x === 'reel').length, 6, 'заброс: шесть щелчков катушки');
+  if (has('cast')) assert.ok(cast.out.includes('cast') && cast.synth.burst === 0, `заброс: запись вместо синтеза — ${JSON.stringify(cast)}`);
+  const coins = await played('a.coin(4)');
+  if (has('coin')) assert.ok(coins.out.length === 4 && coins.out.every((x) => x === 'coin') && coins.rates[3] > coins.rates[0] && coins.synth.tone === 0, `монеты: четыре звона, каждый выше — ${JSON.stringify(coins)}`);
+  else assert.equal(coins.synth.tone, 8, 'монеты синтезом');
+  const flop = await played('a.landed(false)');
+  if (has('flop')) assert.deepEqual(flop.out.map(base), ['flop', 'flop'], `улов без подсака: два шлепка — ${JSON.stringify(flop)}`);
+  const gull = await played('a.gull(a.ctx.currentTime)');
+  if (has('gull')) assert.ok(gull.out.length >= 1 && gull.out.every((x) => base(x) === 'gull'), JSON.stringify(gull));
+  else assert.ok(gull.out.length === 0, 'чайка — синтезом');
+  // варианты одного звука не повторяются подряд
+  if (has('step_wood')) {
+    const seq = [];
+    for (let i = 0; i < 24; i++) seq.push((await played('a.step(true, false)')).out[0]);
+    assert.ok(seq.every((x, i) => !i || x !== seq[i - 1]), `шаги по доскам: соседние разные — ${seq.join(' ')}`);
+    assert.ok(new Set(seq).size >= Math.min(4, man.sfx.step_wood.length), `шаги по доскам: в ходу разные варианты — ${[...new Set(seq)].join(' ')}`);
+  }
+  console.log(`  игра: из ${CASES.length} звуков записью играют ${rec}, синтезом (записи пока нет) — ${syn}; заброс, монеты, шаги без повторов — как задумано`);
+
+  // ───── петли: есть запись — крутится она, нет — синтез; ничего не падает ─────
+  const bedState = (k) => page.evaluate((k) => { const L = RYBAK.audio.beds[k]; return L ? { st: L.st, on: !!L.src } : null; }, k);
+  await page.evaluate(() => { const a = RYBAK.audio; a.motor(0.6); a.rain(0.9, 0.8); a.place('waterfall', 5, 60, 0.55, 0.3); a.place('fire', 2, 16, 0.5, -0.2); a.night = 1; });
+  await page.waitForTimeout(2500);
+  await page.evaluate(() => { const a = RYBAK.audio; a.motor(0.6); a.rain(0.9, 0.8); a.place('waterfall', 5, 60, 0.55, 0.3); a.place('fire', 2, 16, 0.5, -0.2); });
+  const eng = await page.evaluate(() => ({ synthMotor: !!RYBAK.audio.eng, synthRain: !!RYBAK.audio.rainN }));
+  for (const k of ['motor', 'rain', 'wind', 'waterfall', 'fire', 'waves']) {
+    const s = await bedState(k);
+    if (man.loops[k]) assert.deepEqual(s, { st: 2, on: true }, `петля ${k} загружена и крутится: ${JSON.stringify(s)}`);
+    else assert.equal(s, null, `петли ${k} в описи нет — её и не ищут`);
+  }
+  assert.equal(eng.synthMotor, !man.loops.motor, 'мотор: запись либо синтез, не оба сразу');
+  if (man.loops.motor) {
+    const p = await page.evaluate(() => { const s = RYBAK.audio.beds.motor.src; return { loop: s.loop, ls: s.loopStart, le: s.loopEnd }; });
+    assert.deepEqual(p, { loop: true, ls: man.loops.motor.start, le: man.loops.motor.end }, 'у петли мотора — точки из описи');
+  }
+  await page.evaluate(() => { const a = RYBAK.audio; a.motor(-1); a.rain(0, 0.2); a.night = 0; });
+  assert.ok(!page.__err, 'ошибок на странице нет');
+  console.log(`  петли: записью — ${loops.length ? loops.join(', ') : 'пока ни одной'}; остальное — синтез, как раньше`);
+  await browser.close();
+  console.log('ЗАПИСИ ЗВУКОВ: всё в порядке');
+})().catch((e) => { console.error('ПРОВАЛ:', e.message.split('\n').slice(0, 8).join('\n'), '\n', (e.stack || '').split('\n').filter((l) => l.includes('sound.cjs')).slice(0, 3).join('\n')); process.exit(1); });

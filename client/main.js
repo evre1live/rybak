@@ -19,10 +19,11 @@ import { Net } from './net.js';
 import { createVoice } from './voice.js';
 import { Audio2 } from './audio.js';
 import { UI } from './ui.js';
-import { loadProfile, saveProfile, saveProfileNow, settings, saveSettings, session } from './profile.js';
+import { loadProfile, saveProfile, saveProfileNow, lockProfile, hooks as profileHooks, settings, saveSettings, session } from './profile.js';
+import { Cloud } from './cloud.js';
 import { S, FLAG, MARKS } from './proto.js';
 import { cardText, cardFile, drawCard } from './postcard.js';
-import { DECK_Y, MARKET, MOORINGS, RENT_DESK, MAP_VIEW, WRECK, SEA, ISLAND, palmR, canStand } from './terrain.js';
+import { DECK_Y, MARKET, MOORINGS, RENT_DESK, MAP_VIEW, WRECK, SEA, ISLAND, palmR, canStand, FALLS, CAMPFIRE } from './terrain.js';
 import { ITEMS, FISH_BY_ID, JUNK, JUNK_BY_ID, RARITY, ZONES, BAITS, LURES, clockHours, dayPart, fmtW, fmtCoins, isLure } from '../shared/data.js';
 import {
   marketState, hashStr, buy, equip, sell, kitStats, levelInfo, tackleCount, fishValue, newProfile, speciesWeights,
@@ -76,6 +77,18 @@ class Game {
     // пробная версия без сервера (например, страница-витрина): только одиночная рыбалка
     this.offline = !!window.RYBAK_OFFLINE;
     this.profile = loadProfile();
+    // сохранение на сервере: прогресс уходит туда вслед за каждым сохранением в браузере (client/cloud.js)
+    this.cloud = new Cloud({
+      enabled: !this.offline,
+      profile: () => {
+        const { fresh, ...rest } = this.profile;
+        return rest;
+      },
+      apply: (save, sum, asked) => this.cloudApply(save, sum, asked),
+      changed: () => this.cloudChanged(),
+      notify: (kind) => this.cloudNotify(kind)
+    });
+    profileHooks.saved = () => this.cloud.touch();
     this.canvas = $('#view');
     const touch = isTouch();
     document.body.classList.toggle('touch', touch);
@@ -252,6 +265,7 @@ class Game {
       this.serverUp = ok;
       const el = $('#srvNote');
       if (el) el.classList.toggle('hidden', ok || this.state !== 'title');
+      if (ok) this.cloud.start();
     });
     this.boot();
     setTimeout(() => $('#loading').classList.add('out'), 300);
@@ -598,10 +612,11 @@ class Game {
       this.input.enabled = false;
       this.input.unlock();
       if (name === 'editor') this.startEdit();
+      if (name !== was && (name === 'journal' || name === 'quests' || name === 'help' || name === 'top')) this.audio.page();
       return;
     }
     if (was === 'editor') this.endEdit();
-    if (was === 'settings') this.pendingSave = null; // выбранный, но не подтверждённый файл сохранения забываем
+    if (was === 'save') this.pendingSave = this.pendingCode = null; // выбранный, но не подтверждённый файл или код сохранения забываем
     if (was === 'card') this.card = null;
     if (this.state === 'world') {
       this.ui.hideScreen();
@@ -934,7 +949,7 @@ class Game {
       return this.ui.toast('Не получилось сделать открытку', 'bad');
     }
     this.card = { cv, t, file: cardFile(t, date), url: cv.toDataURL('image/jpeg', 0.9) };
-    this.audio.tick();
+    this.audio.shutter();
     this.ui.flash('#ffffff');
     this.ui.openPanel('card');
     return this.card;
@@ -1007,7 +1022,7 @@ class Game {
     }
     if (this.fishing.state === 'fight' || this.fishing.state === 'landed') return this.ui.toast('Сначала вытащите рыбу', 'bad');
     this.pendingSave = r;
-    if (this.ui.panel === 'settings') this.ui.renderSettings();
+    if (this.ui.panel === 'save') this.ui.renderSave();
   }
   /** Заменить прогресс загруженным сохранением: пишем сразу и открываем игру заново — так всё встаёт на места. */
   applySave() {
@@ -1016,8 +1031,89 @@ class Game {
     this.pendingSave = null;
     const look = r.profile.look || this.profile.look;
     saveProfileNow({ ...r.profile, look });
+    lockProfile();
+    // игрок сам заменил прогресс: на сервер он уйдёт, даже если там опыта больше, — но уже после перезапуска, из нового профиля
+    this.cloud.touch({ force: true });
+    this.cloud.hold();
     this.ui.toast('Сохранение загружено — открываем игру заново', 'good', 2000);
     if (!this.noReload) setTimeout(() => location.reload(), 700);
+  }
+
+  // ───── сохранение на сервере ─────
+  /**
+   * Принять сохранение с сервера: с другого устройства (само) или по коду (asked — игрок сам попросил).
+   * Прогресс заменяется на месте, без перезапуска игры. false — сейчас нельзя: рыба на крючке или в руках.
+   */
+  cloudApply(save, sum, asked) {
+    if (!this.fishing || !this.ui) return false; // игра ещё собирается
+    if (this.fishing.state === 'fight' || this.fishing.state === 'landed') return false;
+    const r = importSave(exportSave(save, 0));
+    if (!r.ok) {
+      this.ui.toast('Сохранение с сервера не читается — оставляем то, что на этом устройстве', 'bad', 6000);
+      return true;
+    }
+    const p = this.profile;
+    const look = r.profile.look && r.profile.look.hero ? r.profile.look : p.look;
+    for (const k of Object.keys(p)) delete p[k];
+    Object.assign(p, r.profile, { look });
+    saveProfileNow(p);
+    // всё, что в игре выведено из профиля: герой, снасть в руках, лодка, задания, цифры на экране
+    this.vm.setLook(fpLook(look));
+    this.player.eye = heroEye(look);
+    this.fishing.reelIn(true);
+    this.fishing.refreshGear();
+    if (this.me) this.dressBoat();
+    this.sendCard();
+    if (this.state !== 'title') {
+      this.syncQuests();
+      this.ui.questTracker();
+      this.rosterChanged();
+    }
+    this.ui.refreshHud();
+    if (this.state === 'title' && !this.ui.panel) this.ui.showTitle();
+    else this.ui.rerender();
+    this.ui.toast(`${asked ? 'Сохранение загружено' : 'Прогресс обновлён — вы играли на другом устройстве'}: ${r.name || 'Рыбак'}, уровень ${r.lvl}`, 'good', 5200);
+    return true;
+  }
+  cloudChanged() {
+    const ui = this.ui;
+    if (!ui) return;
+    // панель «Сохранение» перерисовываем целиком, только если поменялось её устройство (появился выбор, выключили хранение);
+    // иначе правим одни подписи: человек может в эту секунду набирать код или вести ползунок в настройках
+    if (ui.panel === 'save' && ui.saveKey !== ui.saveShape()) ui.renderSave();
+    else if (ui.panel === 'save' || ui.panel === 'settings') {
+      const line = $('#saveLine');
+      if (line) line.textContent = ui.saveLine();
+      const note = $('#cloudNote');
+      if (note && !note.classList.contains('warn')) note.textContent = ui.cloudNote();
+    }
+    const el = $('#saveNote');
+    if (el) el.innerHTML = ui.saveNote();
+  }
+  cloudNotify(kind) {
+    if (kind === 'clash' && this.ui) this.ui.toast('Сохранение на сервере и на этом устройстве разошлись. Откройте «Настройки → Сохранение и перенос» и выберите, какое оставить', 'bad', 9000);
+  }
+  /** Настройки → «Загрузить по коду»: смотрим, что лежит под кодом, и спрашиваем, заменить ли нынешний прогресс. */
+  async cloudLookup(text) {
+    if (this.fishing.state === 'fight' || this.fishing.state === 'landed') return this.ui.toast('Сначала вытащите рыбу', 'bad');
+    this.pendingCode = null;
+    const r = await this.cloud.lookup(text);
+    if (!r.ok) {
+      this.audio.error();
+      const why = { BAD_CODE: 'В коде сохранения 16 букв и цифр — проверьте, всё ли набрано', SAME: 'Это код этого же устройства — прогресс уже здесь', NO_SAVE: 'Под таким кодом сохранения нет. Проверьте код', SLOW_DOWN: 'Слишком много попыток — подождите минуту', NO_DB: 'Сервер сейчас не хранит сохранения' }[r.why] || 'Сервер не отвечает — попробуйте чуть позже';
+      return this.ui.toast(why, 'bad', 4600);
+    }
+    this.pendingCode = r;
+    if (this.ui.panel === 'save') this.ui.renderSave();
+  }
+  cloudAdopt() {
+    const r = this.pendingCode;
+    if (!r) return;
+    this.pendingCode = null;
+    if (!this.cloud.adopt(r)) return this.ui.toast('Сейчас загрузить не получится — сначала вытащите рыбу', 'bad', 4200);
+    const inp = $('#cloudcode');
+    if (inp) inp.value = '';
+    if (this.ui.panel === 'save') this.ui.renderSave();
   }
   resetProgress() {
     const name = this.profile.name;
@@ -1026,6 +1122,7 @@ class Game {
     this.syncQuests();
     this.ui.questTracker();
     saveProfile(this.profile);
+    this.cloud.touch({ force: true }); // игрок сам стёр прогресс — на сервере он тоже обнуляется
     this.fishing.reelIn(true);
     this.fishing.refreshGear();
     this.sendCard();
@@ -1169,7 +1266,7 @@ class Game {
       case 'warn': return a.warn();
       case 'run':
         this.fauna.scare(this.fishing.bx, this.fishing.bz, 3);
-        a.splash(0.6);
+        a.thrash(0.6);
         return this.rumble(180, 0.8);
       case 'jump':
         this.fauna.scare(d.x, d.z, 3.5);
@@ -1218,6 +1315,7 @@ class Game {
         ui.banner(null);
         a.strain(-1);
         a.catch(f ? f.rar : 0);
+        if (f) a.landed(this.fishing.kit.net);
         ui.catchCard(d);
         this.rumble(300, 0.5);
         this.stopTime(0.26, 0.45);
@@ -1239,6 +1337,8 @@ class Game {
         if (d.forced) ui.toast('Садок полон — рыбу пришлось отпустить. Продайте улов на рынке', 'bad', 3600);
         else if (d.released) ui.toast(`Отпущена. Опыт +${d.xp}`, 'good', 1800);
         else ui.toast(`В садок. Опыт +${d.xp}`, 'good', 1600);
+        if (d.released) a.splash(0.45);
+        else a.keep();
         if (d.isNew && f) ui.toast(`Новый вид в журнале: ${f.name}`, 'gold', 3200);
         if (d.levelUp) {
           a.level();
@@ -1395,6 +1495,7 @@ class Game {
       this.ui.toast(`Награда: +${fmtCoins(r.coins)} монет, опыт +${r.xp}`, 'good', 4200);
       if (r.bonus) this.ui.toast(`Все задания дня выполнены! Премия +${fmtCoins(r.bonus)} монет`, 'gold', 5200);
       this.audio.coin(3);
+      if (!r.levelUp) this.audio.jingle();
       if (r.levelUp) {
         this.audio.level();
         this.ui.toast(`Уровень ${r.levelUp} — ${levelInfo(p.xp).title}!`, 'gold', 4000);
@@ -1435,8 +1536,7 @@ class Game {
     const name = TOURS[t.kind].name;
     if (late) return this.ui.feed(`Идёт турнир: <b>${name}</b>`);
     this.ui.feed(t.solo ? `Заплыв на время: <b>${name}</b>` : `${by ? `<b>${esc(by)}</b> объявляет турнир` : 'Турнир объявлен'}: <b>${name}</b>, ${Math.round(t.len / 60)} мин`);
-    this.audio.tone(523, 0.12, 'triangle', 0.14);
-    this.audio.tone(784, 0.2, 'triangle', 0.14, null, 0.14);
+    this.audio.bell();
     if (this.ui.panel === 'tour') this.ui.rerender();
   }
   /** Свой улов во время заплыва в одиночку (в комнате очки считает сервер). */
@@ -1498,11 +1598,18 @@ class Game {
       return;
     }
     if (document.activeElement && document.activeElement.tagName === 'INPUT' && document.activeElement.type !== 'range') {
+      if (e.code === 'Enter' && document.activeElement.id === 'cloudcode') {
+        const b = $('[data-a="cloudlink"]');
+        if (b) b.click();
+        return;
+      }
       if (e.code === 'Enter' && this.state === 'title') {
         const b = $('.tcard .btn.pri');
         if (b) b.click();
       }
-      return;
+      // Esc в поле ввода на открытой панели — как обычно, закрывает панель
+      if (!(e.code === 'Escape' && ui.panel)) return;
+      document.activeElement.blur();
     }
     if (e.code === 'KeyM') return this.toggleVoice();
     if (ui.panel) {
@@ -1801,6 +1908,27 @@ class Game {
       if (this.ride) this.rideStep(dt, pnow, tw);
       // мотор слышно и пассажиру — пока хозяин в лодке
       this.audio.motor(boat.active ? Math.abs(boat.k) : this.ride && this.ride.moored < 0 ? Math.abs(this.ride.k) : -1);
+      // в лодке время от времени поскрипывает дерево
+      if (boat.active || this.ride) {
+        this.creakT = (this.creakT || 4) - dt;
+        if (this.creakT <= 0) {
+          this.creakT = 5 + Math.random() * 10;
+          this.audio.creak();
+        }
+      }
+      // звуки мест: водопады на острове с маяком и костёр на Пальмовом — слышны вблизи, с той стороны, где они есть
+      {
+        const pl = this.player;
+        const hear = (name, x, z, far, vol) => {
+          const dx = x - pl.x, dz = z - pl.z;
+          const d = Math.hypot(dx, dz);
+          // взгляд игрока — вдоль (−sin yaw, −cos yaw); справа от него — (cos yaw, −sin yaw)
+          this.audio.place(name, d, far, vol, d > 0.01 ? (dx * Math.cos(pl.yaw) - dz * Math.sin(pl.yaw)) / d : 0);
+        };
+        const fall = FALLS.reduce((a, b) => (Math.hypot(a.bx - pl.x, a.bz - pl.z) < Math.hypot(b.bx - pl.x, b.bz - pl.z) ? a : b));
+        hear('waterfall', fall.bx, fall.bz, 60, 0.55);
+        hear('fire', CAMPFIRE.x, CAMPFIRE.z, 16, 0.5);
+      }
       if (!ui.panel || !this.editing) {
         const noLook = !!ui.panel;
         if (noLook) i.lookDX = i.lookDY = 0;
@@ -1970,7 +2098,7 @@ class Game {
         t.begun = true;
         if (this.state === 'world') {
           ui.banner('ТУРНИР НАЧАЛСЯ!', 'cy', 1800);
-          this.audio.tone(880, 0.3, 'triangle', 0.16);
+          this.audio.horn();
         }
       }
       if (t.solo && tn >= t.end) this.endTour(null);

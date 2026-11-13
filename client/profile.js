@@ -28,18 +28,31 @@ export function loadProfile() {
   return p;
 }
 let timer = null;
+let locked = false;
+// saved — вызывается при каждом сохранении профиля: по нему прогресс уходит ещё и на сервер (client/cloud.js)
+export const hooks = { saved: null };
 export function saveProfile(p) {
+  if (locked) return;
   clearTimeout(timer);
   timer = setTimeout(() => {
     const { fresh, ...rest } = p;
     store.set(KEY, rest);
   }, 300);
+  if (hooks.saved) hooks.saved();
 }
-/** Записать профиль сразу, не дожидаясь паузы: перед перезагрузкой страницы (загрузка сохранения из файла). */
+/** Записать профиль сразу, не дожидаясь паузы: перед перезагрузкой страницы (загрузка сохранения из файла или с сервера). */
 export function saveProfileNow(p) {
   clearTimeout(timer);
   const { fresh, ...rest } = p;
   store.set(KEY, rest);
+}
+/**
+ * Прогресс заменён другим сохранением, страница сейчас откроется заново. До тех пор профиль из памяти больше
+ * не пишется: иначе игра, которая ещё идёт на экране, затёрла бы только что загруженное.
+ */
+export function lockProfile() {
+  clearTimeout(timer);
+  locked = true;
 }
 // drs — уменьшать разрешение, когда кадры проседают; fps — окошко со счётчиком кадров; autoQ — что подобрано на «авто» для этой видеокарты;
 // follow — при вываживании взгляд сам держится на рыбе, пока игрок не ведёт мышью; music — громкость музыки, которую сочиняет игра

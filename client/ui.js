@@ -9,6 +9,7 @@ import { heroes, heroOf, heroTemplate } from './hero.js';
 import { MARKS, markSvg } from './proto.js';
 import { MAP_VIEW, MARKET, MOORINGS, WRECK } from './terrain.js';
 import { settings, saveSettings } from './profile.js';
+import { showCode, saveSummary, agoText, plural } from '../shared/cloud.js';
 import { $, $$, el, esc, clamp } from './util.js';
 
 const SVG = {
@@ -562,12 +563,19 @@ export class UI {
         <button class="btn ghost" data-a="solo"><span>РЫБАЧИТЬ В ОДИНОЧКУ</span></button>`}
       </div>
       <div class="tnote${this.g.serverUp === false ? '' : ' hidden'}" id="srvNote">Сервер просыпается — комнаты заработают через минуту. В одиночку можно рыбачить уже сейчас.</div>
-      <div class="tfoot">${this.g.offline ? 'Прогресс хранится в этом браузере' : 'Голосовой чат включается в комнате · прогресс хранится в этом браузере'}<br><a data-a="help">Как играть</a> · <a data-a="settings">Настройки</a></div>
+      <div class="tfoot">${this.g.offline ? 'Прогресс хранится в этом браузере' : `Голосовой чат включается в комнате · <span id="saveNote">${this.saveNote()}</span>`}<br><a data-a="help">Как играть</a>${this.g.offline ? '' : ' · <a data-a="open" data-p="top">Рекорды</a>'} · <a data-a="settings">Настройки</a></div>
     </div>`;
     setTimeout(() => {
       const n = $('#nm');
       if (n && !n.value) n.focus();
     }, 50);
+  }
+  /** Одна строка на заставке: где сейчас лежит прогресс. */
+  saveNote() {
+    const st = this.g.cloud.state;
+    if (st === 'clash') return '<a data-a="open" data-p="save" class="warnlink">сохранения разошлись — выберите, какое оставить</a>';
+    if (st === 'ok' || st === 'pending') return 'прогресс хранится в браузере и на сервере';
+    return 'прогресс хранится в этом браузере';
   }
   showLobby() {
     this.view = 'lobby';
@@ -593,6 +601,7 @@ export class UI {
   }
 
   openPanel(name, opts = {}) {
+    const prev = this.panel;
     this.panel = name;
     this.popts = opts;
     if (name === 'tackle' || name === 'shop') {
@@ -609,7 +618,9 @@ export class UI {
     else if (name === 'tour') this.renderTour();
     else if (name === 'bench') this.renderBench();
     else if (name === 'card') this.renderCard();
-    this.g.onPanel(name);
+    else if (name === 'top') this.openTop();
+    else if (name === 'save') this.renderSave();
+    this.g.onPanel(name, prev);
   }
   closePanel() {
     if (!this.panel) return;
@@ -798,10 +809,58 @@ export class UI {
       </div>
       ${this.g.cache && this.g.cache.on ? `<div class="hint cachenote">Игра сохранена на этом устройстве${this.g.cache.total ? `: ${this.g.cache.done} из ${this.g.cache.total} файлов` : ''} — открывается сразу и не ждёт сервер.</div>` : ''}
       <button class="btn pri" data-a="close"><span>ГОТОВО</span></button>
-      <div class="row2">${this.g.installPrompt ? '<button class="btn sm" data-a="install"><span>УСТАНОВИТЬ КАК ПРИЛОЖЕНИЕ</span></button>' : ''}<button class="btn sm" data-a="bench"><span>ПРОВЕРКА КОМПЬЮТЕРА</span></button></div>
-      <div class="hint savenote">Прогресс хранится в этом браузере. Файл сохранения можно перенести на другое устройство или оставить про запас.</div>
+      <div class="row2">${this.g.installPrompt ? '<button class="btn sm" data-a="install"><span>УСТАНОВИТЬ КАК ПРИЛОЖЕНИЕ</span></button>' : ''}<button class="btn sm" data-a="bench"><span>ПРОВЕРКА КОМПЬЮТЕРА</span></button><button class="btn sm ${this.g.cloud.clash ? 'red' : ''}" data-a="open" data-p="save"><span>СОХРАНЕНИЕ И ПЕРЕНОС</span></button></div>
+      <div class="hint savenote" id="saveLine">${this.saveLine()}</div></div>`;
+  }
+  /** Одна строка: где сейчас лежит прогресс и когда он в последний раз ушёл на сервер. */
+  saveLine() {
+    const c = this.g.cloud;
+    return {
+      none: 'Прогресс хранится в этом браузере.',
+      off: 'Прогресс хранится только в этом браузере: сохранение на сервере выключено.',
+      wake: 'Прогресс хранится в этом браузере. Сервер просыпается…',
+      nodb: 'Прогресс хранится в этом браузере: сервер сейчас сохранений не принимает.',
+      net: 'Прогресс хранится в этом браузере. С сервером нет связи — отправим, как появится.',
+      busy: 'Прогресс хранится в этом браузере. Сервер занят — отправим чуть позже.',
+      clash: 'Сохранения на сервере и на этом устройстве разошлись — выберите, какое оставить.',
+      empty: 'Прогресс хранится в этом браузере, а после первого улова — ещё и на сервере.',
+      pending: `Прогресс хранится в браузере и на сервере: сохранено ${agoText(c.s.at)}, новое уйдёт через несколько секунд.`,
+      ok: `Прогресс хранится в браузере и на сервере: сохранено ${agoText(c.s.at)}.`
+    }[c.state];
+  }
+  /** От чего зависит устройство панели «Сохранение» (а не только подписи в ней). */
+  saveShape() {
+    const c = this.g.cloud;
+    return `${c.state === 'none'}|${!!c.clash}|${c.s.on}|${c.s.listed}|${c.code}`;
+  }
+  /** Сохранение и перенос: сервер (код сохранения, вход по коду, выбор при расхождении), файл, сброс. */
+  renderSave() {
+    const g = this.g;
+    this.saveKey = this.saveShape();
+    const typed = (this.screen.querySelector('#cloudcode') || {}).value || '';
+    this.screen.innerHTML = `<div class="dim"></div><div class="center wide savep">
+      <h1>СОХРАНЕНИЕ</h1>
+      <div class="hint savenote" id="saveLine">${this.saveLine()}</div>
+      ${this.cloudBlock()}
+      <h3>ФАЙЛ СОХРАНЕНИЯ</h3>
+      <div class="hint savenote">Запасная копия прогресса одним файлом: её можно убрать в надёжное место или открыть на другом устройстве.</div>
       <div class="row2"><button class="btn sm" data-a="savefile"><span>СОХРАНИТЬ В ФАЙЛ</span></button><button class="btn sm" data-a="loadfile"><span>ЗАГРУЗИТЬ ИЗ ФАЙЛА</span></button><button class="btn ghost sm" data-a="reset"><span>НАЧАТЬ ЗАНОВО — СТЕРЕТЬ ПРОГРЕСС</span></button></div>
-      <input type="file" id="savein" accept=".json,application/json" hidden></div>`;
+      <input type="file" id="savein" accept=".json,application/json" hidden>
+      <button class="btn pri" data-a="open" data-p="settings"><span>ГОТОВО</span></button></div>`;
+    const inp0 = this.screen.querySelector('#cloudcode');
+    if (inp0 && typed) inp0.value = typed;
+    const found = g.pendingCode;
+    if (found) {
+      // под кодом нашлось сохранение: показываем чьё и спрашиваем, заменить ли нынешний прогресс
+      const b = this.screen.querySelector('[data-a="cloudlink"]');
+      if (b) {
+        b.dataset.sure = '1';
+        b.classList.add('red');
+        b.innerHTML = `<span>ЗАМЕНИТЬ ПРОГРЕСС: ${esc(found.sum.name.toUpperCase())}, УРОВЕНЬ ${found.sum.lvl}? НАЖМИТЕ ЕЩЁ РАЗ</span>`;
+        const inp = this.screen.querySelector('#cloudcode');
+        if (inp) inp.value = showCode(found.code);
+      }
+    }
     const pick = this.g.pendingSave;
     if (pick) {
       // файл выбран: показываем, что в нём, и спрашиваем, заменить ли нынешний прогресс
@@ -814,6 +873,102 @@ export class UI {
       const f = e.target.files && e.target.files[0];
       if (f) this.g.loadFromFile(f);
     });
+  }
+  /** Подпись под переключателем «Хранить прогресс на сервере». */
+  cloudNote() {
+    const c = this.g.cloud;
+    return {
+      off: 'выключено',
+      wake: 'сервер просыпается…',
+      nodb: 'сервер сейчас сохранений не принимает',
+      net: 'нет связи с сервером — отправим позже',
+      busy: 'сервер занят — отправим чуть позже',
+      clash: 'сохранения разошлись — выберите ниже',
+      empty: 'появится на сервере после первого улова',
+      pending: `сохранено ${agoText(c.s.at)}`,
+      ok: `сохранено ${agoText(c.s.at)}`
+    }[c.state] || '';
+  }
+  /** Панель «Сохранение»: сервер — состояние, код, вход по коду с другого устройства, выбор при расхождении. */
+  cloudBlock() {
+    const c = this.g.cloud;
+    const st = c.state;
+    if (st === 'none') return '';
+    const tog = (a, on) => `<span class="tog ${on ? 'on' : ''} click" data-a="${a}"></span>`;
+    const me = saveSummary(this.g.profile);
+    const what = (m) => `уровень ${m.lvl}, ${m.species} ${plural(m.species, 'вид', 'вида', 'видов')} рыб, поймано ${m.caught}`;
+    const note = this.cloudNote();
+    const clash = c.clash
+      ? `<div class="clash"><b>Сохранения разошлись.</b> На сервере — ${esc(c.clash.sum.name)}: ${what(c.clash.sum)}; сохранено ${agoText(c.clash.at)} с другого устройства. На этом устройстве — ${what(me)}.
+        <div class="row2"><button class="btn sm" data-a="cloudserver"><span>ВЗЯТЬ С СЕРВЕРА</span></button><button class="btn sm" data-a="cloudmine"><span>ОСТАВИТЬ С ЭТОГО УСТРОЙСТВА</span></button></div>
+        <small>Второе сохранение при этом пропадёт. Не уверены — сначала «Сохранить в файл».</small></div>`
+      : '';
+    const shown = this.codeShown;
+    const code = showCode(c.code);
+    return `<div class="cloudbox">
+      <h3>СОХРАНЕНИЕ НА СЕРВЕРЕ</h3>
+      <div class="set">
+        <span>Хранить прогресс на сервере<small class="sub" id="cloudNote">${note}</small></span>${tog('cloudtog', c.s.on)}
+        <span>Показывать меня в таблице рекордов<small class="sub">имя, уровень и лучший улов видят все игроки</small></span>${tog('cloudlisted', c.s.on && c.s.listed)}
+      </div>
+      ${clash}
+      ${c.s.on ? `<div class="codebox"><span>Код сохранения</span><code id="cloudmy">${shown ? code : code.slice(0, 4) + '-••••-••••-' + code.slice(-4)}</code><button class="btn sm ghost" data-a="cloudshow"><span>${shown ? 'СКРЫТЬ' : 'ПОКАЗАТЬ'}</span></button><button class="btn sm" data-a="cloudcopy"><span>СКОПИРОВАТЬ</span></button></div>
+      <div class="hint savenote">С этим кодом прогресс откроется на любом устройстве — даже если очистить браузер. Запишите его и никому не показывайте: кто знает код, тот распоряжается сохранением.</div>
+      <div class="codebox"><span>Есть код с другого устройства?</span><input class="in" id="cloudcode" maxlength="24" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false"><button class="btn sm" data-a="cloudlink"><span>ЗАГРУЗИТЬ ПО КОДУ</span></button></div>` : ''}
+    </div>`;
+  }
+  // ───── таблица рекордов ─────
+  openTop() {
+    this.top = { tab: (this.top && this.top.tab) || 'anglers', data: null, why: '' };
+    this.renderTop();
+    const run = this.top;
+    // своё последнее — сначала на сервер, чтобы увидеть себя в таблице с только что пойманным
+    Promise.resolve(this.g.cloud.s.dirty ? this.g.cloud.push() : null)
+      .then(() => this.g.cloud.top())
+      .then((r) => {
+        if (this.top !== run) return;
+        if (r.ok) run.data = r;
+        else run.why = r.why || 'NET';
+        if (this.panel === 'top') this.renderTop();
+      });
+  }
+  renderTop() {
+    const g = this.g;
+    const t = this.top;
+    const d = t.data;
+    const mine = g.cloud.s.on ? g.cloud.s.pub : '';
+    const p = g.profile;
+    let body = '';
+    if (!d) {
+      body = `<p class="topnote">${t.why ? ({ NO_DB: 'Сервер сейчас не ведёт таблицу рекордов.', SLOW_DOWN: 'Слишком часто — подождите несколько секунд и откройте снова.' }[t.why] || 'Сервер не отвечает: он просыпается или нет связи. Попробуйте через минуту.') : 'Загружаю таблицу…'}</p>`;
+    } else if (t.tab === 'anglers') {
+      const rows = d.anglers.map((r, i) => {
+        const lv = levelInfo(r.xp);
+        return `<div class="trow ${r.pub === mine ? 'me' : ''}"><i>${i + 1}</i><span class="nm">${esc(r.name)}${r.pub === mine ? ' <em>вы</em>' : ''}</span><span class="lv"><b>${lv.lvl}</b> ${esc(lv.title)}</span><span>${r.species}/${FISH.length}</span><span>${r.legends || '—'}</span><span>${r.medals || '—'}</span><span>${r.caught}</span></div>`;
+      }).join('');
+      const out = d.me && !d.anglers.some((r) => r.pub === mine);
+      body = d.anglers.length
+        ? `<div class="ttable"><div class="trow hd"><i>№</i><span class="nm">Рыбак</span><span class="lv">Уровень</span><span>Видов</span><span>Легенд</span><span>Медалей</span><span>Улов</span></div>${rows}</div>
+          ${out ? `<p class="topnote">Ваше место — <b class="y">${d.me.place}</b> из ${d.total}.</p>` : ''}`
+        : '<p class="topnote">Таблица пока пуста. Поймайте первую рыбу — и откроете её собой.</p>';
+    } else {
+      const rec = new Map(d.records.map((r) => [r.sp, r]));
+      const rows = FISH.map((f) => {
+        const r = rec.get(f.id);
+        const j = p.journal[f.id];
+        const hold = r && r.pub === mine;
+        return `<div class="trow ${hold ? 'me' : ''}"><img class="${j ? '' : 'unk'}" src="${fishIcon(f.id)}" alt=""><span class="nm" style="color:${j ? RARITY[f.rar].color : '#9fb4d3'}">${j ? esc(f.name) : '???'}</span><span class="w">${r ? fmtW(r.w) : '—'}</span><span class="who">${r ? `${esc(r.name)}${hold ? ' <em>вы</em>' : ''}` : 'ещё никто не поймал'}</span><span class="my">${j ? fmtW(j.best) : '—'}</span></div>`;
+      }).join('');
+      body = `<div class="ttable rec"><div class="trow hd"><i></i><span class="nm">Рыба</span><span class="w">Рекорд</span><span class="who">Чей</span><span class="my">Ваш вес</span></div>${rows}</div>`;
+    }
+    const c = g.cloud;
+    const foot = c.state === 'off' ? 'Вас в таблице нет: сохранение на сервере выключено (Настройки → Сохранение и перенос).' : !c.s.listed ? 'Вас в таблице нет: вы скрыли себя (Настройки → Сохранение и перенос).' : c.s.rev > 0 ? 'Таблицу видят все игроки. Скрыть себя можно в настройках: «Сохранение и перенос».' : 'Вы появитесь в таблице после первого улова. Таблицу видят все игроки.';
+    this.screen.innerHTML = `<div class="dim"></div><div class="center toppanel">
+      <div class="tophead"><h1>РЕКОРДЫ БУХТЫ</h1>${d ? `<span class="cnt">${d.total} ${plural(d.total, 'рыбак', 'рыбака', 'рыбаков')}</span>` : ''}</div>
+      <div class="opt3"><button class="btn sm ${t.tab === 'anglers' ? 'pri' : 'ghost'}" data-a="toptab" data-id="anglers"><span>РЫБАКИ</span></button><button class="btn sm ${t.tab === 'records' ? 'pri' : 'ghost'}" data-a="toptab" data-id="records"><span>РЕКОРДЫ ПО ВИДАМ</span></button></div>
+      ${body}
+      <div class="hint savenote">${foot}</div>
+      <button class="btn ${g.inWorld ? 'ghost' : 'pri'}" data-a="${g.inWorld ? 'back' : 'close'}"><span>НАЗАД</span></button></div>`;
   }
   /** Открытка с уловом (или с видом бухты): картинка и что с ней сделать. */
   renderCard() {
@@ -872,7 +1027,7 @@ export class UI {
       <h1>ПАУЗА</h1>
       <button class="btn pri" data-a="close"><span>ВЕРНУТЬСЯ К РЫБАЛКЕ</span></button>
       <button class="btn" data-a="open" data-p="tackle"><span>СНАСТИ</span></button>
-      <button class="btn" data-a="open" data-p="journal"><span>ЖУРНАЛ РЫБ</span></button>
+      <div class="row2"><button class="btn" data-a="open" data-p="journal"><span>ЖУРНАЛ РЫБ</span></button>${g.offline ? '' : `<button class="btn" data-a="open" data-p="top"><span>${ic('crown')} РЕКОРДЫ</span></button>`}</div>
       <div class="row2"><button class="btn" data-a="open" data-p="quests"><span>${ic('list')} ЗАДАНИЯ ДНЯ</span></button><button class="btn" data-a="open" data-p="tour"><span>${ic('cup')} ТУРНИР</span></button></div>
       <button class="btn" data-a="open" data-p="editor"><span>ПЕРСОНАЖ</span></button>
       <button class="btn" data-a="open" data-p="help"><span>КАК ИГРАТЬ</span></button>
@@ -959,6 +1114,7 @@ export class UI {
         <span>${k('ПОДСАК')}</span><span>Друг рядом вываживает рыбу — подойдите: когда она пройдёт 70 % пути, кнопка даст взять её подсаком. Рыбаку — улов, вам — четверть опыта.</span>
       </div>
       <p>Чем лучше удочка — тем дальше заброс: до рифа, водопада и арки стартовой не достать. Тёмные тени под водой — косяки, там клюёт чаще и крупнее.</p>
+      ${this.g.offline ? '' : '<p>Прогресс сохраняется сам — в этом браузере и на сервере игры. Чтобы открыть его на другом устройстве, возьмите код в «Настройках → Сохранение и перенос».</p>'}
       <button class="btn pri" data-a="${this.popts && this.popts.first ? 'close' : 'back'}"><span>ПОНЯТНО</span></button></div>`;
       return;
     }
@@ -980,6 +1136,7 @@ export class UI {
         <span>${k('E')}</span><span><b>Вдвоём:</b> друг рядом вываживает рыбу — подойдите: когда она пройдёт 70 % пути, её можно взять подсаком. Рыбаку — улов, вам — четверть опыта.</span>
       </div>
       <p>Чем лучше удочка — тем дальше заброс: до рифа, водопада и арки стартовой не достать. Тёмные тени под водой — косяки, там клюёт чаще и крупнее. В непогоду, особенно в дождь, рыба берёт охотнее.</p>
+      ${this.g.offline ? '' : '<p>Прогресс сохраняется сам — в этом браузере и на сервере игры. Чтобы открыть его на другом устройстве, возьмите код в «Настройках → Сохранение и перенос».</p>'}
       <button class="btn pri" data-a="${this.popts && this.popts.first ? 'close' : 'back'}"><span>ПОНЯТНО</span></button></div>`;
   }
 
@@ -1078,6 +1235,48 @@ export class UI {
         return this.renderSettings();
       case 'cardsave': return g.saveCard();
       case 'cardshare': return g.shareCard();
+      case 'toptab':
+        this.top.tab = id;
+        return this.renderTop();
+      case 'cloudshow':
+        this.codeShown = !this.codeShown;
+        return this.renderSave();
+      case 'cloudcopy': {
+        const text = showCode(g.cloud.code);
+        const done = () => this.toast('Код сохранения скопирован. Храните его там, где не потеряете', 'good', 3600);
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, () => ((this.codeShown = true), this.renderSave(), this.toast('Не вышло скопировать — перепишите код с экрана', '', 3600)));
+        else {
+          this.codeShown = true;
+          this.renderSave();
+          this.toast('Перепишите код с экрана', '', 3000);
+        }
+        return;
+      }
+      case 'cloudlink': {
+        if (t.dataset.sure) return g.cloudAdopt();
+        const inp = this.screen.querySelector('#cloudcode');
+        return g.cloudLookup(inp ? inp.value : '');
+      }
+      case 'cloudserver':
+        return g.cloud.keepServer().then((ok) => ok || this.toast('Сервер не отвечает — попробуйте чуть позже', 'bad', 4000));
+      case 'cloudmine':
+        return g.cloud.keepMine().then((ok) => this.toast(ok ? 'На сервере теперь сохранение с этого устройства' : 'Сервер не отвечает — попробуйте чуть позже', ok ? 'good' : 'bad', 4000));
+      case 'cloudlisted':
+        if (!g.cloud.s.on) return;
+        return g.cloud.setListed(!g.cloud.s.listed);
+      case 'cloudtog':
+        if (!g.cloud.s.on) return g.cloud.setOn(true);
+        if (!t.dataset.sure && g.cloud.s.rev > 0) {
+          // выключение стирает сохранение с сервера — спрашиваем
+          t.dataset.sure = '1';
+          const n = this.screen.querySelector('#cloudNote');
+          if (n) {
+            n.classList.add('warn');
+            n.textContent = 'Выключить и стереть сохранение с сервера? Нажмите переключатель ещё раз';
+          }
+          return;
+        }
+        return g.cloud.setOn(false).then((ok) => ok || this.toast('Нет связи с сервером — стереть сохранение не получилось, попробуйте позже', 'bad', 5000));
       case 'savefile': return g.saveToFile();
       case 'loadfile':
         if (t.dataset.sure) return g.applySave();
@@ -1112,7 +1311,8 @@ export class UI {
       g.saveLook({ hero: this.ed.look.hero });
       this.closePanel();
     } else if (this.panel === 'card') g.saveCard();
-    else if (this.panel === 'help' || this.panel === 'settings' || this.panel === 'quests') this.closePanel();
+    else if (this.panel === 'help' || this.panel === 'settings' || this.panel === 'quests' || this.panel === 'top') this.closePanel();
+    else if (this.panel === 'save') this.openPanel('settings');
     else if (this.panel === 'tour') {
       if (!this.g.tour && !this.popts.result && this.g.state === 'world' && (this.g.solo || this.g.me.id === this.g.hostId)) this.g.startTour(this.tr.kind, this.tr.len);
       else this.closePanel();

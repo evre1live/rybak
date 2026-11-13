@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { Batch, M, G, BATCH_MAT_2S } from './batch.js';
 import { loft } from './shapes.js';
 import { rng, rockGeo, blobGeo, canvasTex, shade, TAU } from './util.js';
-import { groundH, palmR, PALM, WRECK, DECK_Y, CIRCLES, MOORINGS } from './terrain.js';
+import { groundH, palmR, PALM, WRECK, DECK_Y, CIRCLES, MOORINGS, CAMPFIRE } from './terrain.js';
 import { ENV } from './envmodels.js';
 
 /** Лист пальмы: дуга вдоль +X с провисанием, по ширине — три точки (ребро приподнято). Длина 1. */
@@ -154,8 +154,8 @@ function buildPalmIsland(scene, r) {
   ENV.singles.push({ id: 'env-hut', key: 'hut', x: sx, y: sy - 0.05, z: sz, s: 4.4, ry: -0.585, block: 2.25 });
   // кострище: камни по кругу, поленья, угли. Стоит на свободном месте: готовые пальмы толще нарисованных,
   // и на прежнем месте (258.5, −188.4) ствол соседней пальмы вставал прямо в огонь
-  const fx = 262.6;
-  const fz = -187.4;
+  const fx = CAMPFIRE.x;
+  const fz = CAMPFIRE.z;
   const fy = groundH(fx, fz);
   const stone = rockGeo(5, 1);
   for (let i = 0; i < 8; i++) FB.add(stone, shade('#8d95a1', (r() - 0.5) * 0.16), M(fx + Math.cos((i / 8) * TAU) * 0.62, fy + 0.05, fz + Math.sin((i / 8) * TAU) * 0.62, 0.2, 0.15, 0.2, 0, r() * 6, 0), { mat: 2 });
