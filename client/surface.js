@@ -22,6 +22,7 @@ export const surfaceU = {
   uWet: { value: 0 }, // дождь намочил мир: 0 — сухо, 1 — льёт давно
   uWetSky: { value: new THREE.Color(0.5, 0.55, 0.6) }, // что отражает мокрое: небо у горизонта
   uCaustK: { value: 1 },
+  uBed: { value: new THREE.Vector4(0.62, 0.7, 0.075, 0.5) }, // дно под водой: сила сетки света, окраска в цвет воды, как быстро тонет в глубине и насколько глубина тёмная (palette.js)
   uCloudK: { value: 1 },
   uSunC: { value: new THREE.Color('#fff4e0') },
   uWaterS: { value: new THREE.Color('#35e0d4') },
@@ -165,6 +166,7 @@ const PARS_F = /* glsl */ `
 uniform sampler2D uDet, uCaust, uGrass, uRock, uSand, uDirt;
 uniform float uDetail, uTimeS, uCaustK, uCloudK, uPaint;
 uniform vec3 uSunC, uWaterS, uWaterD, uRockC, uMossC;
+uniform vec4 uBed;
 uniform sampler2D uWood;
 varying float vMat;
 varying vec3 vTex;
@@ -339,9 +341,9 @@ if (vWp.y < 0.0) {
   float net = max(c1, c2 * 0.85);
   net = net * net * 1.7 + min(c1, c2) * 0.8;
   float lit = smoothstep(0.0, 0.3, dW) * exp(-dW * 0.13) * (0.35 + 0.65 * max(nGeo.y, 0.0));
-  outgoingLight += (diffuseColor.rgb * 0.7 + 0.3) * uSunC * net * uCaustK * lit * 0.62;
-  outgoingLight *= mix(vec3(1.0), uWaterS * 1.25 + 0.08, smoothstep(0.0, 2.2, dW) * 0.7);
-  outgoingLight = mix(outgoingLight, uWaterD * 0.5, 1.0 - exp(-dW * 0.075));
+  outgoingLight += (diffuseColor.rgb * 0.7 + 0.3) * uSunC * net * uCaustK * lit * uBed.x;
+  outgoingLight *= mix(vec3(1.0), uWaterS * 1.25 + 0.08, smoothstep(0.0, 2.2, dW) * uBed.y);
+  outgoingLight = mix(outgoingLight, uWaterD * uBed.w, 1.0 - exp(-dW * uBed.z));
 } else if (uWet > 0.01) {
   // Дождь: мокрое темнее. Доски, камень и крашеное ещё и отсвечивают небом — сильнее всего то, что смотрит вверх;
   // на ровном настиле стоят лужи. Трава и листва не зеркалят: им только лёгкий отсвет.
@@ -395,6 +397,7 @@ const MODEL_PARS_F = /* glsl */ `
 uniform sampler2D uDet, uCaust;
 uniform float uTimeS, uCaustK, uCloudK;
 uniform vec3 uSunC, uWaterS, uWaterD;
+uniform vec4 uBed;
 varying vec3 vWp;
 `;
 const MODEL_WP_V = /* glsl */ `

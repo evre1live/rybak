@@ -1,6 +1,7 @@
 // РЫБАК — сборка игры: состояния (меню → лобби → рыбалка), главный цикл, связь всех частей.
 import * as THREE from 'three';
 import { Gfx, QUALITIES } from './gfx.js';
+import { PAL, usePalette } from './palette.js';
 import { loadManifest, loadHero, heroes, fpLook, heroEye } from './hero.js';
 import { loadModel, loadModels, modelInfo, modelReady, setWarmer } from './models.js';
 import { setEnvLight } from './env.js';
@@ -227,6 +228,12 @@ class Game {
     // торговец за прилавком
     this.vendor = new Character(VENDOR_PUPPET, { puppet: true });
     this.modelReady = (id) => !!modelReady(id); // для проверок: загружена ли модель (и её текстуры уже у видеокарты)
+    /** Для подбора палитры на ходу (palette.js): сменить набор цветов и тональную кривую. */
+    this.setPalette = (id) => {
+      usePalette(id);
+      this.gfx.retone();
+      return PAL.id;
+    };
     /** Снимок модели в картинку — им пользуются tools/bake-icons.cjs и проверочные листы. */
     this.modelShot = (id, view) => loadModel(id).then((t) => modelShot(t, view));
     /** Портрет героя — для tools/bake-icons.cjs --faces. */
@@ -1862,9 +1869,8 @@ class Game {
     const t = this.input.touch;
     const stick = $('#stick');
     const knob = stick.firstElementChild;
-    // внизу слева живёт джойстик: плашка улова и наживки переезжает наверх, под название места, а карта — в правый верхний угол
+    // внизу слева живёт джойстик: плашка улова и наживки переезжает наверх, под название места (карта и так наверху справа)
     $('.hud-tl').insertBefore($('.tally'), $('#quests'));
-    $('.hud-tr').prepend($('#locName'), $('.mapbox'));
     let sid = null;
     let lid = null;
     let lx = 0;
@@ -2147,7 +2153,7 @@ class Game {
       const aim = f.aim;
       if (!ui.panel && ((f.state === 'idle' && i.enabled && (i.grab || i.touch.on)) || f.state === 'charge')) {
         v3.set(aim.x, 0.05, aim.z).project(cam);
-        ui.castMark({ x: (v3.x * 0.5 + 0.5) * this.gfx.w, y: (-v3.y * 0.5 + 0.5) * this.gfx.h, aim: f.state === 'charge', ok: aim.ok, hot: aim.spot && aim.spot.hot, clamped: aim.clamped, dist: aim.dist, zone: aim.spot ? ZONES[aim.spot.zone].name : '', depth: aim.spot ? aim.spot.depth : 0, act: aim.act });
+        ui.castMark({ x: (v3.x * 0.5 + 0.5) * this.gfx.w, y: (-v3.y * 0.5 + 0.5) * this.gfx.h, ok: aim.ok, hot: aim.spot && aim.spot.hot, clamped: aim.clamped, dist: aim.dist, zone: aim.spot ? ZONES[aim.spot.zone].name : '', depth: aim.spot ? aim.spot.depth : 0, act: aim.act });
       } else ui.castMark(null);
       ui.power(f.state === 'charge' ? f.power : null, aim.dist / kit.cast);
       $('#cross').className = !i.grab && !i.touch.on ? 'off' : f.state === 'idle' && !aim.ok ? 'bad' : '';

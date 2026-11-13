@@ -1385,6 +1385,35 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
         solo: $('#onlineN').textContent, map: [$('#minimap').width, $('#minimap').height], rows: document.querySelectorAll('#hints span').length, keys: document.querySelectorAll('#hints kbd').length,
         font: getComputedStyle($('#placeName')).fontFamily, tilt: getComputedStyle($('#fstate')).fontStyle
       };
+      // карта — в правом верхнем углу (над ней — где мы, под ней — команда и кошелёк), плашка улова — слева внизу
+      const box = (s) => { const r = $(s).getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
+      out.lay = { inTr: !!$('.hud-tr .mapbox') && !!$('.hud-tr #locName'), map: box('.mapbox'), cap: box('#locName'), crew: box('.crewbox'), purse: box('.purse'), tally: box('.tally'), hints: box('#hints'), w: innerWidth, h: innerHeight };
+      // прицел: пунктирное кольцо; подпись у точки заброса видна всегда и меняется, когда ведёшь взгляд
+      {
+        const keep = [g.input.grab, g.input.enabled, g.player.yaw, g.player.pitch];
+        g.input.grab = g.input.enabled = true;
+        out.aim = { ring: getComputedStyle($('#cross')).borderTopStyle, seen: [] };
+        for (const pitch of [-0.5, -0.22, -0.03]) {
+          g.player.pitch = pitch;
+          await frames(6);
+          const l = $('#castMark .lbl');
+          out.aim.seen.push({ on: vis('#castMark') && getComputedStyle(l).display !== 'none', text: l.textContent, sub: $('#castMark .sub').textContent.length > 0 });
+        }
+        out.aim.ptr = getComputedStyle($('#castMark .ring')).borderBottomColor;
+        [g.input.grab, g.input.enabled, g.player.yaw, g.player.pitch] = keep;
+        await frames(3);
+      }
+      // палитра (palette.js): в игре — «Тропики»; смена на ходу доходит до воды, дна и дымки и возвращается обратно
+      {
+        const wat = () => [g.world.water.uniforms.uWat.value.x, g.world.water.uniforms.uWat2.value.x, g.world.scene.fog.far];
+        out.pal = { a: [g.setPalette('нет такой'), ...wat()] };
+        g.setPalette('now');
+        await frames(4);
+        out.pal.b = wat();
+        out.pal.back = g.setPalette('tropic');
+        await frames(4);
+        out.pal.c = wat();
+      }
       // компас с градусами на месте; в настройках его можно убрать и вернуть
       out.compass = [vis('#compass')];
       for (let i = 0; i < 2; i++) {
@@ -1433,9 +1462,21 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     assert.ok(hud.place === 'Солнечная бухта' && /^\d\d:\d\d/.test(hud.loc) && hud.cap === 'БУХТА', `место, время и погода — слева вверху, где мы — над картой: ${JSON.stringify(hud)}`);
     assert.ok(/^\d+ \/ \d+$/.test(hud.bag) && hud.bait.length > 0 && hud.rod.length > 2 && hud.solo === 'Одиночная рыбалка', `улов, наживка, удочка и команда на своих местах: ${JSON.stringify(hud)}`);
     assert.deepEqual(hud.map, [512, 276], 'мини-карта широкая');
+    {
+      const L = hud.lay;
+      assert.ok(L.inTr && L.map.l > L.w * 0.6 && L.map.b < L.h * 0.45 && L.cap.b <= L.map.t + 2 && Math.abs(L.cap.l - L.map.l) < 2, `карта — в правом верхнем углу, подпись места — над ней: ${JSON.stringify(L)}`);
+      assert.ok(L.crew.t >= L.map.b && L.purse.t >= L.crew.b && L.purse.b < L.hints.t, `команда и кошелёк — под картой и не доходят до подсказок: ${JSON.stringify(L)}`);
+      assert.ok(L.tally.l < L.w * 0.2 && L.tally.t > L.h * 0.8, `плашка улова — слева внизу: ${JSON.stringify(L.tally)}`);
+      const A = hud.aim;
+      assert.equal(A.ring, 'dashed', 'прицел — пунктирное кольцо');
+      assert.ok(A.seen.every((x) => x.on && x.text.length > 3), `подпись у точки заброса видна всегда: ${JSON.stringify(A.seen)}`);
+      assert.ok(new Set(A.seen.map((x) => x.text)).size >= 2 && A.seen.some((x) => /не добросить/i.test(x.text)), `подпись меняется на ходу: ${JSON.stringify(A.seen)}`);
+      assert.ok(/255,\s*255,\s*255/.test(A.ptr), `указатель над подписью белый, не голубой: ${A.ptr}`);
+    }
     assert.ok(hud.rows >= 3 && hud.keys >= 3, `подсказки управления — по строке на действие, с клавишами: ${hud.rows}, ${hud.keys}`);
     assert.ok(/Onest/.test(hud.font) && hud.tilt === 'normal', `экран игры набран прямым шрифтом: ${hud.font}, ${hud.tilt}`);
     assert.deepEqual(hud.compass, [true, false, true], 'компас с градусами на месте, убирается и возвращается настройкой');
+    assert.ok(hud.pal.a[0] === 'tropic' && hud.pal.a[1] < 0.12 && hud.pal.a[2] > 20 && Math.abs(hud.pal.b[0] - 0.16) < 1e-6 && hud.pal.b[1] === 14 && hud.pal.back === 'tropic' && Math.abs(hud.pal.c[0] - hud.pal.a[1]) < 1e-6 && hud.pal.c[1] === hud.pal.a[2] && Math.abs(hud.pal.c[2] - hud.pal.a[3]) < 1, `палитра игры — «Тропики», меняется на ходу и возвращается: ${JSON.stringify(hud.pal)}`);
     assert.ok(hud.none === null && hud.market && hud.market.kind === 'market' && hud.market.sail === false && hud.market.n === 2 && hud.market.len > 20 && /^\d+ м$/.test(hud.distFoot), `пешком с уловом — к торговцу: ${JSON.stringify([hud.none, hud.market, hud.distFoot])}`);
     assert.ok(hud.home && hud.home.kind === 'home' && hud.home.sail && hud.home.n >= 2 && Math.abs(hud.home.end[0] - 4) < 0.01 && hud.home.len >= hud.home.direct - 1 && hud.home.len < hud.home.direct * 1.5, `из моря маршрут ведёт домой, по воде: ${JSON.stringify(hud.home)}`);
     assert.ok(/^\d+ м$/.test(hud.distBoat[0]) && hud.distBoat[1], `расстояние до цели — на карте: ${hud.distBoat}`);

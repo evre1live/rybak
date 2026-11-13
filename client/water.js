@@ -207,6 +207,8 @@ void main() {
 const FRAG = /* glsl */ `
 precision highp float;
 uniform float uTime, uGlitter, uFogNear, uFogFar, uSwell, uWind;
+uniform vec4 uWat; // из палитры: прозрачность толщи, наименьший «косинус взгляда» для неё, сила отражения неба, сетка света на поверхности
+uniform vec4 uWat2; // до какой глубины вода бирюзовая; насколько сетка света гаснет над глубиной; насколько она в цвет воды, а не солнца; насколько темнее и синее открытое море
 uniform sampler2D uNormal, uCaustic, uDet;
 uniform float uCloudK;
 ${DEPTH_GLSL}
@@ -254,19 +256,19 @@ void main() {
   float fres = 0.025 + 0.975 * pow(1.0 - ndv, 5.0);
 
   // толща воды: чем длиннее путь взгляда сквозь неё, тем плотнее цвет; на мели и при взгляде сверху вниз видно дно
-  float path = depth / max(ndv, 0.18);
-  float body = 1.0 - exp(-path * 0.16);
-  vec3 c = mix(uShallow, uDeep, ss(1.0, 14.0, depth));
+  float path = depth / max(ndv, uWat.y);
+  float body = 1.0 - exp(-path * uWat.x);
+  vec3 c = mix(uShallow, uDeep, ss(1.0, uWat2.x, depth));
   c = mix(uShallow * 1.1 + vec3(0.04, 0.06, 0.04), c, ss(0.0, 2.2, depth));
   // открытое море темнее и синее бухты: под лодкой — глубина
-  c = mix(c, uDeep * vec3(0.62, 0.8, 1.0), 0.45 * min(open, 1.0) * ss(8.0, 14.0, depth));
+  c = mix(c, uDeep * vec3(0.62, 0.8, 1.0), uWat2.w * min(open, 1.0) * ss(8.0, 14.0, depth));
 
   // сетка света на поверхности — как на мелководье в ясный день
   vec2 warp = (texture2D(uNormal, p * 0.012 + uTime * 0.003).xy - 0.5) * 0.32;
   float c1 = texture2D(uCaustic, p * 0.075 + uTime * vec2(0.011, 0.007) + n1.xy * 0.035 + warp).r;
   float c2 = texture2D(uCaustic, p * 0.11 - uTime * vec2(0.009, 0.013) + n2.xy * 0.03 - warp * 1.3).r;
-  float net = max(c1 * 0.75, c2 * 0.55) * (1.0 - 0.55 * ss(3.0, 12.0, depth)) * (1.0 - 0.7 * min(open, 1.0));
-  c += uSunCol * net * 0.27 * uGlitter * (0.35 + 0.65 * body) / (1.0 + dist * 0.016);
+  float net = max(c1 * 0.75, c2 * 0.55) * (1.0 - uWat2.y * ss(3.0, 12.0, depth)) * (1.0 - 0.7 * min(open, 1.0));
+  c += mix(uSunCol, uSunCol * (uShallow * 1.5 + 0.25), uWat2.z) * net * uWat.w * uGlitter * (0.35 + 0.65 * body) / (1.0 + dist * 0.016);
 
   vec3 R = reflect(-V, N);
   vec3 sky = mix(uSkyHor, uSkyZen, pow(max(R.y, 0.0), 0.55));
@@ -277,7 +279,7 @@ void main() {
     vec2 ruv = rc.xy / max(rc.w, 1e-4) + N.xz * (0.05 * calm + 0.012) * (1.0 + 2.2 * min(open, 1.0));
     sky = mix(sky, texture2D(uRefl, clamp(ruv, 0.003, 0.997)).rgb, uReflK);
   }
-  c = mix(c, sky, fres * 0.8);
+  c = mix(c, sky, fres * uWat.z);
   if (uRain > 0.02) {
     // круги светлые, как небо; вдали сливаются в рябь и гаснут
     float rr = rainRings(p, uTime) * uRain * (1.0 - ss(22.0, 55.0, dist));
@@ -356,6 +358,7 @@ export function createWater() {
   geo.setIndex(idx);
   const uniforms = {
     uTime: { value: 0 }, uGlitter: { value: 1 }, uFogNear: { value: 150 }, uFogFar: { value: 1400 },
+    uWat: { value: new THREE.Vector4(0.16, 0.18, 0.8, 0.27) }, uWat2: { value: new THREE.Vector4(14, 0.55, 0, 0.45) }, // прозрачность воды, отражение неба и сетка света — из палитры (palette.js)
     uDepth: { value: depthTexture(BOUNDS, 400, 400) }, uDepthFar: { value: depthTexture(FAR, Math.round((FAR.x1 - FAR.x0) / 2.5), Math.round((FAR.z1 - FAR.z0) / 2.5), farFloor) },
     uNormal: { value: normalTexture() }, uCaustic: { value: causticTexture() }, uDet: surfaceU.uDet, uCloudK: surfaceU.uCloudK,
     uBounds: { value: boundsVec(BOUNDS) }, uBoundsFar: { value: boundsVec(FAR) },

@@ -98,7 +98,7 @@ body.blur #tour{-webkit-backdrop-filter:blur(14px) saturate(1.3);backdrop-filter
 
 /* справа вверху: команда — у каждого своя фигурка и цвет, огонёк и микрофон; ниже — монеты и уровень */
 .hud-tr{right:2.2em;top:1.7em;display:flex;flex-direction:column;align-items:flex-end;gap:.7em}
-.crewbox{width:19.5em;padding:.75em 1.1em .65em}
+.crewbox{width:23em;padding:.75em 1.1em .65em}
 .crewbox .ch{display:flex;align-items:center;justify-content:space-between;padding-bottom:.6em;border-bottom:1px solid var(--gb)}
 .crewbox.solo{width:auto;padding:.62em 1.1em}
 .crewbox.solo .ch{padding:0;border:0}
@@ -125,13 +125,14 @@ body.blur #tour{-webkit-backdrop-filter:blur(14px) saturate(1.3);backdrop-filter
 .purse .lv{color:var(--mut);font-size:.85em}
 
 /* слева внизу: где мы, мини-карта с маршрутом и расстоянием, плашка «улов | наживка» */
-.hud-bl{left:2.2em;bottom:1.9em;display:flex;flex-direction:column;align-items:stretch;gap:.75em;width:24.6em}
-#hud #locName{text-shadow:var(--tsh);font-size:1.25em;padding-left:.2em}
-.mapbox{height:13.3em;border-radius:1.1em;border:.14em solid rgba(255,255,255,.9);overflow:hidden;position:relative;box-shadow:0 .6em 1.8em rgba(4,10,24,.3);background:#5fb0c4}
+.hud-bl{left:2.2em;bottom:1.9em;display:flex;flex-direction:column;align-items:flex-start;gap:.75em}
+/* карта — в правом верхнем углу: над ней подпись места, под ней команда и кошелёк */
+#hud #locName{align-self:stretch;text-shadow:var(--tsh);font-size:1.25em;padding-left:.2em;margin-bottom:-.15em}
+.mapbox{width:23em;height:12.4em;border-radius:1.1em;border:.14em solid rgba(255,255,255,.9);overflow:hidden;position:relative;box-shadow:0 .6em 1.8em rgba(4,10,24,.3);background:#5fb0c4}
 .mapbox canvas{width:100%;height:100%;display:block}
 .mapbox .dist{position:absolute;left:.75em;top:.45em;font-size:1.4em;text-shadow:0 1px 3px rgba(4,14,34,.8),0 0 8px rgba(4,14,34,.55)}
 .mapbox .north{position:absolute;left:.6em;bottom:.6em;width:1.9em;height:1.9em;border-radius:50%;background:var(--ink2);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.95em}
-.tally{display:flex;align-items:center;justify-content:center;gap:1.3em;height:2.75em;border-radius:.85em;background:var(--g2);border:.11em solid var(--pk);font-size:1.3em;box-shadow:0 .4em 1.2em rgba(4,10,24,.25)}
+.tally{display:flex;align-items:center;justify-content:center;gap:1.3em;height:2.75em;padding:0 1.5em;border-radius:.85em;background:var(--g2);border:.11em solid var(--pk);font-size:1.3em;box-shadow:0 .4em 1.2em rgba(4,10,24,.25)}
 .tally .seg{display:flex;align-items:center;gap:.6em}
 #hud .tally .seg b{font-size:1.1em;white-space:nowrap}
 .tally .bag .ic{color:var(--pk);width:1.55em;height:1.55em}
@@ -211,17 +212,18 @@ body.blur #power{-webkit-backdrop-filter:blur(14px) saturate(1.3);backdrop-filte
 #hud .rodchip b{font-weight:500;font-size:1.15em;white-space:nowrap}
 
 /* прицел, метка заброса, приглашения и тревоги */
-#cross{left:50%;top:50%;width:2.3em;height:2.3em;margin:-1.15em 0 0 -1.15em;border-radius:50%;border:.14em solid rgba(255,255,255,.92);filter:drop-shadow(0 0 2px rgba(4,20,50,.8));transition:transform .15s}
-#cross i{position:absolute;left:50%;top:50%;width:.42em;height:.42em;margin:-.21em;border-radius:50%;background:#fff}
+#cross{left:50%;top:50%;width:3em;height:3em;margin:-1.5em 0 0 -1.5em;border-radius:50%;border:.16em dashed rgba(255,255,255,.92);filter:drop-shadow(0 0 2px rgba(4,20,50,.9));transition:transform .15s}
+#cross i{position:absolute;left:50%;top:50%;width:.36em;height:.36em;margin:-.18em;border-radius:50%;background:#fff}
 #cross.off{opacity:.25}
 #cross.bad{border-color:var(--rd)}
-#castMark{left:0;top:0;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:.3em;will-change:transform}
-#castMark .ring{width:0;height:0;border:.62em solid transparent;border-bottom:.85em solid var(--tl);border-top:0;filter:drop-shadow(0 2px 2px rgba(4,20,50,.6));margin-top:2.4em}
-#castMark .lbl{font-weight:600;font-size:1.25em;background:var(--g2);padding:.28em .8em;border-radius:.6em;border:1px solid var(--gb);white-space:nowrap}
+#castMark{left:0;top:0;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:.25em;will-change:transform}
+/* указатель над подписью — маленький и белый: цветная стрелка под прицелом отвлекала */
+#castMark .ring{width:0;height:0;border:.5em solid transparent;border-bottom:.62em solid rgba(255,255,255,.95);border-top:0;filter:drop-shadow(0 1px 2px rgba(4,20,50,.75));margin-top:2.4em}
+#castMark .lbl{font-weight:700;font-size:1.3em;letter-spacing:.04em;text-transform:uppercase;background:var(--g2);padding:.28em .8em;border-radius:.6em;border:1px solid var(--gb);white-space:nowrap}
 #castMark .sub{font-size:.95em;background:var(--g);padding:.2em .7em;border-radius:.5em;white-space:nowrap;color:var(--mut)}
 #castMark .sub:empty{display:none}
-#castMark.quiet .lbl{display:none}
 #castMark.bad .ring{border-bottom-color:var(--rd)}
+#castMark.bad .lbl{border-color:var(--rd);color:#ffd0d4}
 #castMark.hot .lbl{border-color:var(--am);color:var(--am)}
 #prompt{left:50%;top:60%;transform:translateX(-50%);font-size:1.3em}
 .hintp{display:inline-flex;align-items:center;gap:.6em;padding:.55em 1.1em;font-weight:600;letter-spacing:.06em;white-space:nowrap}
@@ -230,14 +232,14 @@ body.blur #power{-webkit-backdrop-filter:blur(14px) saturate(1.3);backdrop-filte
 @keyframes alert{to{transform:translate(-50%,-50%) scale(1.09) rotate(-2deg)}}
 
 /* метки над друзьями: фигурка видна издалека, имя — вблизи */
-#tags{inset:0}
+#tags{inset:0;z-index:-1} /* метки друзей — под панелями экрана: имя вдали не ложится на карту и список команды */
 .tag{position:absolute;left:0;top:0;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;gap:.25em;will-change:transform;white-space:nowrap}
 .tag .nm{display:flex;flex-direction:column;align-items:center;gap:.05em;font-weight:600;font-size:1.15em;text-shadow:var(--tsh)}
 .tag .mark{filter:drop-shadow(0 2px 3px rgba(4,14,34,.45))}
 .tag.far .nm span{display:none}
 .tag.talk .mark{filter:drop-shadow(0 0 .45em #3fe3d5)}
 .tag .say{background:#fff;color:var(--ink2);font-weight:600;font-size:.95em;padding:.3em .7em;border-radius:.7em;max-width:16em;white-space:normal;text-align:center;box-shadow:0 .3em .9em rgba(4,10,24,.3)}
-#chat{left:2.2em;bottom:22em;width:24.6em;pointer-events:auto}
+#chat{left:2.2em;bottom:7.4em;width:24.6em;pointer-events:auto}
 #chat input{width:100%;font:500 1.1em var(--body);padding:.7em 1em;border-radius:.8em;border:1px solid rgba(63,227,213,.75);background:var(--g2);color:#fff;outline:none;user-select:text;-webkit-user-select:text}
 
 /* карточка улова */
@@ -473,7 +475,7 @@ input.code{text-transform:uppercase;letter-spacing:.3em;text-align:center;font-f
 #tMenu{right:.7em;top:.7em;width:3em;height:3em}
 #tChat{right:.7em;top:4.6em;width:3em;height:3em}
 #tChat svg{width:1.25em;height:1.25em}
-/* на телефоне внизу — джойстик и кнопки: карта уходит в правый верхний угол, плашка улова — под название места (их переставляет игра),
+/* на телефоне внизу — джойстик и кнопки: плашка улова уходит под название места (её переставляет bindTouch),
    чип удочки — вниз по центру: касание открывает снасти */
 body.touch .hud-tl{left:1.6em;top:1.3em;gap:.7em}
 body.touch .hud-tr{right:calc(1.3em + clamp(46px,13.4vmin,70px));top:1.3em;gap:.55em}
@@ -489,8 +491,8 @@ body.touch .hud-bc{bottom:1em}
 body.touch #catch{right:auto;left:50%;top:47%;transform:translate(-50%,-50%)}
 body.touch #prompt{top:auto;bottom:26%}
 body.touch #chat{left:1.6em;top:10.5em;bottom:auto}
-/* узкое окно на компьютере: вываживание встаёт над картой и подсказками, а не между ними */
-@media (max-aspect-ratio:4/3){body:not(.touch) .hud-bc{bottom:22em}}
+/* узкое окно на компьютере: вываживание встаёт над плашкой улова и подсказками, а не между ними */
+@media (max-aspect-ratio:11/10){body:not(.touch) .hud-bc{bottom:18.5em}}
 #rotate{display:none;position:fixed;inset:0;z-index:60;background:rgba(8,21,41,.96);flex-direction:column;align-items:center;justify-content:center;gap:1.2em;text-align:center;padding:2em;font-size:15px;pointer-events:auto}
 #rotate b{font-size:2.2em}
 #rotate p{margin:0;color:#cfe3ff;max-width:18em;line-height:1.4}

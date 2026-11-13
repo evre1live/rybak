@@ -325,8 +325,7 @@ export class UI {
     e.style.transform = `translate(${m.x}px,${m.y}px) translate(-50%,-2.6em)`;
     e.classList.toggle('bad', !m.ok);
     e.classList.toggle('hot', !!m.hot);
-    // пока просто смотрим на воду, крупной подписи нет — только строка о месте; подпись нужна на замахе, над косяком и «тут не вода»
-    e.classList.toggle('quiet', !m.aim && m.ok && !m.hot);
+    // подпись видна всегда и меняется на ходу: куда упадёт поплавок, добросим ли, есть ли здесь косяк
     const lbl = m.ok ? (m.hot ? 'Косяк рыбы!' : m.clamped ? 'Дальше не добросить' : 'Заброс сюда') : 'Тут не вода';
     const l = e.querySelector('.lbl');
     if (l.textContent !== lbl) l.textContent = lbl;

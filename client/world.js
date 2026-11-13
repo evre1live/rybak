@@ -11,29 +11,16 @@ import { GrassField } from './grass.js';
 import { Seabed } from './seabed.js';
 import { Flags, SunRays } from './flags.js';
 import { Rain } from './weather.js';
+import { PAL } from './palette.js';
 
-// ключевые часы суток: цвета неба, солнца, воды
-const K = (h, zen, hor, sun, sunI, hemiS, hemiG, hemiI, fog, wS, wD, cloud, stars, glit, exp) => ({
-  h, zen: new THREE.Color(zen), hor: new THREE.Color(hor), sun: new THREE.Color(sun), sunI, hemiS: new THREE.Color(hemiS), hemiG: new THREE.Color(hemiG), hemiI,
-  fog: new THREE.Color(fog), wS: new THREE.Color(wS), wD: new THREE.Color(wD), cloud: new THREE.Color(cloud), stars, glit, exp
-});
-const KEYS = [
-  K(0, '#070d24', '#14244a', '#8fa8ff', 0.9, '#33477f', '#141a28', 0.8, '#14244a', '#16506e', '#071b33', '#2b3a5e', 1, 0.3, 1.0),
-  K(4.6, '#070d24', '#172850', '#8fa8ff', 0.9, '#33477f', '#141a28', 0.8, '#172850', '#16506e', '#071b33', '#2b3a5e', 1, 0.3, 1.0),
-  K(5.7, '#2c4f96', '#ff9e7a', '#ffb98a', 1.5, '#8fa0d0', '#5a4a3a', 0.72, '#f0a890', '#3aa8b8', '#1a4a85', '#ffc9b0', 0.1, 0.8, 1.0),
-  K(7.2, '#2a86ea', '#bfe3ff', '#fff0d6', 2.7, '#cfe8ff', '#c9b384', 1.25, '#bfe3ff', '#36ddd2', '#1273c4', '#ffffff', 0, 1, 1.0),
-  K(12, '#1b78e2', '#a9dcff', '#fff6e6', 3.0, '#d6ecff', '#d2bc8c', 1.35, '#a9dcff', '#35e0d4', '#1070c4', '#ffffff', 0, 1, 1.0),
-  K(17, '#2280e4', '#b4dcff', '#fff0d0', 2.9, '#d6ecff', '#d2bc8c', 1.3, '#b4dcff', '#38dccf', '#126ec0', '#fff8ee', 0, 1, 1.0),
-  K(19, '#3a5cb0', '#ffb070', '#ffb060', 2.1, '#b0b8e0', '#8a6a4a', 1.0, '#ffb88a', '#48b8c4', '#244a90', '#ffc79a', 0, 1, 1.0),
-  K(20.4, '#1f2c66', '#d86a5a', '#ff8a5a', 0.9, '#6a70a8', '#3a3040', 0.62, '#a8607a', '#2a7a98', '#142c5c', '#c9708a', 0.35, 0.6, 1.0),
-  K(21.4, '#0b1430', '#23305e', '#8fa8ff', 0.85, '#33477f', '#141a28', 0.8, '#1c2a55', '#18587a', '#081d38', '#33426a', 0.9, 0.3, 1.0),
-  K(24, '#070d24', '#14244a', '#8fa8ff', 0.9, '#33477f', '#141a28', 0.8, '#14244a', '#16506e', '#071b33', '#2b3a5e', 1, 0.3, 1.0)
-];
-const cur = K(0, '#000', '#000', '#000', 0, '#000', '#000', 0, '#000', '#000', '#000', '#000', 0, 0, 1);
+// ключевые часы суток (цвета неба, солнца, воды) — в палитре: palette.js
+const cur = { h: 0, sunI: 0, hemiI: 0, stars: 0, glit: 0, exp: 1 };
+for (const k of ['zen', 'hor', 'sun', 'hemiS', 'hemiG', 'fog', 'wS', 'wD', 'cloud']) cur[k] = new THREE.Color();
 const _ov = new THREE.Color();
 const _c1 = new THREE.Color();
 function sampleKeys(h) {
   h = ((h % 24) + 24) % 24;
+  const KEYS = PAL.keys;
   let i = 0;
   while (i < KEYS.length - 2 && KEYS[i + 1].h <= h) i++;
   const a = KEYS[i];
@@ -536,8 +523,8 @@ export class World {
     this.scene.fog.color.copy(k.fog);
     // даль: ясно — 1,7 км; пасмурно чуть ближе; дождь — полкилометра; туман — полторы сотни метров
     const fk = fogK * fogK * (3 - 2 * fogK);
-    this.scene.fog.near = lerp(lerp(170, 30, W.rain), 3, fk);
-    this.scene.fog.far = lerp(lerp(1700 - 350 * cov, 560, W.rain), 150, fk);
+    this.scene.fog.near = lerp(lerp(PAL.fog.near, 30, W.rain), 3, fk);
+    this.scene.fog.far = lerp(lerp(PAL.fog.far - 350 * cov, 560, W.rain), 150, fk);
     const s = this.skyU;
     s.uZen.value.copy(k.zen);
     s.uHor.value.copy(k.hor);
@@ -558,6 +545,10 @@ export class World {
     w.uSunCol.value.copy(k.sun);
     w.uFogCol.value.copy(k.fog);
     w.uGlitter.value = k.glit;
+    const PW = PAL.water;
+    w.uWat.value.set(PW.clear, PW.pathMin, PW.fres, PW.net);
+    w.uWat2.value.set(PW.deepAt, PW.netDeep, PW.netTint, PW.seaDeep);
+    surfaceU.uBed.value.set(PW.bedNet, PW.bedTint, PW.bedFog, PW.bedDeep);
     surfaceU.uSunC.value.copy(k.sun);
     surfaceU.uWaterS.value.copy(k.wS);
     surfaceU.uWaterD.value.copy(k.wD);

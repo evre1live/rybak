@@ -10,27 +10,51 @@
 import * as THREE from 'three';
 import { yieldNow } from './perf.js';
 import { surfaceU, detail } from './surface.js';
+import { PAL } from './palette.js';
 import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 
-// Тональная кривая — своя, одна на все уровни качества: насыщенность → «подошва» и контраст по яркости → сжатие светов.
+// Тональная кривая — своя, одна на все уровни качества: насыщенность → «подошва» и контраст по яркости → оттенок теней
+// и светов → сжатие светов. Числа — из палитры (palette.js).
 // Стандартная «нейтральная» кривая three.js вычитает из каждого канала одно и то же число (до 0,04): у насыщенных цветов
 // наименьший канал уходит в ноль (трава становится кислотной, кожа — оранжевой), а тёмные краски моделей — в чёрное
 // и меняют оттенок (чёрное худи выходило коричневым). Здесь то же самое делается по яркости: цвет темнеет, оттенок остаётся.
-// Для подбора: ?tone=насыщенность,контраст,подошва
+// Для подбора: ?tone=насыщенность,контраст,подошва — поверх палитры
 const toneQ = (typeof location !== 'undefined' ? new URLSearchParams(location.search).get('tone') || '' : '').split(',').map(Number);
-export const TONE = { sat: toneQ[0] || 1.25, con: toneQ[1] || 1.08, toe: Number.isFinite(toneQ[2]) && toneQ.length > 2 ? toneQ[2] : 0.7 };
-THREE.ShaderChunk.tonemapping_pars_fragment = THREE.ShaderChunk.tonemapping_pars_fragment.replace(
-  'vec3 CustomToneMapping( vec3 color ) { return color; }',
-  /* glsl */ `vec3 CustomToneMapping( vec3 color ) {
+export const TONE = {};
+const TONE_BASE = THREE.ShaderChunk.tonemapping_pars_fragment;
+const f3 = (v) => `vec3( ${v.map((x) => x.toFixed(3)).join(', ')} )`;
+/** Вписать тональную кривую палитры в шейдеры. Действует на всё, что будет собрано после вызова. */
+export function setTone() {
+  const P = PAL.tone;
+  Object.assign(TONE, { sat: toneQ[0] || P.sat, vib: P.vib || 0, con: toneQ[1] || P.con, toe: Number.isFinite(toneQ[2]) && toneQ.length > 2 ? toneQ[2] : P.toe, sh: P.sh || [1, 1, 1], hi: P.hi || [1, 1, 1] });
+  const T = TONE;
+  const split = [...T.sh, ...T.hi].some((v) => Math.abs(v - 1) > 1e-4);
+  THREE.ShaderChunk.tonemapping_pars_fragment = TONE_BASE.replace(
+    'vec3 CustomToneMapping( vec3 color ) { return color; }',
+    /* glsl */ `vec3 CustomToneMapping( vec3 color ) {
 	const vec3 W = vec3( 0.2126, 0.7152, 0.0722 );
 	color *= toneMappingExposure;
 	float l = dot( color, W );
-	color = max( mix( vec3( l ), color, ${TONE.sat.toFixed(3)} ), 0.0 );
+	${
+    T.vib
+      ? `// «живость»: блёклым цветам насыщенности добавляется больше, чем уже ярким
+	float mx = max( color.r, max( color.g, color.b ) );
+	float sat = ${T.sat.toFixed(3)} + ${T.vib.toFixed(3)} * ( 1.0 - ( mx - min( color.r, min( color.g, color.b ) ) ) / max( mx, 1e-4 ) );
+	color = max( mix( vec3( l ), color, sat ), 0.0 );`
+      : `color = max( mix( vec3( l ), color, ${T.sat.toFixed(3)} ), 0.0 );`
+  }
 	l = max( dot( color, W ), 1e-5 );
 	float toe = l < 0.08 ? l - 6.25 * l * l : 0.04;
-	float l2 = max( l - ${TONE.toe.toFixed(3)} * toe, 0.0 );
-	l2 = 0.18 * pow( l2 / 0.18, ${TONE.con.toFixed(3)} );
+	float l2 = max( l - ${T.toe.toFixed(3)} * toe, 0.0 );
+	l2 = 0.18 * pow( l2 / 0.18, ${T.con.toFixed(3)} );
 	color *= l2 / l;
+	${
+    split
+      ? `// тени уходят в один оттенок, света — в другой; яркость при этом та же
+	vec3 tint = mix( ${f3(T.sh)}, ${f3(T.hi)}, smoothstep( 0.03, 0.55, l2 ) );
+	color *= tint / dot( tint, W );`
+      : ''
+  }
 	const float StartCompression = 0.8 - 0.04;
 	const float Desaturation = 0.15;
 	float peak = max( color.r, max( color.g, color.b ) );
@@ -41,7 +65,9 @@ THREE.ShaderChunk.tonemapping_pars_fragment = THREE.ShaderChunk.tonemapping_pars
 	float g = 1. - 1. / ( Desaturation * ( peak - newPeak ) + 1. );
 	return mix( color, vec3( newPeak ), g );
 }`
-);
+  );
+}
+setTone();
 
 const VERT = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
 // яркие места сцены → четверть разрешения (4 выборки накрывают блок 4×4 точки)
@@ -116,6 +142,7 @@ const REFL_WIDE = 1.12; // отражение снимается с обзоро
 const REFL_TURN = Math.cos((6 * Math.PI) / 180); // развернулись сильнее — снимаем отражение заново, не дожидаясь очереди
 const LEVELS = 6; // слоёв свечения: 1/4, 1/8 … 1/128 экрана — самые мелкие дают широкий мягкий ореол
 const HIGH_PIXELS = 5.6e6; // на «высоком» рисуем не больше стольких точек: дальше глаз разницы не видит, а видеокарта — видит
+let toneRev = 0; // номер пересборки итогового прохода: другой текст шейдера — значит, его точно соберут заново
 const mk = (frag, uniforms) => new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: frag, uniforms, depthTest: false, depthWrite: false });
 const TEX_SLOTS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'aoMap', 'alphaMap'];
 /** На следующем кадре; вкладка в фоне кадров не получает — тогда по таймеру. */
@@ -337,6 +364,18 @@ export class Gfx {
     if (this.post) this.sizePost();
     return sized;
   }
+  /**
+   * Палитру сменили на ходу: вписать её тональную кривую. На «высоком» кривая живёт в одном шейдере — итоговом проходе,
+   * он пересобирается сразу; на остальных ступенях она вшита в шейдеры всех материалов и сменится после перезагрузки.
+   */
+  retone() {
+    setTone();
+    const p = this.post;
+    if (!p) return;
+    const u = p.final.uniforms;
+    p.final.dispose();
+    p.final = mk(FINAL + `\n// кривая ${++toneRev}`, u);
+  }
   dropPost() {
     const p = this.post;
     if (!p) return;
@@ -504,6 +543,7 @@ export class Gfx {
     r.render(scene, camera);
     // 2) свечение: яркое → вниз по слоям → обратно вверх, собирая слои
     p.pre.uniforms.tSrc.value = p.scene.texture;
+    p.pre.uniforms.uThreshold.value = PAL.post.thr;
     p.pre.uniforms.uTexel.value.set(1 / p.scene.width, 1 / p.scene.height);
     pass(p.pre, p.down[0]);
     for (let i = 1; i < LEVELS; i++) {
@@ -521,6 +561,8 @@ export class Gfx {
     }
     // 3) затенение в углах: глубина сцены → половинный буфер → размытие
     p.final.uniforms.uAO.value = this.aoK;
+    p.final.uniforms.uBloom.value = PAL.post.bloom;
+    p.final.uniforms.uVig.value = PAL.post.vig;
     if (this.aoK > 0) {
       const e = camera.projectionMatrix.elements;
       p.aoM.uniforms.uProj.value.set(1 / e[0], 1 / e[5], camera.near, camera.far);

@@ -188,6 +188,8 @@ const view = (page) => G(page, () => {
   await b.waitForFunction(() => !RYBAK.tour, null, { timeout: 20000 });
   // первой уходит гостья: уйди первым хозяин — комната успела бы перейти к ней, и ждали бы после перезапуска уже её
   await b.close();
+  // сервер должен увидеть её уход раньше, чем уход хозяина: на медленной машине закрытия вкладок доходили в обратном порядке
+  await a.waitForFunction(() => RYBAK.players.size === 0, null, { timeout: 20000 });
   await a.close();
   await new Promise((r) => setTimeout(r, 2600));
   server.kill('SIGTERM');
