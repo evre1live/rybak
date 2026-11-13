@@ -132,7 +132,11 @@ class Game {
     // лодка напрокат: стоит у пирса, пока её не возьмут
     this.boat = new Boat(this.scene, this.fx);
     this.boat.onBump = (sp, edge) => {
-      this.audio.thud(Math.min(1, 0.4 + sp / 10));
+      // 1,2 м/с — порог удара, от 7 м/с и выше — в полную силу. У края карты преграды нет: там лодку разворачивает волна
+      if (edge) {
+        this.audio.splash(0.8);
+        this.audio.thud(0);
+      } else this.audio.thud(clamp((sp - 1.2) / 6, 0, 1));
       this.player.shake = Math.max(this.player.shake, Math.min(1, sp / 8));
       this.rumble(120, 0.7);
       if (edge) this.ui.toast('Дальше — только океан. Поворачиваем назад', '', 2600);

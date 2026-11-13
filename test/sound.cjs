@@ -105,15 +105,18 @@ const db = (v) => 20 * Math.log10(v + 1e-9);
     const a = RYBAK.audio;
     window.__plays.length = 0;
     const synth = { tone: 0, burst: 0 };
-    const t0 = a.tone, b0 = a.burst;
+    const ones = []; // что просили у общей дорожки: [имя, настройки]
+    const t0 = a.tone, b0 = a.burst, o0 = a.one;
     a.tone = function () { synth.tone++; return t0.apply(this, arguments); };
     a.burst = function () { synth.burst++; return b0.apply(this, arguments); };
+    a.one = function (name, o) { ones.push([name, { ...(o || {}) }]); return o0.apply(this, arguments); };
     let ret;
     try {
       ret = new Function('a', 'arg', fn)(a, arg);
     } finally {
       a.tone = t0;
       a.burst = b0;
+      a.one = o0;
     }
     const out = [], rates = [];
     let noise = 0;
@@ -125,7 +128,7 @@ const db = (v) => 20 * Math.log10(v + 1e-9);
       for (const [k, list] of Object.entries(sfx)) list.forEach(([at, d], i) => { if (Math.abs(p.offset - at) < 1e-6 && Math.abs(p.duration - d) < 1e-6) hit = list.length > 1 ? `${k}#${i}` : k; });
       out.push(hit);
     }
-    return { out, synth, noise, ret: ret === undefined ? null : ret, rates };
+    return { out, synth, noise, ones, ret: ret === undefined ? null : ret, rates };
   }, { fn, arg, sfx: man.sfx });
   const has = (k) => !!man.sfx[k];
   const base = (x) => x.replace(/#\d+$/, '');
@@ -133,7 +136,7 @@ const db = (v) => 20 * Math.log10(v + 1e-9);
   const CASES = [
     ['a.ui()', 'ui', false], ['a.error()', 'error', false], ['a.buy()', 'buy', false], ['a.shutter()', 'shutter', false], ['a.page()', 'page', false],
     ['a.nibble()', 'nibble', false], ['a.bite()', 'bite', true], ['a.hook()', 'hook', true], ['a.keep()', 'keep', false], ['a.wrap()', 'scrape', false],
-    ['a.thrash(0.6)', 'thrash', false], ['a.landed(true)', 'net', false], ['a.thud(0.8)', 'bump', false], ['a.stuck()', 'bubbles', true],
+    ['a.thrash(0.6)', 'thrash', false], ['a.landed(true)', 'net', false], ['a.stuck()', 'bubbles', true],
     ['a.step(true, false)', 'step_wood', false], ['a.step(false, false)', 'step_sand', false], ['a.step(true, true)', 'land', false],
     ['a.jingle()', 'jingle', false], ['a.bell()', 'bell', false], ['a.horn()', 'horn', false], ['a.creak()', 'creak', false]
   ];
@@ -149,6 +152,61 @@ const db = (v) => 20 * Math.log10(v + 1e-9);
       syn++;
       assert.deepEqual(fromTape, [], `${fn}: записи «${name}» нет — из дорожки ничего не играет: ${JSON.stringify(r)}`);
     }
+  }
+  // удар лодки о преграду. В самой записи удар один: несколько ударов подряд слышатся как стук в дверь (так было).
+  // В игре: сильный удар — запись в полную силу, под ней низкий толчок, следом брызги и откат волны, море и музыка
+  // на миг отступают; пока лодка упирается в ту же преграду, удары редкие, глухие и тихие; слабый удар — тоже глухой;
+  // варианты записи чередуются.
+  if (has('bump')) {
+    const hits = (at, d) => page.evaluate(({ at, d }) => {
+      const { buf, ch } = window.__dec['audio/sfx.webm'];
+      const sr = buf.sampleRate, i0 = Math.round(at * sr), n = Math.round(d * sr);
+      const win = Math.round(sr * 0.005), hop = Math.round(sr * 0.0025), pad = Math.round(sr * 0.05); // перед звуком — тишина: удару в самом начале есть с чем сравниться
+      const e = [];
+      for (let i = -pad; i + win <= n; i += hop) { let q = 0; for (let k = 0; k < win; k++) { const v = i + k < 0 ? 0 : ch[0][i0 + i + k]; q += v * v; } e.push(Math.sqrt(q / win)); }
+      const top = Math.max(...e);
+      const out = [];
+      for (let i = 4; i < e.length; i++) {
+        let m = 0, c = 0;
+        for (let k = Math.max(0, i - 6); k < i - 1; k++) { m += e[k]; c++; }
+        // удар: громкость за сотую долю секунды выросла больше чем на 9 дБ и поднялась выше −22 дБ от самого громкого места
+        if (e[i] > top * 0.0794 && e[i] / Math.max(m / c, top * 0.004) > 2.818 && (!out.length || ((i - out[out.length - 1]) * hop) / sr > 0.06)) out.push(i);
+      }
+      return out.map((i) => +((i * hop - pad) / sr).toFixed(3));
+    }, { at, d });
+    for (const [i, [at, d]] of man.sfx.bump.entries()) {
+      const h = await hits(at, d);
+      assert.ok(h.length === 1 && h[0] < 0.03, `удар лодки, вариант ${i + 1}: в записи один удар, в самом начале — ${JSON.stringify(h)}`);
+      assert.ok(d > 0.5 && d < 1.2, `удар лодки, вариант ${i + 1}: длина ${d} с`);
+    }
+    const reset = () => page.evaluate(() => { RYBAK.audio.thudAt = -9; });
+    await reset();
+    const hard = await played('a.thud(0.9)');
+    assert.deepEqual(hard.out.map(base), ['bump', 'splash', 'splash'], `сильный удар: запись, брызги и откат волны — ${JSON.stringify(hard)}`);
+    assert.ok(hard.rates[2] < hard.rates[1] - 0.1, `откат волны ниже и медленнее брызг — ${JSON.stringify(hard.rates)}`);
+    assert.ok(hard.synth.tone === 1 && hard.synth.burst === 0, `сильный удар: под записью один низкий толчок — ${JSON.stringify(hard.synth)}`);
+    assert.ok(hard.ones[0][0] === 'bump' && hard.ones[0][1].vol > 0.9 && !hard.ones[0][1].lp, `сильный удар: запись в полную силу, без среза верхов — ${JSON.stringify(hard.ones)}`);
+    const dip = await page.evaluate(() => new Promise((ok) => setTimeout(() => ok(RYBAK.audio.back.gain.value), 80)));
+    assert.ok(dip > 0.4 && dip < 0.75, `сильный удар: море и музыка на миг отступают — ${dip}`);
+    const at0 = await played('a.thud(0.9)');
+    assert.ok(at0.out.length === 0 && at0.synth.tone + at0.synth.burst === 0, `удар сразу за ударом не слышен: лодка всё ещё упирается — ${JSON.stringify(at0)}`);
+    await page.evaluate(() => { RYBAK.audio.thudHeard -= 1.2; }); // прошло больше секунды, а лодку всё толкают в ту же преграду
+    const again = await played('a.thud(0.9)');
+    assert.deepEqual(again.out.map(base), ['bump'], `удар подряд: только сам удар — ${JSON.stringify(again)}`);
+    assert.ok(again.ones[0][1].lp > 0 && again.ones[0][1].vol < 0.5 && again.synth.tone + again.synth.burst === 0, `удар подряд: глухо и тихо — ${JSON.stringify(again.ones)}`);
+    await reset();
+    const light = await played('a.thud(0.1)');
+    assert.deepEqual(light.out.map(base), ['bump'], `слабый удар: только сам удар — ${JSON.stringify(light)}`);
+    assert.ok(light.ones[0][1].lp > 400 && light.ones[0][1].lp < 520 && light.ones[0][1].vol < 0.3, `слабый удар: глухо и тихо — ${JSON.stringify(light.ones)}`);
+    await reset();
+    const h1 = (await played('a.thud(1)')).out[0];
+    await reset();
+    const h2 = (await played('a.thud(1)')).out[0];
+    if (man.sfx.bump.length > 1) assert.notEqual(h1, h2, `два сильных удара — разные записи: ${h1}, ${h2}`);
+    await page.waitForTimeout(1800);
+    const back = await page.evaluate(() => RYBAK.audio.back.gain.value);
+    assert.ok(back > 0.97, `после удара море и музыка возвращаются — ${back}`);
+    console.log(`  удар лодки: в каждой из ${man.sfx.bump.length} записей один удар; сильный — с низким толчком, брызгами и откатом волны, повторный и слабый — глухие`);
   }
   // составные: заброс (запись и щелчки катушки), монеты горстью, улов без подсака (два шлепка), чайка
   const cast = await played('a.cast()');

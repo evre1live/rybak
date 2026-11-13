@@ -3,7 +3,8 @@
 
   python3 tools/sounds.py <папка с исходниками> <папка для готового> [--sfx имя,имя,…] [--kbps 40] [--frame 20] [--no-loops]
 
---sfx — собрать дорожку только из перечисленных коротких звуков, --no-loops — без петель;
+--sfx — собрать дорожку только из перечисленных коротких звуков; --no-loops — петли не трогать (пересобрать только
+общую дорожку: в описи остаются прежние петли);
 --kbps и --frame — сжатие общей дорожки: килобит в секунду и длина кадра Opus в миллисекундах.
 Готовое:
   sfx.webm          все короткие звуки подряд одной дорожкой;
@@ -30,8 +31,9 @@ def dec(path, ch=1):
 def enc(path, y, kbps, frame=20):
     ch = 1 if y.ndim == 1 else y.shape[1]
     raw = np.clip(y, -1, 1).astype(np.float32).tobytes()
+    # bitexact — без случайных меток в файле: из тех же исходников тем же ffmpeg выходит тот же файл, байт в байт
     subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'f32le', '-ar', str(SR), '-ac', str(ch), '-i', '-', '-c:a', 'libopus', '-b:a', f'{kbps}k', '-vbr', 'on',
-                    '-compression_level', '10', '-application', 'audio', '-frame_duration', str(frame), path], input=raw, check=True)
+                    '-compression_level', '10', '-application', 'audio', '-frame_duration', str(frame), '-fflags', '+bitexact', '-flags:a', '+bitexact', path], input=raw, check=True)
 
 
 def hp(y, hz):
@@ -82,13 +84,41 @@ def cut(y, a, b, limit, tail=0.6):
     return z, i0 / SR, i1 / SR
 
 
+def layer(src, name, t0, t1, o):
+    """Слой составного звука: кусок записи [t0, t1] с фильтрами (hp, lp — срез в герцах), приведённый к пику 1."""
+    y = dec(os.path.join(src, name + '.mp3'))
+    if o.get('hp'):
+        y = sosfiltfilt(butter(2, o['hp'], 'hp', fs=SR, output='sos'), y)
+    if o.get('lp'):
+        y = sosfiltfilt(butter(2, o['lp'], 'lp', fs=SR, output='sos'), y)
+    z = y[int(t0 * SR):int(t1 * SR)].copy()
+    fi, fo = int(0.002 * SR), int(o.get('fout', 0.03) * SR)
+    z[:fi] *= np.linspace(0, 1, fi)
+    z[-fo:] *= np.linspace(1, 0, fo) ** 2
+    return z / (np.max(np.abs(z)) + 1e-9)
+
+
+def blend(src, layers):
+    """Один звук из слоёв (запись, начало, конец, настройки; gain — громкость слоя в дБ): начала ударов ставятся в одну точку."""
+    zs = [(layer(src, n, t0, t1, o), o.get('gain', 0)) for n, t0, t1, o in layers]
+    p0 = int(0.004 * SR)
+    m = np.zeros(max(len(z) for z, _ in zs) + p0)
+    for z, g in zs:
+        on = int(np.argmax(np.abs(z) > 0.1))
+        z = z[max(0, on - p0):]
+        at = max(0, p0 - on)
+        m[at:at + len(z)] += z * amp(g)
+    return m
+
+
 def loud50(y):
     """Громкость самого громкого куска в 50 мс — по ней короткие звуки приводятся к одному уровню."""
     return float(np.max(rms_env(y, 2400, 240))) if len(y) > 2400 else float(np.sqrt(np.mean(y ** 2)))
 
 
 # ───── короткие звуки: имя в игре, исходник, какие куски записи взять ─────
-# 'all' — от первого звука до последнего одним куском; список номеров — каждый кусок отдельным вариантом.
+# 'all' — от первого звука до последнего одним куском; список номеров — каждый кусок отдельным вариантом;
+# 'mix' — звук собирается из слоёв разных записей (настройка mix: по списку слоёв на каждый вариант).
 ONE = [
     ('cast', 'cast', 'all', {}), ('nibble', 'nibble', [0, 1], {}), ('bite', 'bite', 'all', {}), ('hook', 'hook', 'all', {}),
     ('net', 'net', 'all', {}), ('flop', 'flop', [0, 1], {}), ('keep', 'keep2', 'all', {}), ('thrash', 'thrash', 'all', {}),
@@ -96,9 +126,16 @@ ONE = [
     ('coin', 'coins', 'all', {}), ('buy', 'buy', 'all', {}), ('ui', 'ui2', [0, 1], {}), ('error', 'error2', 'all', {}),
     ('page', 'page', 'all', {}), ('shutter', 'shutter', 'all', {}),
     ('step_wood', 'steps_wood', [0, 1, 2, 3, 4, 5], {}), ('step_sand', 'steps_sand', [1, 2, 3], {'tail': 0.15}),
-    ('land', 'land2', 'all', {}), ('bump', 'bump', 'all', {}), ('creak', 'creak', [0, 1, 2], {'ch': 'mix'}),
+    ('land', 'land2', 'all', {}), ('creak', 'creak', [0, 1, 2], {'ch': 'mix'}),
     ('gull', 'gulls', [0, 1, 2, 3, 4], {}), ('thunder', 'thunder2', 'all', {'tail': 1.0, 'level': -11}),
     ('bell', 'bell', 'all', {'tail': 1.2}), ('horn', 'horn', 'all', {}), ('jingle', 'jingle', 'all', {'tail': 1.0}),
+    # Удар лодки о преграду — один тяжёлый удар, собранный из слоёв: низ и тело — от удара о сваю (bump4a, bump4b),
+    # треск дерева — от удара о камень (bump3a). Целиком записи «о камень» не годятся: в них ударов по нескольку,
+    # а несколько ударов подряд слышатся как стук в дверь (первая запись, bump, была именно такой).
+    ('bump', None, 'mix', {'level': -9, 'mix': [
+        [('bump4b', 0.0, 0.72, {'hp': 28}), ('bump3a', 0.168, 0.36, {'hp': 500, 'fout': 0.06, 'gain': -5})],
+        [('bump4a', 0.015, 0.70, {'hp': 28}), ('bump3a', 0.0, 0.165, {'hp': 350, 'fout': 0.07, 'gain': -4})],
+    ]}),
 ]
 LEVEL = -14.0  # дБ: громкость самого громкого куска у каждого короткого звука
 PEAK = -1.0  # дБ: выше этого пики не поднимаются
@@ -176,20 +213,24 @@ def main(src, out, only=None, kbps=40, loops=True, frame=20):
     for name, s, pick, o in ONE:
         if only and name not in only:
             continue
-        y = hp(dec(os.path.join(src, s + '.mp3')), 40)
-        segs = segments(y)
-        if pick == 'all':
-            parts = [(segs[0][0], segs[-1][1], len(y) / SR)]
+        if pick == 'mix':
+            cuts = [(blend(src, layers), '+'.join(l[0] for l in layers), 0.0, 0.0) for layers in o['mix']]
         else:
-            parts = [(segs[i][0], segs[i][1], segs[i + 1][0] - 0.02 if i + 1 < len(segs) else len(y) / SR) for i in pick]
+            y = hp(dec(os.path.join(src, s + '.mp3')), 40)
+            segs = segments(y)
+            if pick == 'all':
+                parts = [(segs[0][0], segs[-1][1], len(y) / SR)]
+            else:
+                parts = [(segs[i][0], segs[i][1], segs[i + 1][0] - 0.02 if i + 1 < len(segs) else len(y) / SR) for i in pick]
+            cuts = [cut(y, a, b, lim, o.get('tail', 0.6)) for a, b, lim in parts]
+            cuts = [(z, s, t0, t1) for z, t0, t1 in cuts]
         man['sfx'][name] = []
-        for k, (a, b, lim) in enumerate(parts):
-            z, t0, t1 = cut(y, a, b, lim, o.get('tail', 0.6))
+        for k, (z, what, t0, t1) in enumerate(cuts):
             pk, l50 = np.max(np.abs(z)), loud50(z)
             g = min(amp(o.get('level', LEVEL)) / l50, amp(PEAK) / pk)
             z = z * g
             man['sfx'][name].append([round(pos / SR, 4), round(len(z) / SR, 4)])
-            rows.append(f"{name}{k + 1 if len(parts) > 1 else '':<2} {s:<11} {t0:5.2f}-{t1:5.2f} {len(z) / SR:5.2f}с пик{db(np.max(np.abs(z))):6.1f} гр{db(loud50(z)):6.1f} усил{db(g):+6.1f}")
+            rows.append(f"{name}{k + 1 if len(cuts) > 1 else '':<2} {what:<11} {t0:5.2f}-{t1:5.2f} {len(z) / SR:5.2f}с пик{db(np.max(np.abs(z))):6.1f} гр{db(loud50(z)):6.1f} усил{db(g):+6.1f}")
             tape += [z, np.zeros(int(GAP * SR))]
             pos += len(z) + int(GAP * SR)
     sfx = np.concatenate(tape)
@@ -231,6 +272,13 @@ def main(src, out, only=None, kbps=40, loops=True, frame=20):
         he = rms_env(hf, 192, 96)
         click = float(np.max(he[-(4800 // 96) - 4:-(4800 // 96) + 4]))
         rows.append(f"{f:<20} тело {L / SR:6.3f}с файл {len(d) / SR:6.3f}с сходство {c:5.2f} гр{db(np.sqrt(np.mean(body ** 2)) * g):6.1f} пик{db(np.max(np.abs(z))):6.1f} шов{db(np.sqrt(np.mean(wrap ** 2))):6.1f} (обычно {db(np.median(ev)):.1f}, от {db(np.min(ev)):.1f} до {db(np.max(ev)):.1f}) скачок×{jump:.2f} щелчок{db(click):6.1f} (верх обычно {db(np.median(he)):.1f}, 99% — до {db(np.percentile(he, 99)):.1f}) {k} кбит/с {os.path.getsize(os.path.join(out, f)) // 1024}КБ")
+    if not loops:
+        # петли не пересобирались: в описи остаются прежние (файлы loop-*.webm лежат в той же папке нетронутыми)
+        try:
+            with open(os.path.join(out, 'sounds.json'), encoding='utf-8') as fh:
+                man['loops'] = json.load(fh).get('loops', {})
+        except (OSError, ValueError):
+            pass
     with open(os.path.join(out, 'sounds.json'), 'w') as fh:
         json.dump(man, fh, ensure_ascii=False, separators=(',', ':'))
     print('\n'.join(rows))
