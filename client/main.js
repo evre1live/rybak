@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { Gfx, QUALITIES } from './gfx.js';
 import { PAL, usePalette } from './palette.js';
-import { loadManifest, loadHero, heroes, fpLook, heroEye } from './hero.js';
+import { loadManifest, loadHero, heroes, fpLook, heroEye, heroRim } from './hero.js';
 import { loadModel, loadModels, modelInfo, modelReady, setWarmer } from './models.js';
 import { setEnvLight } from './env.js';
 import { adopt, buildFish, warmFish } from './fish3d.js';
@@ -40,6 +40,7 @@ import { initCache, wakeServer } from './offline.js';
 
 const SPAWNS = [[-2, 9], [0.6, 9.4], [-4, 8.2], [2.6, 8.6], [-1, 11], [1.6, 11.4], [-3.6, 11], [3.6, 10.4]];
 const LINE_Z = 7;
+const MENU_HOUR = 19.2; // который час на заставке и в лобби: золотой час (см. palette.js — ключ 19,3)
 const BUMP_FAR = 80; // с какого расстояния слышен удар чужой лодки о преграду, м
 const FLOCK_FAR = 130; // с какого расстояния слышны чайки над морским косяком, м
 const DOLPHIN_FAR = 110; // с какого расстояния слышен всплеск дельфина после прыжка, м
@@ -122,8 +123,8 @@ class Game {
     this.vm = new ViewModel(this.camera);
     this.vm.setLook(fpLook(this.profile.look));
     this.vm.setVisible(false);
-    // вода отражает мир; сама вода, пена у свай, руки с удочкой и трава в отражение не попадают
-    this.gfx.setReflection(this.world.water.uniforms, [this.world.water.mesh, this.world.rings, this.vm.root, this.world.grass.tufts, this.world.grass.flowers, this.world.rain.mesh, this.world.seabed.mesh, this.world.seabed.kelp, this.world.rays.mesh, ...this.world.scenery.fauna.under].filter(Boolean));
+    // вода отражает мир; сама вода, пена у свай, руки с удочкой, трава и дорожки огней в отражение не попадают
+    this.gfx.setReflection(this.world.water.uniforms, [this.world.water.mesh, this.world.rings, this.vm.root, this.world.grass.tufts, this.world.grass.flowers, this.world.rain.mesh, this.world.seabed.mesh, this.world.seabed.kelp, this.world.rays.mesh, this.world.nightfx.wakeMesh, ...this.world.scenery.fauna.under].filter(Boolean));
     // живность: рыба и мальки шарахаются от шагов по воде, поплавка и лодки; всплеск играющей рыбы слышен неподалёку
     this.fauna = this.world.scenery.fauna;
     this.fauna.onSplash = (x, z, pw) => {
@@ -580,6 +581,7 @@ class Game {
   }
   enterWorld() {
     this.audio.start();
+    if (this.state !== 'world') this.ui.dip(); // лобби стоит в золотом часе, бухта — в своём: смену света прячем
     this.state = 'world';
     this.inWorld = true;
     this.settle();
@@ -2033,7 +2035,9 @@ class Game {
     this.frameNo++;
     const pnow = performance.now() / 1000;
     const T = this.nowSec();
-    this.hours = this.fixedHour != null ? this.fixedHour : this.state === 'title' ? 10.5 + Math.sin(T * 0.01) : clockHours(T, 8);
+    // Заставка и лобби — всегда в золотой час, как на макетах меню: низкое тёплое солнце, длинные тени. Часы самой
+    // рыбалки идут своим чередом; смену света при входе в бухту прикрывает короткое затемнение (ui.dip).
+    this.hours = this.fixedHour != null ? this.fixedHour : this.state === 'world' ? clockHours(T, 8) : MENU_HOUR + 0.12 * Math.sin(now * 0.00002);
     // погода: на заставке всегда ясно; при входе в бухту ставится сразу, дальше меняется плавно
     const wx = (this.weather = this.state === 'title' ? weatherAt('title', 0) : weatherAt(this.seed, Math.max(0, T), this.forceWx));
     this.world.setWeather(wx, this.wxSeed === this.seed ? dt : 0);
@@ -2041,6 +2045,8 @@ class Game {
     this.audio.rain(wx.rain, wx.wind);
     this.audio.wet = wx.rain;
     this.world.setClock(this.hours);
+    heroRim.uRimCol.value.copy(this.world.rim);
+    heroRim.uRimDir.value.copy(this.world.lightDir).transformDirection(this.camera.matrixWorldInverse);
     this.fx.setLight(1 - this.world.night); // ночью брызги и пена не светятся белым
     setEnvLight(0.22 + 0.78 * (1 - this.world.night));
     this.audio.night = this.world.night;

@@ -12,6 +12,7 @@ import { Seabed } from './seabed.js';
 import { Flags, SunRays } from './flags.js';
 import { Rain } from './weather.js';
 import { PAL } from './palette.js';
+import { NightFx } from './nightfx.js';
 
 // ключевые часы суток (цвета неба, солнца, воды) — в палитре: palette.js
 const cur = { h: 0, sunI: 0, hemiI: 0, stars: 0, glit: 0, exp: 1 };
@@ -34,7 +35,15 @@ export function sunDirection(h, out) {
   const phi = ((h - 5) / 16) * Math.PI;
   return out.set(Math.cos(phi), Math.sin(phi) * 0.95, 0.42 * Math.sin(phi) + 0.28).normalize();
 }
-const MOON = new THREE.Vector3(-0.45, 0.62, -0.5).normalize();
+// Луна встаёт на востоке, когда садится солнце (21:00), идёт невысоко над морем на севере и к рассвету (5:00) садится
+// на западе: с причала она видна над водой, и лунная дорожка тянется к ногам. Днём её не видно — она ждёт у горизонта.
+const MOON = new THREE.Vector3(0, 0.29, -0.96).normalize();
+export function moonDirection(h, out) {
+  const hh = ((h % 24) + 24) % 24;
+  const u = hh >= 21 ? (hh - 21) / 8 : hh < 5 ? (hh + 3) / 8 : hh < 13 ? 1 : 0;
+  const phi = u * Math.PI;
+  return out.set(Math.cos(phi) * 0.82, 0.11 + 0.13 * Math.sin(phi), -(0.38 + 0.42 * Math.sin(phi))).normalize();
+}
 
 const TERRAIN_MAT = patchSurface(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96 }), { terrain: true });
 const C = (hex) => new THREE.Color(hex);
@@ -302,11 +311,21 @@ void main(){
       c *= mix(1.0, lay, uCover * smoothstep(0.02, 0.22, d.y));
     }
   }
+  // месяц: диск с тенью сбоку, тесный ореол и широкое мягкое свечение вокруг
   float md = max(dot(d, uMoonDir), 0.0);
-  c += vec3(0.85, 0.9, 1.0) * (smoothstep(0.9990, 0.9993, md) * 1.6 + pow(md, 60.0) * 0.12) * uStars * (1.0 - uCover);
+  float moon = pow(md, 900.0) * 0.3 + pow(md, 70.0) * 0.13;
+  if (md > 0.995) {
+    vec3 mr = normalize(cross(vec3(0.0, 1.0, 0.0), uMoonDir));
+    vec2 q = vec2(dot(d, mr), dot(d, cross(uMoonDir, mr))) / 0.046;
+    float disc = 1.0 - smoothstep(0.9, 1.0, length(q));
+    moon += disc * mix(0.06, 1.0, smoothstep(0.84, 0.97, length(q - vec2(0.44, 0.2)))) * 2.1;
+  }
+  c += vec3(0.86, 0.92, 1.0) * moon * uStars * (1.0 - uCover);
+  // звёзды: мелкие — россыпью, крупные — редкие, мерцают каждая в своём ритме
   vec3 gp = d * 330.0; vec3 g = floor(gp);
-  float st = step(0.9965, hash(g)) * smoothstep(0.42, 0.08, length(fract(gp) - 0.5)) * (0.65 + 0.35 * sin(uTime * 2.0 + hash(g + 3.0) * 30.0)) * 1.6;
-  c += vec3(st) * uStars * smoothstep(0.02, 0.25, d.y) * (1.0 - uCover);
+  float sh = hash(g);
+  float st = step(0.9945, sh) * smoothstep(0.42, 0.08, length(fract(gp) - 0.5)) * (0.6 + 0.4 * sin(uTime * 2.0 + hash(g + 3.0) * 30.0)) * (0.7 + 260.0 * max(sh - 0.9965, 0.0));
+  c += mix(vec3(0.82, 0.88, 1.0), vec3(1.0, 0.93, 0.82), hash(g + 7.0)) * st * uStars * smoothstep(0.02, 0.25, d.y) * (1.0 - uCover);
   if (d.y < 0.0) c = mix(c, uHor * 0.9, min(1.0, -d.y * 6.0));
   // туман: у горизонта небо тонет в нём целиком, над головой — наполовину
   c = mix(c, uFogC, uFogK * mix(0.96, 0.5, smoothstep(0.0, 0.75, max(d.y, 0.0))));
@@ -446,7 +465,10 @@ export class World {
     sun.shadow.normalBias = 0.05;
     scene.add(sun, sun.target);
 
-    this.scenery = buildScenery(scene);
+    // ночные огни: лампочки гирлянд, светлячки, дорожки света на воде — их расставляет окружение
+    this.nightfx = new NightFx(scene, this.water.uniforms);
+    this.scenery = buildScenery(scene, this.nightfx);
+    this.nightfx.build();
     shadeUnderTrees(this.terrain);
     this.grass = new GrassField(scene, grassTint, isTouch() ? { max: 3000, maxFlowers: 500 } : {});
     // дно, флаги на шестах (показывают ветер) и лучи низкого солнца
@@ -462,6 +484,7 @@ export class World {
     this.rings = FOAM_SPOTS.length ? createFoamRings(FOAM_SPOTS, this.water.uniforms) : null;
     if (this.rings) scene.add(this.rings);
     this.sunDir = new THREE.Vector3(0, 1, 0);
+    this.rim = new THREE.Color(0, 0, 0); // кромочный свет героев: цвет и сила на этот час (hero.js)
     this.night = 0;
     this.hours = 12;
     this.exposure = 1;
@@ -487,8 +510,10 @@ export class World {
     const kStars = k.stars; // «ночь» — по часам, а не по тому, видны ли звёзды сквозь облака
     const dayLight = h >= 5 && h < 21;
     sunDirection(h, this.sunDir);
+    moonDirection(h, MOON);
     const dir = dayLight ? this.sunDir : MOON;
-    const fadeLow = dayLight ? sstep(0.0, 0.12, this.sunDir.y) : 1;
+    // низкое светило светит слабее: солнце у горизонта, луна — пока не поднялась над островами
+    const fadeLow = dayLight ? sstep(0.0, 0.12, this.sunDir.y) : sstep(0.03, 0.2, MOON.y);
     // Погода. Пасмурное небо — серое с синевой, яркость берём от неба этого часа; солнце за облаками светит вполсилы,
     // блики на воде и сетка света на дне гаснут; туман и дождь съедают даль.
     const W = this.wx;
@@ -517,6 +542,9 @@ export class World {
     this.sun.color.copy(k.sun);
     this.sun.intensity = k.sunI * (0.25 + 0.75 * fadeLow);
     this.lightDir = dir;
+    // кромочный свет героев: в полдень едва заметен, при низком солнце — тёплая кайма, ночью — холодная от луны
+    const lowSun = dayLight ? 1 - sstep(0.22, 0.6, this.sunDir.y) : 1;
+    this.rim.copy(k.sun).multiplyScalar((dayLight ? 0.3 + 0.42 * lowSun : 0.44) * (1 - 0.6 * cov) * (1 - 0.7 * fogK) * (0.3 + 0.7 * fadeLow));
     this.hemi.color.copy(k.hemiS);
     this.hemi.groundColor.copy(k.hemiG);
     this.hemi.intensity = k.hemiI;
@@ -530,6 +558,7 @@ export class World {
     s.uHor.value.copy(k.hor);
     s.uSunDir.value.copy(this.sunDir);
     s.uSunCol.value.copy(k.sun);
+    s.uMoonDir.value.copy(MOON);
     s.uStars.value = k.stars;
     s.uCover.value = cov;
     s.uFogK.value = fogK;
@@ -545,6 +574,12 @@ export class World {
     w.uSunCol.value.copy(k.sun);
     w.uFogCol.value.copy(k.fog);
     w.uGlitter.value = k.glit;
+    {
+      // лунная дорожка ярче, чем дал бы ночной свет сам по себе: и блики, и мягкая полоса света под луной до горизонта
+      const nk = clamp(kStars * 1.15, 0, 1);
+      const [sharp, soft] = PAL.water.moonPath || [4, 42];
+      w.uPath.value.set(lerp(1, sharp, nk), lerp(1, soft, nk));
+    }
     const PW = PAL.water;
     w.uWat.value.set(PW.clear, PW.pathMin, PW.fres, PW.net);
     w.uWat2.value.set(PW.deepAt, PW.netDeep, PW.netTint, PW.seaDeep);
@@ -579,6 +614,7 @@ export class World {
     this.night = clamp(kStars * 1.15, 0, 1);
     this.exposure = k.exp;
     this.scenery.setNight(this.night, 1 - this.night);
+    this.nightfx.setNight(this.night * (1 - 0.7 * fogK)); // в тумане огни тонут
   }
 
   update(dt, t, camera) {
@@ -596,6 +632,7 @@ export class World {
     }
     this.water.uniforms.uTime.value = t;
     this.water.follow(camera);
+    this.nightfx.update();
     surfaceU.uTimeS.value = t;
     this.skyU.uTime.value = t;
     this.sky.position.copy(camera.position);

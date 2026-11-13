@@ -72,6 +72,51 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     await G(page, () => RYBAK.ui.showLobby());
     assert.equal(await G(page, () => RYBAK.ui.shown), 'lobby');
   }
+  {
+    // этап 20, часть 3 — свет. Заставка и лобби стоят в золотом часе (без ?h=). Ночью луна идёт невысоко над морем
+    // на севере, от неё на воде дорожка; горят лампочки гирлянд, от фонарей по воде тянутся дорожки света;
+    // у героев кромочный свет. Окно без размера не рисуется.
+    const lt = await G(page, async () => {
+      const g = RYBAK, W = g.world, wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
+      const frame = async () => { const n = window.__frames; while (window.__frames < n + 2) await wait(30); };
+      const keep = g.fixedHour;
+      g.fixedHour = null; await frame();
+      const menu = g.hours;
+      g.fixedHour = 1; await frame();
+      const u = W.water.uniforms;
+      const night = { fx: W.nightfx.state(), moon: W.lightDir.toArray(), sky: W.skyU.uMoonDir.value.toArray(), path: u.uPath.value.toArray(), rim: W.rim.toArray(), dots: W.nightfx.dotMesh.visible, wakes: W.nightfx.wakeMesh.visible };
+      g.fixedHour = 22; await frame();
+      const rise = W.lightDir.toArray();
+      g.fixedHour = 13; await frame();
+      const day = { fx: W.nightfx.state(), path: u.uPath.value.toArray(), rim: W.rim.toArray(), dots: W.nightfx.dotMesh.visible };
+      // окно без размера: буфер не трогаем и не рисуем
+      const size = [g.gfx.w, g.gfx.h];
+      const dw = Object.getOwnPropertyDescriptor(window, 'innerWidth'), dh = Object.getOwnPropertyDescriptor(window, 'innerHeight');
+      const cv = g.gfx.renderer.domElement;
+      cv.style.display = 'none';
+      Object.defineProperty(window, 'innerWidth', { value: 0, configurable: true });
+      Object.defineProperty(window, 'innerHeight', { value: 0, configurable: true });
+      const sized = g.gfx.resize();
+      const n0 = g.gfx.renderer.info.render.frame;
+      g.gfx.render(g.scene, g.camera, 1);
+      const blank = { on: g.gfx.blank, sized, drew: g.gfx.renderer.info.render.frame - n0, size: [g.gfx.w, g.gfx.h] };
+      cv.style.display = '';
+      Object.defineProperty(window, 'innerWidth', dw);
+      Object.defineProperty(window, 'innerHeight', dh);
+      g.gfx.resize();
+      g.fixedHour = keep;
+      await frame();
+      return { menu, night, rise, day, size, blank, back: g.gfx.blank };
+    });
+    assert.ok(lt.menu > 19 && lt.menu < 19.45, `лобби в золотом часе: ${lt.menu}`);
+    assert.ok(lt.night.fx.bulbs >= 40 && lt.night.fx.wakes >= 12 && lt.night.fx.night > 0.9 && lt.night.dots && lt.night.wakes, `ночью горят лампочки и дорожки: ${JSON.stringify(lt.night.fx)}`);
+    assert.ok(lt.night.moon[2] < -0.9 && lt.night.moon[1] > 0.2 && lt.night.moon[1] < 0.36 && Math.abs(lt.night.moon[0]) < 0.05 && lt.night.sky.every((v, i) => Math.abs(v - lt.night.moon[i]) < 1e-6), `в час ночи луна на севере, невысоко: ${JSON.stringify(lt.night.moon)}`);
+    assert.ok(lt.rise[0] > 0.7 && lt.rise[1] > 0.1 && lt.rise[1] < lt.night.moon[1], `в десять вечера луна ещё на востоке и ниже: ${JSON.stringify(lt.rise)}`);
+    assert.ok(lt.night.path[0] > 3 && lt.night.path[1] > 20 && lt.day.path[0] === 1 && lt.day.path[1] === 1, `лунная дорожка ярче дневных бликов: ${JSON.stringify([lt.night.path, lt.day.path])}`);
+    assert.ok(lt.day.fx.night === 0 && lt.day.dots, `днём огни погашены, но остаются в сцене (шейдеры собраны заранее): ${JSON.stringify(lt.day)}`);
+    assert.ok(lt.night.rim[2] > lt.night.rim[0] && lt.day.rim[0] > lt.day.rim[2] && lt.day.rim[0] > 0.1, `кромочный свет: ночью холодный, днём тёплый: ${JSON.stringify([lt.night.rim, lt.day.rim])}`);
+    assert.ok(lt.blank.on && !lt.blank.sized && lt.blank.drew === 0 && lt.blank.size[0] === lt.size[0] && lt.blank.size[1] === lt.size[1] && !lt.back, `окно без размера не рисуется: ${JSON.stringify(lt.blank)}`);
+  }
 
   // лобби → снасти, журнал, редактор
   await page.click('.nav [data-p="tackle"]');
@@ -141,6 +186,7 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
   // на рыбалку
   await page.click('[data-a="start"]');
   await page.waitForFunction(() => RYBAK.state === 'world');
+  assert.equal(await G(page, () => RYBAK.ui.dips), 1, 'вход в бухту — через короткое затемнение');
   assert.ok(await page.isVisible('.center h1'), 'первая справка');
   await shot(page, '07-help');
   await page.click('.center [data-a="close"]');

@@ -207,6 +207,7 @@ void main() {
 const FRAG = /* glsl */ `
 precision highp float;
 uniform float uTime, uGlitter, uFogNear, uFogFar, uSwell, uWind;
+uniform vec2 uPath; // во сколько раз усилить дорожку от светила: сами блики и широкое мягкое пятно вокруг них (ночью — лунная дорожка)
 uniform vec4 uWat; // из палитры: прозрачность толщи, наименьший «косинус взгляда» для неё, сила отражения неба, сетка света на поверхности
 uniform vec4 uWat2; // до какой глубины вода бирюзовая; насколько сетка света гаснет над глубиной; насколько она в цвет воды, а не солнца; насколько темнее и синее открытое море
 uniform sampler2D uNormal, uCaustic, uDet;
@@ -286,7 +287,7 @@ void main() {
     c = mix(c, uSkyHor * 1.15, min(1.0, rr * 0.5));
   }
   float rs = max(dot(R, uSunDir), 0.0);
-  c += uSunCol * (pow(rs, 380.0) * 3.0 + pow(rs, 28.0) * 0.1) * uGlitter;
+  c += uSunCol * (pow(rs, 380.0) * 3.0 * uPath.x + pow(rs, 28.0) * 0.1 * uPath.y) * uGlitter;
 
   // Барашки: на гребнях зыби вода срывается в пену. Пена лежит вдоль гребня рваной полосой: где ей быть, решают
   // крупные пятна шума (uDet; рисунок крупный, чтобы не расплывался вдали), которые медленно сносит ветром, —
@@ -357,7 +358,7 @@ export function createWater() {
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geo.setIndex(idx);
   const uniforms = {
-    uTime: { value: 0 }, uGlitter: { value: 1 }, uFogNear: { value: 150 }, uFogFar: { value: 1400 },
+    uTime: { value: 0 }, uGlitter: { value: 1 }, uPath: { value: new THREE.Vector2(1, 1) }, uFogNear: { value: 150 }, uFogFar: { value: 1400 },
     uWat: { value: new THREE.Vector4(0.16, 0.18, 0.8, 0.27) }, uWat2: { value: new THREE.Vector4(14, 0.55, 0, 0.45) }, // прозрачность воды, отражение неба и сетка света — из палитры (palette.js)
     uDepth: { value: depthTexture(BOUNDS, 400, 400) }, uDepthFar: { value: depthTexture(FAR, Math.round((FAR.x1 - FAR.x0) / 2.5), Math.round((FAR.z1 - FAR.z0) / 2.5), farFloor) },
     uNormal: { value: normalTexture() }, uCaustic: { value: causticTexture() }, uDet: surfaceU.uDet, uCloudK: surfaceU.uCloudK,

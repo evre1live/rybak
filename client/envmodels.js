@@ -79,14 +79,18 @@ const flameTex = () =>
     }
   });
 let _glow = null;
-/** Мягкое свечение в точке: ночью — свет фонаря, днём не видно. day — насколько оно заметно и днём (огонь костра). */
-function glow(scene, x, y, z, size, color = '#ffc37a', day = 0) {
+/**
+ * Мягкое свечение в точке: ночью — свет фонаря, днём не видно. day — насколько оно заметно и днём (огонь костра).
+ * pull — на сколько метров свечение выдвинуто к смотрящему: пятно висит перед фонарём, а не внутри него, иначе
+ * стекло и решётка закрывают самую яркую его часть и фонарь выглядит погасшим.
+ */
+function glow(scene, x, y, z, size, color = '#ffc37a', day = 0, pull = 0) {
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: (_glow ||= glowTex()), color, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
   s.position.set(x, y, z);
   s.scale.setScalar(size);
   s.visible = false;
   scene.add(s);
-  const rec = { s, k: 1, day };
+  const rec = { s, k: 1, day, pull, home: pull ? new THREE.Vector3(x, y, z) : null };
   glows.push(rec);
   return rec;
 }
@@ -324,7 +328,8 @@ export function upgradeEnv(scene) {
           const ly = l.y - 0.05 + LAMP.y * s;
           if (l.glass) l.glass.visible = false;
           if (l.light) l.light.position.set(lx, ly, l.z);
-          glow(scene, lx, ly, l.z, 1.5);
+          if (l.wake) Object.assign(l.wake, { x: lx, y: ly }); // дорожка света на воде — от нового места фонаря
+          glow(scene, lx, ly, l.z, 1.9, '#ffc37a', 0, 0.3);
           state.lamps++;
         }
         drop(scene, 'lamps');
@@ -406,6 +411,14 @@ export function upgradeEnv(scene) {
     scatter,
     update(camera, t = performance.now() / 1000) {
       scatter.update(camera);
+      // свечение фонарей держится перед фонарём со стороны смотрящего
+      if (night > 0.01)
+        for (const g of glows) {
+          if (!g.home) continue;
+          const p = g.s.position.copy(camera.position).sub(g.home);
+          const d = p.length();
+          p.multiplyScalar(Math.min(g.pull, d * 0.5) / Math.max(d, 1e-3)).add(g.home);
+        }
       // чайка то и дело поворачивается: посмотрела в одну сторону, замерла, потом в другую
       const dt = Math.min(0.1, Math.max(0, t - last));
       last = t;

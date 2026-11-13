@@ -20,6 +20,20 @@ const NEED = ['hips', 'spine', 'head', 'aL', 'eL', 'hL', 'aR', 'eR', 'hR', 'lL',
 const DOWN = new THREE.Vector3(0, -1, 0);
 /** Под ярким солнцем краски героев уходили в оранжевый — чуть приглушаем насыщенность, сильнее всего у тёплых тонов (кожа). */
 export const HERO_TONE = 'float heroL = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114)); float heroWarm = clamp((diffuseColor.r - diffuseColor.b) * 2.2, 0.0, 1.0); diffuseColor.rgb = mix(vec3(heroL), diffuseColor.rgb, 1.0 - 0.2 * heroWarm) * (1.0 + 0.05 * heroWarm);';
+/**
+ * Кромочный свет героев: светлая кайма по контуру с той стороны, откуда светит солнце (ночью — луна). Она отделяет
+ * фигуру от фона, как на макетах; ночью по ней читаются тёмные рукава и перчатки. Цвет и направление (в осях
+ * камеры) каждый кадр ставит игра — числа общие для всех героев и для рук от первого лица.
+ */
+export const heroRim = { uRimCol: { value: new THREE.Color(0, 0, 0) }, uRimDir: { value: new THREE.Vector3(0, 1, 0) } };
+const RIM_PARS = 'uniform vec3 uRimCol;\nuniform vec3 uRimDir;\n';
+const RIM = '{ float rimF = pow(1.0 - saturate(dot(normal, normalize(vViewPosition))), 3.0); float rimL = saturate(dot(normal, uRimDir) * 0.6 + 0.5); outgoingLight += (diffuseColor.rgb * 0.5 + 0.5) * uRimCol * rimF * rimL * rimL; }\n';
+/** Добавить кромочный свет в шейдер материала героя (вызывать из onBeforeCompile). */
+export function addRim(sh) {
+  sh.uniforms.uRimCol = heroRim.uRimCol;
+  sh.uniforms.uRimDir = heroRim.uRimDir;
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + RIM_PARS).replace('#include <opaque_fragment>', RIM + '#include <opaque_fragment>');
+}
 
 export const heroes = { list: [], byId: new Map(), props: {}, ready: false, onLoad: () => {} };
 const templates = new Map();
@@ -190,8 +204,9 @@ function prepare(gltf, info) {
         '#include <roughnessmap_fragment>',
         'float roughnessFactor = roughness;\n#ifdef USE_ROUGHNESSMAP\n  roughnessFactor *= mix(0.55, 1.0, texture2D(roughnessMap, vRoughnessMapUv).g);\n#endif'
       ).replace('#include <color_fragment>', '#include <color_fragment>\n' + HERO_TONE);
+      addRim(sh);
     };
-    m.customProgramCacheKey = () => 'hero-matte2';
+    m.customProgramCacheKey = () => 'hero-matte3';
     m.needsUpdate = true;
   });
   const clips = {};

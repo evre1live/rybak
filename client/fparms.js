@@ -10,7 +10,7 @@
 // за плечом. Без этого плечо отбрасывалось, и рука обрывалась у локтя прямо в кадре.
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
-import { HERO_TONE } from './hero.js';
+import { HERO_TONE, addRim } from './hero.js';
 
 const X = new THREE.Vector3();
 const Y = new THREE.Vector3();
@@ -123,8 +123,9 @@ export class FpArms {
             'float roughnessFactor = roughness;\n#ifdef USE_ROUGHNESSMAP\n  roughnessFactor *= mix(0.55, 1.0, texture2D(roughnessMap, vRoughnessMapUv).g);\n#endif'
           )
           .replace('#include <color_fragment>', '#include <color_fragment>\n' + HERO_TONE);
+        addRim(sh);
       };
-      m.customProgramCacheKey = () => 'hero-fp5';
+      m.customProgramCacheKey = () => 'hero-fp6';
     });
   }
 

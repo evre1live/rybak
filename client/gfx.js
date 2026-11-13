@@ -350,8 +350,16 @@ export class Gfx {
   }
   resize() {
     const cv = this.renderer.domElement;
-    const w = cv.clientWidth || window.innerWidth;
-    const h = cv.clientHeight || window.innerHeight;
+    let w = cv.clientWidth || window.innerWidth;
+    let h = cv.clientHeight || window.innerHeight;
+    // Окно без размера (свёрнутая панель, вкладка ещё не показана): буфер нулевого размера видеокарта не принимает
+    // («Framebuffer is incomplete»). Прежний размер оставляем как есть и не рисуем, пока окно не появится.
+    this.blank = !(w > 0 && h > 0);
+    if (this.blank) {
+      if (this.w) return false;
+      w = 1280; // размера ещё не было вовсе — берём условный, чтобы было из чего считать пропорции
+      h = 720;
+    }
     const ratio = this.pixelRatio(w, h);
     if (w === this.w && h === this.h && ratio === this.ratio) return false;
     const sized = w !== this.w || h !== this.h;
@@ -511,6 +519,7 @@ export class Gfx {
     return true;
   }
   render(scene, camera, exposure = 1) {
+    if (this.blank) return; // окно без размера: рисовать некуда (см. resize)
     const r = this.renderer;
     r.info.reset();
     r.toneMappingExposure = exposure;

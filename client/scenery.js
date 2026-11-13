@@ -7,7 +7,7 @@ import { buildPlaces } from './places.js';
 import { ENV, upgradeEnv, envNight, envState } from './envmodels.js';
 import { spot01 } from './scatter.js';
 import { rng, rockGeo, blobGeo, canvasTex, shade, sstep, TAU, fbm2 } from './util.js';
-import { DECKS, CIRCLES, DECK_Y, groundH, shoreZ, islandR, ISLAND, ARCH, ARCH_LEGS, REEF, CAPE, capeDist, FALLS, LIGHTHOUSE, COTTAGE, cottageUV, BACKWATER, deckAt, SCHOOL_HOMES, SEA_HOMES, SKERRIES, BUOYS, MARKS } from './terrain.js';
+import { DECKS, CIRCLES, DECK_Y, groundH, shoreZ, islandR, ISLAND, ARCH, ARCH_LEGS, REEF, CAPE, capeDist, FALLS, LIGHTHOUSE, COTTAGE, CAMPFIRE, cottageUV, BACKWATER, deckAt, SCHOOL_HOMES, SEA_HOMES, SKERRIES, BUOYS, MARKS } from './terrain.js';
 import { waveH, swellMax } from './water.js';
 import { FAR_ISLES, farTrees, farCliffs } from './farisles.js';
 import { Fauna } from './fauna.js';
@@ -438,13 +438,15 @@ function upgradeProps(scene, fallback, floaters) {
   });
 }
 
-function buildLamps(B, scene) {
+function buildLamps(B, scene, nfx) {
   const lamps = [];
   const glassMat = new THREE.MeshStandardMaterial({ color: '#ffe2a8', emissive: '#ffb347', emissiveIntensity: 0, roughness: 0.4 });
   for (const [x, z, side, dim] of LAMP_POSTS) {
     const y = DECK_Y;
-    const rec = { x, y, z, side, glass: null, light: null };
+    // wake — где горит фонарь (над водой): от него по воде идёт дорожка света; готовая модель столба его передвинет
+    const rec = { x, y, z, side, glass: null, light: null, wake: { x: x + side * 0.6, y: y + 2.32, z } };
     ENV.lamps.push(rec);
+    if (nfx) nfx.wake(rec.wake, '#ffb25e', dim ? 0.8 : 1);
     CIRCLES.push({ x, z, r: 0.2 });
     B.add(G.cyl(8, 0.8, 1), '#5b3a1e', M(x, y + 1.55, z, 0.16, 3.3, 0.16), { grad: [0.8, 1.05] }); // высотой с готовый столб (3,3 м)
     B.add(G.box(), '#5b3a1e', M(x + side * 0.32, y + 2.7, z, 0.72, 0.07, 0.07));
@@ -476,13 +478,23 @@ function buildLamps(B, scene) {
   const tri = new THREE.BufferGeometry();
   tri.setAttribute('position', new THREE.Float32BufferAttribute([-0.5, 0, 0, 0.5, 0, 0, 0, -1, 0], 3));
   tri.computeVertexNormals();
-  const span = (p0, p1, n, sag) => {
+  // Лампочки: на гирлянде флажков — между флажками, на отдельном проводе — через каждые полметра. Днём это
+  // матовые шарики, ночью над каждым горит огонёк (nightfx.js).
+  const BULBS = ['#ffd49a', '#ffd49a', '#ffc27a', '#ffe0b0'];
+  let bulbN = 0;
+  const bulb = (x, y, z) => {
+    fb.add(G.sph(6, 4), '#f3e6c8', M(x, y - 0.075, z, 0.085));
+    fb.add(G.cyl(5), '#3b2a1a', M(x, y - 0.02, z, 0.03, 0.05, 0.03));
+    if (nfx) nfx.bulb(x, y - 0.075, z, BULBS[bulbN++ % BULBS.length]);
+  };
+  const span = (p0, p1, n, sag, flagged = true, lit = 1) => {
     const dir = Math.atan2(-(p1.z - p0.z), p1.x - p0.x);
     for (let i = 0; i <= n; i++) {
       const t = i / n;
       const x = p0.x + (p1.x - p0.x) * t;
       const z = p0.z + (p1.z - p0.z) * t;
       const y = p0.y + (p1.y - p0.y) * t - sag * Math.sin(Math.PI * t);
+      if (lit && i > 0 && i < n && i % lit === 0) bulb(x, y, z);
       if (i < n) {
         const t2 = (i + 1) / n;
         const x2 = p0.x + (p1.x - p0.x) * t2;
@@ -490,13 +502,21 @@ function buildLamps(B, scene) {
         const y2 = p0.y + (p1.y - p0.y) * t2 - sag * Math.sin(Math.PI * t2);
         const len = Math.hypot(x2 - x, y2 - y, z2 - z);
         fb.add(G.box(), '#3b2a1a', M((x + x2) / 2, (y + y2) / 2, (z + z2) / 2, len, 0.015, 0.015, 0, dir, Math.atan2(y2 - y, Math.hypot(x2 - x, z2 - z))));
-        fb.add(tri, flags[i % flags.length], M((x + x2) / 2, (y + y2) / 2 - 0.01, (z + z2) / 2, len * 0.8, 0.34, 1, 0, dir, 0));
+        if (flagged) fb.add(tri, flags[i % flags.length], M((x + x2) / 2, (y + y2) / 2 - 0.01, (z + z2) / 2, len * 0.8, 0.34, 1, 0, dir, 0));
       }
     }
   };
-  span(a, b, 3, 0.05);
-  span(b, c, 34, 0.7);
+  span(a, b, 3, 0.05, true, 0);
+  span(b, c, 34, 0.7, true, 2);
+  // вторая гирлянда — одни лампочки: над площадкой у лавки, от столба к столбу
+  const top = (i) => new THREE.Vector3(LAMP_POSTS[i][0], DECK_Y + 3.16, LAMP_POSTS[i][1]);
+  span(top(4), top(2), 30, 0.62, false, 1);
   scene.add(fb.build(BATCH_MAT_2S, false));
+  // гирлянды тоже отражаются в воде: по одной дорожке на несколько лампочек
+  if (nfx) {
+    for (const [p0, p1, k] of [[b, c, 0.3], [b, c, 0.62], [top(4), top(2), 0.5]])
+      nfx.wake({ x: p0.x + (p1.x - p0.x) * k, y: p0.y + (p1.y - p0.y) * k - 0.5, z: p0.z + (p1.z - p0.z) * k }, '#ffc680', 0.55, 2.2);
+  }
   return { lamps, glassMat };
 }
 
@@ -1337,7 +1357,15 @@ function buildSchools(fauna) {
   };
 }
 
-export function buildScenery(scene) {
+/** Дорожки света на воде от лавки, маяка, домика и костра (от фонарей и гирлянд их кладёт buildLamps). */
+function buildNightLife(nfx, shack, lh) {
+  nfx.wake(shack.glow.position, '#ffcf98', 0.8, 1.8);
+  nfx.wake(lh.beam.position, '#ffe6a8', 1.15, 3.2); // фонарь маяка: готовая башня поднимет его на свою высоту
+  nfx.wake({ x: COTTAGE.x, y: COTTAGE.y + 2.2, z: COTTAGE.z }, '#ffc56b', 0.5, 2.6);
+  nfx.wake({ x: CAMPFIRE.x, y: Math.max(0.6, groundH(CAMPFIRE.x, CAMPFIRE.z) + 0.5), z: CAMPFIRE.z }, '#ff9a3c', 0.9, 1.6);
+}
+
+export function buildScenery(scene, nfx = null) {
   const r = rng(20261111);
   const B = new Batch();
   B.auto = true;
@@ -1349,7 +1377,7 @@ export function buildScenery(scene) {
   buildDocks(B, r, false, X.piles);
   const shack = buildShack(B, P, scene, r);
   buildProps(B, P, r, X);
-  const lamps = buildLamps(X.lamps, scene);
+  const lamps = buildLamps(X.lamps, scene, nfx);
   buildDocks(B, rng(20261113), true, X.piles);
   scene.add(B.build());
   for (const k of ['bench', 'lamps', 'piles']) {
@@ -1370,12 +1398,15 @@ export function buildScenery(scene) {
   const schools = buildSchools(fauna);
   buildPlaces(scene);
   upgradeProps(scene, fallback, floaters);
+  if (nfx) buildNightLife(nfx, shack, lh);
   const env = upgradeEnv(scene);
   return {
     /** Для проверок: какие готовые модели локации уже стоят и сколько в них треугольников. */
     envState: () => ({ ...envState(), ...env.scatter.stats() }),
     env,
     setBoard: shack.setBoard,
+    /** Ночные огни (nightfx.js): лампочки гирлянд и дорожки света на воде. */
+    nightfx: nfx,
     schools,
     fauna,
     /** Источники света фонарей: днём выключены совсем. */

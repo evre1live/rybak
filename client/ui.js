@@ -1490,6 +1490,14 @@ export class UI {
     $('#ui').appendChild(d);
     setTimeout(() => d.remove(), 800);
   }
+  /** Короткое затемнение: экран на миг гаснет и проявляется — так прячется смена камеры и света при входе в бухту. */
+  dip() {
+    const d = document.createElement('div');
+    d.className = 'dip';
+    $('#ui').appendChild(d);
+    this.dips = (this.dips || 0) + 1;
+    setTimeout(() => d.remove(), 700);
+  }
   /** Перерисовать открытую панель после покупки, продажи и т. п. */
   rerender() {
     if (this.panel === 'tackle' || this.panel === 'shop') this.renderTackle();
