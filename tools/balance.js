@@ -33,7 +33,13 @@ const TIERS = [
   { name: 'остр. 6 прилив, живец протока/край', loc: 'keys', eq: { rod: 'rod6', line: 'line4', reel: 'reel4', hook: 'hook4' }, tackle: 'live', spots: [['channel', 6, 0], ['edge', 9, 0]] },
   { name: 'остр. 7 звезда, краб сад/край', loc: 'keys', eq: { rod: 'rod7', line: 'line5', reel: 'reel5', hook: 'hook5' }, tackle: 'crab', spots: [['garden', 3, 0], ['edge', 9, 0]] },
   { name: 'остр. 8 волк, поппер край/море', loc: 'keys', eq: { rod: 'rod8', line: 'line6', reel: 'reel6', hook: 'hook6' }, tackle: 'popper', spots: [['edge', 9, 0], ['sea', 14, 0]] },
-  { name: 'остр. 10 легенда, блесна', loc: 'keys', eq: { rod: 'rod10', line: 'line7', reel: 'reel7', hook: 'hook6', float: 'float6' }, tackle: 'legendlure', spots: [['edge', 9, 0], ['sea', 14, 0], ['garden', 3, 0]] }
+  { name: 'остр. 10 легенда, блесна', loc: 'keys', eq: { rod: 'rod10', line: 'line7', reel: 'reel7', hook: 'hook6', float: 'float6' }, tackle: 'legendlure', spots: [['edge', 9, 0], ['sea', 14, 0], ['garden', 3, 0]] },
+  // этап 24: гиганты (только на морскую удочку; багор — брать у борта с 90 %)
+  { name: '8 волк+багор, кальмар море', eq: { rod: 'rod8', line: 'line6', reel: 'reel6', hook: 'hook6' }, gaff: true, tackle: 'squid', spots: [['sea', 14, 0]] },
+  { name: '8 волк без багра, кальмар море', eq: { rod: 'rod8', line: 'line6', reel: 'reel6', hook: 'hook6' }, tackle: 'squid', spots: [['sea', 14, 0]] },
+  { name: '7 звезда, кальмар море (без гигантов)', eq: { rod: 'rod7', line: 'line6', reel: 'reel6', hook: 'hook6' }, tackle: 'squid', spots: [['sea', 14, 0]] },
+  { name: 'остр. 8 волк+багор, краб край', loc: 'keys', eq: { rod: 'rod8', line: 'line6', reel: 'reel6', hook: 'hook6' }, gaff: true, tackle: 'crab', spots: [['edge', 9, 0]] },
+  { name: 'озеро 8 волк+багор, червь яма', loc: 'lake', eq: { rod: 'rod8', line: 'line6', reel: 'reel6', hook: 'hook6' }, gaff: true, tackle: 'worm', spots: [['pit', 16, 0]] }
 ];
 const N = Number(process.argv[2]) || 4000;
 const rng = mulberry32(12345);
@@ -41,6 +47,7 @@ for (const tier of TIERS) {
   const p = newProfile();
   Object.assign(p.equip, tier.eq);
   for (const id of Object.values(tier.eq)) p.owned[id] = 1;
+  if (tier.gaff) p.owned.gaff = 1;
   const kit = kitStats(p);
   let time = 0, coins = 0, xp = 0, landed = 0, snap = 0, esc = 0, legends = 0, fightT = 0;
   const byRar = [0, 0, 0, 0, 0];
@@ -73,11 +80,16 @@ console.log('\nПоединки (поймано% / обрыв% / сход% / с�
 const DUELS = [
   ['bychok', 0.15, {}], ['okun', 0.6, {}], ['kefal', 1.6, {}], ['karp', 3, {}], ['karp', 6, {}], ['shuka', 5, {}],
   ['karp', 6, { rod: 'rod2', line: 'line2' }], ['shuka', 6, { rod: 'rod3', line: 'line2' }], ['som', 15, { rod: 'rod3', line: 'line3' }], ['som', 30, { rod: 'rod4', line: 'line3', reel: 'reel3' }],
-  ['tunec', 30, { rod: 'rod5', line: 'line3', reel: 'reel3' }], ['tunec', 60, { rod: 'rod6', line: 'line4', reel: 'reel4' }], ['mech', 90, { rod: 'rod6', line: 'line4', reel: 'reel4' }], ['starik', 130, { rod: 'rod6', line: 'line4', reel: 'reel4' }], ['mech', 90, { rod: 'rod5', line: 'line3', reel: 'reel3' }]
+  ['tunec', 30, { rod: 'rod5', line: 'line3', reel: 'reel3' }], ['tunec', 60, { rod: 'rod6', line: 'line4', reel: 'reel4' }], ['mech', 90, { rod: 'rod6', line: 'line4', reel: 'reel4' }], ['starik', 130, { rod: 'rod6', line: 'line4', reel: 'reel4' }], ['mech', 90, { rod: 'rod5', line: 'line3', reel: 'reel3' }],
+  // гиганты: с багром и без
+  ['mako', 150, { rod: 'rod8', line: 'line6', reel: 'reel6', gaff: 1 }], ['mako', 400, { rod: 'rod8', line: 'line6', reel: 'reel6', gaff: 1 }], ['mako', 400, { rod: 'rod8', line: 'line6', reel: 'reel6' }],
+  ['mako', 400, { rod: 'rod10', line: 'line7', reel: 'reel7', gaff: 1 }], ['rifakula', 60, { rod: 'rod8', line: 'line6', reel: 'reel5', gaff: 1 }], ['osetr', 120, { rod: 'rod8', line: 'line6', reel: 'reel6', gaff: 1 }]
 ];
-for (const [sp, w, eq] of DUELS) {
+for (const [sp, w, eq0] of DUELS) {
   const p = newProfile();
+  const { gaff, ...eq } = eq0;
   Object.assign(p.equip, eq);
+  if (gaff) p.owned.gaff = 1;
   const kit = kitStats(p);
   const row = [];
   let rho = 0;
@@ -92,5 +104,5 @@ for (const [sp, w, eq] of DUELS) {
     }
     row.push(`${Math.round((L / M) * 100)}/${Math.round((S / M) * 100)}/${Math.round((E / M) * 100)} ${(T / M).toFixed(1)}с`);
   }
-  console.log(`${(FISH_BY_ID[sp].name + ' ' + w + 'кг').padEnd(22)} ${(eq.rod || 'rod1').padEnd(5)} леска ${kit.lineKg.toFixed(1).padStart(5)}  rho ${rho.toFixed(2)}   ${row.join('   |   ')}`);
+  console.log(`${(FISH_BY_ID[sp].name + ' ' + w + 'кг').padEnd(22)} ${(eq.rod || 'rod1').padEnd(5)}${gaff ? '+багор' : '      '} леска ${kit.lineKg.toFixed(1).padStart(5)}  rho ${rho.toFixed(2)}   ${row.join('   |   ')}`);
 }

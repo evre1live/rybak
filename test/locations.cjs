@@ -130,7 +130,7 @@ async function clickAndReload(page, sel) {
     g.profile.equip.tackle = keep;
     return { fish: [...fish].sort(), zones, land: f.probe(0, 12) };
   });
-  const LAKE = ['ersh', 'forel', 'harius', 'karas', 'lesh', 'nalim', 'okun', 'plotva', 'shuka', 'sig', 'som', 'sudak', 'taimen', 'zolforel'];
+  const LAKE = ['ersh', 'forel', 'harius', 'karas', 'lesh', 'nalim', 'okun', 'plotva', 'shuka', 'sig', 'som', 'sudak', 'taimen', 'zolforel', 'osetr'];
   assert.ok(got.fish.every((id) => LAKE.includes(id)), `на озере ловится только озёрная рыба: ${got.fish}`);
   assert.ok(got.fish.length >= 12, `почти весь список озера встречается за пару тысяч забросов: ${got.fish}`);
   for (const id of ['ersh', 'harius', 'sig', 'nalim', 'taimen']) assert.ok(got.fish.includes(id), `новый вид ${id} ловится`);
@@ -255,20 +255,20 @@ async function clickAndReload(page, sel) {
   // журнал: сначала рыба этого озера; на вкладке бухты у рыбы написано, где её искать; «вся рыба» — общий список
   await G(a, () => RYBAK.ui.openPanel('journal'));
   await a.waitForSelector('.jstats');
-  assert.match(await a.textContent('.jtabs .tab.on'), /Сосновое озеро · 0\/14/);
-  assert.equal(await a.locator('.panel .grid .tile').count(), 14);
-  assert.match(await a.textContent('.jstats'), /\/43/);
+  assert.match(await a.textContent('.jtabs .tab.on'), /Сосновое озеро · 0\/15/);
+  assert.equal(await a.locator('.panel .grid .tile').count(), 15);
+  assert.match(await a.textContent('.jstats'), /\/46/);
   await a.click('.panel .tile[data-id="harius"]');
   assert.match(await a.textContent('.jdetail'), /водопад/i);
   assert.ok(!/Сосновое озеро —/.test(await a.textContent('.jdetail')), 'у здешней рыбы — просто места');
   await shot(a, 'loc-05-journal');
   await a.click('.jtabs [data-id="bay"]');
-  assert.equal(await a.locator('.panel .grid .tile').count(), 25);
+  assert.equal(await a.locator('.panel .grid .tile').count(), 26);
   await a.click('.panel .tile[data-id="tunec"]');
   assert.match(await a.textContent('.jdetail'), /Солнечная бухта —/);
   await a.click('.jtabs [data-id="all"]');
-  assert.equal(await a.locator('.panel .grid .tile').count(), 43);
-  assert.match(await a.textContent('.jtabs .tab.on'), /Вся рыба · 0\/43/);
+  assert.equal(await a.locator('.panel .grid .tile').count(), 46);
+  assert.match(await a.textContent('.jtabs .tab.on'), /Вся рыба · 0\/46/);
   await G(a, () => RYBAK.ui.closePanel());
 
   // ── выйти в меню: страница остаётся на озере (адрес и выбранная карточка) ──

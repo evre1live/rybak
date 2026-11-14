@@ -24,7 +24,10 @@ const PROFILES = {
   // рифовая рыба: диск (бабочка, ангел, хирург), крылатка с большой головой, лобастый каранкс с тонким хвостовым стеблем
   disc: [[0, 0.014, 0.008, 0], [0.06, 0.1, 0.03, 0], [0.2, 0.24, 0.046, 0.005], [0.42, 0.3, 0.05, 0.01], [0.65, 0.25, 0.042, 0.005], [0.85, 0.08, 0.022, 0], [1, 0.04, 0.01, 0]],
   lion: [[0, 0.03, 0.025, 0], [0.06, 0.1, 0.07, 0], [0.2, 0.16, 0.09, 0.005], [0.42, 0.16, 0.08, 0.01], [0.65, 0.115, 0.055, 0.005], [0.85, 0.055, 0.028, 0], [1, 0.03, 0.012, 0]],
-  jack: [[0, 0.03, 0.02, 0], [0.06, 0.115, 0.046, 0.005], [0.2, 0.2, 0.066, 0.012], [0.4, 0.22, 0.07, 0.012], [0.62, 0.15, 0.055, 0.005], [0.82, 0.045, 0.026, 0], [0.94, 0.02, 0.02, 0], [1, 0.018, 0.01, 0]]
+  jack: [[0, 0.03, 0.02, 0], [0.06, 0.115, 0.046, 0.005], [0.2, 0.2, 0.066, 0.012], [0.4, 0.22, 0.07, 0.012], [0.62, 0.15, 0.055, 0.005], [0.82, 0.045, 0.026, 0], [0.94, 0.02, 0.02, 0], [1, 0.018, 0.01, 0]],
+  // гиганты: акула — острое рыло, толстое тело и тонкий хвостовой стебель; осётр — длинный, с плоским брюхом
+  shark: [[0, 0.006, 0.008, -0.004], [0.05, 0.034, 0.04, -0.008], [0.14, 0.072, 0.078, -0.004], [0.3, 0.112, 0.1, 0.002], [0.5, 0.11, 0.092, 0.006], [0.72, 0.064, 0.052, 0.01], [0.9, 0.024, 0.02, 0.012], [1, 0.016, 0.01, 0.014]],
+  sturgeon: [[0, 0.007, 0.012, -0.014], [0.06, 0.032, 0.044, -0.012], [0.18, 0.068, 0.072, -0.002], [0.4, 0.085, 0.082, 0.004], [0.65, 0.066, 0.058, 0.005], [0.85, 0.032, 0.028, 0.008], [1, 0.015, 0.01, 0.012]]
 };
 // плавники: хвост, спинной [от, до, высота], анальный, второй спинной
 const FINS = {
@@ -43,7 +46,10 @@ const FINS = {
   flat: { tail: 'round', d: [0.1, 0.9, 0.055], a: [0.12, 0.9, 0.055] },
   disc: { tail: 'fork', d: [0.2, 0.8, 0.07], a: [0.5, 0.82, 0.07], tailK: 0.8 },
   lion: { tail: 'round', d: [0.14, 0.72, 0.17], a: [0.56, 0.8, 0.1] },
-  jack: { tail: 'cres', d: [0.3, 0.46, 0.1], d2: [0.5, 0.82, 0.06], a: [0.52, 0.82, 0.055] }
+  jack: { tail: 'cres', d: [0.3, 0.46, 0.1], d2: [0.5, 0.82, 0.06], a: [0.52, 0.82, 0.055] },
+  // у акулы и осётра хвост несимметричный (верхняя лопасть длиннее), спинной плавник акулы — треугольник (рисуется отдельно)
+  shark: { tail: 'shark', d: null, d2: [0.74, 0.79, 0.045], a: [0.75, 0.8, 0.04], tailK: 0.72 },
+  sturgeon: { tail: 'shark', d: [0.73, 0.81, 0.06], a: [0.73, 0.8, 0.05], tailK: 0.58 }
 };
 
 function profileAt(P, t) {
@@ -339,9 +345,10 @@ function proceduralFish(sp) {
   if (fins.tail === 'fork') tg = flat([[0, 0.02], [0.2 * k, 0.17 * k], [0.24 * k, 0.16 * k], [0.14 * k, 0], [0.24 * k, -0.16 * k], [0.2 * k, -0.17 * k], [0, -0.02]]);
   else if (fins.tail === 'cres') tg = flat([[0, 0.015], [0.1, 0.2], [0.2, 0.3], [0.17, 0.2], [0.1, 0], [0.17, -0.2], [0.2, -0.3], [0.1, -0.2], [0, -0.015]]);
   else if (fins.tail === 'round') tg = flat([[0, 0.03], [0.1 * k, 0.12 * k], [0.2 * k, 0.11 * k], [0.25 * k, 0], [0.2 * k, -0.11 * k], [0.1 * k, -0.12 * k], [0, -0.03]]);
+  else if (fins.tail === 'shark') tg = flat([[0, 0.022], [0.12 * k, 0.12 * k], [0.29 * k, 0.33 * k], [0.25 * k, 0.31 * k], [0.13 * k, 0.07 * k], [0.17 * k, -0.12 * k], [0.12 * k, -0.135 * k], [0, -0.025]]);
   if (tg) tail.add(new THREE.Mesh(tg, finMat));
   g.add(tail);
-  g.add(new THREE.Mesh(finShape(P, fins.d, fins.d[2], true), finMat));
+  if (fins.d) g.add(new THREE.Mesh(finShape(P, fins.d, fins.d[2], true), finMat));
   if (fins.d2) g.add(new THREE.Mesh(finShape(P, fins.d2, fins.d2[2], true), finMat));
   if (fins.a) g.add(new THREE.Mesh(finShape(P, fins.a, fins.a[2], false), finMat));
   // грудные и брюшные
@@ -363,7 +370,7 @@ function proceduralFish(sp) {
   const er = (look.bigEye ? 0.034 : shape === 'needle' || shape === 'eel' ? 0.013 : 0.023) * (shape === 'grouper' || shape === 'cat' ? 0.8 : 1);
   const ex = (shape === 'pike' || shape === 'needle' ? 0.2 : shape === 'sword' ? 0.07 : 0.1) - 0.5;
   const sides = shape === 'flat' ? [1] : [-1, 1];
-  for (const s of sides) {
+  for (const s of shape === 'shark' || shape === 'sturgeon' ? [] : sides) {
     const e = new THREE.Mesh(G.sph(10, 8), eyeW);
     e.scale.set(er * 2, er * 2, er * 0.9);
     e.position.set(ex, ey + eh * 0.3, s * ew * 0.93);
@@ -378,6 +385,57 @@ function proceduralFish(sp) {
     e.scale.set(0.04, 0.04, 0.03);
     e.position.set(-0.36, 0.09, 0.03);
     g.add(e);
+  }
+  if (shape === 'shark' || shape === 'sturgeon') {
+    // маленький тёмный глаз без белка
+    const [h0, w0, y0] = profileAt(P, 0.08);
+    for (const s of [-1, 1]) {
+      const e = new THREE.Mesh(G.sph(8, 6), eyeB);
+      e.scale.set(0.022, 0.018, 0.012);
+      e.position.set(0.08 - 0.5, y0 + h0 * 0.25, s * w0 * 0.92);
+      g.add(e);
+    }
+  }
+  if (shape === 'shark') {
+    // треугольный спинной плавник и широкие грудные «крылья»; жаберные щели
+    const [hh, , yo] = profileAt(P, 0.36);
+    const dorsal = new THREE.Mesh(flat([[-0.09, 0], [0.0, 0.17], [0.035, 0.165], [0.06, 0.12], [0.07, 0]]), finMat);
+    dorsal.position.set(0.34 - 0.5, yo + hh - 0.012, 0);
+    g.add(dorsal);
+    const [h2, w2, y2] = profileAt(P, 0.27);
+    for (const s of [-1, 1]) {
+      const wing = new THREE.Mesh(flat([[0, 0.02], [0.08, 0.01], [0.24, -0.15], [0.2, -0.165], [0.02, -0.05]]), finMat);
+      wing.position.set(0.25 - 0.5, y2 - h2 * 0.55, s * w2 * 0.8);
+      wing.rotation.set(s * 1.05, 0, 0);
+      g.add(wing);
+      for (let i = 0; i < 4; i++) {
+        const gill = new THREE.Mesh(G.box(), mat(shade(look.side, -0.35), 0.6));
+        gill.scale.set(0.004, h2 * 0.75, 0.004);
+        gill.position.set(0.19 - 0.5 + i * 0.018, y2 + h2 * 0.05, s * w2 * 0.99);
+        g.add(gill);
+      }
+    }
+  }
+  if (shape === 'sturgeon') {
+    // костяные щитки рядами по спине и бокам, рыло и усики
+    const sc = mat(look.patC || '#dcd6bd', 0.5);
+    for (let t = 0.16; t <= 0.74; t += 0.045) {
+      const [hh, hw, yo] = profileAt(P, t);
+      const top = new THREE.Mesh(G.cone(4), sc);
+      top.scale.set(0.018, 0.02, 0.012);
+      top.position.set(t - 0.5, yo + hh, 0);
+      g.add(top);
+      for (const s of [-1, 1]) {
+        const side = new THREE.Mesh(G.cone(4), sc);
+        side.scale.set(0.014, 0.016, 0.01);
+        side.rotation.x = s * Math.PI / 2;
+        side.position.set(t - 0.5, yo + hh * 0.15, s * hw * 0.98);
+        g.add(side);
+      }
+    }
+    const bm = mat(look.belly, 0.7);
+    for (const s of [-1, 1])
+      for (const dz of [0.012, 0.03]) g.add(new THREE.Mesh(tube([[-0.47, -0.02, s * dz], [-0.47, -0.05, s * dz * 1.2], [-0.46, -0.07, s * dz * 1.3]], 0.003, 4), bm));
   }
   if (shape === 'sword') {
     const bill = new THREE.Mesh(G.cone(6), mat(look.back, 0.5));

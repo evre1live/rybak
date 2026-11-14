@@ -46,6 +46,8 @@ export function kitStats(p) {
     bagCap: bag.cap,
     net: !!(own.net || own.bignet),
     landAt: own.bignet ? 0.75 : own.net ? 0.85 : 1, // с какой доли пути рыбу можно брать подсаком
+    gaff: !!own.gaff,
+    gaffAt: own.gaff ? GAFF_AT : 1, // гиганта в подсак не взять: только багром у борта (или вытащить до конца)
     sonar: !!(own.sonar || own.sonar2),
     sonar2: !!own.sonar2, // у точки заброса видно, кто здесь клюёт
     // особенности дорогих удочек (data.js, RODS[].perk)
@@ -95,6 +97,7 @@ export function speciesWeights(spot, tackleId, hour, loc, kit) {
     if (spot.pier && spot.zone !== 'pier') z += (zones.pier || 0) * 0.8;
     if (!z) continue;
     if (f.minDepth && spot.depth < f.minDepth) continue;
+    if (f.giant && !(kit && kit.heavy)) continue; // гигант не берёт на лёгкую снасть: нужна морская удочка
     const aff = tk.lure ? f.lure * tk.power : f.baits[tk.id] ?? 0.3;
     if (!aff) continue;
     const boost = tk.rare * ((kit && kit.rare) || 1) * (spot.hot ? 1.5 : 1);
@@ -215,6 +218,11 @@ export const STYLE_K = {
   snag: { runs: 1.05, len: 1, pull: 0.9, jump: 0.1, calm: 1 },
   flat: { runs: 0.8, len: 0.9, pull: 1, jump: 0, calm: 1.1 }
 };
+// Гиганты (FISH[].giant): клюют только на тяжёлую (морскую) удочку, бой длиннее — рывки дольше и чаще срывают
+// леску с катушки, у самого борта (на 80 % пути) великан собирается с силами. В подсак не помещается:
+// берут багром с GAFF_AT пути, друг — с ASSIST_GIANT; без багра вываживают до конца.
+export const GAFF_AT = 0.9;
+export const GIANT_K = { stamina: 1.15, len: 1.35, peel: 1.4, side: 0.45 };
 export const FIGHT_K = {
   leap: 0.35, // рыба в воздухе не держит отпущенную леску: та успевает ослабнуть
   slackBulldog: 0.6, // сколько хода теряет тяжеловес на вялой леске
@@ -238,14 +246,16 @@ export function fightInit(c, kit, rng) {
   const f = FISH_BY_ID[c.sp];
   const power = c.junk || !f ? 0.25 : f.str * Math.pow(c.w, 0.55);
   const rho = power / (kit.lineKg * 0.9);
+  const giant = !!(f && !c.junk && f.giant);
+  const legend = !!(f && !c.junk && f.rar >= 4);
   return {
-    power, rho, junk: !!c.junk, temper: f ? f.str : 0.5,
-    stamina: 1.7 + 2.9 * Math.pow(power, 0.75),
+    power, rho, junk: !!c.junk, temper: f ? f.str : 0.5, giant,
+    stamina: (1.7 + 2.9 * Math.pow(power, 0.75)) * (giant ? GIANT_K.stamina : 1),
     T: 0.45, p: 0.06, strain: 0, slack: 0,
     phase: 'calm', phaseT: 1.2 + rng() * 1.2, pull: 0.35, dir: 0, t: 0, fat: 0, result: null, next: null, warned: false,
     style: c.junk || !f ? 'plain' : f.style || 'plain',
-    boss: f && !c.junk && f.rar >= 4 ? 2 : 0, // у легенды два «вторых дыхания»
-    bossMax: f && !c.junk && f.rar >= 4 ? 2 : 0,
+    boss: legend ? 2 : giant ? 1 : 0, // у легенды два «вторых дыхания», у гиганта одно — у самого борта
+    bossMax: legend ? 2 : giant ? 1 : 0,
     rage: false, jumpT: 0, stuck: 0, stuckT: 0, lift: 0, stickCd: 0, wrapT: 0, wrapped: false
   };
 }
@@ -286,7 +296,7 @@ export function fightStep(s, input, dt, kit, rng) {
       const rage = s.rage;
       s.rage = false;
       s.phase = 'run';
-      s.phaseT = (0.9 + rng() * 1.5 + 0.6 * k01) * K.len * (rage ? F.bossLen : 1);
+      s.phaseT = (0.9 + rng() * 1.5 + 0.6 * k01) * K.len * (rage ? F.bossLen : 1) * (s.giant ? GIANT_K.len : 1);
       s.pull = (0.9 + 0.5 * k01 + rng() * 0.15) * (0.72 + 0.28 * tired(s)) * K.pull * (rage ? F.bossPull : 1);
       s.dir = rng() < 0.5 ? -1 : 1;
       s.wrapT = 0;
@@ -367,6 +377,8 @@ export function fightStep(s, input, dt, kit, rng) {
   let eff = s.T < T_LOW ? 0.35 : s.T > T_DANGER ? 0.85 : 1;
   // тяжеловес идёт к берегу, только пока леска внатяг
   if (s.style === 'bulldog' && s.T < T_TIGHT) eff *= 1 - F.slackBulldog * k01;
+  // гигант у самого борта: без багра его не перехватить — бьётся и подаётся вдвое медленнее
+  if (s.giant && !kit.gaff && s.p >= GAFF_AT) eff *= GIANT_K.side;
   if (s.stickCd > 0) s.stickCd -= dt;
   if (s.stuck) {
     // залегла: отрывают натяжением у верхней границы нормы; через шесть секунд снимется сама
@@ -379,14 +391,16 @@ export function fightStep(s, input, dt, kit, rng) {
       ev.push('unstuck');
     }
   } else if (input.reel) s.p += (kit.reel * eff * (run ? (input.steer === -s.dir ? 0.75 : 0.35) : 1) * dt) / s.stamina;
-  else s.p -= ((run ? 0.1 : 0.03) * (0.5 + Math.min(1.2, s.rho)) * tired(s) * dt) / Math.sqrt(s.stamina);
+  else s.p -= ((run ? 0.1 * (s.giant ? GIANT_K.peel : 1) : 0.03) * (0.5 + Math.min(1.2, s.rho)) * tired(s) * dt) / Math.sqrt(s.stamina);
   s.p = clamp(s.p, 0, 1);
-  if (s.p >= (kit.landAt ?? (kit.net ? 0.85 : 1))) {
+  if (s.p >= landAtOf(s, kit)) {
     s.result = 'landed';
     ev.push('landed');
   }
   return ev;
 }
+/** С какой доли пути рыбу можно взять: обычную — подсаком (если он есть), гиганта — только багром. */
+export const landAtOf = (s, kit) => (s.giant ? kit.gaffAt ?? 1 : kit.landAt ?? (kit.net ? 0.85 : 1));
 // рыба устаёт: чем дольше борьба, тем слабее и реже рывки
 const tired = (s) => 1 / (1 + s.fat / 35);
 function nextPhase(s, rng, K) {
@@ -397,12 +411,15 @@ function nextPhase(s, rng, K) {
 // ───── помощь друга: подсачить чужую рыбу ─────
 export const ASSIST_AT = 0.7; // друг берёт рыбу в подсак раньше, чем рыбак возьмёт её сам (свой подсачек — с 85 % пути)
 export const ASSIST_REACH = 3.4; // …если стоит не дальше этого от рыбака, м
+export const ASSIST_GIANT = 0.8; // гиганта друг берёт багром позже
+/** С какой доли пути друг может взять эту рыбу. */
+export const assistAt = (s) => (s && s.giant ? ASSIST_GIANT : ASSIST_AT);
 /**
  * Можно ли сейчас подсачить рыбу: '' — да, иначе причина. early — рыба ещё далеко; boss — у легенды впереди
  * «второе дыхание»; stuck — залегла на дно; air — в свече.
  */
 export function assistBlock(s) {
-  if (!s || s.result || !(s.p >= ASSIST_AT)) return 'early';
+  if (!s || s.result || !(s.p >= assistAt(s))) return 'early';
   if (s.boss > 0) return 'boss';
   if (s.stuck) return 'stuck';
   if (s.jumpT > 0) return 'air';

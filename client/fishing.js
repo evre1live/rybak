@@ -565,7 +565,7 @@ export class Fishing {
     this.fish.position.set(this.bx, -0.3, this.bz);
     this.scene.add(this.fish);
     this.fx.splash(this.bx, this.bz, 0.8);
-    this.emit('hook', { rho: this.fight.rho, rar: f ? f.rar : 0, style: this.fight.style, boss: this.fight.boss });
+    this.emit('hook', { rho: this.fight.rho, rar: f ? f.rar : 0, style: this.fight.style, boss: this.fight.boss, giant: this.fight.giant, legend: !!(f && f.rar >= 4) });
   }
 
   land() {
@@ -581,7 +581,7 @@ export class Fishing {
     const rar = f0 ? f0.rar : c.sp === 'chest' ? 4 : -1;
     // Как показываем улов. Без подсака рыба висит на леске под кончиком удилища — в двух метрах от глаз, поэтому крупнее.
     // С подсаком — лежит в сетке, которую держит левая рука; длинная рыба стоит в ней наискось, головой над обручем.
-    const net = !!this.kit.net;
+    const net = !!this.kit.net && !(this.fight && this.fight.giant); // гигант в подсак не влезает: висит на багре у борта
     const base = c.junk ? 0.3 : clamp(0.2 + this.fishLen * 0.22, 0.24, 0.62);
     const s = base * (net ? 1.08 : HANG_K);
     const hoop = clamp(s * 1.02, 0.38, 0.6); // поперечник обруча: под рыбу
@@ -677,7 +677,7 @@ export class Fishing {
     out.bz = this.bz;
     out.t = s === 'fight' ? this.fight.T : s === 'charge' ? this.power : 0;
     out.k = s === 'cast' ? this.castK : s === 'charge' ? this.power : s === 'fight' ? this.fight.p : 0; // в бою — пройденный путь: друг видит, когда можно подсачить
-    out.flags = (this.reeling ? FLAG.reel : 0) | (this.lure ? FLAG.lure : 0);
+    out.flags = (this.reeling ? FLAG.reel : 0) | (this.lure ? FLAG.lure : 0) | (s === 'fight' && this.fight.giant ? FLAG.giant : 0);
     return out;
   }
   /** Что показывать рукам от первого лица. */

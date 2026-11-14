@@ -38,7 +38,7 @@ const _fc = new THREE.Color();
  * Цветущий куст: сам куст (на его место встаёт готовая модель) и цветы поверх кроны — они остаются и на модели.
  * F — набор для цветов; k — сколько цветов (0 — зелёный куст).
  */
-function bloomBush(T, F, x, y, z, s, r, k = 1, col = null) {
+export function bloomBush(T, F, x, y, z, s, r, k = 1, col = null) {
   bush(T, x, y, z, s, r);
   const c = col || BLOOMS[Math.floor(r() * BLOOMS.length)];
   const n = Math.round((4 + r() * 4) * k);
@@ -111,7 +111,7 @@ function buildHome(scene, P, T, F, near) {
 }
 
 /** Камни: валун-заготовка и запись для готовой модели. */
-function rocker(B, S, r) {
+export function rocker(B, S, r) {
   const geos = [rockGeo(11), rockGeo(23), rockGeo(37), rockGeo(51), rockGeo(64, 2, 0.3)];
   const small = [rockGeo(11, 1), rockGeo(23, 1), rockGeo(37, 1)];
   return (as, x, y, z, sx, sy, sz, grass = false, tone = 0) => {
@@ -126,7 +126,7 @@ function rocker(B, S, r) {
  * Кольцо утёсов вокруг каменного острова: записи для готовых моделей (стена из пластов и уступ из глыб) — как у
  * острова с маяком в бухте. radius(a) — кромка воды, topAt(x, z) — высота плато; gaps — просветы: [угол, полуширина в метрах].
  */
-function cliffRing(S, cx, cz, radius, topAt, gaps, rc, step = 11.5) {
+export function cliffRing(S, cx, cz, radius, topAt, gaps, rc, step = 11.5) {
   const at = (a, rad) => [cx + Math.cos(a) * rad, cz + Math.sin(a) * rad];
   const geos = [rockGeo(11), rockGeo(23), rockGeo(37)];
   gaps = gaps.map(([a, w]) => [(a + TAU * 4) % TAU, w]).sort((p, q) => p[0] - q[0]);

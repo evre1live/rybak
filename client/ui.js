@@ -4,7 +4,7 @@ import { CATS, ITEMS, FISH, FISH_BY_ID, FIGHT_STYLES, JUNK_BY_ID, RARITY, zoneIn
 import { LOCATIONS, locOf } from '../shared/locations.js';
 import { LOC_ID, LOC } from './loc/id.js';
 import {
-  kitStats, rodBars, rodPerks, mastery, MASTERY_PRIZE, owns, tackleCount, priceOf, fishValue, coolerValue, levelInfo, fightGrade, T_LOW, T_DANGER, T_TIGHT, dangerAt, liftNeed,
+  kitStats, rodBars, rodPerks, mastery, MASTERY_PRIZE, owns, tackleCount, priceOf, fishValue, coolerValue, levelInfo, fightGrade, T_LOW, T_DANGER, T_TIGHT, dangerAt, liftNeed, assistAt,
   WEATHER, questText, questCount, questReward, QUEST_BONUS, TOURS, TOUR_LENS, tourTable, tourScoreText, tourTargets, tourPrize, medalPrize, MEDALS
 } from '../shared/logic.js';
 import { itemIcon, fishIcon, faceIcon } from './icons.js';
@@ -298,6 +298,9 @@ export class UI {
       $('#tok').textContent = f.style === 'bulldog' ? 'ВНАТЯГ' : 'НОРМА';
       $('#pbar').classList.toggle('boss', f.bossMax > 0);
       $('#fboss').classList.toggle('on', f.bossMax > 0);
+      // у гиганта одно «второе дыхание» — у самого борта (80 %), и друг берёт его багром позже
+      $$('#pbar .pm')[0].style.display = f.bossMax === 1 ? 'none' : '';
+      $('#pbar .pn').style.left = Math.round(assistAt(f) * 100) + '%';
     }
     // стрелка и полоса двигаются сдвигом и растяжением (transform): страница при этом не пересчитывается
     $('#tptr').style.transform = `translateX(${(clamp(f.T, 0, 1) * 100).toFixed(2)}%)`;
@@ -319,7 +322,7 @@ export class UI {
       this.fBoss = f.boss;
       const used = f.bossMax - f.boss;
       $('#fboss').innerHTML = Array.from({ length: f.bossMax }, (_, i) => `<i${i < f.boss ? '' : ' class="used"'}></i>`).join('');
-      $$('#pbar .pm').forEach((m, i) => m.classList.toggle('used', i < used));
+      $$('#pbar .pm').forEach((m, i) => m.classList.toggle('used', i < used + (2 - f.bossMax)));
     }
     const st = $('#fstate');
     const run = f.phase === 'run';
@@ -928,7 +931,7 @@ export class UI {
         <h2>${j ? esc(f.name) : '???'}</h2>
         <p class="desc">${j ? esc(f.desc) : 'Эту рыбу вы ещё не ловили. Подсказки ниже помогут её найти.'}</p>
         <div class="kv"><span>Где</span><span>${zones}</span><span>На что</span><span>${baits || '—'}</span><span>Когда</span><span>${times}</span>
-          <span>Манера</span><span>${esc(FIGHT_STYLES[f.style].name)}: ${esc(FIGHT_STYLES[f.style].tip.charAt(0).toLowerCase() + FIGHT_STYLES[f.style].tip.slice(1))}${f.rar >= 4 ? '. Легенда: дважды собирается с силами' : ''}</span>
+          <span>Манера</span><span>${esc(FIGHT_STYLES[f.style].name)}: ${esc(FIGHT_STYLES[f.style].tip.charAt(0).toLowerCase() + FIGHT_STYLES[f.style].tip.slice(1))}${f.rar >= 4 ? '. Легенда: дважды собирается с силами' : f.giant ? '. Гигант: у самого борта собирается с силами' : ''}</span>${f.giant ? '<span>Снасть</span><span class="y">Гигант: берёт только на морскую удочку, в подсак не влезает — берут багром</span>' : ''}
           <span>Вес</span><span>${fmtW(f.w[0])} – ${fmtW(f.w[1])}</span>${j ? `<span>Поймано</span><span>${j.n}</span><span>Рекорд</span><span class="y">${fmtW(j.best)}</span>` : ''}</div>
       </div>
       <div class="loadout"><span class="hd">ДО УРОВНЯ ${lv.lvl + 1}</span><div class="it bar"><div class="pbar"><i style="width:${Math.round((lv.cur / lv.need) * 100)}%"></i></div>${lv.cur} / ${lv.need}</div>${this.footKeys('')}</div></div>`;

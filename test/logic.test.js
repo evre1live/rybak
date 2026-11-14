@@ -28,14 +28,17 @@ test('данные согласованы: у каждой рыбы есть з�
 
 test('каждую рыбу можно поймать хоть где-то и хоть на что-то — на своей локации, и только на ней', () => {
   const r = rng();
+  const HEAVY = { heavy: true };
   const tackles = Object.values(ITEMS).filter((i) => i.count).map((i) => i.id);
   const all = new Set();
   for (const loc of LOCATIONS) {
     const caught = new Set();
     for (const zone of Object.keys(ZONES)) for (const tk of tackles) for (const hour of [6, 12, 19, 23]) {
       const spot = { zone, depth: ['deep', 'arch', 'pit', 'sea', 'edge', 'channel'].includes(zone) ? 12 : 3, pier: zone === 'pier', hot: true };
-      for (const e of L.speciesWeights(spot, tk, hour, loc.id)) caught.add(e.f.id);
-      const c = L.rollFish(spot, tk, hour, r, loc.id);
+      // с морской удочкой: гиганты берут только на неё
+      for (const e of L.speciesWeights(spot, tk, hour, loc.id, HEAVY)) caught.add(e.f.id);
+      for (const e of L.speciesWeights(spot, tk, hour, loc.id)) assert.ok(!e.f.giant, `${loc.id}: гигант ${e.f.id} на лёгкую снасть не берёт`);
+      const c = L.rollFish(spot, tk, hour, r, loc.id, HEAVY);
       assert.ok(c.w > 0 && (c.junk || FISH_BY_ID[c.sp]));
       assert.ok(c.junk || Object.keys(zonesOf(FISH_BY_ID[c.sp], loc.id)).length, `${loc.id}: ${c.sp} здесь не водится`);
     }
@@ -47,7 +50,7 @@ test('каждую рыбу можно поймать хоть где-то и х
   assert.equal(all.size, FISH.length, FISH.filter((f) => !all.has(f.id)).map((f) => f.id).join());
   // без указания локации — бухта, как раньше
   assert.deepEqual(L.speciesWeights({ zone: 'pier', depth: 3, pier: true }, 'worm', 12).map((e) => e.f.id), L.speciesWeights({ zone: 'pier', depth: 3, pier: true }, 'worm', 12, 'bay').map((e) => e.f.id));
-  assert.equal(fishOf('bay').length, 25);
+  assert.equal(fishOf('bay').length, 26);
 });
 
 test('локации: список, подписи зон, кто может открыть комнату', () => {
@@ -142,7 +145,7 @@ const TOP = () => kitOf('rod6', 'line4', 'reel4', 'hook4', true);
 const half = () => 0.5; // «случай», при котором всё происходит по среднему
 const DT = 1 / 30;
 
-test('манеры: у каждой рыбы своя, все семь в деле; у легенд два «вторых дыхания», у мусора — ничего', () => {
+test('манеры: у каждой рыбы своя, все семь в деле; у легенд два «вторых дыхания», у гиганта одно, у мусора — ничего', () => {
   const used = new Set();
   const kit = L.kitStats(L.newProfile());
   for (const f of FISH) {
@@ -151,7 +154,8 @@ test('манеры: у каждой рыбы своя, все семь в дел
     used.add(f.style);
     const s = L.fightInit({ sp: f.id, w: f.w[0] }, kit, half);
     assert.equal(s.style, f.style, f.id);
-    assert.equal(s.boss, f.rar >= 4 ? 2 : 0, f.id);
+    assert.equal(s.boss, f.rar >= 4 ? 2 : f.giant ? 1 : 0, f.id);
+    assert.equal(s.giant, !!f.giant, f.id);
   }
   assert.deepEqual([...used].sort(), Object.keys(FIGHT_STYLES).sort());
   assert.ok(FISH.filter((f) => f.rar >= 4).length >= 3);
@@ -1044,7 +1048,7 @@ test('снасти: лестница цен растёт, у каждой сту
   }
   for (const r of RODS22) { const b = L.rodBars(r); for (const k of ['cast', 'line', 'reel']) assert.ok(b[k] > 0 && b[k] <= 1.0001, `${r.name}: полоска ${k} = ${b[k]}`); }
   assert.deepEqual(Object.values(L.rodBars(RODS22[9])).map((v) => +v.toFixed(3)), [1, 1, 1], 'у лучшей удочки полоски полные');
-  assert.ok(REELS22.length === 7 && LINES22.length === 7 && HOOKS22.length === 6 && FLOATS22.length === 6 && BAGS22.length === 7 && LURES22.length === 7 && BAITS22.length === 10 && EXTRAS22.length === 7);
+  assert.ok(REELS22.length === 7 && LINES22.length === 7 && HOOKS22.length === 6 && FLOATS22.length === 6 && BAGS22.length === 7 && LURES22.length === 7 && BAITS22.length === 10 && EXTRAS22.length === 8);
   // у каждого предмета — название, описание и своё имя в общем списке
   const ids = new Set();
   for (const it of Object.values(ITEMS)) { assert.ok(it.name && it.desc && !ids.has(it.id), it.id); ids.add(it.id); }
@@ -1111,12 +1115,12 @@ test('звания после двадцатого уровня и мастер�
   assert.deepEqual([1, 2, 3, 15, 19, 20, 24, 25, 30, 40, 50, 70, 99].map((l) => L.titleOf(l)), ['Новичок', 'Новичок', 'Любитель', 'Морской волк', 'Морской волк', 'Легенда бухты', 'Легенда бухты', 'Гроза глубин', 'Хозяин вод', 'Повелитель приливов', 'Морской царь', 'Живая легенда', 'Живая легенда']);
   const p = L.newProfile();
   assert.deepEqual(p.mastery, {});
-  assert.deepEqual([L.mastery(p, 'lake').stars, L.mastery(p, 'lake').of, L.mastery(p, 'bay').of], [0, 14, 25]);
-  assert.match(L.mastery(p, 'lake').next, /откройте ещё 7 видов/);
+  assert.deepEqual([L.mastery(p, 'lake').stars, L.mastery(p, 'lake').of, L.mastery(p, 'bay').of], [0, 15, 26]);
+  assert.match(L.mastery(p, 'lake').next, /откройте ещё 8 видов/);
   assert.deepEqual(L.claimMastery(p), []);
   // половина видов озера — первая звезда
   const lake = fishOf('lake');
-  for (const f of lake.slice(0, 7)) p.journal[f.id] = { n: 1, best: f.w[0] };
+  for (const f of lake.slice(0, 8)) p.journal[f.id] = { n: 1, best: f.w[0] };
   assert.equal(L.mastery(p, 'lake').stars, 1);
   const c0 = p.coins;
   assert.deepEqual(L.claimMastery(p), [{ loc: 'lake', stars: 1, coins: L.MASTERY_PRIZE[1] }]);
@@ -1125,7 +1129,7 @@ test('звания после двадцатого уровня и мастер�
   // все виды — вторая; крупный экземпляр каждого — третья. Сразу две звезды — две награды
   for (const f of lake) p.journal[f.id] = { n: 2, best: f.w[0] + (f.w[1] - f.w[0]) * 0.59 };
   assert.equal(L.mastery(p, 'lake').stars, 2);
-  assert.match(L.mastery(p, 'lake').next, /крупный экземпляр каждого вида — осталось 14/);
+  assert.match(L.mastery(p, 'lake').next, /крупный экземпляр каждого вида — осталось 15/);
   for (const f of lake) p.journal[f.id].best = f.w[0] + (f.w[1] - f.w[0]) * 0.6;
   assert.equal(L.mastery(p, 'lake').stars, 3);
   const got = L.claimMastery(p);
@@ -1138,4 +1142,55 @@ test('звания после двадцатого уровня и мастер�
   const old = L.fixProfile({ ...L.newProfile(), mastery: undefined, journal: Object.fromEntries(fishOf('bay').slice(0, 13).map((f) => [f.id, { n: 1, best: f.w[0] }])) });
   assert.deepEqual(old.mastery, {});
   assert.deepEqual(L.claimMastery(old).map((m) => [m.loc, m.stars]), [['bay', 1]]);
+});
+
+test('гиганты: только на морскую удочку, у борта одно «второе дыхание», в подсак не влезают — берут багром', () => {
+  const p = L.newProfile();
+  const light = L.kitStats(p);
+  // на лёгкую снасть гигант не клюёт даже там, где живёт
+  const sea = { zone: 'sea', depth: 20, pier: false, hot: false };
+  assert.ok(!L.speciesWeights(sea, 'squid', 12, 'bay', light).some((e) => e.f.giant));
+  p.equip.rod = 'rod8';
+  p.owned.rod8 = 1;
+  p.owned.bignet = 1;
+  const heavy = L.kitStats(p);
+  assert.ok(heavy.heavy && !heavy.gaff && heavy.gaffAt === 1);
+  assert.ok(L.speciesWeights(sea, 'squid', 12, 'bay', heavy).some((e) => e.f.id === 'mako'));
+  const giants = FISH.filter((f) => f.giant);
+  assert.deepEqual(giants.map((f) => f.id).sort(), ['mako', 'osetr', 'rifakula']);
+  for (const f of giants) assert.ok(f.rar >= 3 && f.w[1] >= 90 && f.minDepth >= 5, f.id);
+  // большой подсак гиганту не помогает: без багра — до конца пути; с багром — с 90 %
+  const s = L.fightInit({ sp: 'mako', w: 200 }, heavy, half);
+  assert.ok(s.giant && s.boss === 1 && s.bossMax === 1);
+  assert.equal(L.landAtOf(s, heavy), 1);
+  p.owned.gaff = 1;
+  const withGaff = L.kitStats(p);
+  assert.equal(L.landAtOf(s, withGaff), L.GAFF_AT);
+  assert.equal(L.landAtOf(L.fightInit({ sp: 'okun', w: 1 }, withGaff, half), withGaff), 0.75, 'обычную рыбу по-прежнему берут подсаком');
+  // друг берёт гиганта багром позже, чем рыбу подсаком
+  assert.equal(L.assistAt(s), L.ASSIST_GIANT);
+  assert.ok(L.ASSIST_GIANT > L.ASSIST_AT);
+  s.p = 0.75;
+  s.boss = 0;
+  assert.equal(L.assistBlock(s), 'early');
+  s.p = L.ASSIST_GIANT;
+  assert.equal(L.assistBlock(s), '');
+  // у борта без багра гигант подаётся медленнее, чем с багром
+  const pull = (kit) => {
+    const t = L.fightInit({ sp: 'mako', w: 200 }, kit, half);
+    t.boss = 0;
+    t.p = 0.92;
+    t.T = 0.5;
+    t.phase = 'calm';
+    t.phaseT = 99;
+    t.next = 'calm';
+    const p0 = t.p;
+    L.fightStep(t, { reel: true, steer: 0 }, 0.1, { ...kit, landAt: 1, gaffAt: 1 }, half);
+    return t.p - p0;
+  };
+  assert.ok(pull(heavy) < pull(withGaff) * 0.6, `${pull(heavy)} < ${pull(withGaff)}`);
+  // бой с гигантом дольше, чем с обычной рыбой той же силы
+  const tuna = L.fightInit({ sp: 'tunec', w: 60 }, heavy, half);
+  const mako = L.fightInit({ sp: 'mako', w: 60 }, heavy, half);
+  assert.ok(mako.stamina > tuna.stamina);
 });

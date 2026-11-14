@@ -6,7 +6,7 @@ import { loadManifest, loadHero, heroes, fpLook, heroEye, heroRim } from './hero
 import { loadModel, loadModels, modelInfo, modelReady, setWarmer } from './models.js';
 import { setEnvLight } from './env.js';
 import { adopt, buildFish, warmFish } from './fish3d.js';
-import { modelShot, faceShot } from './icons.js';
+import { modelShot, faceShot, fishIcon } from './icons.js';
 import { World, drawMinimap, SEA_VIEW } from './world.js';
 import { Character, VENDOR_PUPPET } from './character.js';
 import { buildRod, itemModel } from './gear3d.js';
@@ -33,7 +33,7 @@ import {
   marketState, hashStr, buy, equip, sell, kitStats, levelInfo, tackleCount, fishValue, newProfile, speciesWeights,
   weatherAt, WEATHER, syncQuests, questEvent, questText, questDay, claimMastery,
   TOURS, TOUR_COUNTDOWN, tourBlank, tourAdd, tourTable, tourPrize, tourMedal, medalPrize, tourScoreText, MEDALS,
-  owns, assistBlock, fightAssist, recordAssist, assistXp, ASSIST_AT, ASSIST_REACH, exportSave, importSave
+  owns, assistBlock, fightAssist, recordAssist, assistXp, ASSIST_AT, ASSIST_GIANT, ASSIST_REACH, exportSave, importSave
 } from '../shared/logic.js';
 import { $, esc, clamp, damp, angDiff, isTouch } from './util.js';
 import { Perf, isSoftware, newTuner, tuneStep, longShare, pickQuality, scaleFor, TARGET_MS, yieldNow } from './perf.js';
@@ -236,6 +236,7 @@ class Game {
     };
     /** Снимок модели в картинку — им пользуются tools/bake-icons.cjs и проверочные листы. */
     this.modelShot = (id, view) => loadModel(id).then((t) => modelShot(t, view));
+    this.fishShot = (sp) => fishIcon(sp); // значок рыбы — для проверок и листов (tools, test)
     /** Портрет героя — для tools/bake-icons.cjs --faces. */
     this.faceShot = (id) => loadHero(id).then(() => faceShot({ hero: id }));
     heroes.onLoad = () => {
@@ -1374,8 +1375,10 @@ class Game {
       case 'hook': {
         this.fauna.baitTaken();
         ui.alert(null);
-        this.hookText = d.boss ? 'ЛЕГЕНДА НА КРЮЧКЕ!' : 'НА КРЮЧКЕ!';
+        this.hookText = d.legend ? 'ЛЕГЕНДА НА КРЮЧКЕ!' : d.giant ? 'ГИГАНТ НА КРЮЧКЕ!' : 'НА КРЮЧКЕ!';
         ui.banner(this.hookText);
+        // гиганта в подсак не взять: без багра его вываживают до самого конца
+        if (d.giant) ui.toast(this.fishing.kit.gaff ? 'Гигант! У борта он соберётся с силами — с 90 % пути берите багром.' : 'Гигант! В подсак он не влезет, а багра нет — вываживайте до конца.', '', 4200);
         a.hook();
         this.rumble(120, 0.6);
         this.stopTime(0.07, 0.04);
@@ -1435,7 +1438,7 @@ class Game {
         ui.banner(null);
         a.strain(-1);
         a.catch(f ? f.rar : 0);
-        if (f) a.landed(this.fishing.kit.net);
+        if (f) a.landed(this.fishing.kit.net && !f.giant);
         ui.catchCard(d);
         this.rumble(300, 0.5);
         this.stopTime(0.26, 0.45);
@@ -1590,7 +1593,10 @@ class Game {
     }
     if (!best) return null;
     const k = clamp(Number(best.st[S.K]) || 0, 0, 1);
-    return { p: best, k, ready: k >= ASSIST_AT };
+    // на леске гигант: его берут багром и позже
+    const giant = ((best.st[S.FLAGS] | 0) & FLAG.giant) !== 0;
+    const at = giant ? ASSIST_GIANT : ASSIST_AT;
+    return { p: best, k, ready: k >= at, at, giant };
   }
   /** Мы подсачиваем рыбу друга: просим его игру отдать улов (решает она — рыба на его леске). */
   assist(p) {
@@ -1823,7 +1829,9 @@ class Game {
     if (help) {
       // друг рядом вываживает рыбу: с 70 % пути её можно взять подсаком — это важнее причала и лавки
       const nm = help.p.card.name.toUpperCase();
-      act = help.ready ? { text: `ПОДСАЧИТЬ РЫБУ — ${nm}`, short: 'ПОДСАК', run: () => this.assist(help.p) } : { text: `ПОДСАК НАГОТОВЕ: РЫБА ${nm} ПОДОЙДЁТ — БЕРИТЕ (${Math.round(help.k * 100)} % ИЗ ${Math.round(ASSIST_AT * 100)})`, short: '', run: () => {} };
+      act = help.ready
+        ? { text: help.giant ? `ВЗЯТЬ ГИГАНТА БАГРОМ — ${nm}` : `ПОДСАЧИТЬ РЫБУ — ${nm}`, short: help.giant ? 'БАГОР' : 'ПОДСАК', run: () => this.assist(help.p) }
+        : { text: `${help.giant ? 'БАГОР' : 'ПОДСАК'} НАГОТОВЕ: РЫБА ${nm} ПОДОЙДЁТ — БЕРИТЕ (${Math.round(help.k * 100)} % ИЗ ${Math.round(help.at * 100)})`, short: '', run: () => {} };
     } else if (!f.lineOut && f.state !== 'charge') {
       // друг сидит в своей лодке у настила и ждёт — садимся к нему (свою лодку берут у прилавка будки или когда он отойдёт)
       const rt = ride || boat.active ? null : this.rideTarget(true);
@@ -2250,7 +2258,7 @@ class Game {
           this.helperNear = near;
           if (near && this.helpFight !== f.fight && !f.fight.junk) {
             this.helpFight = f.fight;
-            ui.toast(`${near.card.name} рядом — с ${Math.round(ASSIST_AT * 100)} % пути возьмёт рыбу подсаком`, '', 3200);
+            ui.toast(f.fight.giant ? `${near.card.name} рядом — с ${Math.round(ASSIST_GIANT * 100)} % пути возьмёт гиганта багром` : `${near.card.name} рядом — с ${Math.round(ASSIST_AT * 100)} % пути возьмёт рыбу подсаком`, '', 3200);
           }
         }
       } else this.helperNear = null;

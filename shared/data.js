@@ -123,6 +123,12 @@ export const FISH = [
     { shape: 'grouper', back: '#4a3a2a', side: '#8a6f4f', belly: '#d9c9a8', fin: '#5a4532', pat: 'marble', patC: '#cdb890', lenK: 31 },
     'Старожил арки. Смотрители маяка рассказывают о нём уже сорок лет — а кто-то видел его в трюме затонувшего корабля.'),
 
+  // ── гиганты: берут только на морскую (тяжёлую) удочку, в подсак не влезают — их берут багром (logic.js, GAFF_AT) ──
+  fish('mako', 'Акула-мако', 3, 60, 480, 9000, 2.4, { sea: 1.1, wreck: 0.5 }, { live: 1.6, squid: 1.8 }, 1.7, { dawn: 1.2, dusk: 1.3 },
+    { shape: 'shark', back: '#24477f', side: '#557bb0', belly: '#eef2f6', fin: '#1f3d6c', pat: 'none', lenK: 50 },
+    'Самая быстрая из акул: в свече взлетает над водой на высоту мачты. Заходит из открытого моря к затонувшему кораблю — на лёгкую снасть даже не смотрит.',
+    { giant: true, minDepth: 12, at: { keys: { sea: 0.6 } } }),
+
   // ── Сосновое озеро ──
   fish('ersh', 'Ёрш', 0, 0.02, 0.2, 8, 0.6, {}, { worm: 1.5, maggot: 1.3, bread: 0.6 }, 0, { night: 1.2 },
     { shape: 'std', back: '#5d5a3a', side: '#a79c62', belly: '#ece6c4', fin: '#7f7a4c', pat: 'dots', patC: '#2d2a18', lenK: 30, bigEye: true },
@@ -148,6 +154,10 @@ export const FISH = [
     { shape: 'std', back: '#c98a1c', side: '#f2c544', belly: '#fff0b8', fin: '#e0661c', pat: 'dots', patC: '#7a3a10', band: '#e8502a', lenK: 38 },
     'Легенда Соснового озера. Говорят, на рассвете она поднимается к самой струе водопада — и сияет, как монета.',
     { at: { lake: { falls: 1.3 } } }),
+  fish('osetr', 'Осётр-великан', 3, 12, 160, 4800, 2.1, {}, { worm: 1.3, bloodworm: 1.4, live: 1.1 }, 0.3, { night: 1.4, dawn: 1.2, day: 0.7 },
+    { shape: 'sturgeon', back: '#4b4e45', side: '#87877a', belly: '#ebe5cf', fin: '#54564b', pat: 'none', patC: '#dcd6bd', lenK: 52 },
+    'Древняя рыба в костяных щитках, старше самого озера. Лежит на дне ямы, ночью берёт червя — и тащит лодку за собой, как буксир.',
+    { at: { lake: { pit: 1.3, deep: 0.6 } }, giant: true, minDepth: 8 }),
 
   // ── Коралловые островки ──
   fish('klown', 'Рыба-клоун', 0, 0.02, 0.14, 30, 0.5, {}, { bloodworm: 1.5, shrimp: 1.3, maggot: 1.2, bread: 0.8 }, 0, null,
@@ -197,7 +207,11 @@ export const FISH = [
   fish('imperator', 'Императорский ангел', 4, 0.4, 3.2, 5000, 1.4, {}, { shrimp: 1.5, bloodworm: 1.4, crab: 1.2 }, 0, { dawn: 1.9, dusk: 1.2 },
     { shape: 'disc', back: '#16306a', side: '#1f4fb0', belly: '#f2c81e', fin: '#f2c81e', pat: 'lines', patC: '#f5d21e', lenK: 27 },
     'Легенда островков: синий, в золотых струнах. Говорят, на рассвете он обходит свой коралловый сад — и берёт у того, кто пришёл раньше солнца.',
-    { at: { keys: { garden: 1.3, arch: 0.6 } } })
+    { at: { keys: { garden: 1.3, arch: 0.6 } } }),
+  fish('rifakula', 'Рифовая акула', 3, 15, 95, 3600, 2.0, {}, { live: 1.6, squid: 1.6, crab: 1.3, shrimp: 0.6 }, 1.3, { dusk: 1.4, night: 1.3, day: 0.8 },
+    { shape: 'shark', back: '#5f6b70', side: '#8d989c', belly: '#f1f3f2', fin: '#2a3034', pat: 'none', lenK: 47 },
+    'Серая, с чёрными кончиками плавников. Патрулирует край рифа, а к вечеру заходит в протоки — за всем, что трепещет на крючке.',
+    { at: { keys: { edge: 1.4, channel: 0.5, sea: 0.6 } }, giant: true, minDepth: 5 })
 ];
 // рыба бухты, которая живёт и в озере: свои места там
 const AT_LAKE = {
@@ -258,7 +272,8 @@ const STYLE_OF = {
   mech: 'jumper', koi: 'snag', starik: 'bulldog',
   ersh: 'thrash', harius: 'jumper', sig: 'plain', nalim: 'snag', taimen: 'runner', zolforel: 'jumper',
   klown: 'thrash', serzhant: 'plain', babochka: 'plain', hirurg: 'thrash', popugai: 'bulldog', lucian: 'runner', krylatka: 'thrash',
-  barrakuda: 'jumper', karanks: 'runner', murena: 'snag', napoleon: 'bulldog', imperator: 'snag'
+  barrakuda: 'jumper', karanks: 'runner', murena: 'snag', napoleon: 'bulldog', imperator: 'snag',
+  mako: 'jumper', osetr: 'bulldog', rifakula: 'runner'
 };
 for (const f of FISH) f.style = STYLE_OF[f.id] || 'plain';
 
@@ -364,7 +379,8 @@ export const EXTRAS = [
   { id: 'lantern', name: 'Фонарь рыбака', price: 12000, desc: 'Свет приманивает рыбу: ночью клюёт на 20% чаще. Складывается со светящимся поплавком.' },
   { id: 'sonar2', name: 'Эхолот-профи', price: 28000, desc: 'Всё, что умеет эхолот, и главное — у точки заброса видно, кто здесь сейчас клюёт.' },
   { id: 'belt', name: 'Пояс рыболова', price: 35000, desc: 'Упор для удилища: натяжение растёт плавнее, рывки переносить легче.' },
-  { id: 'bignet', name: 'Большой подсак', price: 60000, desc: 'Рыбу можно брать, когда вываживание дошло до 75% (обычный подсачек — с 85%).' }
+  { id: 'bignet', name: 'Большой подсак', price: 60000, desc: 'Рыбу можно брать, когда вываживание дошло до 75% (обычный подсачек — с 85%).' },
+  { id: 'gaff', name: 'Багор', price: 25000, desc: 'Гиганта в подсак не взять. С багром его берут у борта, когда вываживание дошло до 90%, — без багра тянут до конца.' }
 ];
 
 export const CATS = [

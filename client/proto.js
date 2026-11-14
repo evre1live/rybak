@@ -4,7 +4,7 @@ export const S = { X: 0, Y: 1, Z: 2, YAW: 3, PITCH: 4, SPEED: 5, FS: 6, BX: 7, B
 // RIDE: в чьей лодке игрок сидит пассажиром (номер игрока-хозяина; 0 — ни в чьей), SEAT — на каком месте (1 или 2)
 export const FS = { idle: 0, charge: 1, cast: 2, wait: 3, bite: 4, fight: 5, landed: 6 };
 export const FS_NAME = ['hold', 'charge', 'cast', 'wait', 'wait', 'fight', 'landed'];
-export const FLAG = { sit: 1, reel: 2, dangle: 4, lure: 8, own: 16 }; // own — лодка у игрока своя, а не прокатная (вымпел его цвета)
+export const FLAG = { sit: 1, reel: 2, dangle: 4, lure: 8, own: 16, giant: 32 }; // own — лодка у игрока своя, а не прокатная (вымпел его цвета); giant — на леске гигант (друг берёт его багром и позже)
 // метки игроков на карте и в списке: форма и цвет по номеру места
 export const MARKS = [
   { shape: 'circle', color: '#3fe3d5' }, { shape: 'diamond', color: '#ff5fa8' }, { shape: 'tri', color: '#b79cff' }, { shape: 'square', color: '#ffd166' },

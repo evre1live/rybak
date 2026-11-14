@@ -11,7 +11,7 @@ import { Scatter, spot01 } from './scatter.js';
 import { patchModel } from './surface.js';
 import { small } from './smalls.js';
 import { canvasTex, isTouch, TAU } from './util.js';
-import { BOXES, CIRCLES, DECK_Y, groundH, HAS } from './terrain.js';
+import { BOXES, CIRCLES, DECK_Y, groundH, HAS, deckAt } from './terrain.js';
 import { kitSwap, splitItems, stoneTint, stoneSat, kitSingle } from './kit.js';
 import { LOC_ID } from './loc/id.js';
 
@@ -433,13 +433,16 @@ export function upgradeEnv(scene) {
     if (has('env-fender'))
       loadModel('env-fender').then((tpl) => {
         const s = 1.05;
+        // места — по причалам бухты; на других локациях дальних причалов нет: шина висит, только если рядом настил
+        const nearDeck = (x, z) => [[0.8, 0], [-0.8, 0], [0, 0.8], [0, -0.8]].some(([dx, dz]) => deckAt(x + dx, z + dz));
         for (const [x, z, ry] of [[1.76, -10.9, Math.PI / 2], [1.76, -13.3, Math.PI / 2], [-17.1, -69.86, 0], [-18.6, -69.86, 0], [211.0, -185.36, 0], [212.4, -185.36, 0]]) {
+          if (!nearDeck(x, z)) continue;
           put(scene, tpl, { x, y: DECK_Y + 0.1 - s * 0.988, z, s, ry }, 1.05);
           state.singles++;
         }
       }, fail);
-    // ── скамейка на причале у маяка ──
-    if (has('env-bench'))
+    // ── скамейка на причале у маяка (только там, где этот причал есть) ──
+    if (has('env-bench') && deckAt(-17.8, -78.0))
       loadModel('env-bench').then((tpl) => {
         put(scene, tpl, { x: -17.8, y: DECK_Y, z: -78.0, s: 1.62, ry: Math.PI }, 1.62);
         CIRCLES.push({ x: -17.8, z: -78.0, r: 0.65 });

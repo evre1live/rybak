@@ -142,7 +142,7 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
   assert.ok(await G(page, () => { const d = document.querySelector('.detail'); return d.querySelector('h2').getBoundingClientRect().right <= d.getBoundingClientRect().right + 1; }), '«Повелитель приливов» не обрезан');
   await shot(page, '03b-tackle-rods');
   await page.click('.tabs2 [data-id="extra"]');
-  assert.deepEqual(await page.$$eval('.grid .tile', (els) => els.map((e) => e.dataset.id)), ['net', 'sonar', 'boat', 'lantern', 'sonar2', 'belt', 'bignet']);
+  assert.deepEqual(await page.$$eval('.grid .tile', (els) => els.map((e) => e.dataset.id)), ['net', 'sonar', 'boat', 'lantern', 'sonar2', 'belt', 'bignet', 'gaff']);
   await page.click('.tabs2 [data-id="tackle"]');
   assert.equal(await page.locator('.grid .tile').count(), 10);
   assert.ok(await G(page, () => [...document.querySelectorAll('.grid .tile img')].every((i) => i.complete && i.naturalWidth > 0)), 'значки новых наживок нарисованы');
@@ -771,7 +771,8 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
       await G(mp, () => RYBAK.saveLook({ hero: 'hero-pip' }));
       // значки из готовых моделей — обычные картинки, которые действительно загружаются
       await G(mp, () => RYBAK.ui.openPanel('journal'));
-      await mp.waitForFunction(() => { const im = [...document.querySelectorAll('.tile img')]; return im.length >= 25 && im.every((i) => /models\/icons\/fish-.*\.webp$/.test(i.getAttribute('src')) && i.complete && i.naturalWidth > 0); }, null, { timeout: 60000 });
+      // у рыбы без готовой модели (гиганты этапа 24) значок рисуется кодом — картинкой data:
+      await mp.waitForFunction(() => { const im = [...document.querySelectorAll('.tile img')]; const baked = im.filter((i) => /models\/icons\/fish-.*\.webp$/.test(i.getAttribute('src'))); return baked.length >= 25 && im.every((i) => (baked.includes(i) || i.getAttribute('src').startsWith('data:image/')) && i.complete && i.naturalWidth > 0); }, null, { timeout: 60000 });
       await shot(mp, '23-model-journal', 300);
       // модели локации: лес, пальмы, камни, маяк, будка проката, фонари, чайки — встали на место нарисованных кодом
       await G(mp, () => RYBAK.ui.closePanel());
