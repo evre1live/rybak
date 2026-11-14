@@ -1467,10 +1467,12 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
         shown = Math.max(shown, D.state(T).shown);
         for (let i = 0; i < 4; i++) { const q = D.poseAt(i, T); top = Math.max(top, q.y); low = Math.min(low, q.y); }
       }
+      // прыжки считаем сразу: пока страница ждёт ниже, игра сама двигает дельфинов, и новый прыжок уже не услышан
+      const leaps = D.state(0).leaps - leaps0;
       D.onLeap = keep;
       const areas = [g.areaAt(96 + 30, -348), g.areaAt(338, 22 + 40), g.areaAt(-262 + 20, -52), g.areaAt(300, -300), g.areaAt(-2, -30)];
       await w(200);
-      return { names, flock, dol: { n: D.state(0).n, shown, leaps: D.state(0).leaps - leaps0, heard, top, low }, areas };
+      return { names, flock, dol: { n: D.state(0).n, shown, leaps, heard, top, low }, areas };
     });
     assert.ok(sea.names.every((n) => n > 0) && sea.names[3] === 7, `дальние острова с лесом и дельфины стоят в сцене: ${JSON.stringify(sea.names)}`);
     // косяк ходит по морю и может оказаться у шхер (там место называется по камню, а не «открытое море») — важно, что он не в бухте

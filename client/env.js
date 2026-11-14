@@ -48,7 +48,16 @@ for (const m of MATS) {
   m.envMap = tex;
   m.envMapIntensity = 1;
 }
+let envK = 1;
 /** Сила отражений по времени суток: днём 1, ночью почти нет. */
 export function setEnvLight(k) {
-  for (const m of MATS) m.envMapIntensity = k;
+  envK = k;
+  for (const m of MATS) m.envMapIntensity = k * (m.userData.envBase ?? 1);
+}
+/** Отражение неба на материал готовой модели (снасти): base — его сила днём. */
+export function addEnvMat(m, base = 1) {
+  m.envMap = tex;
+  m.userData.envBase = base;
+  m.envMapIntensity = envK * base;
+  MATS.push(m);
 }

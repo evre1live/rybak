@@ -2,13 +2,29 @@
 import * as THREE from 'three';
 import { ITEMS, RODS, FLOATS, LINES, REELS } from '../shared/data.js';
 import { Batch, M, G, BATCH_MAT, BATCH_MAT_2S } from './batch.js';
-import { METAL_MAT, GLOSS_MAT, RING_MAT } from './env.js';
+import { METAL_MAT, GLOSS_MAT, RING_MAT, addEnvMat } from './env.js';
 import { loft, tube } from './shapes.js';
 import { shade, mat, canvasTex } from './util.js';
+import { ROD_SPEC } from './rodspec.js';
+import { mountRodModels, mountBobModel } from './gearmodels.js';
 
 const METAL = '#3b424c';
 export const ROD_LEN = 1.98;
 const SEGS = 10;
+// Пропускные кольца удочек — как на картинках рынка: цвет лапок и колец, ролики у тяжёлых морских.
+// 'ring' — общий хром колец (RING_MAT).
+const GUIDES = {
+  rod1: { frame: '#9aa3ad', ring: 'ring' },
+  rod2: { frame: '#2b3038', ring: '#8c96a3' },
+  rod3: { frame: '#2b3038', ring: '#8c96a3' },
+  rod4: { frame: '#cfd6de', ring: 'ring' },
+  rod5: { frame: '#2b3038', ring: '#a7b0bb' },
+  rod6: { frame: '#d4a73a', ring: '#f2cf63' },
+  rod7: { frame: '#1f2937', ring: '#67e8f9', insert: true, glow: true },
+  rod8: { frame: '#cfd6de', ring: 'ring', roller: true },
+  rod9: { frame: '#d4a73a', ring: '#f2cf63', roller: true },
+  rod10: { frame: '#d4a73a', ring: '#fff1c2' }
+};
 
 /**
  * Удочка. Ось +Y — к кончику, катушка висит со стороны +Z, начало координат — у катушкодержателя (там её держит правая рука).
@@ -21,10 +37,11 @@ export function buildRod(rodId, reelId = 'reel1', lineId = 'line1', handleSide =
   const [cBlank, cAccent, cGrip, cReel] = rod.col;
   const reelCol = reel.id === 'reel1' ? cReel : reel.col;
   const group = new THREE.Group();
-  const B = new Batch();
   const hs = handleSide;
-  const Bg = new Batch(); // глянец: корпус и шпуля
-  const Bm = new Batch(); // хром
+  // рукоять из кода (запасная, пока не пришла модель): матовое, глянец, хром
+  let B = new Batch();
+  let Bg = new Batch();
+  let Bm = new Batch();
   const CHROME = '#dfe5ee';
   // ── рукоять: торец, задняя ручка с цветными кольцами, катушкодержатель с гайками, передняя ручка ──
   B.add(G.cyl(14), cAccent, M(0, -0.285, 0, 0.046, 0.04, 0.046));
@@ -37,6 +54,13 @@ export function buildRod(rodId, reelId = 'reel1', lineId = 'line1', handleSide =
   B.add(G.cyl(14), cAccent, M(0, 0.112, 0, 0.041, 0.022, 0.041));
   B.add(loft([[0.12, 0.017, 0.017], [0.2, 0.0165, 0.0165], [0.245, 0.0128, 0.0128]], 14), cGrip, M(0, 0, 0), { mat: 5 });
   B.add(G.cyl(14), cAccent, M(0, 0.252, 0, 0.031, 0.016, 0.031));
+  const handleProc = new THREE.Group();
+  handleProc.add(B.build(BATCH_MAT, false), Bg.build(GLOSS_MAT, false), Bm.build(METAL_MAT, false));
+  group.add(handleProc);
+  // катушка из кода — тоже запасная: её место займёт модель катушки (gearmodels.js)
+  B = new Batch();
+  Bg = new Batch();
+  Bm = new Batch();
   // ── катушка: крупная, как на макете. Ось шпули параллельна удилищу и висит под ним (со стороны +Z) ──
   const RZ = 0.108;
   // лапка под гайками катушкодержателя и ножка
@@ -61,7 +85,9 @@ export function buildRod(rodId, reelId = 'reel1', lineId = 'line1', handleSide =
   Bm.add(G.cyl(8), '#f2c94c', M(0.046, 0.157, RZ + 0.004, 0.014, 0.014, 0.014, Math.PI / 2, 0, 0));
   // вал ручки
   Bm.add(G.cyl(10), CHROME, M(hs * 0.034, 0.036, RZ, 0.016, 0.028, 0.016, 0, 0, Math.PI / 2));
-  group.add(B.build(BATCH_MAT, false), Bg.build(GLOSS_MAT, false), Bm.build(METAL_MAT, false));
+  const reelProc = new THREE.Group();
+  reelProc.add(B.build(BATCH_MAT, false), Bg.build(GLOSS_MAT, false), Bm.build(METAL_MAT, false));
+  group.add(reelProc);
   // ручка катушки — отдельно, она крутится: рычаг и крупная ручка-«грибок»
   const handle = new THREE.Group();
   handle.position.set(hs * 0.05, 0.036, RZ);
@@ -73,52 +99,148 @@ export function buildRod(rodId, reelId = 'reel1', lineId = 'line1', handleSide =
   hm.add(G.cyl(8), CHROME, M(hs * 0.012, KNOB.y, 0, 0.009, 0.024, 0.009, 0, 0, Math.PI / 2));
   hb.add(G.sph(14, 10), shade(cGrip, -0.1), M(KNOB.x, KNOB.y, 0, 0.05, 0.034, 0.034), { mat: 5 });
   hb.add(G.cyl(10), cAccent, M(hs * 0.019, KNOB.y, 0, 0.022, 0.006, 0.022, 0, 0, Math.PI / 2));
-  handle.add(hb.build(BATCH_MAT, false), hm.build(METAL_MAT, false));
+  const handleKnob = new THREE.Group(); // рычаг и ручка из кода: модель катушки приносит свои
+  handleKnob.add(hb.build(BATCH_MAT, false), hm.build(METAL_MAT, false));
+  handle.add(handleKnob);
   group.add(handle);
-  // бланк из сегментов: каждый следующий чуть наклоняется — так удочка гнётся
-  const segs = [];
-  const total = ROD_LEN - 0.26;
+  // бланк из сегментов: каждый следующий чуть наклоняется — так удочка гнётся. Толщина, длина и кольца — по картинке
+  // удочки (rodspec.js); бланк начинается внутри передней ручки, чтобы между ним и рукоятью не было щели
+  const spec = ROD_SPEC[rod.id] || null;
+  const Y0 = 0.24;
+  const tipY = spec ? spec.tip : ROD_LEN;
+  const total = tipY - Y0;
   const sl = total / SEGS;
+  const segs = [];
   let parent = group;
-  const blankMat = mat(cBlank, 0.45, 0.1);
+  const blankMat = mat(spec ? spec.blank : cBlank, 0.4, 0.15);
   const accentMat = mat(cAccent, 0.5, 0.1);
-  const metalMat = RING_MAT;
+  const gs = GUIDES[rod.id] || GUIDES.rod1;
+  // металл колец и лапок отражает небо, как хром катушки из кода (без отражения он выходит чёрным)
+  const shiny = (m) => (m.userData.envBase === undefined && addEnvMat(m, 1), m);
+  const frameMat = gs.frame === 'ring' ? RING_MAT : shiny(mat(gs.frame, 0.3, 0.85));
+  const ringMat = gs.ring === 'ring' ? RING_MAT : gs.glow ? mat(gs.ring, 0.22, 0.2, { emissive: gs.ring, emissiveIntensity: 0.5 }) : shiny(mat(gs.ring, 0.22, 0.9));
+  const end = spec ? spec.end : 0.26;
+  const R0 = spec ? spec.r0 : 0.0105;
+  const R1 = spec ? spec.r1 : 0.0022;
+  /** радиус бланка на высоте y (у рукояти — R0, у кончика — R1) */
+  const radAt = (y) => R0 + (R1 - R0) * Math.min(1, Math.max(0, (y - end) / (tipY - end)));
+  const blankR = (u) => radAt(Y0 + u * total);
   for (let i = 0; i < SEGS; i++) {
     const s = new THREE.Group();
-    s.position.y = i ? sl : 0.26;
+    s.position.y = i ? sl : Y0;
     parent.add(s);
-    const r0 = 0.0105 - (0.0083 * i) / SEGS;
-    const r1 = 0.0105 - (0.0083 * (i + 1)) / SEGS;
-    const m = new THREE.Mesh(new THREE.CylinderGeometry(r1, r0, sl, 7), blankMat);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(blankR((i + 1) / SEGS), blankR(i / SEGS), sl, 9), blankMat);
     m.position.y = sl / 2;
     s.add(m);
-    if (i % 2 === 1 || i === SEGS - 1) {
-      // пропускное кольцо и цветная обмотка
-      const gr = 0.017 - i * 0.0012;
-      const ring = new THREE.Mesh(G.torus(0.22, 10), metalMat);
-      ring.scale.setScalar(gr * 2);
-      ring.position.set(0, sl, r1 + gr);
-      ring.rotation.x = Math.PI / 2;
-      s.add(ring);
-      const wrap = new THREE.Mesh(G.cyl(7), accentMat);
-      wrap.scale.set(r1 * 2.5, 0.03, r1 * 2.5);
-      wrap.position.y = sl - 0.02;
-      s.add(wrap);
-    }
     segs.push(s);
     parent = s;
   }
+  // Пропускные кольца: на лапках под бланком (со стороны катушки), к кончику всё мельче и чаще; у тяжёлых морских — ролики.
+  // В середине каждого кольца — метка: через них идёт леска от катушки к кончику (path()).
+  const guides = [];
+  // [y, радиус кольца, высота лапки вместе с кольцом]; без замеров — прежняя раскладка
+  const GU = spec
+    ? spec.guides
+    : (gs.roller ? [0.17, 0.38, 0.56, 0.71, 0.84, 1] : [0.15, 0.33, 0.49, 0.63, 0.75, 0.86, 1]).map((u, k, U) => {
+        const gr = (gs.roller ? 0.013 : 0.019) - (gs.roller ? 0.006 : 0.0135) * Math.pow(k / (U.length - 1), 0.75);
+        return [Y0 + u * total, gr, gr * 2.85 + 0.004];
+      });
+  GU.forEach(([gy, gr0, depth], k) => {
+    const u = Math.min(1, (gy - Y0) / total);
+    const i = Math.min(SEGS - 1, Math.floor(u * SEGS - 1e-6));
+    const s = segs[i];
+    const y = u * total - i * sl;
+    const r = blankR(u);
+    const tipTop = k === GU.length - 1 && tipY - gy < 0.06;
+    const gr = Math.max(0.004, Math.min(gr0, depth * 0.4));
+    const h = tipTop ? 0.002 : Math.max(0.004, depth - 2 * gr); // высота лапки
+    const cz = r + h + gr;
+    // цветная обмотка на бланке
+    const wrap = new THREE.Mesh(G.cyl(7), accentMat);
+    wrap.scale.set(r * 2.6, tipTop ? 0.012 : 0.026 + gr * 0.6, r * 2.6);
+    wrap.position.y = tipTop ? y - 0.008 : y;
+    s.add(wrap);
+    if (!tipTop) {
+      // лапка: две косые стойки — от обмотки (вдоль бланка врозь) сходятся к кольцу
+      const lw = Math.max(0.0028, gr * 0.16);
+      for (const sy of [-1, 1]) {
+        const leg = new THREE.Mesh(G.box(), frameMat);
+        leg.scale.set(lw, lw, Math.hypot(h, gr * 0.7) + 0.002);
+        leg.position.set(0, y + sy * gr * 0.35, r + h / 2);
+        leg.rotation.x = sy * Math.atan2(gr * 0.7, h);
+        s.add(leg);
+      }
+    }
+    const mark = new THREE.Object3D();
+    if (gs.roller) {
+      // ролик в П-образной рамке: леска бежит по его стороне, обращённой к бланку
+      for (const sx of [-1, 1]) {
+        const cheek = new THREE.Mesh(G.cyl(12), frameMat);
+        cheek.scale.set(gr * 1.7, 0.0028, gr * 1.7);
+        cheek.position.set(sx * gr * 0.6, y, cz);
+        cheek.rotation.z = Math.PI / 2;
+        s.add(cheek);
+      }
+      const roll = new THREE.Mesh(G.cyl(12), ringMat);
+      roll.scale.set(gr * 1.15, gr * 1.1, gr * 1.15);
+      roll.position.set(0, y, cz);
+      roll.rotation.z = Math.PI / 2;
+      s.add(roll);
+      mark.position.set(0, y, cz - gr * 0.62);
+    } else {
+      const ring = new THREE.Mesh(G.torus(0.26, 12), ringMat);
+      ring.scale.setScalar(gr * 2);
+      ring.position.set(0, y, cz);
+      ring.rotation.x = Math.PI / 2;
+      s.add(ring);
+      if (gs.insert) {
+        // вставка кольца другого цвета (у «Полярной звезды» — светящаяся голубая)
+        const ins = new THREE.Mesh(G.torus(0.12, 12), ringMat);
+        ins.scale.setScalar(gr * 1.62);
+        ins.position.copy(ring.position);
+        ins.rotation.x = Math.PI / 2;
+        s.add(ins);
+      }
+      mark.position.set(0, y, cz);
+    }
+    s.add(mark);
+    guides.push(mark);
+    if (tipTop) mark.userData.tipTop = true;
+  });
+  // кончик — середина кольца-тюльпана; если его нет, конец бланка
   const tip = new THREE.Object3D();
-  tip.position.set(0, sl, 0.006);
-  parent.add(tip);
+  const lastG = guides[guides.length - 1];
+  if (lastG && lastG.userData.tipTop) {
+    lastG.parent.add(tip);
+    tip.position.copy(lastG.position);
+  } else {
+    parent.add(tip);
+    tip.position.set(0, sl, 0);
+  }
+  // откуда леска сходит с катушки: ролик лесоукладывателя
+  const lineOut = new THREE.Object3D();
+  lineOut.position.set(0.046, 0.157, RZ + 0.004);
+  group.add(lineOut);
+  const pts = [lineOut, ...guides].map(() => new THREE.Vector3());
   group.traverse((o) => {
     if (o.isMesh) o.receiveShadow = false;
   });
-  return {
+  const out = {
     group, tip, handle, id: rodId,
     /** середина ручки катушки в осях handle — туда ложится левая кисть */
     knob: KNOB,
     handleSide: hs,
+    /** Леска внутри удочки: от катушки через все кольца, в мировых координатах (последняя точка — кольцо на кончике). */
+    path() {
+      lineOut.getWorldPosition(pts[0]);
+      for (let i = 0; i < guides.length; i++) guides[i].getWorldPosition(pts[i + 1]);
+      return pts;
+    },
+    /** Откуда сходит леска: метку переставляет готовая модель катушки. */
+    lineOut,
+    /** части из кода, которые прячутся, когда приходят модели: рукоять, катушка, рычаг с ручкой */
+    parts: { handleProc, reelProc, handleKnob },
+    spec,
     /** b: 0 — прямая, 1 — в дугу; side — увод кончика вбок */
     setBend(b, side = 0) {
       for (let i = 0; i < SEGS; i++) {
@@ -128,6 +250,9 @@ export function buildRod(rodId, reelId = 'reel1', lineId = 'line1', handleSide =
       }
     }
   };
+  // готовые модели рукояти и катушки (Tripo) встают на место частей из кода, когда загрузятся
+  if (hs > 0) mountRodModels(out, rod.id, reel.id);
+  return out;
 }
 
 let netTex = null;
@@ -141,9 +266,17 @@ export function buildNet() {
   const head = new THREE.Group();
   const stem = new THREE.Group();
   g.add(head, stem);
-  const metal = mat('#cfd8e2', 0.32, 0.85);
-  const dark = mat('#1d2733', 0.7, 0.1);
+  // свои материалы: цвета меняются по тому, какой подсак куплен (setStyle — как на картинках рынка)
+  const metal = new THREE.MeshStandardMaterial({ color: '#cfd8e2', roughness: 0.32, metalness: 0.85 });
+  addEnvMat(metal, 1);
+  const dark = new THREE.MeshStandardMaterial({ color: '#1d2733', roughness: 0.7, metalness: 0.1 });
+  const shaftMat = new THREE.MeshStandardMaterial({ color: '#cfd8e2', roughness: 0.4, metalness: 0.2 });
+  const capMat = new THREE.MeshStandardMaterial({ color: '#ffd60a', roughness: 0.5, metalness: 0.1 });
   const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.017, 8, 44), metal);
+  const band = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.0215, 6, 44), dark); // резиновая окантовка обруча
+  band.rotation.x = Math.PI / 2;
+  band.scale.set(1, 1, 0.55);
+  head.add(band);
   hoop.rotation.x = Math.PI / 2;
   head.add(hoop);
   // сетка: ромбическая ячея, между нитями — насквозь
@@ -167,7 +300,8 @@ export function buildNet() {
       },
       { repeat: [9, 3] }
     );
-  const bag = new THREE.Mesh(new THREE.SphereGeometry(0.5, 28, 9, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), new THREE.MeshStandardMaterial({ map: netTex, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.95, metalness: 0 }));
+  const bagMat = new THREE.MeshStandardMaterial({ map: netTex, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.95, metalness: 0 });
+  const bag = new THREE.Mesh(new THREE.SphereGeometry(0.5, 28, 9, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), bagMat);
   bag.scale.y = 0.62;
   head.add(bag);
   // развилка и ручка с резиновой рукоятью (в метрах, от края обруча)
@@ -178,7 +312,7 @@ export function buildNet() {
     strut.rotation.set(Math.PI / 2, 0, sx * 0.72);
     stem.add(strut);
   }
-  const shaft = new THREE.Mesh(G.cyl(10), metal);
+  const shaft = new THREE.Mesh(G.cyl(10), shaftMat);
   shaft.scale.set(0.018, 0.2, 0.018);
   shaft.position.set(0, 0, 0.16);
   shaft.rotation.x = Math.PI / 2;
@@ -186,7 +320,7 @@ export function buildNet() {
   grip.scale.set(0.026, 0.19, 0.026);
   grip.position.set(0, 0, 0.33);
   grip.rotation.x = Math.PI / 2;
-  const cap = new THREE.Mesh(G.cyl(12), mat('#ffd60a', 0.5, 0.1));
+  const cap = new THREE.Mesh(G.cyl(12), capMat);
   cap.scale.set(0.03, 0.014, 0.03);
   cap.position.set(0, 0, 0.432);
   cap.rotation.x = Math.PI / 2;
@@ -202,8 +336,21 @@ export function buildNet() {
       head.scale.setScalar(d);
       stem.position.z = d * 0.5 - 0.012;
     },
-    grip: (d = size) => d * 0.5 + 0.31
+    grip: (d = size) => d * 0.5 + 0.31,
+    /** net — подсачек: алюминиевый обруч, тёмная сетка, деревянная ручка с пробкой; bignet — большой: всё чёрное, синяя сетка */
+    setStyle(id) {
+      const big = id === 'bignet';
+      metal.color.set(big ? '#2b3038' : '#cfd8e2');
+      metal.roughness = big ? 0.45 : 0.32;
+      bagMat.color.set(big ? '#3b5bdb' : '#3a4048');
+      shaftMat.color.set(big ? '#22262c' : '#a8743e');
+      shaftMat.metalness = big ? 0.5 : 0;
+      dark.color.set(big ? '#1b1e22' : '#c9a26b'); // рукоять: чёрная пена / пробка
+      band.material = big ? metal : capMat;
+      capMat.color.set('#1f2329');
+    }
   };
+  net.setStyle('net');
   net.setSize(size);
   return net;
 }
@@ -226,6 +373,7 @@ export function buildFloat(floatId = 'float1') {
     glow.position.y = 0.3;
     g.add(glow);
   }
+  mountBobModel(g, f.id, true);
   return g;
 }
 
@@ -233,6 +381,9 @@ function hook(B, x, y, z, s, ry = 0) {
   const g = tube([[0, 0.5, 0], [0, 0, 0], [0.02, -0.28, 0], [0.16, -0.4, 0], [0.3, -0.26, 0], [0.3, -0.1, 0]], 0.022, 5);
   B.add(g, '#cbd5e1', M(x, y, z, s, s, s, 0, ry, 0));
 }
+/** Приманки, которые лежат вдоль X (нос — к −X): на леске под кончиком висят носом вверх. */
+export const LURE_SIDEWAYS = new Set(['wobbler', 'popper', 'jig']);
+
 export function buildLure(id) {
   const it = ITEMS[id] || ITEMS.spoon;
   const [c1, c2] = it.col || ['#d9dee6', '#ef4444'];
@@ -279,6 +430,7 @@ export function buildLure(id) {
   }
   const g = new THREE.Group();
   g.add(B.build(BATCH_MAT_2S));
+  mountBobModel(g, it.id || id, false);
   return g;
 }
 

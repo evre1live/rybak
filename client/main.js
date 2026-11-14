@@ -321,7 +321,7 @@ class Game {
   // ───── комната ─────
   card() {
     const p = this.profile;
-    return { name: p.name || 'Рыбак', look: p.look, rod: p.equip.rod, line: p.equip.line, fl: isLure(p.equip.tackle) ? p.equip.tackle : p.equip.float, lvl: levelInfo(p.xp).lvl };
+    return { name: p.name || 'Рыбак', look: p.look, rod: p.equip.rod, reel: p.equip.reel, line: p.equip.line, fl: isLure(p.equip.tackle) ? p.equip.tackle : p.equip.float, lvl: levelInfo(p.xp).lvl };
   }
   sendCard() {
     if (!this.solo) this.net.send({ t: 'card', card: this.card() });
@@ -2480,11 +2480,13 @@ class Game {
           // чего на локации нет (маяка на озере), того и не ждём — иначе заставка стояла бы все двенадцать секунд
           // киты и дельфины: их готовые модели встают на место заготовок — тоже до показа, чтобы шейдеры собрались здесь
           const sea = sc.fauna.dolphins.ready && (!sc.fauna.whales || sc.fauna.whales.ready);
-          const got = [e.trees, e.palms, e.rocks, e.lighthouse || !HAS.lighthouse, e.kiosk, e.lamps > 0, !sc.propsState().fallback, sea].filter(Boolean).length;
-          say(0.3 + 0.3 * (got / 8));
+          // снасти в руках (модели рукояти, катушки, поплавка): их шейдеры тоже собираются за заставкой
+          const gear = !(this.vm.rod && this.vm.rod.pending) && !(this.fishing.bob && this.fishing.bob.userData.pending);
+          const got = [e.trees, e.palms, e.rocks, e.lighthouse || !HAS.lighthouse, e.kiosk, e.lamps > 0, !sc.propsState().fallback, sea, gear].filter(Boolean).length;
+          say(0.3 + 0.3 * (got / 9));
           this.bootWaits = i; // сколько раз ждали модели (по 0,1 с) — для проверок
           // модель рыбы для сборки «рыбьих» шейдеров ждём не дольше четырёх секунд: не успела — соберутся в фоне
-          if (got === 8 && (this.warmDone || i >= 40)) break;
+          if (got === 9 && (this.warmDone || i >= 40)) break;
           await wait(100);
         }
         // без видеокарты (программная отрисовка) «высокое» незачем даже собирать

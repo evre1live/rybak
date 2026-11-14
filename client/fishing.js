@@ -5,9 +5,9 @@ import { kitStats, biteDelay, rollFish, speciesWeights, fightInit, fightStep, fi
 import { spotAt } from './terrain.js';
 import { LOC_ID } from './loc/id.js';
 import { waveH } from './water.js';
-import { buildFloat, buildLure } from './gear3d.js';
+import { buildFloat, buildLure, LURE_SIDEWAYS } from './gear3d.js';
 import { buildFish, wiggleFish } from './fish3d.js';
-import { FishLine } from './line.js';
+import { FishLine, Dangle } from './line.js';
 import { HANG_K } from './viewmodel.js';
 import { clamp, damp, lerp, angDiff } from './util.js';
 import { FS, FLAG } from './proto.js';
@@ -22,7 +22,9 @@ export class Fishing {
     Object.assign(this, { scene, camera, vm, fx, schools, profile, hour, emit, wx });
     this.state = 'idle';
     this.kit = kitStats(profile);
-    this.line = new FishLine(scene);
+    this.line = new FishLine(scene, '#e8f4ff', () => this.vm.rod && this.vm.rod.path()); // леска идёт от катушки через кольца
+    this.hanger = new Dangle();
+    this.flying = false;
     this.bob = null;
     this.bobId = null;
     this.fish = null;
@@ -51,7 +53,8 @@ export class Fishing {
     if (id !== this.bobId) {
       if (this.bob) this.scene.remove(this.bob);
       this.bob = lure ? buildLure(id) : buildFloat(id);
-      if (lure) this.bob.scale.setScalar(0.42);
+      this.bobScale = lure ? 0.42 : 1;
+      this.bob.scale.setScalar(this.bobScale);
       this.bob.visible = false;
       this.scene.add(this.bob);
       this.bobId = id;
@@ -59,6 +62,7 @@ export class Fishing {
     this.lure = lure;
     this.line.setColor((ITEMS[p.equip.line] || {}).col || '#e8f4ff');
     this.vm.setRod(p.equip.rod, p.equip.reel, p.equip.line);
+    if (this.vm.net && this.vm.net.setStyle) this.vm.net.setStyle(p.owned && p.owned.bignet ? 'bignet' : 'net');
   }
   get busy() {
     return this.state !== 'idle';
@@ -132,6 +136,7 @@ export class Fishing {
   }
   toIdle() {
     this.state = 'idle';
+    this.flying = false;
     this.bob.visible = false;
     this.line.hide();
     this.fight = null;
@@ -168,7 +173,9 @@ export class Fishing {
     const p = this.profile;
     this.t += dt;
     this.reeling = false;
-    this.minD = player.boat ? 3.4 : 2.2;
+    // из лодки — дальше, чтобы снасть не упала на нос; у катера нос с рубкой дальше от рыбака
+    const hull = player.boat && player.boat.vis && player.boat.vis.spec;
+    this.minD = player.boat ? (hull && hull.half ? hull.half + hull.seatZ + 0.8 : 3.4) : 2.2;
     this.inBoat = !!player.boat;
     const st = this.state;
     if (st === 'idle' || st === 'charge') this.updateAim(player);
@@ -203,6 +210,7 @@ export class Fishing {
           this.spot = spot;
           this.short = this.power < need - 0.04;
           this.state = 'cast';
+          this.flying = false;
           this.castK = 0;
           this.castT = 0;
           this.flyT = 0.45 + d / 46;
@@ -217,9 +225,13 @@ export class Fishing {
       const u = clamp((this.castT - 0.16) / this.flyT, 0, 1);
       this.vm.tipWorld(tip);
       if (this.castT > 0.16) {
-        if (!this.bob.visible) {
+        if (!this.flying) {
+          // снасть срывается с того места, где висела под кончиком
+          this.flying = true;
           this.bob.visible = true;
-          this.from = tip.clone();
+          this.from = this.hanger.on ? this.bob.position.clone() : tip.clone();
+          this.bob.scale.setScalar(this.bobScale);
+          this.hanger.reset();
         }
         const h = 1.1 + this.castDist * 0.11;
         this.bx = lerp(this.from.x, this.target.x, u);
@@ -506,6 +518,25 @@ export class Fishing {
       if (this.landT > 0.4 && input.hit('KeyR')) return this.finish(true);
       if (this.landT > 9) return this.finish(false);
     }
+    if (this.state === 'idle' || this.state === 'charge' || (this.state === 'cast' && !this.flying)) this.hangTackle(dt);
+  }
+
+  /** Без заброса снасть висит под кончиком: леска от катушки через кольца, из последнего — вниз к поплавку или приманке. */
+  hangTackle(dt) {
+    const bob = this.bob;
+    if (!this.vm.root.visible || !this.vm.rod || !bob) {
+      if (bob) bob.visible = false;
+      this.line.hide();
+      this.hanger.reset();
+      return;
+    }
+    this.vm.tipWorld(tip);
+    const k = this.lure ? 1 : 0.36; // поплавок у кончика мельче: на воде он крупный, чтобы его было видно издалека
+    const h = this.hanger.step(tip, this.lure ? 0.22 : 0.3, Math.min(dt, 0.05));
+    bob.scale.setScalar(this.bobScale * k);
+    bob.visible = true;
+    this.hanger.place(bob, tip, 0.29 * this.bobScale * k, this.lure && LURE_SIDEWAYS.has(this.bobId));
+    this.line.set(tip, h, 0, -99);
   }
 
   /** Рыба долетела: теперь она в кадре у рыбака — висит на леске под кончиком удилища или лежит в подсаке. */

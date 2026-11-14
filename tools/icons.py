@@ -9,15 +9,6 @@ import sys, os, glob, argparse
 import numpy as np
 from PIL import Image
 
-ap = argparse.ArgumentParser()
-ap.add_argument('src'); ap.add_argument('dst')
-ap.add_argument('--size', type=int, default=256)
-ap.add_argument('--pad', type=float, default=0.04)
-ap.add_argument('--sheet', default=None)
-ap.add_argument('--only', default=None)
-a = ap.parse_args()
-os.makedirs(a.dst, exist_ok=True)
-
 def key(im):
     x = np.asarray(im.convert('RGB')).astype(np.float32) / 255
     h, w, _ = x.shape
@@ -61,33 +52,46 @@ def fit(im, size, pad):
     c.alpha_composite(crop, ((size - cw) // 2, (size - ch) // 2))
     return c
 
-files = sorted(glob.glob(os.path.join(a.src, '*.png')))
-if a.only: files = [f for f in files if os.path.basename(f)[:-4] in a.only.split(',')]
-cells = []
-for f in files:
-    name = os.path.basename(f)[:-4]
-    cut, kind, K = key(Image.open(f))
-    ic = fit(cut, a.size, a.pad)
-    p = os.path.join(a.dst, name + '.webp')
-    ic.save(p, 'WEBP', quality=86, method=6, alpha_quality=90)
-    cells.append((name, ic))
-    print(f'{name}: фон {kind} {np.round(K * 255).astype(int).tolist()}, {os.path.getsize(p) // 1024} КБ')
-# список значков для клиента: какие предметы рисуются картинкой (client/itemimg.js)
-if not a.only:
-    ids = sorted(os.path.basename(f)[:-5] for f in glob.glob(os.path.join(a.dst, '*.webp')))
-    js = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'client', 'itemimg.js')
-    with open(js, 'w') as fh:
-        fh.write('// Создаётся tools/icons.py: предметы рынка, у которых есть картинка public/img/items/<id>.webp\n')
-        fh.write('export const ITEM_IMG = new Set(' + repr(ids).replace("'", '"') + ');\n')
-    print('client/itemimg.js:', len(ids), 'значков')
-if a.sheet:
-    n = len(cells); cols = 9; S = 128; rows = (n + cols - 1) // cols
-    sh = Image.new('RGBA', (cols * S, rows * S * 2), (0, 0, 0, 255))
-    for i, (name, ic) in enumerate(cells):
-        t = ic.resize((S, S), Image.LANCZOS)
-        cx, cy = (i % cols) * S, (i // cols) * S
-        for bg, dy in (((29, 42, 54, 255), 0), ((236, 226, 205, 255), rows * S)):
-            tile = Image.new('RGBA', (S, S), bg); tile.alpha_composite(t)
-            sh.paste(tile, (cx, cy + dy))
-    sh.convert('RGB').save(a.sheet)
-    print('лист:', a.sheet)
+def main():
+    global a
+    ap = argparse.ArgumentParser()
+    ap.add_argument('src'); ap.add_argument('dst')
+    ap.add_argument('--size', type=int, default=256)
+    ap.add_argument('--pad', type=float, default=0.04)
+    ap.add_argument('--sheet', default=None)
+    ap.add_argument('--only', default=None)
+    a = ap.parse_args()
+    os.makedirs(a.dst, exist_ok=True)
+    files = sorted(glob.glob(os.path.join(a.src, '*.png')))
+    if a.only: files = [f for f in files if os.path.basename(f)[:-4] in a.only.split(',')]
+    cells = []
+    for f in files:
+        name = os.path.basename(f)[:-4]
+        cut, kind, K = key(Image.open(f))
+        ic = fit(cut, a.size, a.pad)
+        p = os.path.join(a.dst, name + '.webp')
+        ic.save(p, 'WEBP', quality=86, method=6, alpha_quality=90)
+        cells.append((name, ic))
+        print(f'{name}: фон {kind} {np.round(K * 255).astype(int).tolist()}, {os.path.getsize(p) // 1024} КБ')
+    # список значков для клиента: какие предметы рисуются картинкой (client/itemimg.js)
+    if not a.only:
+        ids = sorted(os.path.basename(f)[:-5] for f in glob.glob(os.path.join(a.dst, '*.webp')))
+        js = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'client', 'itemimg.js')
+        with open(js, 'w') as fh:
+            fh.write('// Создаётся tools/icons.py: предметы рынка, у которых есть картинка public/img/items/<id>.webp\n')
+            fh.write('export const ITEM_IMG = new Set(' + repr(ids).replace("'", '"') + ');\n')
+        print('client/itemimg.js:', len(ids), 'значков')
+    if a.sheet:
+        n = len(cells); cols = 9; S = 128; rows = (n + cols - 1) // cols
+        sh = Image.new('RGBA', (cols * S, rows * S * 2), (0, 0, 0, 255))
+        for i, (name, ic) in enumerate(cells):
+            t = ic.resize((S, S), Image.LANCZOS)
+            cx, cy = (i % cols) * S, (i // cols) * S
+            for bg, dy in (((29, 42, 54, 255), 0), ((236, 226, 205, 255), rows * S)):
+                tile = Image.new('RGBA', (S, S), bg); tile.alpha_composite(t)
+                sh.paste(tile, (cx, cy + dy))
+        sh.convert('RGB').save(a.sheet)
+        print('лист:', a.sheet)
+
+if __name__ == '__main__':
+    main()

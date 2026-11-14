@@ -23,7 +23,7 @@ const manPath = path.join(OUT, 'manifest.json');
 const manifest = fs.existsSync(manPath) ? JSON.parse(fs.readFileSync(manPath, 'utf8')) : { heroes: [], props: {} };
 
 // сколько треугольников оставить и какого размера текстуры: [цвет, нормали и блеск]
-const BUDGET = { hero: { tris: 30000, tex: [2048, 2048] }, prop: { tris: 7000, tex: [1024, 512] }, fish: { tris: 8000, tex: [1024, 512] }, junk: { tris: 4000, tex: [512, 512] }, env: { tris: 6000, tex: [1024, 512] } };
+const BUDGET = { gear: { tris: 7000, tex: [1024, 512] }, hero: { tris: 30000, tex: [2048, 2048] }, prop: { tris: 7000, tex: [1024, 512] }, fish: { tris: 8000, tex: [1024, 512] }, junk: { tris: 4000, tex: [512, 512] }, env: { tris: 6000, tex: [1024, 512] } };
 // У модели локации в art/models.json можно задать: tris — сколько треугольников оставить, tex — размеры текстур,
 // flat — без карты нормалей (деревья и кусты: их много, а рельеф листвы и так в сетке), lod — сколько треугольников
 // в дальней копии (<id>.lod.glb: вместо текстуры — цвет вершин), gamma — высветлить тёмную текстуру (меньше 1),
@@ -116,6 +116,18 @@ function bounds(meshes, f = (x, y, z) => [x, y, z]) {
     }
   return { lo, hi, size: hi.map((h, k) => h - lo[k]), mid: hi.map((h, k) => (h + lo[k]) / 2) };
 }
+/** Произведение матриц 3×3 (строки). */
+const mul = (A, B) => A.map((r) => [0, 1, 2].map((j) => r[0] * B[0][j] + r[1] * B[1][j] + r[2] * B[2][j]));
+/** Поворот на [x, y, z] градусов: сначала вокруг X, потом Y, потом Z. */
+function rotXYZ([ax, ay, az]) {
+  const r = (d) => (d * Math.PI) / 180;
+  const c = (d) => Math.cos(r(d));
+  const sn = (d) => Math.sin(r(d));
+  const X = [[1, 0, 0], [0, c(ax), -sn(ax)], [0, sn(ax), c(ax)]];
+  const Y = [[c(ay), 0, sn(ay)], [0, 1, 0], [-sn(ay), 0, c(ay)]];
+  const Z = [[c(az), -sn(az), 0], [sn(az), c(az), 0], [0, 0, 1]];
+  return mul(Z, mul(Y, X));
+}
 /**
  * Приводит модель к общему виду, чтобы игре не гадать, где у неё что.
  *   рыба:    длина 1, голова к −X, спина к +Y, середина в начале координат;
@@ -139,6 +151,31 @@ function normalize(doc, m) {
     const y = unit(U, m.upDown ? -1 : 1);
     const z = [x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]];
     R = [x, y, z];
+  } else if (m.group === 'gear' && m.align) {
+    // снасть (поплавок, приманка): оси картинки-образца — X вправо, Y вверх, Z к зрителю; потом поворот в плоскости
+    // картинки, который кладёт главную ось предмета вдоль Y (align: 'y') или X (align: 'x') — самый короткий, так что
+    // верх (или левый край) картинки остаётся верхом (левым краем); rot — довернуть руками [x, y, z] в градусах
+    const R0 = [[0, 0, -1], [0, 1, 0], [1, 0, 0]];
+    const f0 = (x, y, z) => R0.map((r) => r[0] * x + r[1] * y + r[2] * z);
+    let sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0, n = 0;
+    for (const mesh of meshes)
+      for (const p of mesh.listPrimitives()) {
+        const a = p.getAttribute('POSITION');
+        const v = [0, 0, 0];
+        for (let i = 0; i < a.getCount(); i++) {
+          a.getElement(i, v);
+          const [x, y] = f0(v[0], v[1], v[2]);
+          sx += x; sy += y; sxx += x * x; syy += y * y; sxy += x * y; n++;
+        }
+      }
+    const cxx = sxx / n - (sx / n) ** 2, cyy = syy / n - (sy / n) ** 2, cxy = sxy / n - (sx / n) * (sy / n);
+    const th = 0.5 * Math.atan2(2 * cxy, cxx - cyy); // угол главной оси от X
+    let phi = (m.align === 'y' ? Math.PI / 2 : 0) - th;
+    while (phi > Math.PI / 2) phi -= Math.PI;
+    while (phi < -Math.PI / 2) phi += Math.PI;
+    R = mul(rotXYZ(m.rot || [0, 0, 0]), mul([[Math.cos(phi), -Math.sin(phi), 0], [Math.sin(phi), Math.cos(phi), 0], [0, 0, 1]], R0));
+  } else if (m.group === 'gear' && m.rot) {
+    R = mul(rotXYZ(m.rot), [[0, 0, -1], [0, 1, 0], [1, 0, 0]]);
   } else {
     // поворот вокруг вертикали, при котором описанный прямоугольник в плане самый тесный
     let best = [Infinity, 0];
@@ -157,7 +194,8 @@ function normalize(doc, m) {
   const rot = (x, y, z) => R.map((r) => r[0] * x + r[1] * y + r[2] * z);
   const q = bounds(meshes, rot);
   const k = 1 / Math.max(...(m.group === 'fish' ? [q.size[0]] : q.size));
-  const t = m.group === 'fish' ? q.mid.map((v) => -v * k) : [-q.mid[0] * k, -q.lo[1] * k, -q.mid[2] * k];
+  // рыба и снасти — серединой в начале координат, предметы локации стоят на y = 0
+  const t = m.group === 'fish' || m.group === 'gear' ? q.mid.map((v) => -v * k) : [-q.mid[0] * k, -q.lo[1] * k, -q.mid[2] * k];
   const M = [R[0][0] * k, R[1][0] * k, R[2][0] * k, 0, R[0][1] * k, R[1][1] * k, R[2][1] * k, 0, R[0][2] * k, R[1][2] * k, R[2][2] * k, 0, t[0], t[1], t[2], 1];
   for (const mesh of meshes) transformMesh(mesh, M);
   return q.size.map((v) => +(v * k).toFixed(3));
@@ -377,6 +415,19 @@ for (const m of spec.models) {
   }
   let size = m.group === 'hero' ? null : normalize(doc, m);
   if (m.stretch) size = stretchY(doc, m.stretch, size);
+  if (m.nudge) {
+    // сдвинуть отставшую часть модели (у катера моторы висели в паре сантиметров за транцем): [ниже какой x, на сколько]
+    const [below, dx] = m.nudge;
+    for (const mesh of doc.getRoot().listMeshes())
+      for (const prim of mesh.listPrimitives()) {
+        const a = prim.getAttribute('POSITION');
+        const v = [0, 0, 0];
+        for (let i = 0; i < a.getCount(); i++) {
+          a.getElement(i, v);
+          if (v[0] < below) a.setElement(i, [v[0] + dx, v[1], v[2]]);
+        }
+      }
+  }
   if (m.group === 'prop' || m.group === 'junk' || m.group === 'env') {
     // предметы в игре матовые: карта блеска им не нужна — минус файл и выборка из текстуры
     for (const mat of doc.getRoot().listMaterials()) {
@@ -395,7 +446,7 @@ for (const m of spec.models) {
     dedup(),
     prune(),
     weld(),
-    ...(ratio < 0.98 ? [simplify({ simplifier: MeshoptSimplifier, ratio, error: m.err || (m.group === 'hero' ? 0.0015 : m.group === 'fish' ? 0.003 : m.group === 'env' ? 0.05 : 0.008), lockBorder: false })] : []),
+    ...(ratio < 0.98 ? [simplify({ simplifier: MeshoptSimplifier, ratio, error: m.err || (m.group === 'hero' ? 0.0015 : m.group === 'fish' || m.group === 'gear' ? 0.003 : m.group === 'env' ? 0.05 : 0.008), lockBorder: false })] : []),
     resample(),
     prune(),
     // карта свечения окон — того же размера, что и цвет: стёкла в ней мелкие, а весит она почти ничего

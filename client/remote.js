@@ -1,9 +1,9 @@
 // Друзья в бухте: персонаж, удочка, леска, поплавок и рыба на крючке — по данным с сервера.
 import * as THREE from 'three';
 import { Character } from './character.js';
-import { buildRod, buildFloat, buildLure } from './gear3d.js';
+import { buildRod, buildFloat, buildLure, LURE_SIDEWAYS } from './gear3d.js';
 import { buildFish, wiggleFish } from './fish3d.js';
-import { FishLine } from './line.js';
+import { FishLine, Dangle } from './line.js';
 import { BoatVisual, moorSpot, wake, VMAX } from './boat.js';
 import { S, FS_NAME, FLAG, MARKS } from './proto.js';
 import { ITEMS, FISH_BY_ID, isLure } from '../shared/data.js';
@@ -25,7 +25,8 @@ export class Remote {
     this.char = new Character(p.card.look);
     this.char.group.visible = false;
     scene.add(this.char.group);
-    this.line = new FishLine(scene);
+    this.line = new FishLine(scene, '#e8f4ff', () => this.char.rod && this.char.rod.path()); // от катушки через кольца
+    this.hanger = new Dangle();
     this.bob = null;
     this.fish = null;
     this.a = null;
@@ -46,8 +47,9 @@ export class Remote {
     const old = this.card || {};
     this.card = card;
     if (JSON.stringify(old.look) !== JSON.stringify(card.look)) this.char.setLook(card.look);
-    if (old.rod !== card.rod || old.line !== card.line || !this.char.rod) {
-      this.char.setRod(buildRod(card.rod || 'rod1', 'reel1', card.line || 'line1', 1));
+    if (old.rod !== card.rod || old.reel !== card.reel || old.line !== card.line || !this.char.rod) {
+      if (this.char.rod) this.char.rod.gone = true;
+      this.char.setRod(buildRod(card.rod || 'rod1', card.reel || 'reel1', card.line || 'line1', 1));
       this.line.setColor((ITEMS[card.line] || {}).col || '#e8f4ff');
     }
     if (old.fl !== card.fl || !this.bob) {
@@ -205,7 +207,21 @@ export class Remote {
       this.line.set(tip, end, fs === 2 ? 0.8 : fs === 5 || fs === 4 ? 0.04 : Math.min(1.2, 0.25 + dist * 0.03), fs === 2 || fs === 5 ? -5 : 0.02);
       if (fs === 2) this.bob.rotation.set(t * 9, 0, t * 5);
       else this.bob.rotation.set(Math.sin(t * 1.7 + bx) * 0.12, 0, Math.cos(t * 1.3) * 0.12 + (fs === 4 ? 0.5 : 0));
-    } else this.line.hide();
+      this.bob.scale.setScalar(this.lure ? 0.42 : 1);
+      this.hanger.reset();
+    } else if (!this.held && fs <= 1 && g.visible) {
+      // без заброса снасть висит под кончиком, как у себя (Fishing.hangTackle)
+      rod.tip.getWorldPosition(tip);
+      const k = this.lure ? 0.42 : 0.36;
+      const h = this.hanger.step(tip, this.lure ? 0.22 : 0.3, Math.min(dt, 0.05));
+      this.bob.scale.setScalar(k);
+      this.bob.visible = true;
+      this.hanger.place(this.bob, tip, 0.29 * k, this.lure && LURE_SIDEWAYS.has(this.card.fl));
+      this.line.set(tip, h, 0, -99);
+    } else {
+      this.line.hide();
+      this.hanger.reset();
+    }
   }
   /** Игрок ещё в лобби: стоит на настиле в ряд с остальными. */
   lobbyPose(dt, x, y, z, variant) {

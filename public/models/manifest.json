@@ -2172,6 +2172,347 @@
         0.436,
         0.416
       ]
+    },
+    "gear-reel1": {
+      "file": "models/gear-reel1.glb",
+      "group": "gear",
+      "tris": 7000,
+      "kb": 219,
+      "size": [
+        0.822,
+        0.817,
+        1
+      ]
+    },
+    "gear-reel2": {
+      "file": "models/gear-reel2.glb",
+      "group": "gear",
+      "tris": 6999,
+      "kb": 254,
+      "size": [
+        0.843,
+        0.889,
+        1
+      ]
+    },
+    "gear-reel3": {
+      "file": "models/gear-reel3.glb",
+      "group": "gear",
+      "tris": 6999,
+      "kb": 243,
+      "size": [
+        1,
+        0.527,
+        0.735
+      ]
+    },
+    "gear-reel4": {
+      "file": "models/gear-reel4.glb",
+      "group": "gear",
+      "tris": 7676,
+      "kb": 263,
+      "size": [
+        1,
+        0.926,
+        0.919
+      ]
+    },
+    "gear-reel5": {
+      "file": "models/gear-reel5.glb",
+      "group": "gear",
+      "tris": 7027,
+      "kb": 279,
+      "size": [
+        1,
+        0.7,
+        0.748
+      ]
+    },
+    "gear-reel6": {
+      "file": "models/gear-reel6.glb",
+      "group": "gear",
+      "tris": 8856,
+      "kb": 284,
+      "size": [
+        0.939,
+        0.902,
+        1
+      ]
+    },
+    "boat-cutter": {
+      "file": "models/boat-cutter.glb",
+      "group": "prop",
+      "tris": 11993,
+      "kb": 508,
+      "size": [
+        1,
+        0.522,
+        0.371
+      ]
+    },
+    "gear-reel7": {
+      "file": "models/gear-reel7.glb",
+      "group": "gear",
+      "tris": 8840,
+      "kb": 354,
+      "size": [
+        1,
+        0.69,
+        0.705
+      ]
+    },
+    "gear-float1": {
+      "file": "models/gear-float1.glb",
+      "group": "gear",
+      "tris": 7000,
+      "kb": 117,
+      "size": [
+        0.687,
+        1,
+        0.682
+      ]
+    },
+    "gear-float2": {
+      "file": "models/gear-float2.glb",
+      "group": "gear",
+      "tris": 7000,
+      "kb": 134,
+      "size": [
+        0.2,
+        1,
+        0.721
+      ]
+    },
+    "gear-float3": {
+      "file": "models/gear-float3.glb",
+      "group": "gear",
+      "tris": 7000,
+      "kb": 150,
+      "size": [
+        0.219,
+        1,
+        0.274
+      ]
+    },
+    "gear-float4": {
+      "file": "models/gear-float4.glb",
+      "group": "gear",
+      "tris": 7000,
+      "kb": 130,
+      "size": [
+        0.244,
+        1,
+        0.251
+      ]
+    },
+    "gear-float5": {
+      "file": "models/gear-float5.glb",
+      "group": "gear",
+      "tris": 7000,
+      "kb": 168,
+      "size": [
+        0.277,
+        1,
+        0.279
+      ]
+    },
+    "gear-float6": {
+      "file": "models/gear-float6.glb",
+      "group": "gear",
+      "tris": 7000,
+      "kb": 142,
+      "size": [
+        0.392,
+        1,
+        0.392
+      ]
+    },
+    "gear-spoon": {
+      "file": "models/gear-spoon.glb",
+      "group": "gear",
+      "tris": 7000,
+      "kb": 180,
+      "size": [
+        0.359,
+        1,
+        0.547
+      ]
+    },
+    "gear-spinner": {
+      "file": "models/gear-spinner.glb",
+      "group": "gear",
+      "tris": 6999,
+      "kb": 241,
+      "size": [
+        0.467,
+        1,
+        0.769
+      ]
+    },
+    "gear-wobbler": {
+      "file": "models/gear-wobbler.glb",
+      "group": "gear",
+      "tris": 7000,
+      "kb": 191,
+      "size": [
+        1,
+        0.614,
+        0.274
+      ]
+    },
+    "gear-jig": {
+      "file": "models/gear-jig.glb",
+      "group": "gear",
+      "tris": 7000,
+      "kb": 195,
+      "size": [
+        1,
+        0.627,
+        0.386
+      ]
+    },
+    "gear-goldspoon": {
+      "file": "models/gear-goldspoon.glb",
+      "group": "gear",
+      "tris": 7000,
+      "kb": 218,
+      "size": [
+        0.371,
+        1,
+        0.509
+      ]
+    },
+    "gear-popper": {
+      "file": "models/gear-popper.glb",
+      "group": "gear",
+      "tris": 6993,
+      "kb": 239,
+      "size": [
+        1,
+        0.567,
+        0.268
+      ]
+    },
+    "gear-legendlure": {
+      "file": "models/gear-legendlure.glb",
+      "group": "gear",
+      "tris": 7000,
+      "kb": 255,
+      "size": [
+        0.315,
+        1,
+        0.449
+      ]
+    },
+    "gear-rod1": {
+      "file": "models/gear-rod1.glb",
+      "group": "gear",
+      "tris": 7000,
+      "kb": 182,
+      "size": [
+        1,
+        0.139,
+        0.148
+      ]
+    },
+    "gear-rod2": {
+      "file": "models/gear-rod2.glb",
+      "group": "gear",
+      "tris": 7000,
+      "kb": 167,
+      "size": [
+        1,
+        0.146,
+        0.15
+      ]
+    },
+    "gear-rod3": {
+      "file": "models/gear-rod3.glb",
+      "group": "gear",
+      "tris": 7000,
+      "kb": 203,
+      "size": [
+        1,
+        0.118,
+        0.123
+      ]
+    },
+    "gear-rod4": {
+      "file": "models/gear-rod4.glb",
+      "group": "gear",
+      "tris": 7000,
+      "kb": 149,
+      "size": [
+        1,
+        0.126,
+        0.135
+      ]
+    },
+    "gear-rod5": {
+      "file": "models/gear-rod5.glb",
+      "group": "gear",
+      "tris": 7000,
+      "kb": 168,
+      "size": [
+        1,
+        0.125,
+        0.133
+      ]
+    },
+    "gear-rod6": {
+      "file": "models/gear-rod6.glb",
+      "group": "gear",
+      "tris": 7000,
+      "kb": 153,
+      "size": [
+        1,
+        0.156,
+        0.164
+      ]
+    },
+    "gear-rod7": {
+      "file": "models/gear-rod7.glb",
+      "group": "gear",
+      "tris": 6994,
+      "kb": 190,
+      "size": [
+        1,
+        0.102,
+        0.109
+      ]
+    },
+    "gear-rod8": {
+      "file": "models/gear-rod8.glb",
+      "group": "gear",
+      "tris": 7000,
+      "kb": 161,
+      "size": [
+        1,
+        0.121,
+        0.123
+      ]
+    },
+    "gear-rod9": {
+      "file": "models/gear-rod9.glb",
+      "group": "gear",
+      "tris": 7000,
+      "kb": 198,
+      "size": [
+        1,
+        0.105,
+        0.112
+      ]
+    },
+    "gear-rod10": {
+      "file": "models/gear-rod10.glb",
+      "group": "gear",
+      "tris": 7000,
+      "kb": 292,
+      "size": [
+        1,
+        0.163,
+        0.169
+      ]
     }
   }
 }

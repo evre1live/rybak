@@ -110,7 +110,16 @@ export class ViewModel {
     this.root.add(this.netSlot);
     this.netK = 0; // 0 — подсак под кадром, 1 — поднят
     this.handK = 0; // 0 — левая рука на катушке, 1 — на ручке подсака
-    this.hangLine = new FishLine(this.root);
+    // леска с рыбой: тоже от катушки через кольца — точки удочки переводятся в оси this.root, где живёт эта леска
+    const local = [];
+    this.hangLine = new FishLine(this.root, '#e8f4ff', () => {
+      if (!this.rod) return null;
+      const pts = this.rod.path();
+      while (local.length < pts.length) local.push(new THREE.Vector3());
+      for (let i = 0; i < pts.length; i++) this.root.worldToLocal(local[i].copy(pts[i]));
+      local.length = pts.length;
+      return local;
+    });
     this.show = null; // что сейчас показываем: { net, s, hoop, heavy } — см. Fishing.land
     this.swX = 0;
     this.swV = 0;
@@ -224,6 +233,7 @@ export class ViewModel {
 
   setRod(rodId, reelId, lineId) {
     if (this.rod) {
+      this.rod.gone = true; // модели, которые ещё грузятся, на неё уже не встанут
       this.pivot.remove(this.rod.group);
       this.rod.group.traverse((o) => o.isMesh && o.geometry && o.geometry.dispose && o.userData.own && o.geometry.dispose());
     }
@@ -432,6 +442,10 @@ export class ViewModel {
     }
   }
 
+  /** Леска внутри удочки (мировые координаты): катушка и кольца. */
+  rodPath() {
+    return this.rod ? this.rod.path() : null;
+  }
   tipWorld(out) {
     return this.rod.tip.getWorldPosition(out);
   }

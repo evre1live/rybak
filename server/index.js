@@ -69,7 +69,7 @@ function cleanCard(c) {
   }
   const str = (v, n) => String(v == null ? '' : v).slice(0, n);
   const name = str(c.name, 16).replace(/[\u0000-\u001f<>]/g, '').trim() || 'Рыбак';
-  return { name, look: look || {}, rod: str(c.rod, 12), fl: str(c.fl, 12), line: str(c.line, 12), lvl: Math.max(1, Math.min(99, Math.round(Number(c.lvl) || 1))) };
+  return { name, look: look || {}, rod: str(c.rod, 12), reel: str(c.reel, 12), fl: str(c.fl, 12), line: str(c.line, 12), lvl: Math.max(1, Math.min(99, Math.round(Number(c.lvl) || 1))) };
 }
 function cleanState(a) {
   if (!Array.isArray(a) || a.length > 20) return null;

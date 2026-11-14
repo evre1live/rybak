@@ -1077,6 +1077,101 @@
     "fish-parusnik": {
       "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/mOxberDJSiyIhVIgUpr0/OajJnBRVjENqWM2xKDEz/content.png",
       "model": "2e3094d8-b98c-440f-82fc-3a6742e2f8b1"
+    },
+    "boat-cutter": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/4KDCUGaiqk9VCcAtKZSe/WQZuMGDk0oPOJJ4l1bXc/content.png",
+      "model": "e0086051-3397-47bd-b2ac-5e007f0ac92d"
+    },
+    "gear-rod5": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/csB20ItPuTqOP0HzpcTG/JMSh4CgtzE1mwvGro9ep/content.png",
+      "model": "427d3866-c839-4dc0-9ee9-0c39451e108d"
+    },
+    "gear-reel5": {
+      "model": "ab326090-6f76-41d8-b2b4-ed9439afcd52"
+    },
+    "gear-reel1": {
+      "model": "9f247357-23ee-437f-9338-56319b56283a"
+    },
+    "gear-reel2": {
+      "model": "fac3eedc-48e0-4abe-b904-3f581e1b4f26"
+    },
+    "gear-reel3": {
+      "model": "4b40a398-407b-49b0-9a94-c3f484336028"
+    },
+    "gear-float2": {
+      "model": "3e890dd8-f522-41a0-97c3-7ff5d40804e4"
+    },
+    "gear-float3": {
+      "model": "e5f074fb-506f-4da6-9963-f856bc19a1ea"
+    },
+    "gear-reel6": {
+      "model": "b5fd41bd-4d80-4584-acfe-145eb68a0b5f"
+    },
+    "gear-reel4": {
+      "model": "7d50e14d-9043-47d7-a9db-62f07ccc2524"
+    },
+    "gear-float6": {
+      "model": "5a8fe7bc-5200-4588-8a6f-aeed84fe0277"
+    },
+    "gear-spoon": {
+      "model": "a6bc2517-2537-4a31-89a0-e6b638e49380"
+    },
+    "gear-float1": {
+      "model": "a1e4a940-dc6b-4378-9fa4-f142c4340daf"
+    },
+    "gear-reel7": {
+      "model": "058f7117-0856-4a0f-bfc4-56509d386943"
+    },
+    "gear-float5": {
+      "model": "453278ed-07e7-48ab-ae59-7f4b898d158e"
+    },
+    "gear-float4": {
+      "model": "2fb8a3b4-de45-423d-a415-f4b90aab92ae"
+    },
+    "gear-legendlure": {
+      "model": "17618666-43a4-4bbd-becd-b5dbf859f859"
+    },
+    "gear-popper": {
+      "model": "2a4301c1-2ff0-46ab-89ab-a2579214f55d"
+    },
+    "gear-goldspoon": {
+      "model": "50b388a8-cf59-4249-a324-b4b5ede8e6b6"
+    },
+    "gear-jig": {
+      "model": "a1b80a05-bd13-4add-a937-89b4363f1b82"
+    },
+    "gear-wobbler": {
+      "model": "70bfdb86-c08c-47f5-8ac9-c9e4d1fa7f7a"
+    },
+    "gear-spinner": {
+      "model": "5fa8ce0a-42d0-44f2-9822-6aa004fbe705"
+    },
+    "gear-rod3": {
+      "model": "28453183-1de3-4aa7-b552-c138de8ce689"
+    },
+    "gear-rod4": {
+      "model": "9a38c896-9cb4-490d-a0a6-df68ea07ab0c"
+    },
+    "gear-rod2": {
+      "model": "4ed0b25c-98a4-465f-bad9-0afb8d706502"
+    },
+    "gear-rod6": {
+      "model": "b2388c05-13d4-4caf-b395-8d76b32425a5"
+    },
+    "gear-rod1": {
+      "model": "7e92b534-cbb0-4623-b733-b4b5438b8191"
+    },
+    "gear-rod10": {
+      "model": "3871d847-1604-4a6f-94c8-c6c91c266e88"
+    },
+    "gear-rod9": {
+      "model": "440ab364-f886-4ea1-9733-cc2aa35c4dec"
+    },
+    "gear-rod8": {
+      "model": "e0481e04-b64d-47d8-8b9e-830220a4a31c"
+    },
+    "gear-rod7": {
+      "model": "27da0932-6d6a-4d56-9ab6-9bcb6b905383"
     }
   },
   "ledger": [
@@ -2990,6 +3085,230 @@
       "type": "texture_model",
       "task": "7b49b85c-32a4-4745-abd4-1ce9fca6a9cc",
       "credits": 20
+    },
+    {
+      "at": "2026-11-14T16:06:49.054Z",
+      "label": "gear-rod5 модель",
+      "type": "image_to_model",
+      "task": "09b6d8a7-346a-42be-86b4-13b5d47a1b4d",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T16:07:29.704Z",
+      "label": "boat-cutter модель",
+      "type": "image_to_model",
+      "task": "e0086051-3397-47bd-b2ac-5e007f0ac92d",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T16:23:21.300Z",
+      "label": "gear-reel3 модель",
+      "type": "image_to_model",
+      "task": "4b40a398-407b-49b0-9a94-c3f484336028",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T16:23:35.314Z",
+      "label": "gear-reel2 модель",
+      "type": "image_to_model",
+      "task": "fac3eedc-48e0-4abe-b904-3f581e1b4f26",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T16:23:36.518Z",
+      "label": "gear-reel1 модель",
+      "type": "image_to_model",
+      "task": "9f247357-23ee-437f-9338-56319b56283a",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T16:23:47.374Z",
+      "label": "gear-reel5 модель",
+      "type": "image_to_model",
+      "task": "ab326090-6f76-41d8-b2b4-ed9439afcd52",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T16:23:54.279Z",
+      "label": "gear-reel4 модель",
+      "type": "image_to_model",
+      "task": "7d50e14d-9043-47d7-a9db-62f07ccc2524",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T16:24:06.189Z",
+      "label": "gear-reel6 модель",
+      "type": "image_to_model",
+      "task": "b5fd41bd-4d80-4584-acfe-145eb68a0b5f",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T16:25:50.235Z",
+      "label": "gear-float3 модель",
+      "type": "image_to_model",
+      "task": "e5f074fb-506f-4da6-9963-f856bc19a1ea",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T16:25:55.179Z",
+      "label": "gear-float2 модель",
+      "type": "image_to_model",
+      "task": "3e890dd8-f522-41a0-97c3-7ff5d40804e4",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T16:26:04.503Z",
+      "label": "gear-float4 модель",
+      "type": "image_to_model",
+      "task": "2fb8a3b4-de45-423d-a415-f4b90aab92ae",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T16:26:19.395Z",
+      "label": "gear-float5 модель",
+      "type": "image_to_model",
+      "task": "453278ed-07e7-48ab-ae59-7f4b898d158e",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T16:26:32.038Z",
+      "label": "gear-reel7 модель",
+      "type": "image_to_model",
+      "task": "058f7117-0856-4a0f-bfc4-56509d386943",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T16:27:22.809Z",
+      "label": "gear-float1 модель",
+      "type": "image_to_model",
+      "task": "a1e4a940-dc6b-4378-9fa4-f142c4340daf",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T16:27:50.231Z",
+      "label": "gear-spoon модель",
+      "type": "image_to_model",
+      "task": "a6bc2517-2537-4a31-89a0-e6b638e49380",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T16:28:07.415Z",
+      "label": "gear-float6 модель",
+      "type": "image_to_model",
+      "task": "5a8fe7bc-5200-4588-8a6f-aeed84fe0277",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T16:28:22.742Z",
+      "label": "gear-spinner модель",
+      "type": "image_to_model",
+      "task": "5fa8ce0a-42d0-44f2-9822-6aa004fbe705",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T16:28:31.114Z",
+      "label": "gear-wobbler модель",
+      "type": "image_to_model",
+      "task": "70bfdb86-c08c-47f5-8ac9-c9e4d1fa7f7a",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T16:28:49.641Z",
+      "label": "gear-jig модель",
+      "type": "image_to_model",
+      "task": "a1b80a05-bd13-4add-a937-89b4363f1b82",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T16:29:17.094Z",
+      "label": "gear-goldspoon модель",
+      "type": "image_to_model",
+      "task": "50b388a8-cf59-4249-a324-b4b5ede8e6b6",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T16:30:03.491Z",
+      "label": "gear-popper модель",
+      "type": "image_to_model",
+      "task": "2a4301c1-2ff0-46ab-89ab-a2579214f55d",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T16:30:07.893Z",
+      "label": "gear-legendlure модель",
+      "type": "image_to_model",
+      "task": "17618666-43a4-4bbd-becd-b5dbf859f859",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T16:33:46.031Z",
+      "label": "gear-rod1 модель",
+      "type": "image_to_model",
+      "task": "7e92b534-cbb0-4623-b733-b4b5438b8191",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T16:33:56.897Z",
+      "label": "gear-rod6 модель",
+      "type": "image_to_model",
+      "task": "b2388c05-13d4-4caf-b395-8d76b32425a5",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T16:33:57.262Z",
+      "label": "gear-rod2 модель",
+      "type": "image_to_model",
+      "task": "4ed0b25c-98a4-465f-bad9-0afb8d706502",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T16:33:57.791Z",
+      "label": "gear-rod5 модель",
+      "type": "image_to_model",
+      "task": "427d3866-c839-4dc0-9ee9-0c39451e108d",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T16:33:59.105Z",
+      "label": "gear-rod4 модель",
+      "type": "image_to_model",
+      "task": "9a38c896-9cb4-490d-a0a6-df68ea07ab0c",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T16:34:04.282Z",
+      "label": "gear-rod3 модель",
+      "type": "image_to_model",
+      "task": "28453183-1de3-4aa7-b552-c138de8ce689",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T16:35:30.701Z",
+      "label": "gear-rod7 модель",
+      "type": "image_to_model",
+      "task": "27da0932-6d6a-4d56-9ab6-9bcb6b905383",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T16:35:33.495Z",
+      "label": "gear-rod8 модель",
+      "type": "image_to_model",
+      "task": "e0481e04-b64d-47d8-8b9e-830220a4a31c",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T16:35:40.928Z",
+      "label": "gear-rod9 модель",
+      "type": "image_to_model",
+      "task": "440ab364-f886-4ea1-9733-cc2aa35c4dec",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T16:35:55.435Z",
+      "label": "gear-rod10 модель",
+      "type": "image_to_model",
+      "task": "3871d847-1604-4a6f-94c8-c6c91c266e88",
+      "credits": 60
     }
   ]
 }

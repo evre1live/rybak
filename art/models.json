@@ -1065,6 +1065,356 @@
       "prompt": "a bottlenose dolphin: sleek streamlined grey body with a lighter belly, short beak, curved dorsal fin, pectoral flippers, tail flukes held flat and horizontal",
       "lead": "A single sea animal, 3D video game asset concept, exact side view, the animal faces left, body straight and horizontal, flippers visible, mouth closed.",
       "textureQuality": "detailed"
+    },
+    {
+      "id": "gear-rod1",
+      "group": "gear",
+      "item": "rod1",
+      "name": "Удочка «Стартовая»",
+      "prompt": "по картинке art/rods (вид сбоку, без катушки)",
+      "rot": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "gear-rod2",
+      "group": "gear",
+      "item": "rod2",
+      "name": "Удочка «Рифовая»",
+      "prompt": "по картинке art/rods (вид сбоку, без катушки)",
+      "rot": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "gear-rod3",
+      "group": "gear",
+      "item": "rod3",
+      "name": "Удочка «Речной разведчик»",
+      "prompt": "по картинке art/rods (вид сбоку, без катушки)",
+      "rot": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "gear-rod4",
+      "group": "gear",
+      "item": "rod4",
+      "name": "Удочка «Глубокая синь»",
+      "prompt": "по картинке art/rods (вид сбоку, без катушки)",
+      "rot": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "gear-rod5",
+      "group": "gear",
+      "item": "rod5",
+      "name": "Удочка «Закат Про»",
+      "prompt": "по картинке art/rods (вид сбоку, без катушки)",
+      "rot": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "gear-rod6",
+      "group": "gear",
+      "item": "rod6",
+      "name": "Удочка «Повелитель приливов»",
+      "prompt": "по картинке art/rods (вид сбоку, без катушки)",
+      "rot": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "gear-rod7",
+      "group": "gear",
+      "item": "rod7",
+      "name": "Удочка «Полярная звезда»",
+      "prompt": "по картинке art/rods (вид сбоку, без катушки)",
+      "rot": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "gear-rod8",
+      "group": "gear",
+      "item": "rod8",
+      "name": "Удочка «Морской волк»",
+      "prompt": "по картинке art/rods (вид сбоку, без катушки)",
+      "rot": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "gear-rod9",
+      "group": "gear",
+      "item": "rod9",
+      "name": "Удочка «Гроза глубин»",
+      "prompt": "по картинке art/rods (вид сбоку, без катушки)",
+      "rot": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "gear-rod10",
+      "group": "gear",
+      "item": "rod10",
+      "name": "Удочка «Легенда»",
+      "prompt": "по картинке art/rods (вид сбоку, без катушки)",
+      "rot": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "gear-reel1",
+      "group": "gear",
+      "item": "reel1",
+      "name": "Простая катушка",
+      "prompt": "по значку рынка",
+      "rot": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "gear-reel2",
+      "group": "gear",
+      "item": "reel2",
+      "name": "Быстрая катушка",
+      "prompt": "по значку рынка",
+      "rot": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "gear-reel3",
+      "group": "gear",
+      "item": "reel3",
+      "name": "Мультипликатор",
+      "prompt": "по значку рынка",
+      "rot": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "gear-reel4",
+      "group": "gear",
+      "item": "reel4",
+      "name": "Турбо",
+      "prompt": "по значку рынка",
+      "rot": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "gear-reel5",
+      "group": "gear",
+      "item": "reel5",
+      "name": "Морской мультипликатор",
+      "prompt": "по значку рынка",
+      "rot": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "gear-reel6",
+      "group": "gear",
+      "item": "reel6",
+      "name": "Титан",
+      "prompt": "по значку рынка",
+      "rot": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "gear-reel7",
+      "group": "gear",
+      "item": "reel7",
+      "name": "Золотой ход",
+      "prompt": "по значку рынка",
+      "rot": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "gear-float1",
+      "group": "gear",
+      "item": "float1",
+      "name": "Поплавок «Классика»",
+      "prompt": "по значку рынка",
+      "geometry": "standard",
+      "align": "y"
+    },
+    {
+      "id": "gear-float2",
+      "group": "gear",
+      "item": "float2",
+      "name": "Поплавок «Гусиное перо»",
+      "prompt": "по значку рынка",
+      "geometry": "standard",
+      "align": "y"
+    },
+    {
+      "id": "gear-float3",
+      "group": "gear",
+      "item": "float3",
+      "name": "Поплавок «Светлячок»",
+      "prompt": "по значку рынка",
+      "geometry": "standard",
+      "align": "y"
+    },
+    {
+      "id": "gear-float4",
+      "group": "gear",
+      "item": "float4",
+      "name": "Поплавок «Чемпион»",
+      "prompt": "по значку рынка",
+      "geometry": "standard",
+      "align": "y"
+    },
+    {
+      "id": "gear-float5",
+      "group": "gear",
+      "item": "float5",
+      "name": "Поплавок «Северное сияние»",
+      "prompt": "по значку рынка",
+      "geometry": "standard",
+      "align": "y"
+    },
+    {
+      "id": "gear-float6",
+      "group": "gear",
+      "item": "float6",
+      "name": "Поплавок «Золотой поплавок»",
+      "prompt": "по значку рынка",
+      "geometry": "standard",
+      "align": "y"
+    },
+    {
+      "id": "gear-spoon",
+      "group": "gear",
+      "item": "spoon",
+      "name": "Блесна-колебалка",
+      "prompt": "по значку рынка",
+      "geometry": "standard",
+      "rot": [
+        90,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "gear-spinner",
+      "group": "gear",
+      "item": "spinner",
+      "name": "Вертушка",
+      "prompt": "по значку рынка",
+      "geometry": "standard",
+      "align": "y"
+    },
+    {
+      "id": "gear-wobbler",
+      "group": "gear",
+      "item": "wobbler",
+      "name": "Воблер",
+      "prompt": "по значку рынка",
+      "geometry": "standard",
+      "align": "x"
+    },
+    {
+      "id": "gear-jig",
+      "group": "gear",
+      "item": "jig",
+      "name": "Джиг",
+      "prompt": "по значку рынка",
+      "geometry": "standard",
+      "align": "x"
+    },
+    {
+      "id": "gear-goldspoon",
+      "group": "gear",
+      "item": "goldspoon",
+      "name": "Золотая блесна",
+      "prompt": "по значку рынка",
+      "geometry": "standard",
+      "rot": [
+        90,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "gear-popper",
+      "group": "gear",
+      "item": "popper",
+      "name": "Поппер",
+      "prompt": "по значку рынка",
+      "geometry": "standard",
+      "align": "x"
+    },
+    {
+      "id": "gear-legendlure",
+      "group": "gear",
+      "item": "legendlure",
+      "name": "Блесна мастера",
+      "prompt": "по значку рынка",
+      "geometry": "standard",
+      "rot": [
+        90,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "boat-cutter",
+      "group": "prop",
+      "name": "Катер",
+      "prompt": "спортивный рыболовный катер с рубкой, по картинке ElevenLabs",
+      "tris": 12000,
+      "tex": [
+        2048,
+        1024
+      ],
+      "geometry": "detailed",
+      "textureQuality": "detailed",
+      "nudge": [
+        -0.432,
+        0.022
+      ]
     }
   ],
   "leads": {
@@ -1105,6 +1455,11 @@
     "env": {
       "textureQuality": "standard",
       "geometry": "standard",
+      "faces": 20000
+    },
+    "gear": {
+      "textureQuality": "detailed",
+      "geometry": "detailed",
       "faces": 20000
     }
   }

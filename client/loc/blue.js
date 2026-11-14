@@ -262,7 +262,7 @@ export function canStand(x, z, skip = null) {
 
 // ── лодка ──
 export const MOORINGS = [
-  { id: 'home', name: 'Синий простор', rent: true, x: 4.0, z: -12, yaw: -0.6, sx: 0.95, sz: -12, syaw: -Math.PI / 2 },
+  { id: 'home', name: 'Синий простор', rent: true, x: 4.4, z: -13, yaw: -0.6, sx: 0.95, sz: -12, syaw: -Math.PI / 2 },
   // мостки Маячной скалы: лодка встаёт вдоль площадки с западной стороны, рыбак выходит лицом к маяку
   { id: 'light', name: 'Маячная скала', x: 35.1, z: -86, yaw: 0, sx: 37.9, sz: -86, syaw: -Math.PI / 2 }
 ];
