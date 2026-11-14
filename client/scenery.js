@@ -450,8 +450,12 @@ function buildProps(B, P, r, X) {
   place('prop-anchor', 7.7, groundH(7.7, 12.6) - 0.06, 12.6, 1.45, -0.7, false, { rz: 0.16 });
   place('prop-tacklebox', 1.95, y + 0.5, 15.33, 0.44, -0.35);
   place('prop-lantern', 5.65, y, -25.4, 0.46, 0.6);
-  if (HAS.lighthouse) {
-    // причал у маяка
+  if (HAS.blue) {
+    // Синий простор: мостки Маячной скалы (места — те же, что в CIRCLES локации)
+    place('prop-crate', 38.6, y, -82.6, 0.62, 0.4);
+    place('prop-netpile', 41.4, y, -89.6, 0.95, 2.1);
+  } else if (HAS.lighthouse) {
+    // причал у маяка в бухте (в других локациях маяк стоит в другом месте — там эти координаты в море)
     place('prop-crate', -19.2, y, -71.2, 0.62, 0.4);
     place('prop-barrel', -16.2, y, -77.6, 0.95, 1.2);
     place('prop-ropecoil', -15.9, y, -70.9, 0.7, 0.3);
@@ -1508,6 +1512,8 @@ export function buildScenery(scene, nfx = null) {
     smallState,
     /** Для проверок: спрятан ли запасной меш и сколько готовых моделей расставлено. */
     propsState: () => ({ fallback: fallback.visible, ...propsDone }),
+    /** Для проверок: готовые модели, повисшие над водой — не на мостках, не на земле и не на другом предмете. */
+    strayProps: () => PLACES.filter((p) => p.on == null && !deckAt(p.x, p.z, -0.3) && groundH(p.x, p.z) < p.y - 0.4).map((p) => [p.id, p.x, p.z]),
     /** night: 0 днём … 1 ночью; light — общая яркость дня */
     setNight(night, light) {
       dark = Math.max(0, night * 1.25 - 0.25);

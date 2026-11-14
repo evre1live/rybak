@@ -57,6 +57,8 @@ const loc = process.argv[3] || ''; // другая локация — свой �
   const waits = await p.evaluate(() => RYBAK.bootWaits);
   console.log(`  заставка ждала модели ${(waits / 10).toFixed(1)} с`);
   assert.ok(waits < 115, `заставка дождалась моделей, а не истечения времени: ${waits}`);
+  // предметы стоят на мостках или на земле, а не висят над водой (ящики маяка бухты однажды попали в море Синего простора)
+  assert.deepEqual(await p.evaluate(() => RYBAK.world.scenery.strayProps()), [], 'нет предметов над водой');
   await mark('после заставки');
   await frame(2);
   await mark('заставка, два кадра');
