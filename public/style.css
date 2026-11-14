@@ -51,7 +51,7 @@ kbd.g{border-color:rgba(255,255,255,.75)}
 /* ───── экран игры: стеклянные панели и плашки; место, улов, монеты и удочка — наклонным шрифтом ───── */
 #hud,#touch,#toasts{font-family:var(--body);font-style:normal}
 /* где видеокарта тянет — панели размывают картинку под собой (класс blur ставит игра: только на «высоком» качестве и не на телефоне) */
-body.blur :is(.gl,.place,.tally,.rodchip,#quests .q,#feed div,.toast,#catch,#castMark .lbl,#castMark .sub,#tour,#power){-webkit-backdrop-filter:var(--bf);backdrop-filter:var(--bf)}
+body.blur :is(.gl,.place,.tally,.rodchip,#quests .q,#feed div,.toast,#catch,#castMark .lbl,#castMark .sub,#castMark .who,#tour,#power){-webkit-backdrop-filter:var(--bf);backdrop-filter:var(--bf)}
 #hud b,#hud kbd,#hud h1,#hud h2,#toasts b,#touch button{font-family:var(--body);font-style:normal;text-transform:none;letter-spacing:0}
 #hud b{font-weight:600}
 #hud .cap{font-weight:600;font-size:1.18em;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}
@@ -226,6 +226,8 @@ body.blur :is(.gl,.place,.tally,.rodchip,#quests .q,#feed div,.toast,#catch,#cas
 #castMark .lbl{font:italic 800 1.5em/1 var(--disp);letter-spacing:.05em;text-transform:uppercase;background:var(--g2);padding:.34em .9em .36em;border-radius:1em;border:.09em solid var(--gb);white-space:nowrap;text-shadow:var(--tsh)}
 #castMark .sub{font-size:.95em;background:var(--g2);padding:.26em .8em;border-radius:1em;border:.07em solid rgba(255,255,255,.3);white-space:nowrap;text-shadow:var(--tsh)}
 #castMark .sub:empty{display:none}
+#castMark .who{font-size:.92em;background:var(--g2);padding:.24em .8em;border-radius:1em;border:.07em solid rgba(46,242,222,.55);color:var(--tl2);white-space:nowrap;text-shadow:var(--tsh)}
+#castMark .who:empty{display:none}
 #castMark.bad .ring{border-bottom-color:var(--rd)}
 #castMark.bad .lbl{border-color:#ffb3b8;color:#ffe1e3}
 #castMark.hot .lbl{border-color:var(--am);color:var(--am)}
@@ -355,6 +357,7 @@ input.code{text-transform:uppercase;letter-spacing:.3em;text-align:center;font:i
 .locs .loc.lock img{filter:saturate(.3) brightness(.62)}
 .locs .loc .lk{position:absolute;left:.7em;top:.7em;display:flex;align-items:center;gap:.3em;padding:.22em .6em .22em .45em;border-radius:1em;background:rgba(14,15,18,.74);color:var(--am);font:italic 800 .78em/1.2 var(--disp);letter-spacing:.05em}
 .locs .loc .lk .ic{width:1em;height:1em}
+.locs .loc .lk.st{font-style:normal;letter-spacing:.08em;padding:.2em .55em}
 .tnote{max-width:27em;margin:.2em auto 0;padding:.6em 1em;border-radius:1.1em;background:var(--g);border:.09em solid var(--gb);color:var(--cream);font-size:.9em;line-height:1.35;text-align:center}
 .tfoot{font-size:.95em;text-align:center;line-height:1.6;text-shadow:var(--tsh)}
 @media (max-height:540px) and (min-aspect-ratio:8/5){
@@ -447,19 +450,24 @@ input.code{text-transform:uppercase;letter-spacing:.3em;text-align:center;font:i
 .tile .wt{position:relative;font-size:.92em;margin-top:.15em;text-shadow:var(--tsh)}
 .tile.lock img{filter:drop-shadow(0 .35em .45em rgba(0,0,0,.4)) saturate(.85)}
 .tile.unk img{filter:brightness(0) opacity(.45)}
+.grid.g4{grid-template-columns:repeat(4,1fr);gap:.75em}
+.grid.g4 .tile{border-radius:1.15em}.grid.g4 .tile .nm{font-size:1.1em}.grid.g4 .tile .tg{left:.5em;top:.5em;font-size:.84em}.grid.g4 .tile .tg.cnt{left:auto;right:.5em}
 .grid.g5{grid-template-columns:repeat(5,1fr);gap:.7em}
 .grid.g5 .tile{aspect-ratio:1/.86;border-radius:1.1em;padding-bottom:.5em}
 .grid.g5 .tile .nm{font-size:1.12em}
 .grid.g5 .tile .tg{left:.45em;top:.45em;font-size:.82em}
 .grid.g5 .tile .tg.cnt{left:auto;right:.45em}
-.detail{grid-column:2/3;grid-row:3/4;padding:1.5em 1.7em 1.6em;display:grid;grid-template-columns:40% 1fr;gap:.7em 1.4em;align-content:start;overflow-y:auto;pointer-events:auto;min-height:0;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.5) transparent}
+.detail{grid-column:2/3;grid-row:3/4;padding:1.5em 1.7em 1.6em;display:grid;grid-template-columns:40% minmax(0,1fr);gap:.7em 1.4em;align-content:start;overflow-y:auto;pointer-events:auto;min-height:0;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.5) transparent}
 .detail .big{width:100%;aspect-ratio:1/1.1;object-fit:contain;filter:drop-shadow(0 .5em .7em rgba(0,0,0,.45));grid-row:1/4}
 .detail .big.rodpic{transform-origin:0 100%;transform:scale(1.14) translate(5%,-1%)} /* удочка на значке тонкая — в карточке показываем крупнее */
 .detail h2{margin:.2em 0 0;width:max-content;max-width:100%;position:relative;padding-bottom:.24em;font:italic 800 4em/1 var(--disp);color:var(--cream);text-shadow:0 .03em 0 rgba(0,0,0,.4),0 .08em .2em rgba(0,0,0,.45)}
+.detail>*{min-width:0} /* иначе длинное название растягивает колонку, и карточка обрезает его по краю */
+.detail h2.lg{font-size:3.2em}.detail h2.xl{font-size:2.6em;line-height:1.02}
 .detail h2::after{content:"";position:absolute;left:0;right:-.5em;bottom:0;height:.24em;background:var(--sw) no-repeat 0 0/100% 100%}
 .detail h2,.detail .desc,.detail .stats,.detail .more{z-index:1}
 .detail .desc{margin:0;position:relative;font-size:1.3em;line-height:1.4;text-shadow:var(--tsh)}
 .detail .chips{display:flex;flex-wrap:wrap;gap:.45em}
+.detail .chips.perks{grid-column:1/-1;justify-content:center;margin-top:.1em;z-index:1}.chipf.pk{border-color:rgba(255,201,60,.6);background:rgba(255,201,60,.1);color:var(--am)}
 .chipf{display:inline-flex;align-items:center;gap:.4em;height:2em;padding:0 .8em 0 .6em;border-radius:1em;border:.08em solid rgba(46,242,222,.65);background:rgba(46,242,222,.1);color:#d9fffb;font:italic 600 1.08em/1 var(--disp);white-space:nowrap}
 .chipf .ic{width:1.15em;height:1.15em;color:var(--tl2)}
 .detail .fx{margin:0;padding-left:1.2em;font-size:1.12em;line-height:1.55;text-shadow:var(--tsh)}
@@ -496,6 +504,10 @@ input.code{text-transform:uppercase;letter-spacing:.3em;text-align:center;font:i
 .loadout .keys span{display:inline-flex;gap:.5em;align-items:center}
 .jtop{grid-column:1/-1;display:flex;flex-direction:column;gap:.7em;min-width:0}
 .jtabs .tab{height:2.25em;font-size:1.14em;padding:0 1em 0 .8em}.jtabs .tab .ic{width:1.05em;height:1.05em;opacity:.85}
+.jtabs{align-items:center}
+.stars{font-style:normal;color:var(--am);letter-spacing:.06em;margin-left:.15em;text-shadow:none}.stars s{text-decoration:none;opacity:.32}
+.tab.on .stars{color:#7a4b00}
+.jmast{font-size:.92em;opacity:.92;margin-left:.4em;text-shadow:var(--tsh)}
 .jstats{grid-column:1/-1;display:flex;gap:.6em;flex-wrap:wrap}
 .jstats div{background:var(--g);border:.09em solid var(--gb);border-radius:1.1em;padding:.5em 1.1em .55em;font-size:.92em;box-shadow:0 .3em 1em rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.4);text-shadow:var(--tsh)}
 .jstats b{display:block;font:italic 800 1.9em/1.05 var(--disp);color:var(--cream)}

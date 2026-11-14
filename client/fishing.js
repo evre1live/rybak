@@ -1,7 +1,7 @@
 // Рыбалка игрока: прицел и заброс, поплавок, поклёвка, подсечка, вываживание, улов.
 import * as THREE from 'three';
-import { ITEMS, FISH_BY_ID, JUNK_BY_ID, RARITY, isLure } from '../shared/data.js';
-import { kitStats, biteDelay, rollFish, fightInit, fightStep, fightAssist, dangerAt, spendTackle, addCatch, recordCatch, activity, T_DANGER, T_LOW } from '../shared/logic.js';
+import { ITEMS, FISH_BY_ID, JUNK_BY_ID, RARITY, isLure, dayPart } from '../shared/data.js';
+import { kitStats, biteDelay, rollFish, speciesWeights, fightInit, fightStep, fightAssist, dangerAt, spendTackle, addCatch, recordCatch, activity, T_DANGER, T_LOW } from '../shared/logic.js';
 import { spotAt } from './terrain.js';
 import { LOC_ID } from './loc/id.js';
 import { waveH } from './water.js';
@@ -45,6 +45,7 @@ export class Fishing {
   refreshGear() {
     const p = this.profile;
     this.kit = kitStats(p);
+    this.whoKey = ''; // подсказка эхолота «кто клюёт» зависит от снастей
     const lure = isLure(p.equip.tackle);
     const id = lure ? p.equip.tackle : p.equip.float;
     if (id !== this.bobId) {
@@ -99,8 +100,23 @@ export class Fishing {
       spot.hot = this.schools.isHot(a.x, a.z);
       spot.wx = this.wx();
       a.act = this.kit.sonar ? activity(spot, this.profile.equip.tackle, this.hour(), this.kit) : 0;
+      a.who = this.kit.sonar2 ? this.whoBites(spot) : '';
     }
     return a;
+  }
+
+  /**
+   * Эхолот-профи: кто сейчас клюёт в этом месте — три самых вероятных вида. Пересчитывается, только когда
+   * меняется место, наживка или время суток, а не каждый кадр.
+   */
+  whoBites(spot) {
+    const tk = this.profile.equip.tackle;
+    const key = `${spot.zone}|${spot.pier ? 1 : 0}|${Math.round(spot.depth)}|${tk}|${dayPart(this.hour())}|${spot.hot ? 1 : 0}`;
+    if (key !== this.whoKey) {
+      this.whoKey = key;
+      this.who = speciesWeights(spot, tk, this.hour(), LOC_ID, this.kit).sort((x, y) => y.w - x.w).slice(0, 3).map((e) => e.f.name.toLowerCase()).join(', ');
+    }
+    return this.who;
   }
 
   startBite() {
@@ -517,7 +533,7 @@ export class Fishing {
 
   hook(dist) {
     const p = this.profile;
-    const c = this.rollOnce || rollFish(this.spot, p.equip.tackle, this.hour(), Math.random, LOC_ID);
+    const c = this.rollOnce || rollFish(this.spot, p.equip.tackle, this.hour(), Math.random, LOC_ID, this.kit);
     const forced = !!this.rollOnce; // проверки и снимки: рыба задана заранее, наживка не тратится
     this.rollOnce = null;
     if (!this.lure && !forced) {
@@ -610,7 +626,7 @@ export class Fishing {
   /** Для проверок: что за место в точке (x, z) и кто там клюнет — по тем же правилам, что и при настоящем забросе. */
   probe(x, z, hour = this.hour()) {
     const spot = spotAt(x, z);
-    return spot ? { spot, c: rollFish(spot, this.profile.equip.tackle, hour, Math.random, LOC_ID) } : null;
+    return spot ? { spot, c: rollFish(spot, this.profile.equip.tackle, hour, Math.random, LOC_ID, this.kit) } : null;
   }
   /** Для проверок и снимков: сразу начать вываживание рыбы sp (u — размер от 0 до 1) в dist метрах перед собой. */
   startFight(sp, u = 0.5, dist = 9) {

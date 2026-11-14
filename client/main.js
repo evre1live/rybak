@@ -31,7 +31,7 @@ import { route, routeReady } from './route.js';
 import { ITEMS, FISH_BY_ID, JUNK, JUNK_BY_ID, RARITY, zoneInfo, BAITS, LURES, clockHours, dayPart, fmtW, fmtCoins, isLure } from '../shared/data.js';
 import {
   marketState, hashStr, buy, equip, sell, kitStats, levelInfo, tackleCount, fishValue, newProfile, speciesWeights,
-  weatherAt, WEATHER, syncQuests, questEvent, questText, questDay,
+  weatherAt, WEATHER, syncQuests, questEvent, questText, questDay, claimMastery,
   TOURS, TOUR_COUNTDOWN, tourBlank, tourAdd, tourTable, tourPrize, tourMedal, medalPrize, tourScoreText, MEDALS,
   owns, assistBlock, fightAssist, recordAssist, assistXp, ASSIST_AT, ASSIST_REACH, exportSave, importSave
 } from '../shared/logic.js';
@@ -618,6 +618,7 @@ class Game {
     this.voiceChanged();
     this.market();
     this.syncQuests();
+    if (this.checkMastery()) this.ui.showLobby(); // звёзды, заработанные раньше, — награда при первом же входе (и монеты в шапке сразу новые)
     if (!this.solo) this.net.send({ t: 'mode', m: 'lobby' });
   }
   toLobby() {
@@ -1311,7 +1312,7 @@ class Game {
   preloadCatch() {
     const f = this.fishing;
     if (!f.spot) return;
-    const all = speciesWeights(f.spot, this.profile.equip.tackle, this.hours, LOC_ID).sort((a, b) => b.w - a.w);
+    const all = speciesWeights(f.spot, this.profile.equip.tackle, this.hours, LOC_ID, f.kit).sort((a, b) => b.w - a.w);
     // берём тех, на кого приходится девять поклёвок из десяти (на телефоне — не больше пяти видов: памяти мало);
     // редкий гость подгрузится при подсечке, как раньше, — шейдеры для него уже собраны
     const total = all.reduce((s, e) => s + e.w, 0);
@@ -1465,12 +1466,32 @@ class Game {
           this.sendCard();
         }
         this.questEv({ t: 'catch', c, zone: d.zone, boat: d.boat, released: d.released, wx: this.weather.kind });
+        this.checkMastery();
         ui.refreshHud();
         return saveProfile(p);
       }
       case 'reelin': return a.reelTicks(5, 0.035);
       default:
     }
+  }
+  /**
+   * Мастерство на локациях: новая звезда (половина видов, все виды, крупный экземпляр каждого) — награда, один раз.
+   * Проверяется после каждого улова и при входе: старым игрокам уже заработанные звёзды засчитываются сразу.
+   */
+  checkMastery() {
+    const p = this.profile;
+    const got = claimMastery(p);
+    if (!got.length) return false;
+    for (const m of got) {
+      const txt = `Мастерство: ${locOf(m.loc).name} ${'★'.repeat(m.stars)} — награда ${fmtCoins(m.coins)} монет`;
+      this.ui.toast(txt, 'gold', 5200);
+      if (this.state === 'world') this.ui.feed(`${'★'.repeat(m.stars)} <b>${esc(locOf(m.loc).name)}</b>: новая звезда мастерства, <b class="y">+${fmtCoins(m.coins)}</b> монет`);
+    }
+    this.audio.coin(3);
+    this.audio.jingle();
+    this.ui.refreshHud();
+    saveProfile(p);
+    return true;
   }
   /** Красная плашка посреди вываживания (легенда собралась, леска за камнями); потом возвращается обычная «НА КРЮЧКЕ!». */
   fightBanner(text, ms) {
@@ -2208,7 +2229,7 @@ class Game {
       const aim = f.aim;
       if (!ui.panel && ((f.state === 'idle' && i.enabled && (i.grab || i.touch.on)) || f.state === 'charge')) {
         v3.set(aim.x, 0.05, aim.z).project(cam);
-        ui.castMark({ x: (v3.x * 0.5 + 0.5) * this.gfx.w, y: (-v3.y * 0.5 + 0.5) * this.gfx.h, ok: aim.ok, hot: aim.spot && aim.spot.hot, clamped: aim.clamped, dist: aim.dist, zone: aim.spot ? zoneInfo(aim.spot.zone, LOC_ID).name : '', depth: aim.spot ? aim.spot.depth : 0, act: aim.act });
+        ui.castMark({ x: (v3.x * 0.5 + 0.5) * this.gfx.w, y: (-v3.y * 0.5 + 0.5) * this.gfx.h, ok: aim.ok, hot: aim.spot && aim.spot.hot, clamped: aim.clamped, dist: aim.dist, zone: aim.spot ? zoneInfo(aim.spot.zone, LOC_ID).name : '', depth: aim.spot ? aim.spot.depth : 0, act: aim.act, who: aim.who });
       } else ui.castMark(null);
       ui.power(f.state === 'charge' ? f.power : null, aim.dist / kit.cast);
       $('#cross').className = !i.grab && !i.touch.on ? 'off' : f.state === 'idle' && !aim.ok ? 'bad' : '';

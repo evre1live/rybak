@@ -127,6 +127,25 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     assert.ok((await page.locator('.grid .tile').count()) >= 2, cat);
     assert.ok((await page.textContent('.detail h2')).length > 2);
   }
+  // лестница снастей: десять удочек помещаются в четыре колонки, у дорогих — особенности плашками, длинные названия целы
+  await page.click('.tabs2 [data-id="rod"]');
+  assert.equal(await page.locator('.grid .tile').count(), 10);
+  assert.ok(await G(page, () => document.querySelector('.panel .grid').classList.contains('g4')));
+  await page.click('.grid [data-id="rod10"]');
+  assert.equal(await page.textContent('.detail h2'), 'Легенда');
+  assert.deepEqual(await page.$$eval('.detail .perks .chipf', (els) => els.map((e) => e.textContent)), ['Ночью клёв +20%', 'Леска держит +43%', 'Рыба крупнее', 'Редкая рыба +30%', 'Чудо-класс']);
+  assert.match(await page.textContent('.detail .price'), /900\s?000/);
+  const fits = await G(page, () => { const d = document.querySelector('.detail'); const b = d.querySelector('.price').getBoundingClientRect(); const r = d.getBoundingClientRect(); const h = d.querySelector('h2').getBoundingClientRect(); return { price: b.bottom <= r.bottom + 1, title: h.right <= r.right + 1 }; });
+  assert.deepEqual(fits, { price: true, title: true }, 'цена и название помещаются в карточку');
+  await page.click('.grid [data-id="rod6"]');
+  assert.equal(await page.locator('.detail .perks .chipf').count(), 0, 'у прежних удочек особенностей нет');
+  assert.ok(await G(page, () => { const d = document.querySelector('.detail'); return d.querySelector('h2').getBoundingClientRect().right <= d.getBoundingClientRect().right + 1; }), '«Повелитель приливов» не обрезан');
+  await shot(page, '03b-tackle-rods');
+  await page.click('.tabs2 [data-id="extra"]');
+  assert.deepEqual(await page.$$eval('.grid .tile', (els) => els.map((e) => e.dataset.id)), ['net', 'sonar', 'boat', 'lantern', 'sonar2', 'belt', 'bignet']);
+  await page.click('.tabs2 [data-id="tackle"]');
+  assert.equal(await page.locator('.grid .tile').count(), 10);
+  assert.ok(await G(page, () => [...document.querySelectorAll('.grid .tile img')].every((i) => i.complete && i.naturalWidth > 0)), 'значки новых наживок нарисованы');
   await page.keyboard.press('Escape');
   await page.click('.nav [data-p="journal"]');
   await page.waitForSelector('.jstats');
@@ -643,6 +662,20 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
   await page.keyboard.press('Escape');
   assert.equal(await G(page, () => RYBAK.ui.panel), null);
   assert.equal(await G(page, () => RYBAK.fishing.kit.cast), 24);
+  // эхолот-профи: у точки заброса видно, кто здесь клюёт (проверяем и убираем — дальше игра идёт без него)
+  const who = await G(page, () => {
+    const g = RYBAK, f = g.fishing, p = g.profile;
+    g.player.place(0, -24.5, 0); g.player.pitch = -0.12;
+    const before = f.updateAim(g.player).who;
+    p.owned.sonar2 = 1; f.refreshGear();
+    const a = f.updateAim(g.player);
+    g.ui.castMark({ x: 600, y: 300, ok: true, hot: false, clamped: false, dist: a.dist, zone: 'Глубина', depth: 5, act: a.act, who: a.who });
+    const line = document.querySelector('#castMark .who').textContent;
+    g.ui.castMark(null);
+    delete p.owned.sonar2; f.refreshGear();
+    return { before, who: a.who, line, after: f.updateAim(g.player).who, sonar: f.kit.sonar };
+  });
+  assert.ok(who.before === '' && who.after === '' && !who.sonar && who.who.split(', ').length === 3 && who.line === 'Берёт: ' + who.who, `эхолот-профи: ${JSON.stringify(who)}`);
 
   // блесна: вести подмоткой
   await page.waitForTimeout(900);

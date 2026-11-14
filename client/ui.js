@@ -4,7 +4,7 @@ import { CATS, ITEMS, FISH, FISH_BY_ID, FIGHT_STYLES, JUNK_BY_ID, RARITY, zoneIn
 import { LOCATIONS, locOf } from '../shared/locations.js';
 import { LOC_ID, LOC } from './loc/id.js';
 import {
-  kitStats, rodBars, owns, tackleCount, priceOf, fishValue, coolerValue, levelInfo, fightGrade, T_LOW, T_DANGER, T_TIGHT, dangerAt, liftNeed,
+  kitStats, rodBars, rodPerks, mastery, MASTERY_PRIZE, owns, tackleCount, priceOf, fishValue, coolerValue, levelInfo, fightGrade, T_LOW, T_DANGER, T_TIGHT, dangerAt, liftNeed,
   WEATHER, questText, questCount, questReward, QUEST_BONUS, TOURS, TOUR_LENS, tourTable, tourScoreText, tourTargets, tourPrize, medalPrize, MEDALS
 } from '../shared/logic.js';
 import { itemIcon, fishIcon, faceIcon } from './icons.js';
@@ -385,6 +385,10 @@ export class UI {
     const sub = m.ok ? `${m.zone} · ${m.dist.toFixed(0)} м от вас · дно ${m.depth.toFixed(1).replace('.', ',')} м${m.act ? ` · клёв ${'●'.repeat(Math.max(1, Math.round(m.act * 5)))}` : ''}` : '';
     const s = e.querySelector('.sub');
     if (s.textContent !== sub) s.textContent = sub;
+    // эхолот-профи: кто здесь сейчас клюёт
+    const who = m.ok && m.who ? `Берёт: ${m.who}` : '';
+    const w = e.querySelector('.who');
+    if (w.textContent !== who) w.textContent = who;
   }
   clock(h) {
     const s = fmtClock(h);
@@ -663,7 +667,8 @@ export class UI {
     const lvl = levelInfo(p.xp).lvl;
     const locs = this.g.offline ? '' : `<label>Где рыбачим</label><div class="locs">${LOCATIONS.map((l) => {
       const lock = lvl < l.level;
-      return `<button class="loc${l.id === this.pickLoc ? ' on' : ''}${lock ? ' lock' : ''}" data-a="loc" data-id="${l.id}" title="${esc(l.about)}"><img src="${imgUrl(l.img)}" alt="">${lock ? `<em class="lk">${ic('lock')}С ${l.level} УРОВНЯ</em>` : ''}<b>${esc(l.name)}</b><i>${esc(l.sub)}</i></button>`;
+      const st = mastery(p, l.id).stars; // звёзды мастерства — на карточке, если уже есть хоть одна
+      return `<button class="loc${l.id === this.pickLoc ? ' on' : ''}${lock ? ' lock' : ''}" data-a="loc" data-id="${l.id}" title="${esc(l.about)}"><img src="${imgUrl(l.img)}" alt="">${lock ? `<em class="lk">${ic('lock')}С ${l.level} УРОВНЯ</em>` : st ? `<em class="lk st">${'★'.repeat(st)}</em>` : ''}<b>${esc(l.name)}</b><i>${esc(l.sub)}</i></button>`;
     }).join('')}</div>`;
     this.screen.innerHTML = `<div class="title">
       ${LOGO}
@@ -791,13 +796,16 @@ export class UI {
     this.screen.innerHTML = `<div class="dim"></div><div class="panel">
       ${this.panelHead(t.shop ? 'МАГАЗИН' : 'СНАСТИ', t.shop ? `<button class="btn sm cy" data-a="open" data-p="sell">${ic('fish')}<span>ПРОДАТЬ УЛОВ</span></button>` : '')}
       <div class="tabs2">${CATS.map((c) => `<button class="tab ${c.key === cat.key ? 'on' : ''}" data-a="cat" data-id="${c.key}">${ic(CAT_ICON[c.key])}${c.name}</button>`).join('')}</div>
-      <div class="grid">${tiles}</div>
+      <div class="grid${cat.items.length > 9 ? ' g4' : ''}">${tiles}</div>
       <div class="detail">${this.itemDetail(it)}</div>
       <div class="loadout"><span class="hd">ТЕКУЩИЙ НАБОР</span>
         <div class="it"><img src="${itemIcon(p.equip.rod)}" alt="">${esc(ITEMS[p.equip.rod].name)}</div>
         <div class="it"><img src="${itemIcon(p.equip.tackle)}" alt="">${esc(ITEMS[p.equip.tackle].name)} <span class="y">${left === Infinity ? '∞' : '×' + left}</span></div>
         <div class="it">Заброс <span class="y">${kit.cast} м</span></div><div class="it">Леска <span class="y">${kit.lineKg.toFixed(1).replace('.', ',')} кг</span></div><div class="it">Садок <span class="y">${p.cooler.length}/${kit.bagCap}</span></div>
         ${this.footKeys(this.actionOf(it).label)}</div></div>`;
+    // выбранная снасть всегда на виду: в длинном разделе плитки прокручиваются
+    const cur = this.screen.querySelector('.grid .tile.sel');
+    if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: 'nearest' });
   }
   actionOf(it) {
     const p = this.g.profile;
@@ -823,17 +831,19 @@ export class UI {
     if (it.cat === 'rod') {
       const b = rodBars(it);
       const row = (name, v, txt) => `<div class="stat"><span>${name}<em>${txt}</em></span><div class="bar"><i style="width:${Math.round(clamp(v, 0.04, 1) * 100)}%"></i></div></div>`;
-      body = `<div class="stats">${row('Дальность', b.cast, it.cast + ' м')}${row('Прочность', b.line, String(it.line).replace('.', ',') + ' кг')}${row('Скорость', b.reel, '×' + it.reel.toFixed(2).replace('.', ','))}</div>`;
+      const perks = rodPerks(it);
+      // особенности дорогих удочек — плашками под полосками (полный текст — по наведению)
+      body = `<div class="stats">${row('Дальность', b.cast, it.cast + ' м')}${row('Прочность', b.line, String(it.line).replace('.', ',') + ' кг')}${row('Скорость', b.reel, '×' + it.reel.toFixed(2).replace('.', ','))}</div>${perks.length ? `<div class="chips perks">${perks.map((k) => `<span class="chipf pk" title="${esc(k.text)}">${esc(k.short)}</span>`).join('')}</div>` : ''}`;
     } else {
       const fx = [];
       let chips = '';
       if (it.cat === 'tackle' || it.cat === 'lure') {
         // кто на это клюёт — плашками с рыбкой
-        const likes = FISH.filter((f) => (it.cat === 'lure' ? f.lure >= 1.2 : (f.baits[it.id] || 0) >= 1.25)).sort((a, b) => b.rar - a.rar).slice(0, 6);
+        const likes = FISH.filter((f) => (it.cat === 'lure' ? f.lure >= 1.2 : (f.baits[it.id] || 0) >= 1.25)).sort((a, b) => b.rar - a.rar).slice(0, it.cat === 'lure' ? 4 : 6);
         if (likes.length) chips = `<div class="chips">${likes.map((f) => `<span class="chipf">${ic('fish')}${esc(f.name)}</span>`).join('')}</div>`;
         if (it.rare > 1) fx.push(`Редкая рыба клюёт охотнее: ×${String(it.rare).replace('.', ',')}`);
         if (it.size > 1) fx.push('Рыба попадается крупнее');
-        if (it.cat === 'lure') fx.push('Не расходуется, но теряется при обрыве лески', 'После заброса удерживайте кнопку — приманка должна двигаться');
+        if (it.cat === 'lure') fx.push('Не расходуется, но теряется при обрыве лески', 'Ведите подмоткой: после заброса держите кнопку');
         else if (it.id !== 'bread') fx.push('Расходуется при каждой поклёвке');
       }
       if (it.cat === 'bag') fx.push(`Вместимость: ${it.cap} рыб`);
@@ -847,7 +857,9 @@ export class UI {
     else if (eq) actHtml = `<div class="state">${ic('check')}ВЫБРАНО</div>`;
     else if (own) actHtml = `<div class="state">${ic('check')}КУПЛЕНО</div>`;
     else actHtml = `${price('НА РЫНКЕ')}<div class="note">Купить можно в лавке у берега —<br>под полосатым навесом.</div>`;
-    return `<img class="big${it.cat === 'rod' ? ' rodpic' : ''}" src="${itemIcon(it.id)}" alt=""><h2>${esc(it.name)}</h2><p class="desc">${esc(it.desc)}</p>${body}<div class="act">${actHtml}</div>`;
+    // длинное название («Морской мультипликатор») — шрифтом помельче, иначе не помещается в карточку
+    const long = it.name.length > 15 ? ' class="xl"' : it.name.length > 10 ? ' class="lg"' : '';
+    return `<img class="big${it.cat === 'rod' ? ' rodpic' : ''}" src="${itemIcon(it.id)}" alt=""><h2${long}>${esc(it.name)}</h2><p class="desc">${esc(it.desc)}</p>${body}<div class="act">${actHtml}</div>`;
   }
 
   renderSell() {
@@ -886,8 +898,12 @@ export class UI {
     const f = FISH_BY_ID[this.js];
     const j = p.journal[f.id];
     const got = Object.keys(p.journal).length;
+    const stars = (n) => `<i class="stars">${'★'.repeat(n)}<s>${'★'.repeat(3 - n)}</s></i>`;
     const tabs = [...LOCATIONS.map((l) => [l.id, l.name, fishOf(l.id)]), ['all', 'Вся рыба', FISH]]
-      .map(([id, name, fs]) => `<button class="tab${id === jl ? ' on' : ''}" data-a="jloc" data-id="${id}">${id === 'all' ? '' : ic('pin')}${esc(name)} · ${fs.filter((x) => p.journal[x.id]).length}/${fs.length}</button>`).join('');
+      .map(([id, name, fs]) => `<button class="tab${id === jl ? ' on' : ''}" data-a="jloc" data-id="${id}">${id === 'all' ? '' : ic('pin')}${esc(name)} · ${fs.filter((x) => p.journal[x.id]).length}/${fs.length}${id === 'all' ? '' : stars(mastery(p, id).stars)}</button>`).join('');
+    // мастерство на выбранной локации: сколько звёзд и что осталось до следующей
+    const ms = jl === 'all' ? null : mastery(p, jl);
+    const mline = !ms ? '' : `<span class="jmast">${ms.stars < 3 ? `До ${'★'.repeat(ms.stars + 1)}: ${esc(ms.next)} — награда ${fmtCoins(MASTERY_PRIZE[ms.stars + 1])} монет` : 'Все виды и крупный экземпляр каждого — вы мастер этой локации'}</span>`;
     const tiles = list.map((x) => {
       const jj = p.journal[x.id];
       return `<div class="tile ${x.id === this.js ? 'sel' : ''} ${jj ? '' : 'unk lock'}" data-a="jpick" data-id="${x.id}">${jj ? `<span class="tg cnt">×${jj.n}</span>` : ''}<img src="${fishIcon(x.id)}" alt=""><div class="nm" style="color:${jj ? rarTint(x.rar) : 'rgba(255,255,255,.7)'}">${jj ? esc(x.name) : '???'}</div></div>`;
@@ -904,7 +920,7 @@ export class UI {
     this.screen.innerHTML = `<div class="dim"></div><div class="panel">
       ${this.panelHead('ЖУРНАЛ')}
       <div class="jtop"><div class="jstats"><div><b>${lv.lvl}</b>уровень · ${esc(lv.title)}</div><div><b>${got}/${FISH.length}</b>видов открыто</div><div><b>${s.caught}</b>поймано</div><div><b>${fmtCoins(s.earned)}</b>заработано</div><div><b>${s.best ? fmtW(s.best.w) : '—'}</b>${s.best ? esc(FISH_BY_ID[s.best.sp].name) + ' — рекорд' : 'самый тяжёлый улов'}</div><div><b>${s.snaps}</b>обрывов лески</div>${s.stalked ? `<div><b>${s.stalked}</b>выслежено</div>` : ''}${s.assists ? `<div><b>${s.assists}</b>подсачено друзьям</div>` : ''}</div>
-        <div class="tabs2 jtabs">${tabs}</div></div>
+        <div class="tabs2 jtabs">${tabs}${mline}</div></div>
       <div class="grid g5">${tiles}</div>
       <div class="detail jdetail">
         <img class="big ${j ? '' : 'unk'}" src="${fishIcon(f.id)}" alt="">

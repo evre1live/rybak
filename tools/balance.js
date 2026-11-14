@@ -13,7 +13,20 @@ const TIERS = [
   { name: '5 закат, воблер водопад/глубь', eq: { rod: 'rod5', line: 'line3', reel: 'reel3', hook: 'hook3' }, tackle: 'wobbler', spots: [['falls', 3, 0], ['deep', 11, 0], ['reef', 4, 0]] },
   { name: '5 закат, кальмар глубь', eq: { rod: 'rod5', line: 'line4', reel: 'reel4', hook: 'hook4' }, tackle: 'squid', spots: [['deep', 12, 0]] },
   { name: '6 прилив, кальмар арка', eq: { rod: 'rod6', line: 'line4', reel: 'reel4', hook: 'hook4' }, tackle: 'squid', spots: [['arch', 10, 0]] },
-  { name: '6 прилив, живец арка (косяк)', eq: { rod: 'rod6', line: 'line4', reel: 'reel4', hook: 'hook4' }, tackle: 'live', spots: [['arch', 10, 1]] }
+  { name: '6 прилив, живец арка (косяк)', eq: { rod: 'rod6', line: 'line4', reel: 'reel4', hook: 'hook4' }, tackle: 'live', spots: [['arch', 10, 1]] },
+  // ступени этапа 22
+  { name: '6 прилив, краб арка', eq: { rod: 'rod6', line: 'line4', reel: 'reel4', hook: 'hook4' }, tackle: 'crab', spots: [['arch', 10, 0]] },
+  { name: '7 звезда, краб арка', eq: { rod: 'rod7', line: 'line5', reel: 'reel5', hook: 'hook5' }, tackle: 'crab', spots: [['arch', 10, 0]] },
+  { name: '8 волк, поппер море/арка', eq: { rod: 'rod8', line: 'line6', reel: 'reel6', hook: 'hook6' }, tackle: 'popper', spots: [['sea', 14, 0], ['arch', 10, 0]] },
+  { name: '9 гроза, краб арка', eq: { rod: 'rod9', line: 'line6', reel: 'reel6', hook: 'hook6' }, tackle: 'crab', spots: [['arch', 10, 0]] },
+  { name: '10 легенда, блесна мастера', eq: { rod: 'rod10', line: 'line7', reel: 'reel7', hook: 'hook6', float: 'float6' }, tackle: 'legendlure', spots: [['arch', 10, 0], ['sea', 14, 0]] },
+  { name: '10 легенда, краб арка (косяк)', eq: { rod: 'rod10', line: 'line7', reel: 'reel7', hook: 'hook6', float: 'float6' }, tackle: 'crab', spots: [['arch', 10, 1]] },
+  // Сосновое озеро
+  { name: 'озеро 1 старт, червь', loc: 'lake', eq: {}, tackle: 'worm', spots: [['pier', 2, 0], ['shallow', 1.5, 0], ['deep', 9, 0]] },
+  { name: 'озеро 2 рифовая, мотыль', loc: 'lake', eq: { rod: 'rod2', line: 'line2', reel: 'reel2', hook: 'hook2' }, tackle: 'bloodworm', spots: [['backwater', 2, 0], ['stones', 3, 0], ['deep', 9, 0]] },
+  { name: 'озеро 3 разведчик, мушка', loc: 'lake', eq: { rod: 'rod3', line: 'line3', reel: 'reel3', hook: 'hook3' }, tackle: 'fly', spots: [['falls', 4, 0], ['stones', 3, 0]] },
+  { name: 'озеро 5 закат, живец яма', loc: 'lake', eq: { rod: 'rod5', line: 'line4', reel: 'reel4', hook: 'hook4' }, tackle: 'live', spots: [['pit', 16, 0], ['falls', 4, 0]] },
+  { name: 'озеро 10 легенда, блесна', loc: 'lake', eq: { rod: 'rod10', line: 'line7', reel: 'reel7', hook: 'hook6', float: 'float6' }, tackle: 'legendlure', spots: [['pit', 16, 0], ['falls', 4, 0], ['backwater', 2, 0]] }
 ];
 const N = Number(process.argv[2]) || 4000;
 const rng = mulberry32(12345);
@@ -32,7 +45,7 @@ for (const tier of TIERS) {
     const lure = ITEMS[tier.tackle].cat === 'lure';
     time += 2.5 + d.t * (lure ? 2 : 1) + 0.5;
     if (rng() < 0.12) { time += 1; if (!lure) coins -= ITEMS[tier.tackle].price; continue; } // прозевали
-    const c = rollFish(spot, tier.tackle, hour % 24, rng);
+    const c = rollFish(spot, tier.tackle, hour % 24, rng, tier.loc, kit);
     if (!lure) coins -= ITEMS[tier.tackle].price;
     const r = botFight(c, kit, rng, 0.8);
     time += r.t + 3;

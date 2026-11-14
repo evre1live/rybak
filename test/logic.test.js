@@ -1025,3 +1025,117 @@ test('рынок локации: в цене — только здешняя р�
     for (const id of bayIds) assert.equal(bay.mult[id], old[id]);
   }
 });
+
+// ───── этап 22: лестница снастей, особенности, мастерство ─────
+import { RODS as RODS22, REELS as REELS22, LINES as LINES22, HOOKS as HOOKS22, FLOATS as FLOATS22, BAGS as BAGS22, LURES as LURES22, BAITS as BAITS22, EXTRAS as EXTRAS22 } from '../shared/data.js';
+
+test('снасти: лестница цен растёт, у каждой ступени есть смысл', () => {
+  for (const [name, list] of [['удочки', RODS22], ['катушки', REELS22], ['лески', LINES22], ['крючки', HOOKS22], ['поплавки', FLOATS22], ['садки', BAGS22], ['приманки', LURES22]]) {
+    for (let i = 1; i < list.length; i++) assert.ok(list[i].price > list[i - 1].price, `${name}: ${list[i].name} дороже, чем ${list[i - 1].name}`);
+  }
+  assert.equal(RODS22.length, 10);
+  assert.ok(RODS22[9].price >= 800000 && RODS22[9].price <= 1000000, 'лучшая удочка — около миллиона');
+  // новые ступени удочек: каждая в 2–2,6 раза дороже прошлой и лучше её по всем трём числам
+  for (let i = 6; i < 10; i++) {
+    const a = RODS22[i - 1], b = RODS22[i];
+    assert.ok(b.price / a.price >= 2 && b.price / a.price <= 2.6, `${b.name}: цена ×${(b.price / a.price).toFixed(2)}`);
+    assert.ok(b.cast > a.cast && b.line > a.line && b.reel > a.reel, `${b.name} лучше ${a.name}`);
+    assert.ok(L.rodPerks(b).length >= 1, `${b.name}: есть особенность`);
+  }
+  for (const r of RODS22) { const b = L.rodBars(r); for (const k of ['cast', 'line', 'reel']) assert.ok(b[k] > 0 && b[k] <= 1.0001, `${r.name}: полоска ${k} = ${b[k]}`); }
+  assert.deepEqual(Object.values(L.rodBars(RODS22[9])).map((v) => +v.toFixed(3)), [1, 1, 1], 'у лучшей удочки полоски полные');
+  assert.ok(REELS22.length === 7 && LINES22.length === 7 && HOOKS22.length === 6 && FLOATS22.length === 6 && BAGS22.length === 7 && LURES22.length === 7 && BAITS22.length === 10 && EXTRAS22.length === 7);
+  // у каждого предмета — название, описание и своё имя в общем списке
+  const ids = new Set();
+  for (const it of Object.values(ITEMS)) { assert.ok(it.name && it.desc && !ids.has(it.id), it.id); ids.add(it.id); }
+  // крючки: чем дороже, тем больше времени на подсечку и тем реже сход
+  for (let i = 1; i < HOOKS22.length; i++) assert.ok(HOOKS22[i].win > HOOKS22[i - 1].win && HOOKS22[i].hold < HOOKS22[i - 1].hold);
+  for (let i = 1; i < BAGS22.length; i++) assert.ok(BAGS22[i].cap > BAGS22[i - 1].cap);
+  for (let i = 1; i < LINES22.length; i++) assert.ok(LINES22[i].mult > LINES22[i - 1].mult);
+});
+
+test('особенности снастей: ночь, прочность, подсак, эхолот', () => {
+  const kit = (eq = {}, own = []) => { const p = L.newProfile(); Object.assign(p.equip, eq); for (const id of [...Object.values(eq), ...own]) p.owned[id] = 1; return L.kitStats(p); };
+  const base = kit();
+  assert.deepEqual([base.nightMult, base.tough, base.size, base.rare, base.landAt, base.sonar2, base.heavy, base.myth], [1, 1, 1, 1, 1, false, false, false]);
+  // ночной клёв: удочка, поплавок и фонарь перемножаются
+  assert.equal(kit({ rod: 'rod7' }).nightMult, 1.25);
+  assert.equal(+kit({ rod: 'rod7', float: 'float5' }, ['lantern']).nightMult.toFixed(3), +(1.25 * 1.35 * 1.2).toFixed(3));
+  assert.equal(kit({}, ['lantern']).nightMult, 1.2);
+  // подсак: обычный — с 85 %, большой — с 75 %; большой заменяет обычный
+  assert.deepEqual([kit({}, ['net']).landAt, kit({}, ['bignet']).landAt, kit({}, ['net', 'bignet']).landAt, kit({}, ['bignet']).net], [0.85, 0.75, 0.75, true]);
+  // эхолот-профи умеет всё, что обычный
+  assert.deepEqual([kit({}, ['sonar2']).sonar, kit({}, ['sonar2']).sonar2, kit({}, ['sonar']).sonar2], [true, true, false]);
+  // пояс и дорогие катушки: натяжение растёт плавнее
+  assert.ok(kit({}, ['belt']).smooth > base.smooth);
+  const sm = REELS22.map((r) => kit({ reel: r.id }).smooth);
+  for (let i = 1; i < sm.length; i++) assert.ok(sm[i] > sm[i - 1], `плавность катушек растёт: ${sm}`);
+  assert.deepEqual(sm.slice(0, 4).map((v) => +v.toFixed(2)), [1, 1.13, 1.26, 1.39], 'у прежних катушек плавность прежняя');
+  const top = kit({ rod: 'rod10', line: 'line7', reel: 'reel7' });
+  assert.ok(top.myth && top.heavy && top.lineKg === 80 * 2.75 && top.tough < 1 && top.size > 1 && top.rare > 1);
+  // в опасной зоне прочная удочка держит леску дольше — ровно во столько раз, во сколько написано
+  const snapT = (tough) => {
+    const k = { lineKg: 10, reel: 1, smooth: 1, hold: 1, net: false, tough };
+    const s = L.fightInit({ sp: 'shuka', w: 6 }, k, () => 0.5);
+    let t = 0;
+    while (!s.result && t < 60) { s.T = 0.95; s.phase = 'calm'; s.phaseT = 5; s.next = 'calm'; L.fightStep(s, { reel: false, steer: 0 }, 1 / 60, k, () => 0.5); t += 1 / 60; }
+    assert.equal(s.result, 'snap');
+    return t;
+  };
+  const t1 = snapT(1), t2 = snapT(0.7);
+  assert.ok(Math.abs(t2 / t1 - 1 / 0.7) < 0.06, `леска держится дольше: ${t1.toFixed(2)} с → ${t2.toFixed(2)} с`);
+  // подсак берёт рыбу раньше
+  const landP = (landAt) => { const k = { lineKg: 50, reel: 3, smooth: 1, hold: 0.2, net: landAt < 1, landAt }; const s = L.fightInit({ sp: 'okun', w: 0.5 }, k, () => 0.5); let n = 0; while (!s.result && n++ < 20000) { s.T = 0.5; L.fightStep(s, { reel: true, steer: 0 }, 1 / 60, k, () => 0.5); } assert.equal(s.result, 'landed'); return s.p; };
+  assert.ok(landP(0.75) >= 0.75 && landP(0.75) < 0.8 && landP(0.85) >= 0.85 && landP(1) >= 1);
+});
+
+test('особенности удочек: крупнее рыба и больше редкой — в числах', () => {
+  const run = (kit, tackle, spot, loc) => { const rng = L.mulberry32(77); let w = 0, rare = 0, tr = 0, n = 0; for (let i = 0; i < 12000; i++) { const c = L.rollFish(spot, tackle, 13, rng, loc, kit); if (c.junk) continue; const f = FISH_BY_ID[c.sp]; n++; w += (c.w - f.w[0]) / (f.w[1] - f.w[0]); if (f.rar >= 2) rare++; if (c.trophy) tr++; } return { u: w / n, rare: rare / n, tr: tr / n }; };
+  const spot = { zone: 'deep', depth: 10, pier: false, hot: false };
+  const a = run({ size: 1, rare: 1 }, 'squid', spot);
+  const none = run(undefined, 'squid', spot);
+  assert.deepEqual(a, none, 'без набора снастей — как с обычным');
+  const big = run({ size: 1.25, rare: 1 }, 'squid', spot);
+  assert.ok(big.u > a.u * 1.12 && big.tr > a.tr * 1.2, `«Гроза глубин»: рыба крупнее, трофеев больше: ${JSON.stringify([a, big])}`);
+  const rr = run({ size: 1, rare: 1.3 }, 'squid', spot);
+  assert.ok(rr.rare > a.rare * 1.04 && Math.abs(rr.u - a.u) < 0.02, `«Легенда»: редкой рыбы больше: ${JSON.stringify([a.rare, rr.rare])}`);
+  // новые наживки: мушка — хариус под водопадом на озере, мотыль — ёрш у свай, краб — у арки берут великаны
+  const topOf = (tackle, sp, loc) => L.speciesWeights(sp, tackle, 13, loc).sort((x, y) => y.w - x.w)[0].f.id;
+  assert.equal(topOf('fly', { zone: 'falls', depth: 4 }, 'lake'), 'harius');
+  assert.equal(topOf('bloodworm', { zone: 'pier', depth: 2, pier: true }, 'lake'), 'ersh');
+  const share = (tackle) => { const l = L.speciesWeights({ zone: 'arch', depth: 10 }, tackle, 13, 'bay'); const t = l.reduce((s, e) => s + e.w, 0); return l.filter((e) => e.f.rar >= 3).reduce((s, e) => s + e.w, 0) / t; };
+  assert.ok(share('crab') > share('squid'), `на краба у арки эпической и легендарной рыбы больше, чем на кальмара: ${share('crab').toFixed(3)} > ${share('squid').toFixed(3)}`);
+});
+
+test('звания после двадцатого уровня и мастерство по локациям', () => {
+  assert.deepEqual([1, 2, 3, 15, 19, 20, 24, 25, 30, 40, 50, 70, 99].map((l) => L.titleOf(l)), ['Новичок', 'Новичок', 'Любитель', 'Морской волк', 'Морской волк', 'Легенда бухты', 'Легенда бухты', 'Гроза глубин', 'Хозяин вод', 'Повелитель приливов', 'Морской царь', 'Живая легенда', 'Живая легенда']);
+  const p = L.newProfile();
+  assert.deepEqual(p.mastery, {});
+  assert.deepEqual([L.mastery(p, 'lake').stars, L.mastery(p, 'lake').of, L.mastery(p, 'bay').of], [0, 14, 25]);
+  assert.match(L.mastery(p, 'lake').next, /откройте ещё 7 видов/);
+  assert.deepEqual(L.claimMastery(p), []);
+  // половина видов озера — первая звезда
+  const lake = fishOf('lake');
+  for (const f of lake.slice(0, 7)) p.journal[f.id] = { n: 1, best: f.w[0] };
+  assert.equal(L.mastery(p, 'lake').stars, 1);
+  const c0 = p.coins;
+  assert.deepEqual(L.claimMastery(p), [{ loc: 'lake', stars: 1, coins: L.MASTERY_PRIZE[1] }]);
+  assert.equal(p.coins, c0 + L.MASTERY_PRIZE[1]);
+  assert.deepEqual(L.claimMastery(p), [], 'второй раз за ту же звезду не платят');
+  // все виды — вторая; крупный экземпляр каждого — третья. Сразу две звезды — две награды
+  for (const f of lake) p.journal[f.id] = { n: 2, best: f.w[0] + (f.w[1] - f.w[0]) * 0.59 };
+  assert.equal(L.mastery(p, 'lake').stars, 2);
+  assert.match(L.mastery(p, 'lake').next, /крупный экземпляр каждого вида — осталось 14/);
+  for (const f of lake) p.journal[f.id].best = f.w[0] + (f.w[1] - f.w[0]) * 0.6;
+  assert.equal(L.mastery(p, 'lake').stars, 3);
+  const got = L.claimMastery(p);
+  assert.deepEqual(got.map((m) => [m.loc, m.stars, m.coins]), [['lake', 2, L.MASTERY_PRIZE[2]], ['lake', 3, L.MASTERY_PRIZE[3]]]);
+  assert.equal(p.mastery.lake, 3);
+  // рыба озера, которая живёт и в бухте, идёт в зачёт бухты тоже — но до звезды там ещё далеко
+  assert.equal(L.mastery(p, 'bay').got, 8);
+  assert.equal(L.mastery(p, 'bay').stars, 0);
+  // старое сохранение без поля мастерства: уже заработанное засчитывается при первой проверке
+  const old = L.fixProfile({ ...L.newProfile(), mastery: undefined, journal: Object.fromEntries(fishOf('bay').slice(0, 13).map((f) => [f.id, { n: 1, best: f.w[0] }])) });
+  assert.deepEqual(old.mastery, {});
+  assert.deepEqual(L.claimMastery(old).map((m) => [m.loc, m.stars]), [['bay', 1]]);
+});

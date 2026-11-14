@@ -1,6 +1,6 @@
 // РЫБАК — правила: клёв, выбор рыбы, вываживание, цены, рынок, профиль игрока.
 import { FISH, FISH_BY_ID, JUNK, JUNK_BY_ID, RARITY, ZONES, ITEMS, RODS, LINES, REELS, HOOKS, FLOATS, BAGS, MARKET_PERIOD, dayPart, isLure, zonesOf, fishOf } from './data.js';
-import { DEFAULT_LOC, locOf } from './locations.js';
+import { DEFAULT_LOC, LOCATIONS, locOf } from './locations.js';
 
 export function mulberry32(a) {
   a >>>= 0;
@@ -30,22 +30,51 @@ export function kitStats(p) {
   const hook = ITEMS[p.equip.hook] || HOOKS[0];
   const fl = ITEMS[p.equip.float] || FLOATS[0];
   const bag = ITEMS[p.equip.bag] || BAGS[0];
+  const own = p.owned || {};
+  const perk = rod.perk || {};
   return {
     cast: rod.cast,
     lineKg: rod.line * line.mult,
     reel: rod.reel * reel.mult,
-    smooth: 1 + REELS.findIndex((r) => r.id === reel.id) * 0.13,
+    // плавность натяжения: от катушки, плюс пояс рыболова
+    smooth: (reel.smooth ?? 1 + REELS.findIndex((r) => r.id === reel.id) * 0.13) + (own.belt ? 0.14 : 0),
     hookWin: 0.95 * hook.win * fl.win,
     hold: hook.hold,
     biteMult: fl.bite || 1,
-    nightMult: fl.night || 1,
+    // ночной клёв: светящийся поплавок, «ночная» удочка и фонарь складываются
+    nightMult: (fl.night || 1) * (perk.night || 1) * (own.lantern ? 1.2 : 1),
     bagCap: bag.cap,
-    net: !!(p.owned && p.owned.net),
-    sonar: !!(p.owned && p.owned.sonar)
+    net: !!(own.net || own.bignet),
+    landAt: own.bignet ? 0.75 : own.net ? 0.85 : 1, // с какой доли пути рыбу можно брать подсаком
+    sonar: !!(own.sonar || own.sonar2),
+    sonar2: !!own.sonar2, // у точки заброса видно, кто здесь клюёт
+    // особенности дорогих удочек (data.js, RODS[].perk)
+    tough: perk.tough || 1,
+    size: perk.size || 1,
+    rare: perk.rare || 1,
+    heavy: !!rod.heavy,
+    myth: !!rod.myth
   };
 }
-// полоски в карточке удочки (0…1)
-export const rodBars = (rod) => ({ cast: rod.cast / 60, line: Math.sqrt(rod.line / 22), reel: (rod.reel - 0.55) / 1.05 });
+// полоски в карточке удочки (0…1): лучшая удочка — полная полоска
+const ROD_TOP = RODS[RODS.length - 1];
+export const rodBars = (rod) => ({ cast: rod.cast / ROD_TOP.cast, line: Math.sqrt(rod.line / ROD_TOP.line), reel: (rod.reel - 0.55) / (ROD_TOP.reel - 0.55) });
+/** Особенности удочки — для карточки в магазине: [{ short — на плашку, text — полностью }]. */
+export function rodPerks(rod) {
+  const k = rod.perk || {};
+  const out = [];
+  const pct = (v) => Math.round(Math.abs(v - 1) * 100);
+  if (k.night) out.push({ short: `Ночью клёв +${pct(k.night)}%`, text: `Ночью клюёт на ${pct(k.night)}% чаще` });
+  if (k.tough) {
+    const more = Math.round((1 / k.tough - 1) * 100);
+    out.push({ short: `Леска держит +${more}%`, text: `В опасной зоне леска держится на ${more}% дольше` });
+  }
+  if (k.size) out.push({ short: 'Рыба крупнее', text: 'Рыба попадается крупнее, трофеи — чаще' });
+  if (k.rare) out.push({ short: `Редкая рыба +${pct(k.rare)}%`, text: `Редкая рыба берёт на ${pct(k.rare)}% охотнее` });
+  if (rod.myth) out.push({ short: 'Чудо-класс', text: 'Чудо-класс: выдержит и того, о ком рассказывают легенды' });
+  else if (rod.heavy) out.push({ short: 'Морской класс', text: 'Тяжёлый морской класс — под рыбу-великана' });
+  return out;
+}
 
 export function tackleInfo(id) {
   const it = ITEMS[id] || ITEMS.bread;
@@ -54,8 +83,9 @@ export function tackleInfo(id) {
 }
 
 // ───── кто клюнет ─────
-// spot: { zone, depth, pier, hot }; loc — локация: у рыбы на каждой свои места (data.js: zones и at)
-export function speciesWeights(spot, tackleId, hour, loc) {
+// spot: { zone, depth, pier, hot }; loc — локация: у рыбы на каждой свои места (data.js: zones и at);
+// kit — набор снастей (kitStats): у дорогих удочек редкая рыба берёт охотнее (kit.rare)
+export function speciesWeights(spot, tackleId, hour, loc, kit) {
   const tk = tackleInfo(tackleId);
   const part = dayPart(hour);
   const out = [];
@@ -67,19 +97,19 @@ export function speciesWeights(spot, tackleId, hour, loc) {
     if (f.minDepth && spot.depth < f.minDepth) continue;
     const aff = tk.lure ? f.lure * tk.power : f.baits[tk.id] ?? 0.3;
     if (!aff) continue;
-    const boost = tk.rare * (spot.hot ? 1.5 : 1);
+    const boost = tk.rare * ((kit && kit.rare) || 1) * (spot.hot ? 1.5 : 1);
     const rar = RARITY[f.rar].mult * (f.rar >= 2 ? boost : f.rar === 1 ? Math.sqrt(boost) : 1);
     const w = z * aff * (f.time[part] ?? 1) * rar;
     if (w > 0) out.push({ f, w });
   }
   return out;
 }
-export function rollFish(spot, tackleId, hour, rng, loc) {
+export function rollFish(spot, tackleId, hour, rng, loc, kit) {
   const tk = tackleInfo(tackleId);
   // spot.big (0…1) — рыбу выследили: наживка легла рядом с крупной тенью в воде. Тогда это точно рыба, а не хлам,
   // и не мелочь: чем крупнее тень, тем выше нижняя граница веса.
   const junkChance = spot.big ? 0 : tk.lure ? 0.015 : { shallow: 0.07, pier: 0.07, backwater: 0.06, mid: 0.025 }[spot.zone] || 0.008;
-  const list = speciesWeights(spot, tackleId, hour, loc);
+  const list = speciesWeights(spot, tackleId, hour, loc, kit);
   if (!list.length || rng() < junkChance) {
     let j = JUNK[Math.floor(rng() * 4)];
     if (rng() < 0.05) j = JUNK_BY_ID.chest;
@@ -96,8 +126,8 @@ export function rollFish(spot, tackleId, hour, rng, loc) {
       break;
     }
   }
-  const sizeBoost = tk.size * (spot.hot ? 1.15 : 1);
-  const k = clamp(2.6 - (sizeBoost - 1) * 1.6, 1.3, 2.6);
+  const sizeBoost = tk.size * ((kit && kit.size) || 1) * (spot.hot ? 1.15 : 1);
+  const k = clamp(2.6 - (sizeBoost - 1) * 1.6, 1.1, 2.6); // нижний предел достижим только с лучшими приманками и «трофейной» удочкой
   let u = Math.pow(rng(), k);
   if (spot.big) u = Math.min(1, Math.max(u, 0.35 + 0.4 * clamp(spot.big, 0, 1) + rng() * 0.1));
   const w = round3(f.w[0] + (f.w[1] - f.w[0]) * u);
@@ -317,7 +347,7 @@ export function fightStep(s, input, dt, kit, rng) {
   const danger = dangerAt(s);
   if (leap) s.jumpT -= dt;
   if (s.T > danger) {
-    s.strain += dt * clamp(s.rho * 1.1 + 0.3, 0.4, 1.6) * (1 + (2.5 * (s.T - danger)) / (1 - danger));
+    s.strain += dt * clamp(s.rho * 1.1 + 0.3, 0.4, 1.6) * (1 + (2.5 * (s.T - danger)) / (1 - danger)) * (kit.tough || 1);
     if (s.strain >= 1) {
       s.result = 'snap';
       ev.push('snap');
@@ -351,7 +381,7 @@ export function fightStep(s, input, dt, kit, rng) {
   } else if (input.reel) s.p += (kit.reel * eff * (run ? (input.steer === -s.dir ? 0.75 : 0.35) : 1) * dt) / s.stamina;
   else s.p -= ((run ? 0.1 : 0.03) * (0.5 + Math.min(1.2, s.rho)) * tired(s) * dt) / Math.sqrt(s.stamina);
   s.p = clamp(s.p, 0, 1);
-  if (s.p >= (kit.net ? 0.85 : 1)) {
+  if (s.p >= (kit.landAt ?? (kit.net ? 0.85 : 1))) {
     s.result = 'landed';
     ev.push('landed');
   }
@@ -416,7 +446,47 @@ export function levelInfo(xp) {
     lvl++;
     need = Math.round(60 * Math.pow(lvl, 1.45));
   }
-  return { lvl, cur: left, need, title: lvl >= 20 ? 'Легенда бухты' : TITLES[Math.min(TITLES.length - 1, lvl - 1)] };
+  return { lvl, cur: left, need, title: titleOf(lvl) };
+}
+// звания после двадцатого уровня: [с какого уровня, звание] — по возрастанию
+const HIGH_TITLES = [[20, 'Легенда бухты'], [25, 'Гроза глубин'], [30, 'Хозяин вод'], [40, 'Повелитель приливов'], [50, 'Морской царь'], [70, 'Живая легенда']];
+export function titleOf(lvl) {
+  let t = TITLES[Math.min(TITLES.length - 1, Math.max(1, lvl) - 1)];
+  for (const [from, name] of HIGH_TITLES) if (lvl >= from) t = name;
+  return t;
+}
+
+// ───── мастерство по локациям ─────
+export const MASTERY_BIG = 0.6; // «крупный экземпляр»: не легче этой доли пути от наименьшего веса вида к наибольшему
+export const MASTERY_PRIZE = [0, 500, 5000, 50000]; // монеты за первую, вторую и третью звезду локации
+/**
+ * Мастерство на локации по журналу: звёзды 0…3. ★ — открыта половина видов; ★★ — все виды;
+ * ★★★ — у каждого вида пойман крупный экземпляр. → { stars, got, big, of, next } (next — что осталось до следующей звезды).
+ */
+export function mastery(p, loc = DEFAULT_LOC) {
+  const fs = fishOf(loc);
+  const j = (p && p.journal) || {};
+  const got = fs.filter((f) => j[f.id]).length;
+  const big = fs.filter((f) => j[f.id] && j[f.id].best >= f.w[0] + (f.w[1] - f.w[0]) * MASTERY_BIG).length;
+  const half = Math.ceil(fs.length / 2);
+  const stars = big === fs.length ? 3 : got === fs.length ? 2 : got >= half ? 1 : 0;
+  const next = stars === 0 ? `откройте ещё ${half - got} ${plural(half - got, 'вид', 'вида', 'видов')}` : stars === 1 ? `откройте все виды — осталось ${fs.length - got}` : stars === 2 ? `поймайте крупный экземпляр каждого вида — осталось ${fs.length - big}` : '';
+  return { stars, got, big, of: fs.length, next };
+}
+/** Награда за новые звёзды мастерства — один раз за каждую. → [{ loc, stars, coins }] */
+export function claimMastery(p) {
+  if (!p.mastery || typeof p.mastery !== 'object') p.mastery = {};
+  const out = [];
+  for (const L of LOCATIONS) {
+    const had = Math.max(0, Math.min(3, Math.round(Number(p.mastery[L.id]) || 0)));
+    const now = mastery(p, L.id).stars;
+    for (let st = had + 1; st <= now; st++) {
+      p.coins += MASTERY_PRIZE[st];
+      out.push({ loc: L.id, stars: st, coins: MASTERY_PRIZE[st] });
+    }
+    if (now > had) p.mastery[L.id] = now;
+  }
+  return out;
 }
 
 // ───── профиль игрока ─────
@@ -436,7 +506,8 @@ export function newProfile() {
     stats: { casts: 0, caught: 0, sold: 0, earned: 0, snaps: 0, escapes: 0, best: null, legends: 0, quests: 0, tours: 0, medals: 0, stalked: 0, assists: 0 },
     seenIntro: false,
     boatTrips: 0,
-    quests: null // задания на день: появляются при первом входе (syncQuests)
+    quests: null, // задания на день: появляются при первом входе (syncQuests)
+    mastery: {} // за сколько звёзд мастерства на каждой локации уже получена награда (claimMastery)
   };
 }
 // подлатать сохранение из старой версии или с повреждениями
