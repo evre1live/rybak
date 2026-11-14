@@ -43,18 +43,19 @@ export class Scatter {
    * (модель приведена к наибольшему размеру 1), sx/sy/sz — растяжение по осям поверх него.
    * opts: cell — размер куска сетки, near — до какого расстояния рисовать подробную модель (на «высоком» качестве),
    * shadow — тени, sway — качание кроны, vary — разброс оттенка между копиями (0…1), sat — насыщенность (1 — как в текстуре),
-   * rock — скала: вблизи поверх текстуры мелкий рисунок камня.
+   * rock — скала: вблизи поверх текстуры мелкий рисунок камня, post — цвет после обесцвечивания (камень локации, stone.js),
+   * minor — мелочь (трава, галька): на «низком» качестве не рисуется, как и пучки травы.
    * Возвращает обещание: готово, когда модели загружены и копии стоят в сцене.
    */
-  add(id, items, { cell = 64, near = 55, shadow = true, sway = 0, vary = 0.5, tint = null, sat = 1, rock = false } = {}) {
+  add(id, items, { cell = 64, near = 55, shadow = true, sway = 0, vary = 0.5, tint = null, sat = 1, rock = false, post = null, minor = false } = {}) {
     if (!items.length) return Promise.resolve(false);
     return Promise.all([loadModel(id), loadLod(id).catch(() => null)]).then(([tpl, lod]) => {
       const src = meshesOf(tpl.scene);
       if (!src.length) return false;
       // общий материал на все копии модели: свой, чтобы не трогать одиночные копии той же модели
-      const mats = src.map((m) => patchModel(m.material.clone(), { sway, sat, rock }));
+      const mats = src.map((m) => patchModel(m.material.clone(), { sway, sat, rock, post }));
       const lodSrc = lod ? meshesOf(lod.scene) : null;
-      const lodMats = lodSrc ? lodSrc.map((m) => patchModel(m.material.clone(), { sway, sat })) : null;
+      const lodMats = lodSrc ? lodSrc.map((m) => patchModel(m.material.clone(), { sway, sat, post })) : null;
       const groups = new Map();
       for (const it of items) {
         const key = Math.floor(it.x / cell) + ':' + Math.floor(it.z / cell);
@@ -118,7 +119,7 @@ export class Scatter {
         this.chunks.push({
           x: sphere.center.x, z: sphere.center.z, r: sphere.radius, n, near, px, pz, col, hiM, loM,
           hi: build(src, mats, shadow), lo: lodSrc ? build(lodSrc, lodMats, false) : null,
-          state: new Uint8Array(n), mode: -1, nHi: 0
+          state: new Uint8Array(n), mode: -1, nHi: 0, minor
         });
       }
       this.cx = 1e9; // новые копии — разобрать заново
@@ -127,6 +128,13 @@ export class Scatter {
   }
   /** Кто из копий куска рисуется подробно. */
   split(ch, cx, cz, near) {
+    if (ch.minor && !detail.grass) {
+      // мелочь на «низком» не рисуется
+      if (ch.mode !== -2) for (const im of [...ch.hi, ...(ch.lo || [])]) (im.count = 0), (im.visible = false);
+      ch.mode = -2;
+      ch.nHi = 0;
+      return;
+    }
     const far = near + KEEP;
     const d = Math.hypot(ch.x - cx, ch.z - cz);
     const n = ch.n;

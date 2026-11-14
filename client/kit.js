@@ -7,6 +7,16 @@
 import { LOC_ID } from './loc/id.js';
 
 const G = (k) => ({ r: k, g: k, b: k });
+/**
+ * Камни локации из готовых подробных моделей. small — валуны (env-rock1), tall — глыбы и столбы (env-rock2, env-rock3).
+ * fit: каждому месту — та модель, которую под его размеры придётся растягивать меньше всего (среди близких — по доле).
+ */
+// Цвет и яркость у всех камней общие — камень локации (stone.js), здесь только какие модели где стоят.
+const rocks = (small, tall) => ({
+  'env-rock1': { use: small, fit: true, opt: { cell: 104, near: 60, vary: 0.2, rock: true } },
+  'env-rock2': { use: tall, fit: true, opt: { cell: 400, near: 1e5, vary: 0.15, rock: true } },
+  'env-rock3': { use: tall, fit: true, opt: { cell: 400, near: 1e5, vary: 0.15, rock: true } }
+});
 
 const SWAP = {
   // Сосновое озеро — горная тайга: ели разной формы, берёзы, лиственные у воды, папоротник, круглые серые валуны
@@ -15,17 +25,13 @@ const SWAP = {
     'env-birch': { use: [['kit-birch1', 1], ['kit-birch2', 1]], k: 1.05, opt: { near: 40, sway: 0.014, vary: 0.35 } },
     'env-oak': { use: [['kit-tree1', 1], ['kit-tree2', 1]], k: 1.0, opt: { near: 40, sway: 0.012, vary: 0.4 } },
     'env-bush': { use: [['kit-bush1', 1.3], ['kit-bush2', 0.4], ['kit-fern', 1.0], ['kit-lupine', 0.9, { k: 0.7 }]], k: 1.0, opt: { sway: 0.006, near: 22, vary: 0.4 } },
-    'env-rock1': { use: [['kit-rock1', 1], ['kit-rock3', 1]], opt: { cell: 104, near: 60, vary: 0.25, tint: G(1.05) } },
-    'env-rock2': { use: [['kit-rock1', 1], ['kit-rock3', 1]], opt: { cell: 400, near: 1e5, vary: 0.2, tint: G(1.05) } },
-    'env-rock3': { use: [['kit-rock2', 1], ['kit-rock3', 1]], opt: { cell: 400, near: 1e5, vary: 0.2, tint: G(1.05) } }
+    ...rocks([['env-rock1', 1], ['env-granite', 0.5]], [['env-seastack', 1], ['env-rock1', 0.6]])
   },
   // Коралловые островки — атолл: пальмы четырёх видов, широколистные растения, цветущие кусты, светлый камень
   keys: {
     'env-palm': { use: [['kit-palm1', 1], ['kit-palm2', 1], ['kit-palm3', 1]], k: 1.0, opt: { cell: 90, near: 70, sway: 0.02, vary: 0.3 } },
     'env-bush': { use: [['kit-bushf', 0.8], ['kit-hibiscus', 1], ['kit-plant1', 1.2]], k: 1.0, opt: { sway: 0.008, near: 30, vary: 0.35 } },
-    'env-rock1': { use: [['kit-krock1', 1], ['kit-krock3', 1]], opt: { cell: 104, near: 60, vary: 0.2 } },
-    'env-rock2': { use: [['kit-krock1', 1], ['kit-krock3', 1]], opt: { cell: 400, near: 1e5, vary: 0.2 } },
-    'env-rock3': { use: [['kit-krock2', 1], ['kit-krock3', 1]], opt: { cell: 400, near: 1e5, vary: 0.2 } }
+    ...rocks([['env-coral', 1]], [['env-coral', 1], ['env-seastack', 0.6]])
   },
   // Солнечная бухта — южное море: оливы с серебристой листвой, светлые лиственные, цветущий кустарник, тёплый камень
   bay: {
@@ -34,31 +40,20 @@ const SWAP = {
     'env-oak': { use: [['kit-olive1', 1], ['kit-olive2', 1], ['kit-btree1', 0.5]], k: 1.0, opt: { near: 40, sway: 0.01, vary: 0.35 } },
     'env-birch': { use: [['kit-btree1', 1], ['kit-btree2', 1]], k: 1.0, opt: { near: 40, sway: 0.012, vary: 0.35 } },
     'env-bush': { use: [['kit-oleander', 1.2], ['kit-drygrass', 0.9], ['kit-lavender', 0.7, { k: 0.5 }]], k: 1.0, opt: { sway: 0.006, near: 22, vary: 0.35 } },
-    // валуны — тёплый известняк (большие столбы в море остаются прежними, перекрашены в тёплый — stoneTint)
-    'env-rock1': { use: [['kit-brock1', 1], ['kit-brock3', 1]], opt: { cell: 104, near: 60, vary: 0.25, sat: 0.5, tint: { r: 1.08, g: 1.04, b: 0.96 } } }
+    // валуны и столбы — подробные модели; цвет — тёплый песчаник бухты (stone.js)
+    ...rocks([['env-rock1', 1]], [['env-seastack', 1], ['env-rock1', 0.6]])
   },
   // Синий простор — вулканический остров в океане: рощи криптомерий (ели озера потемнее), кусты и папоротник,
   // тёмный базальт; гортензии у тропы — цветы поверх кустов (blue-nature.js)
   blue: {
     'env-pine': { use: [['kit-pine1', 1], ['kit-pine3', 1], ['kit-pine4', 0.8]], k: 1.05, opt: { near: 40, sway: 0.01, vary: 0.4, tint: { r: 0.82, g: 0.94, b: 0.9 } } },
     'env-bush': { use: [['kit-bush1', 1.3], ['kit-fern', 1.0], ['kit-bush2', 0.5]], k: 1.0, opt: { sway: 0.01, near: 22, vary: 0.4 } },
-    'env-rock1': { use: [['kit-rock1', 1], ['kit-rock3', 1]], opt: { cell: 104, near: 60, vary: 0.25, sat: 0.6, tint: { r: 0.62, g: 0.58, b: 0.56 } } },
-    'env-rock2': { use: [['kit-rock1', 1], ['kit-rock3', 1]], opt: { cell: 400, near: 1e5, vary: 0.2, sat: 0.6, tint: { r: 0.62, g: 0.58, b: 0.56 } } },
-    'env-rock3': { use: [['kit-rock2', 1], ['kit-rock3', 1]], opt: { cell: 400, near: 1e5, vary: 0.2, sat: 0.6, tint: { r: 0.62, g: 0.58, b: 0.56 } } }
+    ...rocks([['env-rock1', 1]], [['env-seastack', 1], ['env-rock1', 0.6]])
   }
 };
 
 // Скалы и утёсы, у которых нет замены, перекрашиваются под геологию места: в бухте тёплый известняк,
 // на островках — светлый коралловый камень, на озере — холодный гранит, в океане — бурый базальт.
-const STONE = { bay: { r: 1.14, g: 1.02, b: 0.84 }, keys: { r: 1.5, g: 1.45, b: 1.3 }, lake: { r: 0.94, g: 0.98, b: 1.03 }, blue: { r: 0.66, g: 0.6, b: 0.56 } };
-/** Насыщенность камня без замены: светлый известняк островков почти без цвета. */
-export const stoneSat = (s = 1) => (LOC_ID === 'keys' && !kitOff() ? s * 0.55 : s);
-export function stoneTint(t) {
-  const k = STONE[LOC_ID];
-  if (!k || kitOff()) return t;
-  const b = t || { r: 1, g: 1, b: 1 };
-  return { r: b.r * k.r, g: b.g * k.g, b: b.b * k.b };
-}
 const kitOff = () => {
   try {
     return !!globalThis.location && new URLSearchParams(globalThis.location.search).get('kit') === '0';
@@ -99,6 +94,37 @@ export function splitItems(sw, items, pick) {
     let u = pick(it) * total;
     let id = sw.use[sw.use.length - 1][0];
     for (const [vid, w] of sw.use) {
+      if (u < w) {
+        id = vid;
+        break;
+      }
+      u -= w;
+    }
+    out.get(id).push(it);
+  }
+  return out;
+}
+
+/**
+ * Делит камни между моделями замены по форме: каждому месту {w, h, d} — модель, которую придётся растягивать
+ * меньше всего; среди почти одинаково подходящих — по долям (у места всегда одна и та же). size(id) — размеры модели.
+ */
+export function fitItems(sw, items, size, pick) {
+  const out = new Map(sw.use.map(([id]) => [id, []]));
+  for (const it of items) {
+    const cost = sw.use.map(([id]) => {
+      const s = size(id);
+      const a = it.w / s[0];
+      const b = it.h / s[1];
+      const c = it.d / s[2];
+      return Math.abs(Math.log(a / b)) + Math.abs(Math.log(c / b)) + Math.abs(Math.log(a / c)) * 0.5;
+    });
+    const best = Math.min(...cost);
+    const ok = sw.use.filter((_, i) => cost[i] <= best + 0.3);
+    const total = ok.reduce((t, [, w]) => t + w, 0);
+    let u = pick(it) * total;
+    let id = ok[ok.length - 1][0];
+    for (const [vid, w] of ok) {
       if (u < w) {
         id = vid;
         break;

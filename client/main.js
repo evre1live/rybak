@@ -125,6 +125,12 @@ class Game {
     this.gfx.setReflection(this.world.water.uniforms, [this.world.water.mesh, this.world.rings, this.vm.root, this.world.grass.tufts, this.world.grass.flowers, this.world.rain.mesh, this.world.seabed.mesh, this.world.seabed.kelp, this.world.rays.mesh, this.world.nightfx.wakeMesh, ...this.world.scenery.fauna.under].filter(Boolean));
     // живность: рыба и мальки шарахаются от шагов по воде, поплавка и лодки; всплеск играющей рыбы слышен неподалёку
     this.fauna = this.world.scenery.fauna;
+    // вспугнутая со сваи чайка кричит: громче, когда рядом
+    this.world.scenery.onGull = (x, z) => {
+      const pl = this.player;
+      const d = Math.hypot(x - pl.x, z - pl.z) || 1;
+      if (d < 30) this.audio.gullAt(Math.min(0.5, 2.2 / d) * (1 - 0.7 * this.world.night), (((x - pl.x) * Math.cos(pl.yaw) - (z - pl.z) * Math.sin(pl.yaw)) / d) * 0.8);
+    };
     this.fauna.onSplash = (x, z, pw) => {
       const d = Math.hypot(x - this.player.x, z - this.player.z);
       if (this.state === 'world' && d < 60) this.audio.splash(0.5 + pw * 0.5, clamp(1 - d / 60, 0, 1) * 0.7);
@@ -2479,7 +2485,7 @@ class Game {
           const e = sc.envState();
           // чего на локации нет (маяка на озере), того и не ждём — иначе заставка стояла бы все двенадцать секунд
           // киты и дельфины: их готовые модели встают на место заготовок — тоже до показа, чтобы шейдеры собрались здесь
-          const sea = sc.fauna.dolphins.ready && (!sc.fauna.whales || sc.fauna.whales.ready);
+          const sea = sc.fauna.dolphins.ready && (!sc.fauna.whales || sc.fauna.whales.ready) && sc.gullsReady();
           // снасти в руках (модели рукояти, катушки, поплавка): их шейдеры тоже собираются за заставкой
           const gear = !(this.vm.rod && this.vm.rod.pending) && !(this.fishing.bob && this.fishing.bob.userData.pending);
           const got = [e.trees, e.palms, e.rocks, e.lighthouse || !HAS.lighthouse, e.kiosk, e.lamps > 0, !sc.propsState().fallback, sea, gear].filter(Boolean).length;

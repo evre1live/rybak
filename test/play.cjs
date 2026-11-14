@@ -145,7 +145,8 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
   assert.deepEqual(await page.$$eval('.grid .tile', (els) => els.map((e) => e.dataset.id)), ['net', 'sonar', 'boat', 'lantern', 'sonar2', 'belt', 'bignet', 'gaff']);
   await page.click('.tabs2 [data-id="tackle"]');
   assert.equal(await page.locator('.grid .tile').count(), 10);
-  assert.ok(await G(page, () => [...document.querySelectorAll('.grid .tile img')].every((i) => i.complete && i.naturalWidth > 0)), 'значки новых наживок нарисованы');
+  // значки грузятся при открытии вкладки: ждём до 15 секунд (на программной отрисовке мир тяжёлый, картинки догружаются не сразу)
+  assert.ok(await page.waitForFunction(() => [...document.querySelectorAll('.grid .tile img')].every((i) => i.complete && i.naturalWidth > 0), null, { timeout: 15000 }).then(() => true, () => false), 'значки новых наживок нарисованы');
   await page.keyboard.press('Escape');
   await page.click('.nav [data-p="journal"]');
   await page.waitForSelector('.jstats');
@@ -1431,8 +1432,8 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
       return { near, far, back: sc.smallState(), gulls: gulls && gulls.isInstancedMesh ? gulls.count : 0, mirror, both, cam: g.camera.layers.mask, calls: g.gfx.renderer.info.render.calls };
     });
     assert.ok(sm.near.n > 15 && sm.far.shown < sm.near.n * 0.5 && sm.back.shown > sm.far.shown, `издали мелочь не рисуется, вблизи возвращается: ${JSON.stringify(sm)}`);
-    // чаек 22: пять над бухтой, три живут на Чаячьем камне и две стаи по семь над морскими косяками
-    assert.ok(sm.gulls === 22 && sm.mirror > 15 && sm.both > 40 && sm.cam === 3, `чайки одним мешем, мелочь на своём слое: ${JSON.stringify(sm)}`);
+    // чаек 30: пять над бухтой, три живут на Чаячьем камне, две стаи по семь над морскими косяками и 8 мест для вспугнутых со свай
+    assert.ok(sm.gulls === 30 && sm.mirror > 15 && sm.both > 40 && sm.cam === 3, `чайки одним мешем, мелочь на своём слое: ${JSON.stringify(sm)}`);
     assert.ok(sm.calls > 20 && sm.calls < 230, `вызовов отрисовки на «низком» у причала: ${sm.calls}`);
 
     // открытое море: дальние острова — настоящая суша с лесом, над морскими косяками стаи чаек, по морю ходят дельфины
@@ -1693,11 +1694,13 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     await pp.setInputFiles('#savein', { name: 'чужой.json', mimeType: 'application/json', buffer: Buffer.from('{"привет":1}') });
     await pp.waitForFunction(() => /не файл сохранения/.test(document.querySelector('#toasts').textContent), null, { timeout: 10000 });
     assert.equal(await G(pp, () => RYBAK.pendingSave || null), null);
+    // сколько монет сейчас (задания дня зависят от даты: за пойманную щуку может прийти награда)
+    const coinsNow = await G(pp, () => RYBAK.profile.coins);
     data.profile.coins = 4321;
     data.profile.xp = 900;
     await pp.setInputFiles('#savein', { name: 'rybak.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(data)) });
     await pp.waitForFunction(() => /ЗАМЕНИТЬ ПРОГРЕСС: ЖАМШИД, УРОВЕНЬ \d+\?/.test(document.querySelector('[data-a="loadfile"]').textContent), null, { timeout: 10000 });
-    assert.equal(await G(pp, () => RYBAK.profile.coins), 500, 'до подтверждения прогресс прежний');
+    assert.equal(await G(pp, () => RYBAK.profile.coins), coinsNow, 'до подтверждения прогресс прежний');
     await pp.click('[data-a="loadfile"]');
     // игра открывается заново уже с загруженным прогрессом
     await pp.waitForFunction(() => window.RYBAK && window.__frames > 3 && RYBAK.state === 'title' && RYBAK.profile.coins === 4321, null, { timeout: 60000 });

@@ -3,10 +3,11 @@
 // Весь неподвижный мир склеен в несколько мешей с цветом по вершинам (batch.js) — развёрток у него нет.
 // Поэтому фактура считается прямо в шейдере: у вершины есть номер материала и «координаты волокон»,
 // узор дерева берётся из одной повторяющейся текстуры шума (с мип-уровнями — вдали не рябит),
-// а земля и камень расписаны текстурами из public/tex (их рисует tools/paint-textures.js): они ложатся
+// а земля и камень расписаны текстурами из public/tex (бесшовные фото-текстуры из GPT Image, их готовит tools/textures.py): они ложатся
 // сверху вниз (земля) или с трёх сторон (скалы) и умножаются на цвет вершины — оттенок задаёт мир, рисунок — текстура.
 // Так рельеф, утёсы и арка из кода выглядят сделанными той же рукой, что и модели Tripo.
 import * as THREE from 'three';
+import { STONE_HEX, STONE_VERT } from './stone.js';
 
 export const MAT = { PLAIN: 0, WOOD: 1, ROCK: 2, LEAF: 3, RINGS: 4, CLOTH: 5, PAINT: 6, ROOF: 7 }; // PAINT — крашеные доски, ROOF — черепица рядами
 
@@ -34,7 +35,8 @@ export const surfaceU = {
   uDirt: { value: null },
   uPaint: { value: 0 }, // 1 — текстуры на месте
   uWood: { value: null }, // рисованная доска: волокна вдоль u
-  uRockC: { value: new THREE.Color('#85817a') }, // камень, проступающий на крутых склонах (в тон утёсам-моделям)
+  uRockC: { value: new THREE.Color(STONE_HEX) }, // камень рельефа: тот же, что у скал-моделей локации (stone.js)
+  uRockV: { value: STONE_VERT }, // средняя яркость «каменных» вершин: от неё — светлее и темнее
   uMossC: { value: new THREE.Color('#8fb436') } // мох и трава на камнях — в тон траве и мху моделей
 };
 
@@ -49,8 +51,8 @@ function flatTexture() {
  * Загружает рисованные текстуры земли и камня. lite — телефон: текстуры вдвое меньше.
  * В пробной версии одним файлом (без сети) текстур нет — мир остаётся с ровной заливкой.
  */
-// картинки сервер отдаёт с недельным сроком хранения: перерисовал текстуры (tools/paint-textures.js) — прибавь номер
-const TEX_V = 4;
+// картинки сервер отдаёт с недельным сроком хранения: перерисовал текстуры (tools/textures.py) — прибавь номер
+const TEX_V = 5;
 export function loadPaint({ lite = false, offline = false } = {}) {
   const flat = flatTexture();
   for (const k of ['uGrass', 'uRock', 'uSand', 'uDirt', 'uWood']) surfaceU[k].value = flat;
@@ -166,6 +168,9 @@ const PARS_F = /* glsl */ `
 uniform sampler2D uDet, uCaust, uGrass, uRock, uSand, uDirt;
 uniform float uDetail, uTimeS, uCaustK, uCloudK, uPaint;
 uniform vec3 uSunC, uWaterS, uWaterD, uRockC, uMossC;
+uniform float uRockV;
+// камень локации с рисунком светлого и тёмного из цвета вершины: у всех камней мира один тон (stone.js)
+vec3 stoneOf(vec3 v) { return uRockC * clamp(dot(v, vec3(0.2126, 0.7152, 0.0722)) / uRockV, 0.5, 1.7); }
 uniform vec4 uBed;
 uniform sampler2D uWood;
 varying float vMat;
@@ -230,7 +235,7 @@ float nearK = 1.0 - smoothstep(7.0, 20.0, length(vViewPosition));
     if (wRock > 0.003) {
       vec3 rM = paintRock(vWp, nW, nearK);
       // камень, проступивший на склоне, берёт свой цвет; заданный вершинами — их цвет
-      vec3 rc = mix(uRockC * mix(0.88, 1.1, t.a), diffuseColor.rgb, clamp(W.y * 1.6, 0.0, 1.0)) * rM;
+      vec3 rc = mix(uRockC * mix(0.88, 1.1, t.a), stoneOf(diffuseColor.rgb), clamp(W.y * 1.6, 0.0, 1.0)) * rM;
       // на отвесной стене — пласты: тёмный уступ по границе слоя, у каждого слоя свой тон (как у утёсов-моделей)
       float st = vWp.y * 0.4 + (t.r - 0.5) * 1.7 + (f.g - 0.5) * 0.22;
       float band = fract(st);
@@ -250,7 +255,7 @@ float nearK = 1.0 - smoothstep(7.0, 20.0, length(vViewPosition));
     diffuseColor.rgb = col;
   } else {
     // «низкое» качество: без текстур, но границы и камень на склонах те же
-    diffuseColor.rgb = mix(diffuseColor.rgb, mix(uRockC, diffuseColor.rgb, clamp(W.y * 1.6, 0.0, 1.0)), wRock) * mix(0.94, 1.06, t.r);
+    diffuseColor.rgb = mix(diffuseColor.rgb, mix(uRockC, stoneOf(diffuseColor.rgb), clamp(W.y * 1.6, 0.0, 1.0)), wRock) * mix(0.94, 1.06, t.r);
   }
 }
 #else
@@ -261,7 +266,7 @@ if (vMat > 1.5 && vMat < 2.5) {
   float mossy = vTex.x - 2.0 * softK;
   vec4 f = texture2D(uDet, vWp.xz * 0.31 + vTex.z);
   float mossK = mossy * smoothstep(vTex.y - 0.1, vTex.y + 0.1, nW.y + (f.r - 0.5) * 0.36 + (f.g - 0.5) * 0.1) * smoothstep(0.05, 0.5, vWp.y);
-  vec3 rc = diffuseColor.rgb;
+  vec3 rc = stoneOf(diffuseColor.rgb);
   vec3 mc = uMossC * mix(0.86, 1.08, f.a);
   if (uDetail > 0.5) {
     vec3 rM = paintRock(vWp + vTex.z * 7.0, nW, nearK);
@@ -443,7 +448,9 @@ const sway = (k) => /* glsl */ `
  * Готовой модели — тени облаков и подводный цвет; sway > 0 — качание на ветру (доля высоты модели);
  * sat < 1 — приглушить краски (у крон и кустов Tripo в текстуре почти нет синего: рядом с травой они кислотные).
  */
-export function patchModel(material, { sway: k = 0, sat = 1, rock = false } = {}) {
+export function patchModel(material, { sway: k = 0, sat = 1, rock = false, post = null } = {}) {
+  // post — цвет после обесцвечивания: так все камни локации встают в один тон (stone.js)
+  const tone = post ? `\ndiffuseColor.rgb *= vec3(${post.map((v) => v.toFixed(4)).join(', ')});` : '';
   material.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, surfaceU);
     sh.vertexShader = sh.vertexShader
@@ -455,11 +462,11 @@ export function patchModel(material, { sway: k = 0, sat = 1, rock = false } = {}
       .replace('#include <roughnessmap_fragment>', WET_ROUGH)
       .replace(
         '#include <color_fragment>',
-        '#include <color_fragment>' + (sat !== 1 ? `\ndiffuseColor.rgb = mix(vec3(dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722))), diffuseColor.rgb, ${sat.toFixed(3)});` : '') + (rock ? ROCK_DETAIL_F : '')
+        '#include <color_fragment>' + (sat !== 1 ? `\ndiffuseColor.rgb = mix(vec3(dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722))), diffuseColor.rgb, ${sat.toFixed(3)});` : '') + tone + (rock ? ROCK_DETAIL_F : '')
       )
       .replace('#include <opaque_fragment>', 'vec3 nGeo = normalize(cross(dFdx(vWp), dFdy(vWp)));\n' + UNDER_F + '\n#include <opaque_fragment>');
   };
-  material.customProgramCacheKey = () => 'model3' + k + '|' + sat + (rock ? 'R' : '');
+  material.customProgramCacheKey = () => 'model3' + k + '|' + sat + (rock ? 'R' : '') + (post ? '|' + post.map((v) => v.toFixed(4)).join(',') : '');
   return material;
 }
 

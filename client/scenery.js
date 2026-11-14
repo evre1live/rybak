@@ -2,9 +2,9 @@
 import * as THREE from 'three';
 import { Batch, M, G, BATCH_MAT, BATCH_MAT_2S } from './batch.js';
 import { loadManifest } from './hero.js';
-import { modelInfo, loadModels, spawn } from './models.js';
+import { modelInfo, loadModels, spawn, loadModel, modelGeometry } from './models.js';
 import { buildPlaces } from './places.js';
-import { ENV, upgradeEnv, envNight, envState, addTorch } from './envmodels.js';
+import { ENV, upgradeEnv, envNight, envState, addTorch, PERCHED } from './envmodels.js';
 import { spot01 } from './scatter.js';
 import { rng, rockGeo, canvasTex, shade, sstep, TAU, fbm2 } from './util.js';
 import { DECKS, CIRCLES, DECK_Y, groundH, shoreZ, islandR, ISLAND, ARCH, ARCH_LEGS, REEF, CAPE, capeDist, FALLS, LIGHTHOUSE, COTTAGE, CAMPFIRE, cottageUV, BACKWATER, deckAt, SCHOOL_HOMES, SEA_HOMES, SKERRIES, BUOYS, MARKS, HAS, GULL_SPOTS } from './terrain.js';
@@ -1133,84 +1133,225 @@ function buildLighthouse(scene, r) {
   return { lampMat, beamMat, beam, winMat };
 }
 
-const FALL_VERT = /* glsl */ `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
-// облако водяной пыли: прямоугольник всегда повёрнут к смотрящему
-const SPRAY_VERT = /* glsl */ `uniform vec3 uAt; uniform vec2 uSize; varying vec2 vUv;
-void main(){ vUv = uv; vec4 mv = viewMatrix * vec4(uAt, 1.0); mv.xy += (uv - 0.5) * uSize; gl_Position = projectionMatrix * mv; }`;
+const _v3 = new THREE.Vector3();
+// ── Водопады ──
+// Струя — две ленты: плотная (на ней пряди и сгустки, у кромки — белый перегиб) и лёгкая пелена поверх, чуть впереди.
+// Профиль: по руслу над обрывом вода стелется по земле, с кромки летит дугой (свободное падение) и не уходит в скалу.
+// Внизу — кипень с расходящимися кругами, клубы водяной пыли, брызги-капли и радуга в пыли, когда солнце за спиной.
+const FALL_VERT = /* glsl */ `varying vec2 vUv; varying float vCyc; void main(){ vUv = uv; vCyc = 0.0; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+// клуб пыли: прямоугольник повёрнут к смотрящему; поднимается и тает, потом всё сначала (uPhase — свой у каждого)
+const PUFF_VERT = /* glsl */ `uniform vec3 uAt; uniform vec2 uSize; uniform float uTime, uPhase, uRise; varying vec2 vUv; varying float vCyc;
+void main(){ vUv = uv; vCyc = fract(uTime * 0.11 + uPhase);
+  vec3 at = uAt + vec3(sin(uTime * 0.3 + uPhase * 9.0) * 0.6, vCyc * uRise, cos(uTime * 0.23 + uPhase * 7.0) * 0.6);
+  vec4 mv = viewMatrix * vec4(at, 1.0); mv.xy += (uv - 0.5) * uSize * (0.75 + vCyc * 0.55); gl_Position = projectionMatrix * mv; }`;
 const FALL_FRAG = /* glsl */ `
-uniform float uTime, uLight, uDisc, uStrand; varying vec2 vUv;
+uniform float uTime, uLight, uMode, uStrand, uLip, uRain; uniform vec3 uDeep; varying vec2 vUv; varying float vCyc;
 float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f); return mix(mix(h(i), h(i+vec2(1,0)), f.x), mix(h(i+vec2(0,1)), h(i+vec2(1,1)), f.x), f.y); }
+vec3 hue(float x){ return clamp(abs(mod(x * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0); }
 void main(){
-  vec3 c; float a;
-  if (uDisc > 1.5) {
-    // водяная пыль у подножия: мягкое облако, клубится и поднимается
-    vec2 q = vUv * 2.0 - 1.0; float r = length(q * vec2(1.0, 1.25));
-    float s = n(q * 2.6 + vec2(0.0, -uTime * 0.55)) * 0.6 + n(q * 6.0 + vec2(uTime * 0.25, -uTime * 0.9)) * 0.4;
-    a = (1.0 - smoothstep(0.15, 1.0, r)) * smoothstep(0.18, 0.78, s) * 0.62;
-    c = vec3(0.95, 0.98, 1.0);
-  } else if (uDisc > 0.5) {
-    vec2 q = vUv * 2.0 - 1.0; float r = length(q);
-    float s = n(vec2(atan(q.y, q.x) * 3.0, r * 6.0 - uTime * 2.0)) * 0.6 + n(q * 9.0 + uTime) * 0.4;
-    a = (1.0 - smoothstep(0.35, 1.0, r)) * smoothstep(0.25, 0.75, s + (1.0 - r) * 0.5);
-    c = vec3(1.0);
+  vec3 c = vec3(1.0); float a;
+  if (uMode > 3.5) {
+    // радуга: дуга в облаке пыли
+    vec2 q = vUv * 2.0 - 1.0; float r = length(q - vec2(0.0, -0.75));
+    float band = (r - 0.95) / 0.2;
+    a = smoothstep(0.0, 0.2, band) * smoothstep(1.0, 0.8, band) * smoothstep(-0.55, 0.1, q.y) * uRain * 0.2;
+    c = hue(1.0 - clamp(band, 0.0, 1.0)) * 0.85 + 0.15;
+    gl_FragColor = vec4(c * uLight, a);
+    return;
+  } else if (uMode > 2.5) {
+    // клуб водяной пыли
+    vec2 q = vUv * 2.0 - 1.0; float r = length(q * vec2(1.0, 1.2));
+    float s = n(q * 2.4 + vec2(vCyc * 3.0, -uTime * 0.4)) * 0.6 + n(q * 5.5 + vec2(uTime * 0.2, -uTime * 0.7)) * 0.4;
+    a = (1.0 - smoothstep(0.1, 1.0, r)) * smoothstep(0.2, 0.75, s) * 0.5 * smoothstep(0.0, 0.2, vCyc) * smoothstep(1.0, 0.55, vCyc);
+    c = vec3(0.94, 0.97, 1.0);
+  } else if (uMode > 1.5) {
+    // кипень под струёй и круги от неё по воде
+    vec2 q = vUv * 2.0 - 1.0; float r = length(q); float an = atan(q.y, q.x);
+    float s = n(vec2(an * 3.0, r * 5.0 - uTime * 1.7)) * 0.55 + n(q * 8.0 + uTime * 0.8) * 0.45;
+    float core = (1.0 - smoothstep(0.18, 0.62, r)) * smoothstep(0.32, 0.7, s + (1.0 - r) * 0.45);
+    float ring = 1.0 - smoothstep(0.0, 0.06, abs(fract(r * 2.4 - uTime * 0.32) - 0.5));
+    float rings = ring * smoothstep(1.0, 0.45, r) * smoothstep(0.25, 0.4, r) * (0.35 + 0.65 * n(q * 6.0 - uTime * 0.4)) * 0.55;
+    float lace = smoothstep(0.55, 0.8, n(q * 14.0 + vec2(uTime * 0.5, -uTime * 0.3))) * smoothstep(0.95, 0.4, r) * 0.6;
+    a = max(max(core, rings), lace);
   } else {
-    float s = n(vec2(vUv.x * 13.0, vUv.y * 4.0 + uTime * 2.4)) * 0.6 + n(vec2(vUv.x * 31.0, vUv.y * 9.0 + uTime * 3.6)) * 0.4;
-    float edge = smoothstep(0.0, 0.2, vUv.x) * smoothstep(1.0, 0.8, vUv.x);
-    c = mix(vec3(0.5, 0.82, 0.95), vec3(1.0), smoothstep(0.35, 0.78, s));
-    a = edge * (0.78 + 0.22 * s) * smoothstep(1.0, 0.94, vUv.y);
-    // широкая струя (горный водопад) — не сплошная лента: между прядями воды просвечивает скала
-    a *= mix(1.0, 0.5 + 0.5 * smoothstep(0.22, 0.6, n(vec2(vUv.x * 7.0, vUv.y * 2.2 + uTime * 1.5))), uStrand);
+    float fall = smoothstep(uLip - 0.02, 1.0, vUv.y); // 0 — по руслу над кромкой, 1 — у воды
+    float sp = mix(0.8, 3.4, smoothstep(uLip - 0.04, uLip + 0.12, vUv.y));
+    float yy = vUv.y * 5.0 - uTime * sp;
+    float st = n(vec2(vUv.x * 24.0, yy * 0.55)) * 0.55 + n(vec2(vUv.x * 57.0, yy * 1.25)) * 0.45; // пряди
+    float cl = n(vec2(vUv.x * 6.0, vUv.y * 8.0 - uTime * 4.4)); // сгустки
+    float wob = n(vec2(vUv.y * 9.0 - uTime * 2.2, uMode * 3.0)) * 0.14;
+    float edge = smoothstep(0.0, 0.14 + wob, vUv.x) * smoothstep(1.0, 0.86 - wob, vUv.x);
+    if (uMode > 0.5) {
+      // пелена: только белые прожилки и брызги, быстрее и реже
+      float w = smoothstep(0.52, 0.85, n(vec2(vUv.x * 18.0, vUv.y * 4.0 - uTime * 4.8)) * 0.7 + cl * 0.4);
+      a = edge * w * fall * 0.55 * smoothstep(1.0, 0.9, vUv.y);
+    } else {
+      float white = clamp(0.18 + fall * 0.5 + (st - 0.5) * 1.1 + smoothstep(0.55, 0.85, cl) * 0.35 * fall, 0.0, 1.0);
+      white = max(white, (1.0 - smoothstep(0.0, 0.05, abs(vUv.y - uLip))) * 0.92); // белый перегиб на кромке
+      c = mix(uDeep, vec3(1.0), white);
+      a = edge * mix(0.55, 0.96, white) * smoothstep(1.0, 0.95, vUv.y) * smoothstep(0.0, 0.1, vUv.y);
+      // широкая горная струя — не сплошная: между прядями просвечивает скала
+      a *= mix(1.0, 0.42 + 0.58 * smoothstep(0.22, 0.6, n(vec2(vUv.x * 7.0, vUv.y * 2.2 - uTime * 1.5))), uStrand * fall);
+    }
   }
   gl_FragColor = vec4(c * uLight, a);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;
+// брызги: капли летят из-под струи и падают обратно; каждая — своя точка со своим семенем, всё считает видеокарта
+const DROP_VERT = /* glsl */ `uniform float uTime, uSize; uniform vec3 uAt, uOut; attribute vec3 aSeed; varying float vA;
+void main(){
+  float life = 0.9 + aSeed.z * 0.8;
+  float tt = fract(uTime / life + aSeed.x) * life;
+  float an = aSeed.y * 6.2832;
+  vec3 dir = normalize(vec3(cos(an), 0.0, sin(an)) + uOut * 0.9);
+  float sp = 1.6 + aSeed.z * 2.6;
+  vec3 p = uAt + vec3(cos(an) * aSeed.x, 0.0, sin(an) * aSeed.x) * uSize * 0.5 + dir * sp * tt * 0.55;
+  p.y += (2.4 + aSeed.x * 3.2) * tt - 4.9 * tt * tt;
+  vA = smoothstep(0.0, 0.08, tt) * (1.0 - smoothstep(life * 0.6, life, tt)) * step(0.0, p.y);
+  vec4 mv = viewMatrix * vec4(p, 1.0);
+  gl_PointSize = (2.0 + aSeed.y * 3.0) * 180.0 / max(1.0, -mv.z);
+  gl_Position = projectionMatrix * mv; }`;
+const DROP_FRAG = /* glsl */ `uniform float uLight; varying float vA;
+void main(){ vec2 q = gl_PointCoord * 2.0 - 1.0; float a = (1.0 - smoothstep(0.4, 1.0, dot(q, q))) * vA * 0.85; gl_FragColor = vec4(vec3(0.96, 0.99, 1.0) * uLight, a);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}`;
+
+/** Профиль струи: точки [r, y] — r вдоль n от кромки (к воде +), y — высота; сверху по руслу и до воды. */
+function fallProfile(f) {
+  const at = (r) => groundH(f.x + f.nx * r, f.z + f.nz * r);
+  // кромка — там, где русло на уступе кончается и земля уходит вниз
+  const top = at(-5.3);
+  let r0 = -5.3;
+  while (r0 < 0 && at(r0 + 0.1) > top - 0.5) r0 += 0.1;
+  const H = Math.max(at(r0), 1);
+  const pts = [];
+  for (let r = -5.3; r < r0; r += 0.3) pts.push([r, at(r) + 0.22]);
+  const v = 1.8; // с какой скоростью вода сходит с кромки, м/с
+  for (let r = r0; r < 9; r += 0.03) {
+    const tt = (r - r0) / v;
+    const y = Math.max(H + 0.22 - 4.9 * tt * tt, at(r) + 0.34);
+    pts.push([r, Math.max(0, y)]);
+    if (y <= 0.04) break;
+  }
+  // равные шаги по длине: в отвесной части точек столько же, сколько на пологом русле
+  const len = [0];
+  for (let i = 1; i < pts.length; i++) len.push(len[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  const L = len[len.length - 1];
+  const N = 30;
+  const out = [];
+  let j = 0;
+  for (let k = 0; k <= N; k++) {
+    const want = (L * k) / N;
+    while (j < len.length - 2 && len[j + 1] < want) j++;
+    const u = (want - len[j]) / Math.max(1e-6, len[j + 1] - len[j]);
+    out.push([pts[j][0] + (pts[j + 1][0] - pts[j][0]) * u, pts[j][1] + (pts[j + 1][1] - pts[j][1]) * u, want / L]);
+  }
+  let lip = 0;
+  for (let k = 0; k < out.length; k++) if (out[k][0] <= r0) lip = out[k][2];
+  return { pts: out, lip, H, r0, end: out[out.length - 1][0] };
+}
+
 function buildFalls(scene) {
   const uTime = { value: 0 };
   const uLight = { value: 1 };
+  const uRain = { value: 0 };
+  const deep = new THREE.Color(HAS.blue ? '#3f8fbf' : HAS.keys ? '#3fb3c2' : FALLS.length && FALLS[0].w > 1.6 ? '#4f9e94' : '#4c9cc8');
+  const list = [];
+  const mat = (mode, extra = {}, vert = FALL_VERT, opts = {}) =>
+    new THREE.ShaderMaterial({ uniforms: { uTime, uLight, uRain, uMode: { value: mode }, uStrand: { value: 0 }, uLip: { value: 0 }, uDeep: { value: deep }, ...extra }, vertexShader: vert, fragmentShader: FALL_FRAG, transparent: true, depthWrite: false, ...opts });
   for (const f of FALLS) {
     const tx = -f.nz;
     const tz = f.nx;
-    const pos = [];
-    const uv = [];
-    const idx = [];
-    const N = 14;
-    for (let k = 0; k <= N; k++) {
-      const t = k / N;
-      // f.x, f.z — кромка обрыва, n — от скалы к воде: полоса идёт от воды (2,9 м от кромки) вглубь уступа (5,3 м)
-      const rr = 2.9 - t * 8.2;
-      const px = f.x + f.nx * rr;
-      const pz = f.z + f.nz * rr;
-      const y = Math.max(0.02, groundH(px, pz)) + 0.32;
-      const w = (f.w || 1.25) + 0.5 * (1 - t);
-      pos.push(px - tx * w + f.nx * 0.35, y, pz - tz * w + f.nz * 0.35, px + tx * w + f.nx * 0.35, y, pz + tz * w + f.nz * 0.35);
-      uv.push(0, t, 1, t);
-      if (k < N) idx.push(k * 2, k * 2 + 1, k * 2 + 2, k * 2 + 1, k * 2 + 3, k * 2 + 2);
+    const P = fallProfile(f);
+    const W0 = f.w || 1.25;
+    const wide = W0 > 1.6 ? 1 : 0;
+    // две ленты: плотная и пелена (впереди по нормали профиля, шире)
+    for (const layer of [0, 1]) {
+      const pos = [];
+      const uv = [];
+      const idx = [];
+      P.pts.forEach(([r, y, v], k) => {
+        const a = P.pts[Math.max(0, k - 1)];
+        const b = P.pts[Math.min(P.pts.length - 1, k + 1)];
+        let dr = b[0] - a[0];
+        let dy = b[1] - a[1];
+        const dl = Math.hypot(dr, dy) || 1;
+        dr /= dl;
+        dy /= dl;
+        const fall = Math.max(0, (v - P.lip) / (1 - P.lip));
+        const off = layer ? 0.16 + 0.55 * fall : 0;
+        const rr = r - dy * off; // нормаль к профилю — от скалы
+        const yy = y + dr * off;
+        const w = W0 * (1 + 0.42 * Math.pow(fall, 1.2)) * (layer ? 1.16 : 1);
+        const px = f.x + f.nx * rr;
+        const pz = f.z + f.nz * rr;
+        pos.push(px - tx * w, yy, pz - tz * w, px + tx * w, yy, pz + tz * w);
+        uv.push(0, v, 1, v);
+        if (k < P.pts.length - 1) idx.push(k * 2, k * 2 + 1, k * 2 + 2, k * 2 + 1, k * 2 + 3, k * 2 + 2);
+      });
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      g.setIndex(idx);
+      const m = new THREE.Mesh(g, mat(layer, { uStrand: { value: wide }, uLip: { value: P.lip } }, FALL_VERT, { side: THREE.DoubleSide }));
+      m.renderOrder = 3 + layer;
+      scene.add(m);
     }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-    g.setIndex(idx);
-    const wide = f.w > 1.6 ? 1 : 0;
-    const m = new THREE.Mesh(g, new THREE.ShaderMaterial({ uniforms: { uTime, uLight, uDisc: { value: 0 }, uStrand: { value: wide } }, vertexShader: FALL_VERT, fragmentShader: FALL_FRAG, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
-    m.renderOrder = 3;
-    scene.add(m);
-    const ds = 7 * Math.max(1, (f.w || 1.25) / 1.25) ** 0.8;
-    const d = new THREE.Mesh(new THREE.PlaneGeometry(ds, ds), new THREE.ShaderMaterial({ uniforms: { uTime, uLight, uDisc: { value: 1 }, uStrand: { value: 0 } }, vertexShader: FALL_VERT, fragmentShader: FALL_FRAG, transparent: true, depthWrite: false }));
+    // подножие: где струя входит в воду
+    const bx = f.x + f.nx * (P.end + 0.3);
+    const bz = f.z + f.nz * (P.end + 0.3);
+    const ds = 6.5 * Math.max(1, W0 / 1.25) ** 0.8;
+    const d = new THREE.Mesh(new THREE.PlaneGeometry(ds, ds), mat(2));
     d.rotation.x = -Math.PI / 2;
-    d.position.set(f.bx, 0.12, f.bz);
+    d.position.set(bx, 0.1, bz);
     d.renderOrder = 3;
     scene.add(d);
-    if (f.spray) {
-      // водяная пыль у подножия большого водопада
-      const sp = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({ uniforms: { uTime, uLight, uDisc: { value: 2 }, uStrand: { value: 0 }, uAt: { value: new THREE.Vector3(f.bx + f.nx * 1.2, f.spray * 0.26, f.bz + f.nz * 1.2) }, uSize: { value: new THREE.Vector2(f.spray * 1.35, f.spray) } }, vertexShader: SPRAY_VERT, fragmentShader: FALL_FRAG, transparent: true, depthWrite: false }));
+    // клубы водяной пыли: три-четыре, поднимаются и тают по очереди
+    const spray = f.spray || Math.max(4, P.H * 0.55);
+    const puffs = wide ? 4 : 3;
+    for (let i = 0; i < puffs; i++) {
+      const pm = mat(3, { uAt: { value: new THREE.Vector3(bx + f.nx * 0.6 + tx * (i - (puffs - 1) / 2) * W0 * 0.8, spray * 0.12, bz + f.nz * 0.6 + tz * (i - (puffs - 1) / 2) * W0 * 0.8) }, uSize: { value: new THREE.Vector2(spray * 1.1, spray * 0.85) }, uPhase: { value: i / puffs + 0.13 }, uRise: { value: spray * 0.45 } }, PUFF_VERT);
+      const sp = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), pm);
       sp.frustumCulled = false;
       sp.renderOrder = 4;
       scene.add(sp);
     }
+    // радуга в пыли
+    const rb = mat(4, { uAt: { value: new THREE.Vector3(bx + f.nx * 1.5, spray * 0.32, bz + f.nz * 1.5) }, uSize: { value: new THREE.Vector2(spray * 1.6, spray * 1.6) }, uPhase: { value: 0 }, uRise: { value: 0 } }, PUFF_VERT, { blending: THREE.AdditiveBlending });
+    const rain = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), rb);
+    rain.frustumCulled = false;
+    rain.renderOrder = 5;
+    scene.add(rain);
+    // брызги
+    const NP = wide ? 110 : 70;
+    const seeds = new Float32Array(NP * 3);
+    for (let i = 0; i < seeds.length; i++) seeds[i] = Math.random();
+    const pg = new THREE.BufferGeometry();
+    pg.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(NP * 3), 3));
+    pg.setAttribute('aSeed', new THREE.Float32BufferAttribute(seeds, 3));
+    const drops = new THREE.Points(pg, new THREE.ShaderMaterial({ uniforms: { uTime, uLight, uAt: { value: new THREE.Vector3(bx, 0.05, bz) }, uOut: { value: new THREE.Vector3(f.nx, 0, f.nz) }, uSize: { value: W0 * 2 } }, vertexShader: DROP_VERT, fragmentShader: DROP_FRAG, transparent: true, depthWrite: false }));
+    drops.frustumCulled = false;
+    drops.renderOrder = 4;
+    scene.add(drops);
+    list.push({ x: bx, z: bz, rain, spray });
+    // скала с промоиной за струёй (Tripo): мокрый тёмный жёлоб, по бокам — уступы с травой. У скалы бухты лицо смотрит
+    // к −Z модели, у озёрной — к −X; ширина такая, чтобы струя целиком помещалась в жёлоб
+    const lake = W0 > 1.6;
+    const id = lake ? 'env-fallcliff-lake' : 'env-fallcliff-bay';
+    const height = P.H + 1.8;
+    const width = Math.max(lake ? 11 : 8.5, W0 * 7);
+    const depth = lake ? 8 : 7;
+    const c = P.r0 + 1.2 - depth / 2;
+    ENV.singles.push({
+      id, x: f.x + f.nx * c, y: -1.4, z: f.z + f.nz * c,
+      ry: lake ? Math.atan2(f.nz, -f.nx) : Math.atan2(-f.nx, -f.nz),
+      fit: lake ? [depth, height, width] : [width, height, depth], rock: true
+    });
   }
-  return { uTime, uLight };
+  return { uTime, uLight, uRain, list };
 }
 
 function buildFloaters(scene) {
@@ -1325,7 +1466,8 @@ function buildGulls(scene) {
   const GR = SKERRIES.find((s) => s.id === 'gullrock');
   if (GR) centers.push([GR.x, 15, GR.z, 13], [GR.x + 3, 11, GR.z - 2, 8], [GR.x - 2, 19, GR.z + 3, 18]);
   // кроме них — стаи над морскими косяками (FLOCKS стай по FLOCK птиц): пока косяка нет, птицы спрятаны
-  const N = centers.length + FLOCKS * FLOCK;
+  const PMAX = 8; // столько чаек со свай может разом подняться в воздух
+  const N = centers.length + FLOCKS * FLOCK + PMAX;
   const flap = new THREE.InstancedBufferAttribute(new Float32Array(N), 1);
   geo.setAttribute('aFlap', flap);
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side: THREE.DoubleSide });
@@ -1336,6 +1478,64 @@ function buildGulls(scene) {
   };
   mat.customProgramCacheKey = () => 'gull1';
   const mesh = new THREE.InstancedMesh(geo, mat, N);
+  // готовая модель (Tripo): размах крыльев — вдоль X, голова — к −Z, середина тела — в начале координат; взмах — тот же шейдер
+  const out = { ready: !!window.RYBAK_OFFLINE };
+  if (!out.ready)
+    loadManifest()
+      .then(() => (modelInfo('env-gullfly') ? loadModel('env-gullfly') : Promise.reject(new Error('нет модели чайки'))))
+      .then(
+      (tpl) => {
+        const m = modelGeometry(tpl);
+        if (!m) return (out.ready = true);
+        const g = m.g;
+        const P = g.attributes.position;
+        // крылья — главная ось в плане
+        let sx = 0, sz = 0, sxx = 0, szz = 0, sxz = 0;
+        for (let i = 0; i < P.count; i++) {
+          const x = P.getX(i), z = P.getZ(i);
+          sx += x; sz += z; sxx += x * x; szz += z * z; sxz += x * z;
+        }
+        const n = P.count;
+        const cxx = sxx / n - (sx / n) ** 2, czz = szz / n - (sz / n) ** 2, cxz = sxz / n - (sx / n) * (sz / n);
+        g.rotateY(0.5 * Math.atan2(2 * cxz, cxx - czz)); // ось крыльев → X
+        g.computeBoundingBox();
+        let b = g.boundingBox;
+        const span = b.max.x - b.min.x;
+        const mx = (b.max.x + b.min.x) / 2;
+        // голова там, где тело вытянуто дальше от линии крыльев (клюв длиннее хвоста)
+        let zmin = 0, zmax = 0, ys = 0, zs = 0, cn = 0;
+        for (let i = 0; i < n; i++) {
+          if (Math.abs(P.getX(i) - mx) > span * 0.12) continue;
+          zmin = Math.min(zmin, P.getZ(i));
+          zmax = Math.max(zmax, P.getZ(i));
+          ys += P.getY(i);
+          zs += P.getZ(i);
+          cn++;
+        }
+        const zc = cn ? zs / cn : 0;
+        g.translate(-mx, -(cn ? ys / cn : 0), -zc);
+        if (zmax - zc > zc - zmin) g.rotateY(Math.PI); // голова была к +Z
+        const k = 1.6 / span;
+        g.scale(k, k, k);
+        const w = new Float32Array(n);
+        for (let i = 0; i < n; i++) {
+          const x = P.getX(i);
+          w[i] = Math.sign(x) * sstep(0.08, 0.55, Math.abs(x) / 0.8); // у тела крыло не гнётся, к концам — всё сильнее
+        }
+        g.setAttribute('aWing', new THREE.BufferAttribute(w, 1));
+        g.setAttribute('aFlap', flap);
+        const mm = m.material.clone();
+        mm.side = THREE.DoubleSide;
+        mm.metalness = 0;
+        mm.roughness = 0.85;
+        mm.onBeforeCompile = mat.onBeforeCompile;
+        mm.customProgramCacheKey = () => 'gull2';
+        mesh.geometry = g;
+        mesh.material = mm;
+        out.ready = true;
+      },
+      () => (out.ready = true)
+    );
   mesh.frustumCulled = false; // чайки летают по всей бухте
   mesh.name = 'gulls';
   mesh.layers.set(1); // в отражении воды их нет
@@ -1344,8 +1544,34 @@ function buildGulls(scene) {
   const list = centers.map(([cx, cy, cz, rad], i) => ({ cx, cy, cz, rad, ph: i * 1.7, sp: 0.16 + i * 0.03, dir: i % 2 ? 1 : -1 }));
   const hide = new THREE.Matrix4().makeScale(0, 0, 0);
   for (let i = centers.length; i < N; i++) mesh.setMatrixAt(i, hide);
-  return {
+  const BASE = centers.length + FLOCKS * FLOCK;
+  /** Путь чайки, вспугнутой со сваи: взлёт (3 с), круги над сваей, посадка (последние 4 с). u — секунды с взлёта. */
+  const perchPath = (g, u, outV) => {
+    const p0 = g.o.position;
+    const away = g.ry; // улетает в сторону, куда смотрела
+    const c = [p0.x + Math.sin(away) * 7, p0.y + 7, p0.z + Math.cos(away) * 7];
+    const R = 7;
+    const a0 = away + Math.PI;
+    const circ = (a) => [c[0] + Math.sin(a) * R, c[1] + Math.sin(a * 2) * 0.6, c[2] + Math.cos(a) * R];
+    const T = 32;
+    if (u < 3) {
+      const e = 1 - (1 - u / 3) ** 2;
+      const q = circ(a0);
+      return outV.set(p0.x + (q[0] - p0.x) * e, p0.y + 0.3 + (q[1] - p0.y) * Math.sqrt(e), p0.z + (q[2] - p0.z) * e);
+    }
+    const a = a0 + (Math.min(u, T - 4) - 3) * 0.5;
+    if (u < T - 4) return outV.set(...circ(a));
+    const e = Math.min(1, (u - (T - 4)) / 4);
+    const q = circ(a);
+    const ee = e * e * (3 - 2 * e);
+    return outV.set(q[0] + (p0.x - q[0]) * ee, q[1] + (p0.y + 0.3 - q[1]) * ee, q[2] + (p0.z - q[2]) * ee);
+  };
+  const pA = new THREE.Vector3();
+  const pB = new THREE.Vector3();
+  return Object.assign(out, {
     mesh,
+    /** Вспугнули чайку со сваи: (x, z) — откуда; сюда игра вешает крик. */
+    onTakeoff: null,
     /**
      * flocks — морские косяки [{ x, z, on }]: над каждым кружит стая и по очереди ныряет к воде.
      * Издалека птицы рисуются крупнее настоящих — иначе стаю, по которой ищут косяк, с лодки не разглядеть.
@@ -1386,10 +1612,44 @@ function buildGulls(scene) {
           flap.setX(i, Math.sin(t * 6.2 + ph * 3) * 0.6 * (0.5 + 0.5 * Math.max(dive, Math.max(0, Math.sin(t * 0.6 + ph)))));
         }
       }
+      // чайки со свай: подошли ближе шести метров — взлетает, кружит полминуты и садится обратно
+      for (let i = 0; i < PMAX; i++) {
+        const g = PERCHED[i];
+        const idx = BASE + i;
+        if (!g) {
+          mesh.setMatrixAt(idx, hide);
+          continue;
+        }
+        if (!g.fly && camera && t > (g.back || 0) && Math.hypot(camera.position.x - g.o.position.x, camera.position.z - g.o.position.z) < 6) {
+          g.fly = t;
+          if (this.onTakeoff) this.onTakeoff(g.o.position.x, g.o.position.z);
+        }
+        const u = g.fly ? t - g.fly : -1;
+        if (u < 0 || u > 32) {
+          if (g.fly) {
+            g.fly = 0;
+            g.back = t + 10;
+          }
+          g.o.visible = true;
+          mesh.setMatrixAt(idx, hide);
+          continue;
+        }
+        g.o.visible = false;
+        perchPath(g, u, pA);
+        perchPath(g, u + 0.05, pB);
+        o.position.copy(pA);
+        o.rotation.set(0, Math.atan2(-(pB.x - pA.x), -(pB.z - pA.z)), u > 3 && u < 28 ? -0.28 : 0);
+        o.scale.setScalar(0.62);
+        o.updateMatrix();
+        mesh.setMatrixAt(idx, o.matrix);
+        // взлёт и посадка — частые взмахи, на кругу — редкие и планирование
+        const busy = u < 3 || u > 28 ? 1 : 0.35 + 0.65 * Math.max(0, Math.sin(t * 0.5 + i));
+        flap.setX(idx, Math.sin(t * (u < 3 ? 11 : 6) + i * 2) * 0.6 * busy);
+      }
       mesh.instanceMatrix.needsUpdate = true;
       flap.needsUpdate = true;
     }
-  };
+  });
 }
 function buildSchools(fauna) {
   const PER = 9;
@@ -1488,6 +1748,8 @@ export function buildScenery(scene, nfx = null) {
   }
   const current = LOC_ID === 'blue' ? buildCurrent(scene) : null; // Течение: полоса плавучих водорослей
   const falls = buildFalls(scene);
+  const sunAt = new THREE.Vector3(0, 1, 0);
+  let sunK = 0;
   const floaters = buildFloaters(scene);
   let dark = 0; // насколько стемнело: по нему горят огни вех
   const gulls = HAS.gulls ? buildGulls(scene) : null;
@@ -1512,6 +1774,12 @@ export function buildScenery(scene, nfx = null) {
     smallState,
     /** Для проверок: спрятан ли запасной меш и сколько готовых моделей расставлено. */
     propsState: () => ({ fallback: fallback.visible, ...propsDone }),
+    /** Чайки готовы: модель стаи встала на место заготовки (заставка ждёт — шейдеры собираются за ней). */
+    gullsReady: () => !gulls || gulls.ready,
+    /** Вспугнули чайку со сваи (x, z): игра вешает сюда крик. */
+    set onGull(fn) {
+      if (gulls) gulls.onTakeoff = fn;
+    },
     /** Для проверок: готовые модели, повисшие над водой — не на мостках, не на земле и не на другом предмете. */
     strayProps: () => PLACES.filter((p) => p.on == null && !deckAt(p.x, p.z, -0.3) && groundH(p.x, p.z) < p.y - 0.4).map((p) => [p.id, p.x, p.z]),
     /** night: 0 днём … 1 ночью; light — общая яркость дня */
@@ -1531,12 +1799,22 @@ export function buildScenery(scene, nfx = null) {
       falls.uLight.value = 0.14 + 0.86 * light;
       envNight(night);
     },
+    /** Где солнце и видно ли его (0 — ночь, дождь или туман): для радуги в пыли водопадов. */
+    setSun(dir, k) {
+      sunAt.copy(dir);
+      sunK = k;
+    },
     update(dt, t, camera) {
       if (camera) {
         env.update(camera, t);
         cullSmall(camera);
       }
       falls.uTime.value = t;
+      // радуга видна, когда солнце за спиной у смотрящего, а пыль — перед ним
+      if (camera && falls.list.length) {
+        camera.getWorldDirection(_v3);
+        falls.uRain.value = sunK * sstep(0.05, 0.45, -(_v3.x * sunAt.x + _v3.y * sunAt.y + _v3.z * sunAt.z));
+      }
       if (lh) lh.beam.rotation.y = t * 0.45;
       if (current && camera) current.update(camera, t, waveH);
       for (const f of floaters) {

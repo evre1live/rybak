@@ -11,6 +11,7 @@ import { buildMist } from './loc/lake-nature.js';
 import { createWater, createFoamRings, sea } from './water.js';
 import { FAR_ISLES, farH, farWood } from './farisles.js';
 import { buildScenery, FOAM_SPOTS } from './scenery.js';
+import { collectDecor } from './decor.js';
 import { patchSurface, surfaceU, detailTexture, loadPaint, detail } from './surface.js';
 import { ENV } from './envmodels.js';
 import { GrassField } from './grass.js';
@@ -478,6 +479,8 @@ export class World {
     // ночные огни: лампочки гирлянд, светлячки, дорожки света на воде — их расставляет окружение
     this.nightfx = new NightFx(scene, this.water.uniforms);
     this.scenery = buildScenery(scene, this.nightfx);
+    // глыбы на каменных склонах и мелочь природы — по готовой сетке рельефа; встают вместе с камнями (envmodels.js)
+    this.decor = collectDecor(this.terrain);
     this.nightfx.build();
     shadeUnderTrees(this.terrain);
     this.grass = new GrassField(scene, grassTint, isTouch() ? { max: 3000, maxFlowers: 500 } : {});
@@ -637,6 +640,7 @@ export class World {
     this.night = clamp(kStars * 1.15, 0, 1);
     this.exposure = k.exp;
     this.scenery.setNight(this.night, 1 - this.night);
+    this.scenery.setSun(this.sunDir, dayLight ? (1 - W.rain) * (1 - fogK) * sstep(0.05, 0.3, this.sunDir.y) : 0);
     if (this.mist) this.mist.set(Math.min(1, mist * 3.8 + W.fog * 0.6) * (1 - 0.5 * W.rain), _c1.copy(k.fog).lerp(_ov.setRGB(1, 1, 1), 0.5));
     this.nightfx.setNight(this.night * (1 - 0.7 * fogK)); // в тумане огни тонут
   }

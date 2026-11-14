@@ -628,7 +628,8 @@
         }
       ],
       "concept": "28858e99-26ae-41f0-aaf5-23f3f2635440",
-      "model": "1ffd7a88-1711-425f-9f1c-0d3fd79996c6"
+      "model": "c18fb265-3fd1-4284-a090-a8d28a7de737",
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/28MtKiHi7gWgCU6NNXMg/Db5nV9B7rp4O3lHQ3nr5/content.png"
     },
     "env-rock2": {
       "concepts": [
@@ -758,7 +759,8 @@
         }
       ],
       "concept": "858c3a51-fa48-4ca3-ae54-8e3324869386",
-      "model": "ca27f1a4-816f-4e92-84e9-4364f38c8d60"
+      "model": "4760ecde-2b34-4cd9-a51c-d56b627b8115",
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/O2909C24FT1uckfXwHW5/wF3CHo7oFrveLnIGb8Lp/content.png"
     },
     "env-campfire": {
       "concepts": [
@@ -894,7 +896,8 @@
         }
       ],
       "concept": "f1fd3732-3539-406a-82e8-b83dcb7cd8ef",
-      "model": "e3896362-62c2-4335-bcd3-97c2c46b2add"
+      "model": "eec2b446-47ad-44b0-9e50-876be3a5bac3",
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/Wsa5ur1tOYjNeoHuR7Sf/BqFSGhKXRcLt616660pS/content.png"
     },
     "env-pile": {
       "concepts": [
@@ -929,7 +932,8 @@
         }
       ],
       "concept": "e5e60de8-fc8c-4718-b2d4-5ff81aa32d9a",
-      "model": "452ce76c-3bbd-4743-a03c-d928cf309398"
+      "model": "b17e5a77-a50f-47f9-9828-ebd71fc447d7",
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/j9jTunioryndH5Tf4PNu/A5mFt3ZKyIERDDqVVK0B/content.png"
     },
     "env-arch": {
       "concepts": [
@@ -1172,6 +1176,66 @@
     },
     "gear-rod7": {
       "model": "27da0932-6d6a-4d56-9ab6-9bcb6b905383"
+    },
+    "env-gullfly": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/nGLmrCjn0hYZVvjFXUrb/qgQl4YxAqQGgWehicJ9F/content.png",
+      "model": "7ae9493e-0ce7-4f04-95fa-c1f86000381f"
+    },
+    "env-pelican": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/zN5bRZ0Bcz7pLerrDdvB/xUZ1s2FiOSodPSfUGZPh/content.png",
+      "model": "fe19ca12-d87f-4b35-9e3c-82bdc4894413"
+    },
+    "env-heron": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/GDuMjuOAF2xcjR91KW95/tqDIgplkEPyMEUpDqTb2/content.png",
+      "model": "8c9a6c2b-276b-4a14-b914-3d6b6bc5b5d8"
+    },
+    "env-fallcliff-lake": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/M1pD3w9JAYQSi19UUinz/NmbuCpLFN8nrOvYRpWoN/content.png",
+      "model": "23a9c1d5-0ebb-4d7f-b3b5-0f4f87e3927f"
+    },
+    "env-fallcliff-bay": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/qoKbqNZmuAIggVnnrEEi/FvdL0HWGBWE8qZH55z4U/content.png",
+      "model": "852fac60-b787-4b39-ade6-e172a4421142"
+    },
+    "env-coral": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/13sOVOoNkG3CxaXHFlTw/HJHZzUb1m8DS52GuFvmp/content.png",
+      "model": "fd98fe63-8a17-4f03-9e3f-b50995866508"
+    },
+    "env-seacave": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/ZC6Qr4xhytqR2zEzcFXS/9NF6EcyFmEkRwTHBhDsw/content.png",
+      "model": "9b6f1210-fc05-4923-9902-c09158d866e3"
+    },
+    "env-granite": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/P1jGwEB9gnhNrE1eSKsN/BBfEV6B1XfidRHyC2CSo/content.png",
+      "model": "c340b1ab-1283-428f-9d4d-a3e03fb36b30"
+    },
+    "env-pebbles": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/iuuRLGZZ2jcc8cHTFby0/91jWzz7nm7EmR9T6LDax/content.png",
+      "model": "6b35f541-b5dd-4679-82cf-9561a9ba2bca"
+    },
+    "env-seastack": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/hStc0QptWyfCZKxl7H0s/TVe7xlCig1ZeOC3SJOyi/content.png",
+      "model": "80bc2c58-282f-4a4d-9468-8a8d5a3517d5"
+    },
+    "env-shore": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/KAo1XRDWeQoRp4TOW5sU/2LDU0VJrvkxpcxYoxJ3F/content.png",
+      "model": "dc2e04e9-f0fd-4ed9-a535-df32dd05d887"
+    },
+    "env-flowerbush": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/djp7hlJAKmkdW1b3n1HG/KEPs0NKkDiQzyoUvbkB2/content.png",
+      "model": "be12ba54-1edf-4c66-94c8-edcaf8d7a239"
+    },
+    "env-grass": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/eb32nJijODY0lRr5sMzC/5r40W4S7fFEcKpVi9Vly/content.png",
+      "model": "ed0f5027-7649-424d-b2e1-af9e7268dcf1"
+    },
+    "env-reeds": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/pGPvOWzMGgcn4XzUnFm8/sI1kGyN0oOM9eXrkkbA9/content.png",
+      "model": "a46856e7-0b89-4b4d-97ac-49c44cb896ec"
+    },
+    "env-fern": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/5HDsrlpWkRO9297qERgH/am5AC1NA8KjkEHk0CjOZ/content.png",
+      "model": "e6b1344e-bb33-4514-b911-d857c76b7633"
     }
   },
   "ledger": [
@@ -3309,6 +3373,146 @@
       "type": "image_to_model",
       "task": "3871d847-1604-4a6f-94c8-c6c91c266e88",
       "credits": 60
+    },
+    {
+      "at": "2026-11-14T19:28:40.009Z",
+      "label": "env-gullfly модель",
+      "type": "image_to_model",
+      "task": "7ae9493e-0ce7-4f04-95fa-c1f86000381f",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T19:29:44.835Z",
+      "label": "env-rock1 модель",
+      "type": "image_to_model",
+      "task": "c18fb265-3fd1-4284-a090-a8d28a7de737",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T19:29:52.385Z",
+      "label": "env-cliff1 модель",
+      "type": "image_to_model",
+      "task": "eec2b446-47ad-44b0-9e50-876be3a5bac3",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T19:30:05.298Z",
+      "label": "env-fallcliff-bay модель",
+      "type": "image_to_model",
+      "task": "852fac60-b787-4b39-ade6-e172a4421142",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T19:30:08.177Z",
+      "label": "env-cliff2 модель",
+      "type": "image_to_model",
+      "task": "b17e5a77-a50f-47f9-9828-ebd71fc447d7",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T19:30:08.488Z",
+      "label": "env-fallcliff-lake модель",
+      "type": "image_to_model",
+      "task": "23a9c1d5-0ebb-4d7f-b3b5-0f4f87e3927f",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T19:31:28.561Z",
+      "label": "env-seagull модель",
+      "type": "image_to_model",
+      "task": "4760ecde-2b34-4cd9-a51c-d56b627b8115",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T19:32:21.831Z",
+      "label": "env-heron модель",
+      "type": "image_to_model",
+      "task": "8c9a6c2b-276b-4a14-b914-3d6b6bc5b5d8",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T19:33:32.105Z",
+      "label": "env-pelican модель",
+      "type": "image_to_model",
+      "task": "fe19ca12-d87f-4b35-9e3c-82bdc4894413",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T19:59:14.608Z",
+      "label": "env-shore модель",
+      "type": "image_to_model",
+      "task": "dc2e04e9-f0fd-4ed9-a535-df32dd05d887",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T19:59:23.847Z",
+      "label": "env-seastack модель",
+      "type": "image_to_model",
+      "task": "80bc2c58-282f-4a4d-9468-8a8d5a3517d5",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T19:59:55.255Z",
+      "label": "env-pebbles модель",
+      "type": "image_to_model",
+      "task": "6b35f541-b5dd-4679-82cf-9561a9ba2bca",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T20:00:06.953Z",
+      "label": "env-granite модель",
+      "type": "image_to_model",
+      "task": "c340b1ab-1283-428f-9d4d-a3e03fb36b30",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T20:00:12.926Z",
+      "label": "env-seacave модель",
+      "type": "image_to_model",
+      "task": "9b6f1210-fc05-4923-9902-c09158d866e3",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T20:00:14.451Z",
+      "label": "env-coral модель",
+      "type": "image_to_model",
+      "task": "fd98fe63-8a17-4f03-9e3f-b50995866508",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T20:01:56.366Z",
+      "label": "env-fern модель",
+      "type": "image_to_model",
+      "task": "e6b1344e-bb33-4514-b911-d857c76b7633",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T20:02:21.318Z",
+      "label": "env-reeds модель",
+      "type": "image_to_model",
+      "task": "a46856e7-0b89-4b4d-97ac-49c44cb896ec",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T20:02:35.157Z",
+      "label": "env-grass модель",
+      "type": "image_to_model",
+      "task": "ed0f5027-7649-424d-b2e1-af9e7268dcf1",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T20:03:21.407Z",
+      "label": "env-flowerbush модель",
+      "type": "image_to_model",
+      "task": "be12ba54-1edf-4c66-94c8-edcaf8d7a239",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T20:08:30.851Z",
+      "label": "задача",
+      "type": "texture_model",
+      "task": "58eb111b-5ebf-4f49-85de-8bae516e8fcb",
+      "credits": 20
     }
   ]
 }

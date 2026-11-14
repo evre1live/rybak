@@ -5,34 +5,13 @@
 // Z — к зрителю, середина — в начале координат, наибольший размер — 1. Здесь они перекладываются в оси удочки
 // (gear3d.js): +Y — к кончику, катушка висит со стороны +Z, ручка катушки — в +X.
 import * as THREE from 'three';
-import { loadModel, modelInfo } from './models.js';
+import { loadModel, modelInfo, modelGeometry } from './models.js';
 import { loadManifest } from './hero.js';
 import { addEnvMat } from './env.js';
 
 const usable = (id) => !window.RYBAK_OFFLINE && !!modelInfo(id);
 
-/** Сетка модели одним куском, развёрнутая из сжатого вида, в осях модели. */
-function plain(tpl) {
-  let src = null;
-  tpl.scene.updateMatrixWorld(true);
-  tpl.scene.traverse((o) => {
-    if (o.isMesh && !src) src = o;
-  });
-  if (!src) return null;
-  const g = new THREE.BufferGeometry();
-  for (const name of ['position', 'normal', 'uv']) {
-    const a = src.geometry.attributes[name];
-    if (!a) continue;
-    const n = a.itemSize;
-    const arr = new Float32Array(a.count * n);
-    const get = [a.getX, a.getY, a.getZ, a.getW];
-    for (let i = 0; i < a.count; i++) for (let k = 0; k < n; k++) arr[i * n + k] = get[k].call(a, i);
-    g.setAttribute(name, new THREE.BufferAttribute(arr, n));
-  }
-  g.setIndex(src.geometry.index ? Array.from(src.geometry.index.array) : [...Array(g.attributes.position.count).keys()]);
-  g.applyMatrix4(src.matrixWorld);
-  return { g, material: src.material };
-}
+const plain = (tpl) => modelGeometry(tpl);
 /** Материал снасти: металл по карте Tripo и отражение неба (как у хрома из кода). Один на модель. */
 function gearMat(tpl, m0) {
   if (tpl.gearMat) return tpl.gearMat;

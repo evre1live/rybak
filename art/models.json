@@ -547,10 +547,11 @@
       "id": "env-rock1",
       "group": "env",
       "name": "Валун",
-      "prompt": "a big rounded granite boulder: grey stone with darker cracks and chiselled flat facets, a patch of green moss on top",
-      "tris": 1400,
+      "prompt": "(этап 24д, образец GPT Image) one big rounded boulder: smooth grey stone with soft cracks, a thick patch of bright green moss draped over the top, grass tufts at the base",
+      "tris": 2200,
       "lod": 300,
-      "gamma": 0.88
+      "textureQuality": "detailed",
+      "geometry": "detailed"
     },
     {
       "id": "env-rock2",
@@ -660,19 +661,21 @@
       "id": "env-cliff1",
       "group": "env",
       "name": "Утёс",
-      "prompt": "a massive free-standing chunk of a sea cliff: a thick wall of stacked angular rock layers with deep horizontal ledges and vertical cracks, light grey weathered stone with a few warm beige layers, sharp chiselled edges with lighter worn rims, a flat top covered with bright green grass and moss, about as wide as it is tall, a dark wet band at the very bottom",
-      "tris": 3600,
+      "prompt": "(этап 24д, образец GPT Image) a massive free-standing chunk of a sea cliff, wider than tall: soft rounded stacked limestone layers with gentle ledges, grass tufts and little ferns on the ledges, a thick grass cap with two small bushes, a darker damp band at the bottom",
+      "tris": 5200,
       "lod": 420,
-      "gamma": 0.85
+      "textureQuality": "detailed",
+      "geometry": "detailed"
     },
     {
       "id": "env-cliff2",
       "group": "env",
       "name": "Скальный уступ",
-      "prompt": "a massive rocky bluff: a tall heap of huge angular boulders and broken rock slabs fused into one solid rock mass, a heavy overhanging ledge near the top, grey stone with darker cracks, sharp chiselled facets with lighter worn edges, a rounded top covered with bright green grass, a dark wet band at the very bottom",
-      "tris": 3600,
+      "prompt": "(этап 24д, образец GPT Image) a massive rocky bluff: a heap of huge rounded boulders fused into one rock mass with a gentle overhang near the top, moss and grass in the crevices, a grassy top with small flowers, a darker damp band at the bottom",
+      "tris": 5200,
       "lod": 420,
-      "gamma": 0.66
+      "textureQuality": "detailed",
+      "geometry": "detailed"
     },
     {
       "id": "env-arch",
@@ -792,12 +795,14 @@
       "id": "env-seagull",
       "group": "env",
       "name": "Чайка",
-      "prompt": "a seagull standing on its two legs with wings folded: white body, grey wings with black tips, yellow beak and yellow legs",
-      "tris": 1600,
+      "prompt": "(этап 24д, образец GPT Image) a herring gull standing on its two legs with wings folded: white head and chest, light grey back, black wing tips with white spots, yellow beak with a red spot, pale pink legs",
+      "tris": 3000,
       "tex": [
-        512,
+        1024,
         512
-      ]
+      ],
+      "textureQuality": "detailed",
+      "geometry": "detailed"
     },
     {
       "id": "env-campfire",
@@ -1415,6 +1420,165 @@
         -0.432,
         0.022
       ]
+    },
+    {
+      "id": "env-fallcliff-bay",
+      "group": "env",
+      "name": "Скала водопада (бухта)",
+      "prompt": "(образец GPT Image) a tall seaside rock cliff face with a deep vertical notch in the middle for a waterfall, dark wet stone and moss in the notch, warm light grey rounded limestone, grassy top with bushes",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 6000,
+      "lod": 500
+    },
+    {
+      "id": "env-fallcliff-lake",
+      "group": "env",
+      "name": "Скала водопада (озеро)",
+      "prompt": "(образец GPT Image) a tall granite cliff face with a deep stepped rocky chute in the middle for a waterfall, dark wet stone and thick moss, grassy top with two small pines, base of mossy boulders",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 6000,
+      "lod": 500
+    },
+    {
+      "id": "env-gullfly",
+      "group": "env",
+      "name": "Чайка в полёте",
+      "prompt": "(образец GPT Image) a herring gull gliding with wings spread flat: white body, light grey wings with black tips, yellow beak, legs tucked",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 2400,
+      "tex": [
+        1024,
+        512
+      ]
+    },
+    {
+      "id": "env-heron",
+      "group": "env",
+      "name": "Серая цапля",
+      "prompt": "(образец GPT Image) a grey heron standing on long legs: S-curved neck, long yellow beak, black eye stripe and plume, grey wings",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 3500,
+      "tex": [
+        1024,
+        512
+      ]
+    },
+    {
+      "id": "env-pelican",
+      "group": "env",
+      "name": "Бурый пеликан",
+      "prompt": "(образец GPT Image) a brown pelican standing: long beak with a throat pouch, pale yellow head, chestnut neck stripe, grey-brown body",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 3500,
+      "tex": [
+        1024,
+        512
+      ]
+    },
+    {
+      "id": "env-shore",
+      "group": "env",
+      "name": "Прибрежные плиты",
+      "prompt": "(этап 24д, образец GPT Image) flat layered coastal rock slabs at the waterline with tide pools, barnacles and algae",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 4500,
+      "lod": 450
+    },
+    {
+      "id": "env-granite",
+      "group": "env",
+      "name": "Гранитные валуны",
+      "prompt": "(этап 24д, образец GPT Image) a cluster of three rounded granite boulders with lichen, moss and small ferns",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 4500,
+      "lod": 450
+    },
+    {
+      "id": "env-coral",
+      "group": "env",
+      "name": "Коралловый известняк",
+      "prompt": "(этап 24д, образец GPT Image) a pale porous coral limestone rock with many holes, a little algae and a grass tuft",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 4500,
+      "lod": 450
+    },
+    {
+      "id": "env-seastack",
+      "group": "env",
+      "name": "Морской столб",
+      "prompt": "(этап 24д, образец GPT Image) a tall layered sea stack rock pillar with grassy ledges and a grassy top, damp base with algae",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 5000,
+      "lod": 500
+    },
+    {
+      "id": "env-seacave",
+      "group": "env",
+      "name": "Утёс с пещерой",
+      "prompt": "(этап 24д, образец GPT Image) a massive sea cliff chunk with a dark cave opening, grassy ledges and top",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 6000,
+      "lod": 600
+    },
+    {
+      "id": "env-pebbles",
+      "group": "env",
+      "name": "Галька",
+      "prompt": "(этап 24д, образец GPT Image) a loose oval cluster of smooth rounded pebbles and cobbles in grey, beige and slate-blue",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 2000,
+      "lod": 200
+    },
+    {
+      "id": "env-grass",
+      "group": "env",
+      "name": "Пучок травы",
+      "prompt": "(этап 24д, образец GPT Image) a lush clump of tall stylized meadow grass with two seed heads",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 1800,
+      "lod": 200
+    },
+    {
+      "id": "env-fern",
+      "group": "env",
+      "name": "Папоротник",
+      "prompt": "(этап 24д, образец GPT Image) a lush fern rosette with arching fronds and curled fiddleheads",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 2200,
+      "lod": 220
+    },
+    {
+      "id": "env-reeds",
+      "group": "env",
+      "name": "Рогоз",
+      "prompt": "(этап 24д, образец GPT Image) a clump of tall marsh reeds with five brown cattail heads on a muddy base",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 2000,
+      "lod": 200
+    },
+    {
+      "id": "env-flowerbush",
+      "group": "env",
+      "name": "Цветущий куст",
+      "prompt": "(этап 24д, образец GPT Image) a low round shrub covered in small pink and white flowers",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 3000,
+      "lod": 300
     }
   ],
   "leads": {

@@ -191,6 +191,29 @@ export function loadModels(ids) {
   return Promise.all(ids.map((id) => loadModel(id).then((t) => [id, t], () => null))).then((list) => new Map(list.filter(Boolean)));
 }
 
+/** Сетка первой сетки модели, развёрнутая из сжатого вида (позиции, нормали, uv), в осях модели; и её материал. */
+export function modelGeometry(tpl) {
+  let src = null;
+  tpl.scene.updateMatrixWorld(true);
+  tpl.scene.traverse((o) => {
+    if (o.isMesh && !src) src = o;
+  });
+  if (!src) return null;
+  const g = new THREE.BufferGeometry();
+  for (const name of ['position', 'normal', 'uv']) {
+    const a = src.geometry.attributes[name];
+    if (!a) continue;
+    const n = a.itemSize;
+    const arr = new Float32Array(a.count * n);
+    const get = [a.getX, a.getY, a.getZ, a.getW];
+    for (let i = 0; i < a.count; i++) for (let k = 0; k < n; k++) arr[i * n + k] = get[k].call(a, i);
+    g.setAttribute(name, new THREE.BufferAttribute(arr, n));
+  }
+  g.setIndex(src.geometry.index ? Array.from(src.geometry.index.array) : [...Array(g.attributes.position.count).keys()]);
+  g.applyMatrix4(src.matrixWorld);
+  return { g, material: src.material };
+}
+
 /**
  * Сетка готовой модели одним куском — для InstancedMesh (киты, дельфины): вершины развёрнуты из сжатого вида и
  * переложены так, чтобы модель встала в рамку box процедурной заготовки: нос — к +Z, спина — вверх, длина и середина

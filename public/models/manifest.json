@@ -819,17 +819,17 @@
     "env-rock1": {
       "file": "models/env-rock1.glb",
       "group": "env",
-      "tris": 1399,
-      "kb": 62,
+      "tris": 2243,
+      "kb": 159,
       "size": [
         1,
-        0.869,
-        0.903
+        0.552,
+        0.93
       ],
       "lod": {
         "file": "models/env-rock1.lod.glb",
-        "tris": 300,
-        "kb": 6
+        "tris": 296,
+        "kb": 7
       }
     },
     "env-rock2": {
@@ -966,12 +966,12 @@
     "env-seagull": {
       "file": "models/env-seagull.glb",
       "group": "env",
-      "tris": 1597,
-      "kb": 62,
+      "tris": 2998,
+      "kb": 126,
       "size": [
+        0.959,
         1,
-        0.932,
-        0.562
+        0.585
       ]
     },
     "env-campfire": {
@@ -999,12 +999,12 @@
     "env-cliff1": {
       "file": "models/env-cliff1.glb",
       "group": "env",
-      "tris": 3600,
-      "kb": 115,
+      "tris": 5194,
+      "kb": 290,
       "size": [
         1,
-        0.716,
-        0.548
+        0.584,
+        0.661
       ],
       "lod": {
         "file": "models/env-cliff1.lod.glb",
@@ -1015,16 +1015,16 @@
     "env-cliff2": {
       "file": "models/env-cliff2.glb",
       "group": "env",
-      "tris": 3599,
-      "kb": 147,
+      "tris": 5196,
+      "kb": 178,
       "size": [
         1,
-        0.993,
-        0.96
+        0.792,
+        0.947
       ],
       "lod": {
         "file": "models/env-cliff2.lod.glb",
-        "tris": 414,
+        "tris": 420,
         "kb": 8
       }
     },
@@ -2513,6 +2513,231 @@
         0.163,
         0.169
       ]
+    },
+    "env-fallcliff-bay": {
+      "file": "models/env-fallcliff-bay.glb",
+      "group": "env",
+      "tris": 5994,
+      "kb": 266,
+      "size": [
+        0.678,
+        1,
+        0.599
+      ],
+      "lod": {
+        "file": "models/env-fallcliff-bay.lod.glb",
+        "tris": 500,
+        "kb": 9
+      }
+    },
+    "env-fallcliff-lake": {
+      "file": "models/env-fallcliff-lake.glb",
+      "group": "env",
+      "tris": 5992,
+      "kb": 282,
+      "size": [
+        0.756,
+        1,
+        0.699
+      ],
+      "lod": {
+        "file": "models/env-fallcliff-lake.lod.glb",
+        "tris": 492,
+        "kb": 9
+      }
+    },
+    "env-gullfly": {
+      "file": "models/env-gullfly.glb",
+      "group": "env",
+      "tris": 2400,
+      "kb": 93,
+      "size": [
+        1,
+        0.226,
+        0.657
+      ]
+    },
+    "env-heron": {
+      "file": "models/env-heron.glb",
+      "group": "env",
+      "tris": 3498,
+      "kb": 201,
+      "size": [
+        0.608,
+        1,
+        0.4
+      ]
+    },
+    "env-pelican": {
+      "file": "models/env-pelican.glb",
+      "group": "env",
+      "tris": 3498,
+      "kb": 197,
+      "size": [
+        0.911,
+        1,
+        0.477
+      ]
+    },
+    "env-shore": {
+      "file": "models/env-shore.glb",
+      "group": "env",
+      "tris": 4494,
+      "kb": 200,
+      "size": [
+        1,
+        0.263,
+        0.606
+      ],
+      "lod": {
+        "file": "models/env-shore.lod.glb",
+        "tris": 450,
+        "kb": 8
+      }
+    },
+    "env-granite": {
+      "file": "models/env-granite.glb",
+      "group": "env",
+      "tris": 4497,
+      "kb": 295,
+      "size": [
+        1,
+        0.748,
+        0.989
+      ],
+      "lod": {
+        "file": "models/env-granite.lod.glb",
+        "tris": 448,
+        "kb": 8
+      }
+    },
+    "env-coral": {
+      "file": "models/env-coral.glb",
+      "group": "env",
+      "tris": 4490,
+      "kb": 234,
+      "size": [
+        1,
+        0.768,
+        0.977
+      ],
+      "lod": {
+        "file": "models/env-coral.lod.glb",
+        "tris": 446,
+        "kb": 8
+      }
+    },
+    "env-seastack": {
+      "file": "models/env-seastack.glb",
+      "group": "env",
+      "tris": 5000,
+      "kb": 197,
+      "size": [
+        0.406,
+        1,
+        0.376
+      ],
+      "lod": {
+        "file": "models/env-seastack.lod.glb",
+        "tris": 498,
+        "kb": 9
+      }
+    },
+    "env-seacave": {
+      "file": "models/env-seacave.glb",
+      "group": "env",
+      "tris": 5991,
+      "kb": 257,
+      "size": [
+        1,
+        0.626,
+        0.788
+      ],
+      "lod": {
+        "file": "models/env-seacave.lod.glb",
+        "tris": 590,
+        "kb": 10
+      }
+    },
+    "env-pebbles": {
+      "file": "models/env-pebbles.glb",
+      "group": "env",
+      "tris": 2000,
+      "kb": 150,
+      "size": [
+        1,
+        0.246,
+        0.794
+      ],
+      "lod": {
+        "file": "models/env-pebbles.lod.glb",
+        "tris": 192,
+        "kb": 5
+      }
+    },
+    "env-grass": {
+      "file": "models/env-grass.glb",
+      "group": "env",
+      "tris": 3413,
+      "kb": 187,
+      "size": [
+        1,
+        0.731,
+        0.928
+      ],
+      "lod": {
+        "file": "models/env-grass.lod.glb",
+        "tris": 196,
+        "kb": 5
+      }
+    },
+    "env-fern": {
+      "file": "models/env-fern.glb",
+      "group": "env",
+      "tris": 4212,
+      "kb": 253,
+      "size": [
+        1,
+        0.477,
+        0.811
+      ],
+      "lod": {
+        "file": "models/env-fern.lod.glb",
+        "tris": 202,
+        "kb": 6
+      }
+    },
+    "env-reeds": {
+      "file": "models/env-reeds.glb",
+      "group": "env",
+      "tris": 2058,
+      "kb": 149,
+      "size": [
+        0.658,
+        1,
+        0.481
+      ],
+      "lod": {
+        "file": "models/env-reeds.lod.glb",
+        "tris": 194,
+        "kb": 6
+      }
+    },
+    "env-flowerbush": {
+      "file": "models/env-flowerbush.glb",
+      "group": "env",
+      "tris": 4482,
+      "kb": 245,
+      "size": [
+        1,
+        0.505,
+        0.844
+      ],
+      "lod": {
+        "file": "models/env-flowerbush.lod.glb",
+        "tris": 284,
+        "kb": 7
+      }
     }
   }
 }

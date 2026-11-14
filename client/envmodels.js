@@ -11,8 +11,9 @@ import { Scatter, spot01 } from './scatter.js';
 import { patchModel } from './surface.js';
 import { small } from './smalls.js';
 import { canvasTex, isTouch, TAU } from './util.js';
-import { BOXES, CIRCLES, DECK_Y, groundH, HAS, deckAt } from './terrain.js';
-import { kitSwap, splitItems, stoneTint, stoneSat, kitSingle } from './kit.js';
+import { BOXES, CIRCLES, DECK_Y, groundH, HAS, deckAt, BACKWATER } from './terrain.js';
+import { kitSwap, splitItems, fitItems, kitSingle } from './kit.js';
+import { stoneLook } from './stone.js';
 import { LOC_ID } from './loc/id.js';
 
 /** Что процедурный мир сообщает о себе. */
@@ -26,6 +27,8 @@ export const ENV = {
   lamps: [], // фонарные столбы: { x, y, z, side, glass, light }
   docks: [], // сваи причалов: { x, y — низ модели, z, s — высота, ry, rz }
   piles: [], // верхушки высоких свай — на них садятся чайки: [x, y, z]
+  // скальные выходы и мелочь природы по рельефу (decor.js): { id, x, y — низ, z, s | w, h, d?, ry, rx?, rz?, crag? }
+  decor: [],
   // одиночные модели: { id, key?, x, y, z, s, ry, rx?, rz?, block?, fire?, gain? — во сколько раз высветлить,
   //   lit? — { color, k }: ночью загораются окна (карта свечения модели), glows? — тёплые ореолы: [x, y, z в долях модели, поперечник в метрах],
   //   fit? — [ширина, высота, глубина] в метрах: модель растягивается под них, rock? — скала: вблизи поверх текстуры мелкий рисунок камня }
@@ -34,7 +37,7 @@ export const ENV = {
   signBlock: null
 };
 
-const state = { trees: false, palms: false, rocks: false, cliffs: 0, arch: false, piles: 0, singles: 0, lamps: 0, gulls: 0, lighthouse: false, cottage: false, kiosk: false };
+const state = { trees: false, palms: false, rocks: false, cliffs: 0, crags: 0, decor: 0, arch: false, piles: 0, singles: 0, lamps: 0, gulls: 0, lighthouse: false, cottage: false, kiosk: false };
 /** Для проверок: что уже заменено готовыми моделями; lit — сколько материалов с окнами, которые загораются ночью, glowing — как ярко они горят сейчас. */
 export const envState = () => ({ ...state, lit: lits.length, glowing: lits.reduce((m, l) => Math.max(m, l.m.emissiveIntensity), 0) });
 
@@ -47,9 +50,27 @@ const ROCK_OPT = {
   'env-cliff1': { cell: 130, near: 140, vary: 0.25, tint: GREY(1.0), rock: true },
   'env-cliff2': { cell: 130, near: 140, vary: 0.25, tint: GREY(1.15), rock: true }
 };
+// россыпь по рельефу (decor.js): глыбы на склонах — подробные издалека (их видно с воды), мелочь — только рядом.
+// Куски сетки крупные: моделей много, и с мелкими кусками вызовов отрисовки на «низком» становилось больше бюджета
+const DECOR_OPT = {
+  // камень: цвет и яркость — камень локации (stone.js)
+  crag: { cell: 220, near: 70, vary: 0.25, rock: true },
+  'env-granite': { cell: 220, near: 55, vary: 0.25, rock: true },
+  'env-coral': { cell: 220, near: 60, vary: 0.2, rock: true },
+  'env-shore': { cell: 220, near: 45, vary: 0.25, rock: true },
+  // мелочь (minor): на «низком» её нет, как и пучков травы
+  'env-pebbles': { cell: 220, near: 28, vary: 0.25, shadow: false, minor: true },
+  'env-grass': { cell: 220, near: 26, vary: 0.35, tint: { r: 0.95, g: 1.05, b: 0.95 }, sat: 0.9, sway: 0.012, shadow: false, minor: true },
+  'env-fern': { cell: 220, near: 26, vary: 0.35, tint: { r: 0.9, g: 1.0, b: 0.92 }, sat: 0.9, sway: 0.01, shadow: false, minor: true },
+  'env-reeds': { cell: 220, near: 30, vary: 0.3, sat: 0.9, sway: 0.016, shadow: false, minor: true },
+  'env-flowerbush': { cell: 220, near: 30, vary: 0.3, tint: GREY(1.15), sway: 0.006, shadow: false, minor: true }
+};
 const glows = []; // светящиеся пятна фонарей и маяка: { s, k, day }
 const lits = []; // материалы с окнами, которые загораются ночью: { m, k }
-const gulls = [];
+/** Чайки на сваях: { o, ry, pile, ph, turn, fly } — scenery поднимает их в воздух, когда к ним подходят. */
+export const PERCHED = [];
+const gulls = PERCHED;
+const waders = []; // цапли и пеликаны: { o, ry, ph, turn } — стоят на месте и иногда поворачиваются
 const fires = []; // костёр и факелы: { glow, flames, pool, torch }
 let night = 0;
 
@@ -187,9 +208,17 @@ function patched(tpl, opts) {
   }
   return tpl;
 }
+/** Скала-одиночка камнем локации (stone.js): яркость — в цвет материала, тон — в шейдер. */
+function stoned(tpl, id) {
+  const look = stoneLook(id);
+  if (!look || tpl.stoned) return look ? { rock: true, sat: look.sat, post: look.post } : { rock: true };
+  tpl.stoned = true;
+  tpl.scene.traverse((c) => c.isMesh && c.material.color.multiplyScalar(look.tint.r));
+  return { rock: true, sat: look.sat, post: look.post };
+}
 /** size — наибольший размер в метрах, если предмет мелкий: такой не отражается в воде и не рисуется издали (smalls.js). */
 function put(scene, tpl, p, size = 0) {
-  const o = spawn(patched(tpl, p.rock ? { rock: true } : undefined));
+  const o = spawn(patched(tpl, p.rock ? stoned(tpl, p.id) : undefined));
   if (size) small(o, p.x, p.z, size);
   if (p.fit) {
     const size = modelInfo(p.id).size;
@@ -308,18 +337,53 @@ export function upgradeEnv(scene) {
           };
         });
       };
+      // ── скальные выходы и мелочь природы (decor.js): встают вместе с камнями, чтобы шейдеры собрались за заставкой.
+      // Глыбы той же модели, что утёсы и валуны мира, идут в те же куски сетки: меньше вызовов отрисовки ──
+      const decorIds = [...new Set(ENV.decor.map((d) => d.id))].filter(has);
+      const extra = new Map(
+        decorIds.map((id) => {
+          const size = modelInfo(id).size;
+          const list = ENV.decor
+            .filter((d) => d.id === id)
+            .map((d) => {
+              if (d.s) return { x: d.x, y: d.y, z: d.z, s: d.s, ry: d.ry, rx: d.rx || 0, rz: d.rz || 0 };
+              const dd = d.d || (d.w * size[2]) / size[0];
+              return { x: d.x, y: d.y, z: d.z, s: 1, sx: d.w / size[0], sy: d.h / size[1], sz: dd / size[2], ry: d.ry, rx: d.rx || 0, rz: d.rz || 0 };
+            });
+          return [id, list];
+        })
+      );
+      const take = (id) => {
+        const list = extra.get(id) || [];
+        extra.delete(id);
+        return list;
+      };
       const addRocks = (id, opt) => {
         const sw = swapped(id);
-        if (!sw) return scatter.add(id, items(id), { ...opt, tint: stoneTint(opt.tint), sat: stoneSat(opt.sat) });
-        const parts = splitItems(sw, ENV.rocks[id], (r) => spot01(r.x, r.z, 7));
-        return Promise.all([...parts].map(([vid, list]) => scatter.add(vid, items(id, list, vid), { ...opt, tint: null, rock: false, ...sw.opt, cell: Math.max((sw.opt && sw.opt.cell) || opt.cell || 64, 160) })));
+        if (!sw) {
+          const more = take(id);
+          return scatter.add(id, [...items(id), ...more], { ...opt, ...stoneLook(id), cell: more.length ? Math.max(opt.cell, 220) : opt.cell });
+        }
+        const parts = sw.fit ? fitItems(sw, ENV.rocks[id], (vid) => modelInfo(vid).size, (r) => spot01(r.x, r.z, 7)) : splitItems(sw, ENV.rocks[id], (r) => spot01(r.x, r.z, 7));
+        const own = new Map(sw.use.map(([vid, , o]) => [vid, o || {}]));
+        return Promise.all([...parts].map(([vid, list]) => scatter.add(vid, [...items(id, list, vid), ...(sw.opt && sw.opt.cell > 300 ? [] : take(vid))], { ...opt, tint: null, rock: false, ...sw.opt, ...own.get(vid), ...stoneLook(vid), cell: Math.max((sw.opt && sw.opt.cell) || opt.cell || 64, 220) })));
       };
-      Promise.all(rocks.map((id) => (swapped(id) ? Promise.all(swapped(id).use.map(([v]) => loadModel(v))) : loadModel(id))))
+      const addDecor = () =>
+        Promise.all(
+          [...extra].map(([id, list]) => {
+            const o = DECOR_OPT[id] || DECOR_OPT.crag;
+            return scatter.add(id, list, { ...o, ...stoneLook(id) });
+          })
+        ).then(() => {
+          state.crags = ENV.decor.filter((d) => d.crag).length;
+          state.decor = ENV.decor.length - state.crags;
+        });
+      Promise.all([...rocks.map((id) => (swapped(id) ? Promise.all(swapped(id).use.map(([v]) => loadModel(v))) : loadModel(id))), ...decorIds.map((id) => loadModel(id))])
         // скал в море немного, и они большие — всегда подробные; валуны вдали рисуются грубо.
         // Камень у моделей тёмный, а мир игры светлый — высветляем (и текстуру, и множителем), иначе скалы
         // стоят чёрными столбами
         // утёсы (env-cliff*) — кольцо вокруг острова с маяком и глыбы западного берега: подробные издалека, это главный вид бухты
-        .then(() => Promise.all(rocks.map((id) => addRocks(id, ROCK_OPT[id]))))
+        .then(() => { const done = rocks.map((id) => addRocks(id, ROCK_OPT[id])); return Promise.all([...done, addDecor()]); })
         .then(() => {
           drop(scene, 'rocks');
           state.rocks = true;
@@ -338,7 +402,7 @@ export function upgradeEnv(scene) {
       const p = kitSingle(p0); // на этой локации вместо прежней модели может стоять своя (kit.js)
       if (!has(p.id)) continue;
       loadModel(p.id).then((tpl) => {
-        if (p.gain && !tpl.gained) {
+        if (p.gain && !tpl.gained && !stoneLook(p.id)) {
           tpl.gained = true;
           tpl.scene.traverse((c) => c.isMesh && c.material.color.multiplyScalar(p.gain));
         }
@@ -448,10 +512,30 @@ export function upgradeEnv(scene) {
         CIRCLES.push({ x: -17.8, z: -78.0, r: 0.65 });
         state.singles++;
       }, fail);
-    // ── чайки на сваях: сидят и вертят головой ──
-    if (has('env-seagull'))
-      loadModel('env-seagull').then((tpl) => {
-        for (const [x, z] of [[6.2, -24.6], [-6.2, -22.2], [1.8, -1.5], [-34.9, 9.2], [-20.2, -74.3], [208.9, -190.2]]) {
+    // ── цапли на мелководье заводи (озеро): стоят в воде по щиколотку и поворачиваются, не взлетают ──
+    if (LOC_ID === 'lake' && has('env-heron'))
+      loadModel('env-heron').then((tpl) => {
+        let n = 0;
+        for (let i = 0; i < 48 && n < 3; i++) {
+          const a = (i / 48) * TAU * 3 + 0.7;
+          const R = BACKWATER.r * (0.55 + ((i * 7) % 11) / 18);
+          const x = BACKWATER.x + Math.cos(a) * R;
+          const z = BACKWATER.z + Math.sin(a) * R;
+          const y = groundH(x, z);
+          if (y > -0.34 && y < -0.1 && !waders.some((w) => Math.hypot(w.o.position.x - x, w.o.position.z - z) < 7)) {
+            const ry = spot01(x, z, 6) * TAU;
+            waders.push({ o: put(scene, tpl, { x, y: y - 0.04, z, s: 1.05, ry }, 1.1), ry, ph: ry * 3, turn: 0 });
+            n++;
+          }
+        }
+        state.waders = n;
+      }, fail);
+    // ── чайки на сваях: сидят и вертят головой. На островках вместо них — пеликаны (не взлетают), на озере чаек нет ──
+    const percher = LOC_ID === 'keys' ? 'env-pelican' : LOC_ID === 'lake' ? null : 'env-seagull';
+    if (percher && has(percher))
+      loadModel(percher).then((tpl) => {
+        const pel = percher === 'env-pelican';
+        for (const [x, z] of pel ? [[6.2, -24.6], [-6.2, -22.2], [-34.9, 9.2], [208.9, -190.2]] : [[6.2, -24.6], [-6.2, -22.2], [1.8, -1.5], [-34.9, 9.2], [-20.2, -74.3], [208.9, -190.2]]) {
           let best = null;
           let bd = 4.5;
           for (const p of ENV.piles) {
@@ -463,8 +547,8 @@ export function upgradeEnv(scene) {
           }
           if (!best) continue;
           const ry = spot01(best[0], best[2], 6) * TAU;
-          const o = put(scene, tpl, { x: best[0], y: best[1], z: best[2], s: 0.5, ry }, 0.8);
-          gulls.push({ o, ry, pile: best, ph: ry * 3, turn: 0 });
+          const o = put(scene, tpl, { x: best[0], y: best[1], z: best[2], s: pel ? 0.78 : 0.5, ry }, pel ? 1 : 0.8);
+          (pel ? waders : gulls).push({ o, ry, pile: best, ph: ry * 3, turn: 0 });
           state.gulls++;
         }
       }, fail);
@@ -488,6 +572,12 @@ export function upgradeEnv(scene) {
       for (const g of gulls) {
         const k = Math.sin(t * 0.37 + g.ph) + 0.6 * Math.sin(t * 0.83 + g.ph * 2);
         g.turn += (Math.round(k * 1.2) * 0.42 - g.turn) * Math.min(1, dt * 5);
+        g.o.rotation.y = g.ry + g.turn;
+      }
+      // цапли и пеликаны поворачиваются реже и медленнее чаек
+      for (const g of waders) {
+        const k = Math.sin(t * 0.13 + g.ph) + 0.5 * Math.sin(t * 0.29 + g.ph * 2);
+        g.turn += (Math.round(k) * 0.6 - g.turn) * Math.min(1, dt * 1.6);
         g.o.rotation.y = g.ry + g.turn;
       }
       for (const fire of fires) {
