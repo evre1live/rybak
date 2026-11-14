@@ -28,7 +28,10 @@ export const ZONES = {
   // Коралловые островки
   garden: { name: 'Коралловый сад', hint: 'Кораллы на дне лагуны и за гребнем рифа', act: 1.15 },
   channel: { name: 'Протока', hint: 'Глубокая вода между садами и в проходах рифа', act: 0.95 },
-  edge: { name: 'Край рифа', hint: 'За гребнем: стена рифа уходит в синеву', act: 1.0 }
+  edge: { name: 'Край рифа', hint: 'За гребнем: стена рифа уходит в синеву', act: 1.0 },
+  // Синий простор
+  bank: { name: 'Банка', hint: 'Подводное плато среди океана — далеко на юго-востоке', act: 1.05 },
+  current: { name: 'Течение', hint: 'Полоса плавучих водорослей поперёк океана', act: 0.95 }
 };
 /** Зона ловли так, как её зовут на локации: у локации могут быть свои подписи (shared/locations.js). */
 export const zoneInfo = (id, loc = DEFAULT_LOC) => ({ ...(ZONES[id] || { name: '', hint: '', act: 1 }), ...(locOf(loc).zones[id] || {}) });
@@ -211,7 +214,41 @@ export const FISH = [
   fish('rifakula', 'Рифовая акула', 3, 15, 95, 3600, 2.0, {}, { live: 1.6, squid: 1.6, crab: 1.3, shrimp: 0.6 }, 1.3, { dusk: 1.4, night: 1.3, day: 0.8 },
     { shape: 'shark', back: '#5f6b70', side: '#8d989c', belly: '#f1f3f2', fin: '#2a3034', pat: 'none', lenK: 47 },
     'Серая, с чёрными кончиками плавников. Патрулирует край рифа, а к вечеру заходит в протоки — за всем, что трепещет на крючке.',
-    { at: { keys: { edge: 1.4, channel: 0.5, sea: 0.6 } }, giant: true, minDepth: 5 })
+    { at: { keys: { edge: 1.4, channel: 0.5, sea: 0.6 } }, giant: true, minDepth: 5 }),
+
+  // ── Синий простор ──
+  fish('letuchaya', 'Летучая рыба', 0, 0.08, 0.45, 34, 0.6, {}, { shrimp: 1.4, bread: 1.1, maggot: 1.0, bloodworm: 0.9 }, 0.6, { day: 1.2, night: 0.7 },
+    { shape: 'wing', back: '#1d4f8f', side: '#9cc0e0', belly: '#f2f6f9', fin: '#8ab8e8', pat: 'none', lenK: 52 },
+    'Синяя спинка и плавники-крылья: удирая от корифены, пролетает над волнами по сотне метров. Держится под водорослями Течения.',
+    { at: { blue: { current: 6, sea: 3, mid: 2, pier: 1.5, shallow: 1 } } }),
+  fish('korifena', 'Корифена', 1, 2, 24, 140, 1.6, {}, { live: 1.5, squid: 1.3, shrimp: 1.0 }, 1.7, { day: 1.2, night: 0.6 },
+    { shape: 'mahi', back: '#1fa36a', side: '#e8d63a', belly: '#f6ec9a', fin: '#2a8fd0', pat: 'dots', patC: '#2a7fd0', lenK: 44 },
+    'Золотисто-зелёная, с крутым лбом и плавником во всю спину. Ходит под плавучими водорослями и прыгает, как сумасшедшая.',
+    { at: { blue: { current: 6, sea: 3, bank: 2, deep: 1 } }, minDepth: 6 }),
+  fish('vahu', 'Ваху', 2, 5, 55, 520, 1.9, {}, { live: 1.6, squid: 1.2 }, 2.0, { dawn: 1.4, dusk: 1.3 },
+    { shape: 'slim', back: '#1f3f6a', side: '#8fb0c8', belly: '#eef2f4', fin: '#1f3f6a', pat: 'tiger', patC: '#2a4f7a', lenK: 54 },
+    'Узкая, полосатая, с зубастым клювом. Самая быстрая рыба Банки: блесну догоняет так, что катушка воет.',
+    { at: { blue: { bank: 5, current: 3, sea: 2, deep: 1 } }, minDepth: 8 }),
+  fish('zheltoper', 'Желтопёрый тунец', 2, 8, 110, 620, 2.0, {}, { live: 1.5, squid: 1.5, shrimp: 0.6 }, 1.7, { dawn: 1.3, day: 1.1 },
+    { shape: 'tuna', back: '#1b3a6b', side: '#b8c6d4', belly: '#f2f4f6', fin: '#f2c81e', pat: 'none', band: '#f2c81e', lenK: 37 },
+    'Тунец с золотой полосой и длинными жёлтыми плавниками. Стаей стоит над Банкой и рвёт поверхность, когда гонит малька.',
+    { at: { blue: { bank: 6, sea: 3, current: 2 } }, minDepth: 8 }),
+  fish('parusnik', 'Парусник', 3, 20, 95, 6200, 2.2, {}, { live: 1.7, squid: 1.3 }, 1.9, { dawn: 1.3, day: 1.1 },
+    { shape: 'sail', back: '#1d2f6a', side: '#6f8fc0', belly: '#eef2f6', fin: '#2a4fa0', pat: 'bars', patC: '#7fb0e8', lenK: 60 },
+    'Синий спинной плавник-парус выше роста рыбака. Загоняет косяк вдоль Течения, а на крючке ходит свечами одна за другой.',
+    { at: { blue: { current: 1.4, sea: 0.6 } }, giant: true, minDepth: 15 }),
+  fish('marlin', 'Синий марлин', 3, 80, 560, 15000, 2.5, {}, { live: 1.7, squid: 1.5 }, 1.9, { day: 1.2 },
+    { shape: 'marlin', back: '#122a5c', side: '#5f86c0', belly: '#eef2f6', fin: '#1a3a7a', pat: 'bars', patC: '#8fb8ef', lenK: 55 },
+    'Король океана: копьё вместо носа и полосы, вспыхивающие синим в азарте охоты. Бьётся часами — недаром о нём пишут книги.',
+    { at: { blue: { current: 1.0, sea: 0.9 } }, giant: true, minDepth: 20 }),
+  fish('gigantun', 'Тунец-гигант', 3, 150, 620, 17000, 2.5, {}, { live: 1.6, squid: 1.8 }, 1.5, { dawn: 1.3, dusk: 1.2 },
+    { shape: 'tuna', back: '#0f2a55', side: '#9fb0c4', belly: '#eef1f4', fin: '#e8c62a', pat: 'none', lenK: 40 },
+    'Синеперый великан весом с лодку. Поднимается к Банке за скумбрией — и уходит в глубину так, что леска поёт.',
+    { at: { blue: { bank: 0.9, sea: 0.5 } }, giant: true, minDepth: 10 }),
+  fish('belakula', 'Белая акула', 4, 400, 1500, 60000, 2.7, {}, { squid: 1.6, live: 1.4, crab: 1.0 }, 0.8, { dawn: 1.5, dusk: 1.5, night: 0.8 },
+    { shape: 'shark', back: '#56606a', side: '#8c96a0', belly: '#f4f5f4', fin: '#4a535c', pat: 'none', lenK: 45 },
+    'Легенда Синего простора. На рассвете и в сумерках поднимается к Тюленьим камням — смотрители маяка видели её плавник выше человеческого роста.',
+    { at: { blue: { reef: 0.7, sea: 0.25 } }, giant: true, minDepth: 12 })
 ];
 // рыба бухты, которая живёт и в озере: свои места там
 const AT_LAKE = {
@@ -239,6 +276,19 @@ const AT_KEYS = {
   mech: { sea: 1.6, edge: 0.3 }
 };
 for (const f of FISH) if (AT_KEYS[f.id]) f.at = { ...(f.at || {}), keys: AT_KEYS[f.id] };
+// рыба, которая живёт и в «Синем просторе»: у причала и скал острова, на свале, в океане
+const AT_BLUE = {
+  bychok: { pier: 5, shallow: 4, backwater: 3 },
+  stavrida: { pier: 4, mid: 5, deep: 4, sea: 4 },
+  skumbria: { deep: 4, sea: 5, bank: 4, current: 3 },
+  sargan: { mid: 3, current: 3, shallow: 2 },
+  morokun: { reef: 5, deep: 3, shallow: 2, backwater: 1 },
+  sibas: { shallow: 3, reef: 3, deep: 3, pier: 2, backwater: 2 },
+  tunec: { bank: 3, sea: 3, current: 1.5 },
+  mech: { sea: 1.2, current: 0.8 },
+  mako: { sea: 0.8, current: 0.5, bank: 0.3 }
+};
+for (const f of FISH) if (AT_BLUE[f.id]) f.at = { ...(f.at || {}), blue: AT_BLUE[f.id] };
 // Наживки этапа 22: кому они по вкусу (остальная рыба берёт на незнакомую наживку неохотно — 0,3, см. speciesWeights)
 const BAIT_EXTRA = {
   bloodworm: { ersh: 1.7, plotva: 1.5, lesh: 1.5, karas: 1.3, okun: 1.3, bychok: 1.3, sig: 1.1, harius: 1.0, nalim: 0.9 },
@@ -273,7 +323,8 @@ const STYLE_OF = {
   ersh: 'thrash', harius: 'jumper', sig: 'plain', nalim: 'snag', taimen: 'runner', zolforel: 'jumper',
   klown: 'thrash', serzhant: 'plain', babochka: 'plain', hirurg: 'thrash', popugai: 'bulldog', lucian: 'runner', krylatka: 'thrash',
   barrakuda: 'jumper', karanks: 'runner', murena: 'snag', napoleon: 'bulldog', imperator: 'snag',
-  mako: 'jumper', osetr: 'bulldog', rifakula: 'runner'
+  mako: 'jumper', osetr: 'bulldog', rifakula: 'runner',
+  letuchaya: 'jumper', korifena: 'jumper', vahu: 'runner', zheltoper: 'runner', parusnik: 'jumper', marlin: 'jumper', gigantun: 'runner', belakula: 'bulldog'
 };
 for (const f of FISH) f.style = STYLE_OF[f.id] || 'plain';
 

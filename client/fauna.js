@@ -6,6 +6,7 @@ import { groundH, deckAt, inRocks, BACKWATER, PALM, REEF, ARCH, WRECK } from './
 import { rng, TAU, clamp, damp, angDiff } from './util.js';
 import { waveH, seaK, swellMax } from './water.js';
 import { buildDolphins } from './dolphins.js';
+import { buildWhales } from './whales.js';
 
 const MAX_SHOALS = 24;
 const PER_SHOAL = 40;
@@ -260,6 +261,7 @@ export class Fauna {
     this.buildFish(scene, shared, fog);
     this.buildBugs(scene);
     this.dolphins = buildDolphins(scene); // две стаи в открытом море
+    this.whales = buildWhales(scene); // киты — только в океане (Синий простор)
     this.meshes = [this.fry, this.fish, this.bugs];
     this.under = [this.fry, this.fish]; // в отражении воды их нет
   }
@@ -745,6 +747,7 @@ export class Fauna {
     this.stepJumps(dt, seed, T, centers, camera);
     this.stepBoil(dt, centers, camera);
     this.dolphins.update(dt, t, T, camera, waveH, this.fx);
+    if (this.whales) this.whales.update(dt, t, T, camera, waveH);
     // всё в один буфер
     const m = this._m, q = this._q, q2 = this._q2, p = this._p, sv = this._s;
     for (let i = 0; i < MAX_FISH; i++) {

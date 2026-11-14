@@ -358,6 +358,15 @@ input.code{text-transform:uppercase;letter-spacing:.3em;text-align:center;font:i
 .locs .loc .lk{position:absolute;left:.7em;top:.7em;display:flex;align-items:center;gap:.3em;padding:.22em .6em .22em .45em;border-radius:1em;background:rgba(14,15,18,.74);color:var(--am);font:italic 800 .78em/1.2 var(--disp);letter-spacing:.05em}
 .locs .loc .lk .ic{width:1em;height:1em}
 .locs .loc .lk.st{font-style:normal;letter-spacing:.08em;padding:.2em .55em}
+/* четыре места: карточки в две колонки, картинка слева, подпись справа */
+.locs{display:grid;grid-template-columns:1fr 1fr;gap:.5em}
+.locs .loc{display:grid;grid-template-columns:44% minmax(0,1fr);grid-template-rows:auto auto;column-gap:.5em;row-gap:.1em;align-items:center;align-content:center;padding:.36em .4em .36em .36em}
+.locs .loc img{grid-row:1/span 2;aspect-ratio:4/3;border-radius:.6em}
+.locs .loc b{align-self:end;padding:0 .2em 0 0}
+.locs .loc i{align-self:start;padding:0}
+.locs .loc .lk{left:.5em;top:.5em;font-size:.62em;padding:.18em .45em .18em .35em}
+.locs .loc.on::after{left:.5em;right:auto;top:.5em;width:1.25em;height:1.25em;font-size:.8em;line-height:1.55}
+.locs .loc b{font-size:.98em}
 .tnote{max-width:27em;margin:.2em auto 0;padding:.6em 1em;border-radius:1.1em;background:var(--g);border:.09em solid var(--gb);color:var(--cream);font-size:.9em;line-height:1.35;text-align:center}
 .tfoot{font-size:.95em;text-align:center;line-height:1.6;text-shadow:var(--tsh)}
 @media (max-height:540px) and (min-aspect-ratio:8/5){

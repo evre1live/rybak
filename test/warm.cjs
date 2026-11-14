@@ -99,6 +99,7 @@ const loc = process.argv[3] || ''; // другая локация — свой �
     const g = RYBAK;
     clearInterval(window.__bot);
     window.__hold = hold;
+    window.__land = false;
     window.__hook = null;
     window.__bot = setInterval(() => {
       const f = g.fishing, i = g.input;
@@ -108,6 +109,7 @@ const loc = process.argv[3] || ''; // другая локация — свой �
         // в миг подсечки: готовая модель уже на месте или пока процедурная рыба?
         if (!window.__hook) window.__hook = { sp: f.catch.sp, junk: !!f.catch.junk, model: f.fish.userData.model || null, pre: (g.preIds || []).slice(), left: g.preQ ? g.preQ.length : -1 };
         if (window.__hold) s.p = Math.min(s.p, 0.5);
+        else if (window.__land) s.p = Math.max(s.p, 0.97); // к рукам: рывки и уходы рыбы назад сюда не пускаем — проверяется прогрев, а не вываживание
         // проверяем прогрев, а не умение вываживать: кадры здесь идут по секунде, и леска рвалась бы сама
         s.strain = 0;
         s.slack = 0;
@@ -138,7 +140,7 @@ const loc = process.argv[3] || ''; // другая локация — свой �
     await p.waitForTimeout(2000);
     await frame(3);
     await mark(`${n}: вываживание`);
-    await p.evaluate(() => { window.__hold = false; if (RYBAK.fishing.fight) RYBAK.fishing.fight.p = 0.97; });
+    await p.evaluate(() => { window.__hold = false; window.__land = true; if (RYBAK.fishing.fight) RYBAK.fishing.fight.p = 0.97; });
     await p.waitForFunction(() => RYBAK.fishing.state === 'landed', null, { timeout: 120000 });
     await frame(2);
     await mark(`${n}: рыба летит к рукам`);

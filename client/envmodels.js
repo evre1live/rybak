@@ -377,8 +377,8 @@ export function upgradeEnv(scene) {
         state.lighthouse = true;
       }, fail);
     // ── фонарные столбы: модель встаёт столбом на место процедурного, свет — в её фонарь ──
-    // готовый фонарный столб — только в бухте: на озере остаются деревянные столбы с фонарём, на островках — факелы
-    if (has('env-lamppost') && LOC_ID === 'bay')
+    // готовый фонарный столб — в бухте и на океанском острове: на озере остаются деревянные столбы с фонарём, на островках — факелы
+    if (has('env-lamppost') && (LOC_ID === 'bay' || LOC_ID === 'blue'))
       loadModel('env-lamppost').then((tpl) => {
         for (const l of ENV.lamps) {
           const s = LAMP.h;

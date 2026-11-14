@@ -34,7 +34,7 @@ test('каждую рыбу можно поймать хоть где-то и х
   for (const loc of LOCATIONS) {
     const caught = new Set();
     for (const zone of Object.keys(ZONES)) for (const tk of tackles) for (const hour of [6, 12, 19, 23]) {
-      const spot = { zone, depth: ['deep', 'arch', 'pit', 'sea', 'edge', 'channel'].includes(zone) ? 12 : 3, pier: zone === 'pier', hot: true };
+      const spot = { zone, depth: ['sea', 'current'].includes(zone) ? 30 : ['deep', 'arch', 'pit', 'edge', 'channel', 'bank', 'reef'].includes(zone) ? 12 : 3, pier: zone === 'pier', hot: true };
       // с морской удочкой: гиганты берут только на неё
       for (const e of L.speciesWeights(spot, tk, hour, loc.id, HEAVY)) caught.add(e.f.id);
       for (const e of L.speciesWeights(spot, tk, hour, loc.id)) assert.ok(!e.f.giant, `${loc.id}: гигант ${e.f.id} на лёгкую снасть не берёт`);
@@ -54,7 +54,7 @@ test('каждую рыбу можно поймать хоть где-то и х
 });
 
 test('локации: список, подписи зон, кто может открыть комнату', () => {
-  assert.deepEqual(LOCATIONS.map((l) => l.id), ['bay', 'lake', 'keys']);
+  assert.deepEqual(LOCATIONS.map((l) => l.id), ['bay', 'lake', 'keys', 'blue']);
   for (const l of LOCATIONS) {
     assert.ok(l.name.length > 3 && l.sub && l.about && l.place && /^img\/place-\w+\.webp$/.test(l.img) && l.pin.length === 2 && l.level >= 1, l.id);
     assert.ok(l.say.enter && l.say.back && l.say.top, `${l.id}: слова для сообщений`);
@@ -367,7 +367,10 @@ test('баланс манер: мелочь ловится у всех, редк
   const start = L.kitStats(L.newProfile());
   for (const f of FISH.filter((x) => x.rar === 0)) assert.ok(rate(f.id, 0.28, start, 0.5, 40) >= 95, f.id);
   const mid = MID();
-  for (const f of FISH.filter((x) => x.rar === 1 || x.rar === 2)) assert.ok(rate(f.id, 0.28, mid, 0.5, 40) >= 95, f.id);
+  // рыба океана (только «Синий простор», с 8-го уровня) — на своей снасти: «Закат Про» с флюорокарбоном
+  const sea = kitOf('rod5', 'line3', 'reel3', 'hook3', true);
+  const own = (f) => (locsOf(f).every((l) => l === 'blue') ? sea : mid);
+  for (const f of FISH.filter((x) => x.rar === 1 || x.rar === 2)) assert.ok(rate(f.id, 0.28, own(f), 0.5, 40) >= 95, f.id);
   for (const sp of ['som', 'tunec', 'losos', 'skat']) assert.ok(rate(sp, 0.28, mid, 0.85) >= 80, sp);
   const top = TOP();
   for (const f of FISH.filter((x) => x.rar >= 4)) {
@@ -1157,7 +1160,7 @@ test('гиганты: только на морскую удочку, у борт
   assert.ok(heavy.heavy && !heavy.gaff && heavy.gaffAt === 1);
   assert.ok(L.speciesWeights(sea, 'squid', 12, 'bay', heavy).some((e) => e.f.id === 'mako'));
   const giants = FISH.filter((f) => f.giant);
-  assert.deepEqual(giants.map((f) => f.id).sort(), ['mako', 'osetr', 'rifakula']);
+  assert.deepEqual(giants.map((f) => f.id).sort(), ['belakula', 'gigantun', 'mako', 'marlin', 'osetr', 'parusnik', 'rifakula']);
   for (const f of giants) assert.ok(f.rar >= 3 && f.w[1] >= 90 && f.minDepth >= 5, f.id);
   // большой подсак гиганту не помогает: без багра — до конца пути; с багром — с 90 %
   const s = L.fightInit({ sp: 'mako', w: 200 }, heavy, half);

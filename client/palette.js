@@ -129,6 +129,17 @@ export const PALETTES = {
     fog: { near: 190, far: 1800 }
   },
 
+  // «Синий простор»: открытый океан — вода глубокая, сапфировая, синева начинается сразу за свалом; небо выше,
+  // дымка дальше, солнце чуть золотистее
+  ocean: {
+    name: 'Синий простор',
+    tone: { sat: 1.3, vib: 0.1, con: 1.12, toe: 0.66, sh: [0.92, 1.0, 1.09], hi: [1.06, 1.0, 0.92] },
+    keys: vary(DAY, { wS: [0.05, 1.0, 0.74], wD: [0.03, 1.12, 0.56], zen: [0.004, 1.02, 0.96], fog: [0.004, 0.94, 1.0] }),
+    water: { clear: 0.13, pathMin: 0.3, fres: 0.76, net: 0.26, deepAt: 9, netDeep: 0.85, netTint: 0.6, seaDeep: 1.0, bedNet: 0.75, bedTint: 0.7, bedFog: 0.07, bedDeep: 0.6, moonPath: [4, 42] },
+    post: { bloom: 0.13, thr: 1.0, vig: 0.3 },
+    fog: { near: 210, far: 2300 }
+  },
+
   // Б. «Пастель»: мягко и светло — молочная дымка, кремовый свет, мятная вода, низкий контраст
   pastel: {
     name: 'Пастель',
@@ -159,7 +170,7 @@ export const PALETTES = {
 /** Палитра игры. Остальные наборы — для сравнения: ?pal=now (как было до этапа 20), ?pal=pastel, ?pal=cinema. */
 export const DEFAULT_PALETTE = 'tropic';
 /** У локации может быть своя палитра (иначе — палитра игры). */
-export const LOC_PALETTE = { lake: 'pine', keys: 'coral' };
+export const LOC_PALETTE = { lake: 'pine', keys: 'coral', blue: 'ocean' };
 const asked = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('pal') : null;
 /** Действующая палитра. Поля меняются на месте (usePalette), поэтому читать их нужно в момент использования. */
 export const PAL = { id: '' };

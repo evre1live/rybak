@@ -11,6 +11,8 @@ import { DECKS, CIRCLES, DECK_Y, groundH, shoreZ, islandR, ISLAND, ARCH, ARCH_LE
 import { LOC_ID } from './loc/id.js';
 import { buildLakeNature } from './loc/lake-nature.js';
 import { buildKeysNature } from './loc/keys-nature.js';
+import { buildBlueNature } from './loc/blue-nature.js';
+import { buildCurrent } from './loc/blue-sea.js';
 import { pine, roundTree, bush, farPine, farCrown } from './flora.js';
 import { waveH, swellMax } from './water.js';
 import { FAR_ISLES, farTrees, farCliffs } from './farisles.js';
@@ -168,6 +170,8 @@ const SHACK = {
   teal: { kind: 'boards', wall: '#3fb0a8', trim: '#f1efe6', roof: '#b5533c', roofMat: 7, ridge: '#8f3d2c', rib: '#9c4532', awn: ['#e2452f', '#f6f1e7'], glass: '#24405c' },
   bay: { kind: 'plaster', wall: '#efe7d6', trim: '#2f6fb0', roof: '#c8673f', roofMat: 7, ridge: '#a24a2e', rib: '#a85536', awn: ['#2f6fb0', '#f6f1e7'], glass: '#1f3550' },
   lake: { kind: 'logs', wall: '#94643a', trim: '#e8dcc0', roof: '#5a4d42', roofMat: 7, ridge: '#3e342c', rib: '#463b32', awn: ['#2f7a4f', '#efe6cf'], glass: '#22344a' },
+  // Синий простор: белёный рыбацкий дом под тёмной черепицей, углы и рамы — чёрный базальт (как на Азорах)
+  blue: { kind: 'plaster', wall: '#f2efe8', trim: '#3a3634', roof: '#7c3328', roofMat: 7, ridge: '#5a2219', rib: '#6a2a20', awn: ['#1f4fa0', '#f6f1e7'], glass: '#1c2c40' },
   keys: { kind: 'bamboo', wall: '#d2bf93', trim: '#a07a3c', roof: '#b99358', roofMat: 5, ridge: '#8a6a36', rib: '#9a7842', awn: ['#14a39a', '#f6f1e7'], glass: '#2a3a3a', thatch: true }
 };
 export const SHACK_STYLE = LOC_ID in SHACK ? LOC_ID : 'teal';
@@ -1469,11 +1473,16 @@ export function buildScenery(scene, nfx = null) {
   let lh = null;
   if (LOC_ID === 'lake') buildLakeNature(scene);
   else if (LOC_ID === 'keys') buildKeysNature(scene);
-  else {
+  else if (LOC_ID === 'blue') {
+    // остров Маяка: обрывы, рощи, гортензии; маяк с домиком смотрителя — на Маячной скале (те же, что в бухте)
+    buildBlueNature(scene);
+    lh = buildLighthouse(scene, r);
+  } else {
     buildVegetation(scene, r);
     buildRocks(scene, r);
     lh = buildLighthouse(scene, r);
   }
+  const current = LOC_ID === 'blue' ? buildCurrent(scene) : null; // Течение: полоса плавучих водорослей
   const falls = buildFalls(scene);
   const floaters = buildFloaters(scene);
   let dark = 0; // насколько стемнело: по нему горят огни вех
@@ -1523,6 +1532,7 @@ export function buildScenery(scene, nfx = null) {
       }
       falls.uTime.value = t;
       if (lh) lh.beam.rotation.y = t * 0.45;
+      if (current && camera) current.update(camera, t, waveH);
       for (const f of floaters) {
         const p = f.o.position;
         p.y = f.y + waveH(p.x, p.z, t);

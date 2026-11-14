@@ -711,7 +711,8 @@ const Q_ZONE = {
   pier: 'у свай причала', shallow: 'на мелководье', backwater: 'в заводи', reef: 'у рифа', falls: 'у водопада',
   sea: 'в открытом море', lagoon: 'в лагуне Пальмового острова', wreck: 'у затонувшего корабля',
   stones: 'у камней', pit: 'над ямой',
-  garden: 'в коралловом саду', channel: 'в протоке', edge: 'на краю рифа'
+  garden: 'в коралловом саду', channel: 'в протоке', edge: 'на краю рифа',
+  bank: 'на Банке', current: 'в Течении', deep: 'на свале', mid: 'на средней воде'
 };
 const Q_SPECIES = [
   ['bychok', 'plotva', 'okun', 'kefal', 'karas', 'stavrida'],
@@ -733,8 +734,14 @@ const Q_ELSEWHERE = {
   keys: {
     sp: [['serzhant', 'klown', 'babochka', 'hirurg', 'kefal'], ['popugai', 'lucian', 'krylatka', 'sargan']],
     zone: [['pier', 'shallow', 'garden'], ['garden', 'channel', 'sea'], ['edge', 'sea', 'channel']]
+  },
+  blue: {
+    sp: [['letuchaya', 'stavrida', 'bychok', 'skumbria'], ['korifena', 'skumbria', 'sargan', 'morokun']],
+    zone: [['pier', 'shallow', 'mid'], ['deep', 'reef', 'current'], ['bank', 'current', 'sea']]
   }
 };
+// у локации зона может называться по-своему
+const Q_ZONE_AT = { blue: { reef: 'у Тюленьих камней', backwater: 'в тихой бухточке', sea: 'в синеве', mid: 'у острова' } };
 const Q_REWARD = [{ coins: 25, xp: 20 }, { coins: 60, xp: 45 }, { coins: 130, xp: 90 }];
 export const QUEST_BONUS = 50; // премия за все три задания дня (растёт с уровнем, как и награды)
 const lvlK = (lvl, step, max) => Math.min(max, 1 + step * (Math.max(1, lvl) - 1));
@@ -786,7 +793,7 @@ export function questText(q, here) {
     case 'fish': return `Поймать ${n} ${fishWord(n)}`;
     case 'kinds': return `Поймать рыбу ${n} разных видов`;
     case 'sp': return `Поймать: ${(FISH_BY_ID[q.a] || { name: '?' }).name.toLowerCase()} — ${n} шт.${away}`;
-    case 'zone': return `Поймать ${n} ${fishWord(n)} ${Q_ZONE[q.a] || ''}${away}`;
+    case 'zone': return `Поймать ${n} ${fishWord(n)} ${((q.loc && Q_ZONE_AT[q.loc]) || {})[q.a] || Q_ZONE[q.a] || ''}${away}`;
     case 'sell': return `Продать улов на ${n} монет`;
     case 'free': return `Отпустить ${n} ${fishWord(n)}`;
     case 'kg': return `Наловить ${num(n)} кг рыбы`;

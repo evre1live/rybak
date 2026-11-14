@@ -14,7 +14,8 @@ const OUT = path.join(ROOT, 'public/img');
 const PLACES = {
   bay: { p: [-70, 62, 46], t: [18, 0, -52], fov: 38, hour: 13, pin: [0.6, 1.2, -20] },
   lake: { loc: 'lake', p: [-88, 74, 72], t: [8, 2, -58], fov: 40, hour: 13, pin: [0.6, 1.2, -20] },
-  keys: { loc: 'keys', p: [-104, 84, 96], t: [4, 0, -66], fov: 40, hour: 13, pin: [0.6, 1.2, -20] }
+  keys: { loc: 'keys', p: [-104, 84, 96], t: [4, 0, -66], fov: 40, hour: 13, pin: [0.6, 1.2, -20] },
+  blue: { loc: 'blue', p: [-128, 92, 92], t: [10, 0, -58], fov: 42, hour: 13, pin: [0.6, 1.2, -20] }
 };
 const W = 1120;
 const H = 600;

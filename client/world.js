@@ -5,6 +5,7 @@ import { groundH, shoreZ, BOUNDS, WORLD, PALM, WRECK, palmR, capeDist, CAPE, ISL
 import { LOC_ID, LOC } from './loc/id.js';
 import { lakeTint, buildLakeTerrain } from './loc/lake-world.js';
 import { keysTint, buildKeysTerrain } from './loc/keys-world.js';
+import { blueTint, buildBlueTerrain } from './loc/blue-world.js';
 import { buildReef } from './loc/keys-reef.js';
 import { buildMist } from './loc/lake-nature.js';
 import { createWater, createFoamRings, sea } from './water.js';
@@ -133,7 +134,7 @@ function bayTint(c, x, y, z, ny, w) {
   }
 }
 /** Краски земли — у каждой локации свои. */
-const groundTint = { lake: lakeTint, keys: keysTint }[LOC_ID] || bayTint;
+const groundTint = { lake: lakeTint, keys: keysTint, blue: blueTint }[LOC_ID] || bayTint;
 const _w = [0, 0, 1, 0];
 /** Цвет земли в точке и сколько там травы (0…1) — для пучков травы (grass.js). На склонах, где проступает камень, травы нет. */
 function grassTint(x, z, c) {
@@ -412,7 +413,7 @@ export class World {
   constructor() {
     const scene = (this.scene = new THREE.Scene());
     scene.fog = new THREE.Fog('#a9dcff', 170, 1700);
-    this.terrain = LOC_ID === 'lake' ? buildLakeTerrain(buildGround) : LOC_ID === 'keys' ? buildKeysTerrain(buildGround) : buildTerrain();
+    this.terrain = LOC_ID === 'lake' ? buildLakeTerrain(buildGround) : LOC_ID === 'keys' ? buildKeysTerrain(buildGround) : LOC_ID === 'blue' ? buildBlueTerrain(buildGround) : buildTerrain();
     scene.add(this.terrain);
     this.water = createWater();
     scene.add(this.water.mesh);
