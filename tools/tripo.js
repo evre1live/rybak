@@ -2,7 +2,7 @@
 //
 //   node tools/tripo.js balance
 //   node tools/tripo.js concept hero-yellow [--from файл.png]   картинка героя в Т-позе (по тексту или по картинке-образцу)
-//   node tools/tripo.js model hero-yellow                       модель по картинке-образцу
+//   node tools/tripo.js model hero-yellow                       модель по картинке-образцу (--image файл | --url ссылка)
 //   node tools/tripo.js text prop-barrel                        модель сразу по тексту (предметы, рыба)
 //   node tools/tripo.js rig hero-yellow                         скелет
 //   node tools/tripo.js anim hero-yellow                        анимации из списка героя
@@ -172,9 +172,12 @@ async function model(id) {
   const m = find(id);
   const s = st(id);
   const file = flag('image', null);
-  if (!file && !(s.concepts && s.concepts.length)) throw new Error(`${id}: сначала concept`);
-  // модель строится по картинке-образцу: свой файл или последняя (либо выбранная через pick) картинка из concept
-  const body = { type: 'image_to_model', ...quality(m), file: file ? await upload(path.resolve(file)) : await conceptFile(s) };
+  const url = flag('url', null); // картинка-образец по ссылке (например, из ElevenLabs): Tripo забирает её сам
+  if (!file && !url && !(s.concepts && s.concepts.length)) throw new Error(`${id}: сначала concept`);
+  // модель строится по картинке-образцу: свой файл, ссылка или последняя (либо выбранная через pick) картинка из concept
+  const src = url ? { type: imgExt(url) === 'png' ? 'png' : 'jpg', url } : file ? await upload(path.resolve(file)) : await conceptFile(s);
+  if (url) s.conceptUrl = url.split('?')[0];
+  const body = { type: 'image_to_model', ...quality(m), file: src };
   const d = await run(`${id} модель`, body, modelCost(m));
   s.model = d.id;
   save();

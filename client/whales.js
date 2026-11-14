@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { WHALE_WAY } from './terrain.js';
 import { canvasTex } from './util.js';
+import { loadModel, fitModelGeometry } from './models.js';
 
 export const WHALE_SPEED = 2.4; // м/с
 export const WHALES = [{ at: 0, size: 1.0 }, { at: 0.47, size: 0.86 }];
@@ -137,6 +138,23 @@ export function buildWhales(scene) {
   scene.add(mesh);
   const hide = new THREE.Matrix4().makeScale(0, 0, 0);
   for (let i = 0; i < WHALES.length; i++) mesh.setMatrixAt(i, hide);
+  // готовая модель (Tripo) встаёт на место заготовки, как только загрузится; заставка её ждёт (ready)
+  const fit = { ready: false }; // нет модели в описи — loadModel откажет, и ждать станет нечего
+  geo.computeBoundingBox();
+  const box = geo.boundingBox.clone();
+  if (!fit.ready)
+    loadModel('fauna-kit').then(
+      (tpl) => {
+        const m = fitModelGeometry(tpl, box);
+        if (m) {
+          mesh.geometry = m.geometry;
+          mesh.material = m.material;
+          mesh.userData.model = 'fauna-kit';
+        }
+        fit.ready = true;
+      },
+      () => (fit.ready = true)
+    );
   const tex = spoutTex();
   const spouts = WHALES.map(() => {
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, fog: true }));
@@ -180,6 +198,9 @@ export function buildWhales(scene) {
   return {
     mesh,
     onBlow: null,
+    get ready() {
+      return fit.ready;
+    },
     /** Для проверок: где киты и сколько было фонтанов. */
     state: (T) => ({ n: WHALES.length, shown: st.shown, blows: st.blows, at: WHALES.map((_, i) => { const q = pose(i, T, {}); return { x: q.x, z: q.z, up: q.q >= 0 }; }) }),
     update(dt, t, T, camera, waveH) {

@@ -627,7 +627,7 @@ export class Fauna {
       if (d > 0.05) f.yaw += angDiff(f.yaw, Math.atan2(dz, dx)) * (1 - Math.exp(-(o.flee > 0 ? 6 : 1.5) * dt));
       const nx = f.x + Math.cos(f.yaw) * v * dt, nz = f.z + Math.sin(f.yaw) * v * dt;
       const dep = depthAt(nx, nz);
-      if (dep > 0.55 && !inRocks(nx, nz)) { f.x = nx; f.z = nz; } else { o.timer = 0; o.flee = 0; } // упёрлась в мель или камень — выбирает новый путь
+      if (dep > 0.55 && open(nx, nz, 0.55)) { f.x = nx; f.z = nz; } else { o.timer = 0; o.flee = 0; } // упёрлась в мель, камень или сваи под настилом — выбирает новый путь
       f.y = -clamp(Math.max(dep, 0.55) * 0.45, 0.28, 0.62) + Math.sin(this.t * 0.4 + f.ph * 0.01) * 0.04 - swellMax(f.x, f.z);
       f.amp = 0.1;
       f.ph += dt * (3 + v * 6);

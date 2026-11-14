@@ -190,3 +190,41 @@ export function spawn(tpl, own = false) {
 export function loadModels(ids) {
   return Promise.all(ids.map((id) => loadModel(id).then((t) => [id, t], () => null))).then((list) => new Map(list.filter(Boolean)));
 }
+
+/**
+ * Сетка готовой модели одним куском — для InstancedMesh (киты, дельфины): вершины развёрнуты из сжатого вида и
+ * переложены так, чтобы модель встала в рамку box процедурной заготовки: нос — к +Z, спина — вверх, длина и середина
+ * по длине — как у заготовки, верх спины — на её верхе. Модель рыбьей группы лежит головой к −X (tools/optimize.js).
+ */
+export function fitModelGeometry(tpl, box) {
+  let src = null;
+  tpl.scene.updateMatrixWorld(true);
+  tpl.scene.traverse((o) => {
+    if (o.isMesh && !src) src = o;
+  });
+  if (!src) return null;
+  const g = new THREE.BufferGeometry();
+  for (const name of ['position', 'normal', 'uv']) {
+    const a = src.geometry.attributes[name];
+    if (!a) continue;
+    const n = a.itemSize;
+    const arr = new Float32Array(a.count * n);
+    const get = [a.getX, a.getY, a.getZ, a.getW];
+    for (let i = 0; i < a.count; i++) for (let k = 0; k < n; k++) arr[i * n + k] = get[k].call(a, i);
+    g.setAttribute(name, new THREE.BufferAttribute(arr, n));
+  }
+  if (src.geometry.index) g.setIndex(Array.from(src.geometry.index.array));
+  // голова −X → +Z: поворот на 90° вокруг вертикали
+  g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(new THREE.Matrix4().makeRotationY(Math.PI / 2), src.matrixWorld));
+  g.computeBoundingBox();
+  const b = g.boundingBox;
+  const k = (box.max.z - box.min.z) / (b.max.z - b.min.z || 1);
+  g.scale(k, k, k);
+  g.computeBoundingBox();
+  const c = g.boundingBox;
+  g.translate(-(c.min.x + c.max.x) / 2, box.max.y - c.max.y, (box.min.z + box.max.z) / 2 - (c.min.z + c.max.z) / 2);
+  g.computeBoundingSphere();
+  const material = src.material.clone();
+  material.side = THREE.FrontSide;
+  return { geometry: g, material };
+}

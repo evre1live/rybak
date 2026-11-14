@@ -953,6 +953,130 @@
         }
       ],
       "concept": "90dac1b9-8f38-4c1e-9f3f-b34d7e6bee26"
+    },
+    "fish-ersh": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/qZvSW4R9rnto1iP8zo2Z/C0voXB1m5hBynSElVidc/content.png",
+      "model": "fbbacc2f-1a73-4e11-afe4-fe1165408798"
+    },
+    "fish-krylatka": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/sK3xxpJ8hddog83iLZDi/JxR4hYVtBoKBIK3KORS8/content.png",
+      "model": "d9f7bd07-7c82-4478-8bc3-e9f75e523f90"
+    },
+    "fish-lucian": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/viyvCMChuJN3GJxKiM4h/NDLyR0Uzqm4IAwQ41QIl/content.png",
+      "model": "d9864c81-7c53-4380-b9c6-969b0e59332d"
+    },
+    "fish-babochka": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/1RdiRS0jEEwkWqVQo6EU/UE3RYCt0cmTA4G515lDx/content.png",
+      "model": "6b09d2bf-f44f-4424-ad4d-675d35bf562a"
+    },
+    "fish-karanks": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/MYelEPhkPn5VB68SFMqw/Km18f9Hb2g7FM09pLOvT/content.png",
+      "model": "c99447fa-040e-486d-831f-594a26b2f04b"
+    },
+    "fish-barrakuda": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/aTTA3OiXAc11vaDogVy3/vaSqsljkjmxZB88tV3wb/content.png",
+      "model": "2411234c-bff9-45de-a100-86992a91a963"
+    },
+    "fish-serzhant": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/NznYgaQYCHSLLotRkCfj/z7A3iOVmfccucKOhopyb/content.png",
+      "model": "99beaf5c-7389-4248-b22d-40442b5e463b"
+    },
+    "fish-popugai": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/liQPgBQQkHMlH4UbBvzp/Me2HBo4wKwSQ42Eelh3G/content.png",
+      "model": "da99678e-e617-4515-865b-e0ce78a68dc9"
+    },
+    "fish-klown": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/86rcYE5vXXzy5etUxLMv/uIQuXMBmoN4mks4fRMD4/content.png",
+      "model": "0f76ebf6-0700-493c-ba2c-eb57edee2860"
+    },
+    "fish-zolforel": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/DzC5PUvcX0OEbtjEXAlf/WzcZKljM77Bl3vs4A36g/content.png",
+      "model": "58ace234-3b7b-460c-abca-66bb89b8293e"
+    },
+    "fish-osetr": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/TwLS0UKDrULQ3jciTW2R/i3tSrXk2HZUCpA4Vq9OU/content.png",
+      "model": "e3691d48-4670-46da-b1b9-0bafa1f9138c"
+    },
+    "fish-taimen": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/CAWO4HeahbGeuNQNhWED/UfiQjJRhgmzfvTZOcKPm/content.png",
+      "model": "bebdb855-ac1f-4003-89a7-b14be0b0ffd9"
+    },
+    "fish-harius": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/TspOpWBh1Jt7nhqSGOXB/IoiwMKgwZQfk0F1rCPxy/content.png",
+      "model": "69872c91-4509-4d60-8c0f-b982f581030a"
+    },
+    "fish-mako": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/r8im7FFz9jKpf7yeZXhm/vsvUod89jbfoCDZrUdBe/content.png",
+      "model": "d62897b1-2d9b-4fe7-9e7b-683844650282"
+    },
+    "fish-sig": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/rF23qb0lpBA32LFiOEqR/ByV9siU97RdhGcIq6iF1/content.png",
+      "model": "9002887f-08dc-4aaa-bd32-bae3bc3030b5"
+    },
+    "fish-nalim": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/IiAZ3uAwWDVxmakOfngM/BmlB9xKOu7weNwPXcUnX/content.png",
+      "model": "434fbc84-d21b-4018-a037-01d6d8dc90f0"
+    },
+    "fish-rifakula": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/PxAwRdw8ZDjJghL4sVbH/4Wfn0b2X4pb5ltBOOKIq/content.png",
+      "model": "2c17e06d-39f8-4924-bde5-03c896f2cda4"
+    },
+    "fish-napoleon": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/wzWdM2lDcY4GNfFK1x1t/BvuBJTx9s5PqUYBncYcl/content.png",
+      "model": "fbe0174e-49b4-4a38-9a28-124d0794779c"
+    },
+    "fish-murena": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/iPehXAfZMhlJZhsUG8lC/0j4zyEVf1cVChZaEddEM/content.png",
+      "model": "58a43105-6d3c-4298-a6e2-a535f660903c"
+    },
+    "fish-hirurg": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/23proCu9OXSrFMW5gPxh/cNQDo7hvfXyURNir3Jbj/content.png",
+      "model": "0f1ee0b8-0b4b-4533-a9e9-6f5238e2ed1d"
+    },
+    "fish-zheltoper": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/TUOPjxPgBOvO015UoToW/SWuRqJJcm7FQE8qYFwJw/content.png",
+      "model": "83b5657d-dfe1-42b3-9842-43b384d37bb6"
+    },
+    "fish-vahu": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/Yx27k83bG8yptfj8FrJ6/cVvpgT6XvYRXnNATJi1c/content.png",
+      "model": "dd768d16-11d3-4224-88ed-f9f88eedceeb"
+    },
+    "fish-imperator": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/PGlaSguHkStVyQX9J4Ly/dedMZpns91ot3AObCesW/content.png",
+      "model": "10654076-1588-40e1-a63c-1cfd527533db"
+    },
+    "fish-korifena": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/b8PpssqaK442W4tAZll1/1xrPaGgWDBQKjbnJisZY/content.png",
+      "model": "8ee61582-2f01-4e4b-bb02-8ab508e27921"
+    },
+    "fish-letuchaya": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/OVEZdMCvFEj7In5WIKRw/aG05xun7PcPF9qxya3tQ/content.png",
+      "model": "c3f39f99-a903-4f3c-b8b8-a8ab885fe0ac"
+    },
+    "fauna-delfin": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/OofWYk3VBGjOzRGj1Ymj/7oOgGWfae2bN9sWT2Db5/content.png",
+      "model": "86684010-db85-4ef5-89bd-d4510dd14465"
+    },
+    "fauna-kit": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/g52PFpWwULD2fqYGa4Uj/o8KLx0wbw6SMyi5j0flc/content.png",
+      "model": "3de1c6e4-5801-4297-b42d-516d512d233c"
+    },
+    "fish-belakula": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/lzthkn2DfHmdHOo4a2MP/CyXq0vyr2xq9AK4wq0YA/content.png",
+      "model": "46e25d94-93cf-4195-a0f0-01bab7aa78bb"
+    },
+    "fish-gigantun": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/XdtSbT4ol4NQBUh24yLN/4flDhmGBBmAC3N04x4ZN/content.png",
+      "model": "d9ddb76b-6c30-4693-9fdd-a88a05051844"
+    },
+    "fish-marlin": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/RCu0WfAeEgIoSNkNk3OR/Gbc0WsPt5UcJyah9ckm4/content.png",
+      "model": "490d6128-439f-4720-b79d-7ff9a7efa4ab"
+    },
+    "fish-parusnik": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/mOxberDJSiyIhVIgUpr0/OajJnBRVjENqWM2xKDEz/content.png",
+      "model": "2e3094d8-b98c-440f-82fc-3a6742e2f8b1"
     }
   },
   "ledger": [
@@ -2635,6 +2759,237 @@
       "type": "text_to_image",
       "task": "90dac1b9-8f38-4c1e-9f3f-b34d7e6bee26",
       "credits": 5
+    },
+    {
+      "at": "2026-11-14T13:37:15.489Z",
+      "label": "fish-ersh модель",
+      "type": "image_to_model",
+      "task": "fbbacc2f-1a73-4e11-afe4-fe1165408798",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T14:12:12.599Z",
+      "label": "fish-nalim модель",
+      "type": "image_to_model",
+      "task": "434fbc84-d21b-4018-a037-01d6d8dc90f0",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T14:12:16.634Z",
+      "label": "fish-sig модель",
+      "type": "image_to_model",
+      "task": "9002887f-08dc-4aaa-bd32-bae3bc3030b5",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T14:12:16.652Z",
+      "label": "fish-mako модель",
+      "type": "image_to_model",
+      "task": "d62897b1-2d9b-4fe7-9e7b-683844650282",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T14:12:33.587Z",
+      "label": "fish-harius модель",
+      "type": "image_to_model",
+      "task": "69872c91-4509-4d60-8c0f-b982f581030a",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T14:12:35.382Z",
+      "label": "fish-taimen модель",
+      "type": "image_to_model",
+      "task": "bebdb855-ac1f-4003-89a7-b14be0b0ffd9",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T14:12:35.828Z",
+      "label": "fish-osetr модель",
+      "type": "image_to_model",
+      "task": "e3691d48-4670-46da-b1b9-0bafa1f9138c",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T14:12:39.000Z",
+      "label": "fish-zolforel модель",
+      "type": "image_to_model",
+      "task": "58ace234-3b7b-460c-abca-66bb89b8293e",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T14:12:56.071Z",
+      "label": "fish-klown модель",
+      "type": "image_to_model",
+      "task": "0f76ebf6-0700-493c-ba2c-eb57edee2860",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T14:13:11.509Z",
+      "label": "fish-popugai модель",
+      "type": "image_to_model",
+      "task": "da99678e-e617-4515-865b-e0ce78a68dc9",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T14:13:24.457Z",
+      "label": "fish-serzhant модель",
+      "type": "image_to_model",
+      "task": "99beaf5c-7389-4248-b22d-40442b5e463b",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T14:14:09.686Z",
+      "label": "fish-barrakuda модель",
+      "type": "image_to_model",
+      "task": "2411234c-bff9-45de-a100-86992a91a963",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T14:14:11.469Z",
+      "label": "fish-karanks модель",
+      "type": "image_to_model",
+      "task": "c99447fa-040e-486d-831f-594a26b2f04b",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T14:14:21.504Z",
+      "label": "fish-babochka модель",
+      "type": "image_to_model",
+      "task": "6b09d2bf-f44f-4424-ad4d-675d35bf562a",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T14:14:30.629Z",
+      "label": "fish-lucian модель",
+      "type": "image_to_model",
+      "task": "d9864c81-7c53-4380-b9c6-969b0e59332d",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T14:14:31.692Z",
+      "label": "fish-krylatka модель",
+      "type": "image_to_model",
+      "task": "d9f7bd07-7c82-4478-8bc3-e9f75e523f90",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T14:14:39.943Z",
+      "label": "fish-hirurg модель",
+      "type": "image_to_model",
+      "task": "0f1ee0b8-0b4b-4533-a9e9-6f5238e2ed1d",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T14:16:00.844Z",
+      "label": "fish-murena модель",
+      "type": "image_to_model",
+      "task": "58a43105-6d3c-4298-a6e2-a535f660903c",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T14:16:36.445Z",
+      "label": "fish-napoleon модель",
+      "type": "image_to_model",
+      "task": "fbe0174e-49b4-4a38-9a28-124d0794779c",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T14:16:36.516Z",
+      "label": "fish-rifakula модель",
+      "type": "image_to_model",
+      "task": "2c17e06d-39f8-4924-bde5-03c896f2cda4",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T14:16:48.776Z",
+      "label": "fish-letuchaya модель",
+      "type": "image_to_model",
+      "task": "c3f39f99-a903-4f3c-b8b8-a8ab885fe0ac",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T14:16:50.996Z",
+      "label": "fish-korifena модель",
+      "type": "image_to_model",
+      "task": "8ee61582-2f01-4e4b-bb02-8ab508e27921",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T14:17:02.882Z",
+      "label": "fish-imperator модель",
+      "type": "image_to_model",
+      "task": "10654076-1588-40e1-a63c-1cfd527533db",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T14:18:03.338Z",
+      "label": "fish-vahu модель",
+      "type": "image_to_model",
+      "task": "dd768d16-11d3-4224-88ed-f9f88eedceeb",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T14:18:32.085Z",
+      "label": "fish-zheltoper модель",
+      "type": "image_to_model",
+      "task": "83b5657d-dfe1-42b3-9842-43b384d37bb6",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T14:18:51.676Z",
+      "label": "fish-parusnik модель",
+      "type": "image_to_model",
+      "task": "2e3094d8-b98c-440f-82fc-3a6742e2f8b1",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T14:18:54.845Z",
+      "label": "fish-marlin модель",
+      "type": "image_to_model",
+      "task": "490d6128-439f-4720-b79d-7ff9a7efa4ab",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T14:18:57.790Z",
+      "label": "fish-gigantun модель",
+      "type": "image_to_model",
+      "task": "d9ddb76b-6c30-4693-9fdd-a88a05051844",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T14:19:19.930Z",
+      "label": "fish-belakula модель",
+      "type": "image_to_model",
+      "task": "46e25d94-93cf-4195-a0f0-01bab7aa78bb",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T14:20:14.831Z",
+      "label": "fauna-kit модель",
+      "type": "image_to_model",
+      "task": "3de1c6e4-5801-4297-b42d-516d512d233c",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-14T14:20:28.860Z",
+      "label": "fauna-delfin модель",
+      "type": "image_to_model",
+      "task": "86684010-db85-4ef5-89bd-d4510dd14465",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-14T14:23:49.282Z",
+      "label": "задача",
+      "type": "texture_model",
+      "task": "96fe3f11-48a0-477a-80d0-ba7b63ee8b1e",
+      "credits": 20
+    },
+    {
+      "at": "2026-11-14T14:24:57.389Z",
+      "label": "задача",
+      "type": "texture_model",
+      "task": "7b49b85c-32a4-4745-abd4-1ce9fca6a9cc",
+      "credits": 20
     }
   ]
 }

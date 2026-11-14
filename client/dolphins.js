@@ -3,6 +3,7 @@
 // На всё — один вызов отрисовки: семь копий одной геометрии, хвостом машет шейдер.
 import * as THREE from 'three';
 import { DOLPHIN_WAY } from './terrain.js';
+import { loadModel, fitModelGeometry } from './models.js';
 
 /** Дорога стай: замкнутая петля по глубокой воде — у каждой локации своя (loc/<id>.js). */
 export { DOLPHIN_WAY };
@@ -140,6 +141,26 @@ export function buildDolphins(scene) {
   };
   mat.customProgramCacheKey = () => 'dolphin1';
   const mesh = new THREE.InstancedMesh(geo, mat, DOLPHINS);
+  // готовая модель (Tripo) встаёт на место заготовки, как только загрузится: хвост машет тем же шейдером
+  const fit = { ready: Math.abs(DOLPHIN_WAY[0][0]) > 5000 }; // на озере дельфинов нет (их дорога далеко за краем)
+  geo.computeBoundingBox();
+  const box = geo.boundingBox.clone();
+  if (!fit.ready)
+    loadModel('fauna-delfin').then(
+      (tpl) => {
+        const m = fitModelGeometry(tpl, box);
+        if (m) {
+          m.geometry.setAttribute('aBeat', beat);
+          m.material.onBeforeCompile = mat.onBeforeCompile;
+          m.material.customProgramCacheKey = () => 'dolphin2';
+          mesh.geometry = m.geometry;
+          mesh.material = m.material;
+          mesh.userData.model = 'fauna-delfin';
+        }
+        fit.ready = true;
+      },
+      () => (fit.ready = true)
+    );
   mesh.frustumCulled = false; // стаи ходят по всему морю
   mesh.name = 'dolphins';
   mesh.layers.set(1); // в отражении воды их нет
@@ -182,6 +203,9 @@ export function buildDolphins(scene) {
     return out;
   };
   return {
+    get ready() {
+      return fit.ready;
+    },
     mesh,
     onLeap: null,
     /** Для проверок: где стаи, сколько дельфинов сейчас считается и сколько было прыжков. */

@@ -162,7 +162,8 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
       f.fight.p = 0.4;
     });
     // рыба ещё далеко: подсказка есть, кнопка не берёт
-    await a.waitForFunction(() => /ПОДСАК НАГОТОВЕ/.test(document.querySelector('#prompt').textContent), null, { timeout: 20000 });
+    // путь доходит до друга с очередной сводкой: первая могла уйти до того, как мы выставили 40 %
+    await a.waitForFunction(() => /ПОДСАК НАГОТОВЕ.*НОРИ.*40 % ИЗ 70/.test(document.querySelector('#prompt').textContent), null, { timeout: 20000 });
     assert.match(await a.textContent('#prompt'), /НОРИ.*40 % ИЗ 70/);
     // рыбаку видно, что друг наготове: отметка на полосе пути и подсказка
     await b.waitForFunction(() => document.querySelector('#pbar').classList.contains('help') && /Жамшид рядом — с 70 % пути/.test(document.querySelector('#toasts').textContent), null, { timeout: 10000 });

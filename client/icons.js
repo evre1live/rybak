@@ -5,6 +5,7 @@ import { itemModel } from './gear3d.js';
 import { buildFish } from './fish3d.js';
 import { modelInfo } from './models.js';
 import { Character } from './character.js';
+import { ITEM_IMG } from './itemimg.js';
 
 const SIZE = 256;
 let renderer = null;
@@ -62,6 +63,7 @@ function free(obj) {
 }
 
 export function itemIcon(id) {
+  if (ITEM_IMG.has(id) && !window.RYBAK_OFFLINE) return `img/items/${id}.webp`; // нарисованный значок рынка (tools/icons.py); пробная версия одним файлом рисует кодом
   const baked = modelInfo('junk-' + id);
   if (baked && baked.icon) return baked.icon;
   const key = 'i:' + id;

@@ -36,7 +36,8 @@ const audio = {};
 for (const f of readdirSync(join(pub, 'audio')).filter((f) => f.endsWith('.webm')).sort()) audio[f.replace(/\.webm$/, '')] = readFileSync(join(pub, 'audio', f)).toString('base64');
 // картинки мест (вид сверху на карточке в лобби) — туда же
 const img = {};
-for (const f of readdirSync(join(pub, 'img')).sort()) img[`img/${f}`] = `data:image/${f.split('.').pop()};base64,${readFileSync(join(pub, 'img', f)).toString('base64')}`;
+// значки рынка (img/items) не кладём: пробная версия рисует их кодом, как и рыбу без моделей
+for (const f of readdirSync(join(pub, 'img'), { withFileTypes: true }).filter((d) => d.isFile()).map((d) => d.name).sort()) img[`img/${f}`] = `data:image/${f.split('.').pop()};base64,${readFileSync(join(pub, 'img', f)).toString('base64')}`;
 swap('<script src="app.js"></script>', `<script>window.RYBAK_OFFLINE = true; window.RYBAK_AUDIO = ${JSON.stringify(audio)}; window.RYBAK_IMG = ${JSON.stringify(img)};</script>\n<script>${js}</script>`);
 
 mkdirSync(dirname(out), { recursive: true });

@@ -606,12 +606,54 @@
       "prompt": "a small lighthouse keeper's cottage: white plastered stone walls, a red tiled gable roof with a short stone chimney, a wooden front door with one stone step in the middle of the long wall, two square windows with blue shutters on both sides of the door, a flower box under one window",
       "tris": 8000,
       "glow": [
-        [-0.295, 0.13, 0.28, -0.195, 0.25, 0.37],
-        [0.14, 0.13, 0.28, 0.24, 0.25, 0.37],
-        [-0.295, 0.13, -0.33, -0.195, 0.25, -0.23],
-        [0.14, 0.13, -0.33, 0.24, 0.25, -0.23],
-        [0.42, 0.13, -0.03, 0.5, 0.25, 0.075],
-        [-0.5, 0.13, -0.03, -0.42, 0.25, 0.075]
+        [
+          -0.295,
+          0.13,
+          0.28,
+          -0.195,
+          0.25,
+          0.37
+        ],
+        [
+          0.14,
+          0.13,
+          0.28,
+          0.24,
+          0.25,
+          0.37
+        ],
+        [
+          -0.295,
+          0.13,
+          -0.33,
+          -0.195,
+          0.25,
+          -0.23
+        ],
+        [
+          0.14,
+          0.13,
+          -0.33,
+          0.24,
+          0.25,
+          -0.23
+        ],
+        [
+          0.42,
+          0.13,
+          -0.03,
+          0.5,
+          0.25,
+          0.075
+        ],
+        [
+          -0.5,
+          0.13,
+          -0.03,
+          -0.42,
+          0.25,
+          0.075
+        ]
       ]
     },
     {
@@ -651,7 +693,10 @@
       "prompt": "a square flat section of an old wooden pier deck: ten thick weathered planks laid tightly side by side, nailed to two dark cross beams underneath, rows of iron nail heads, chipped plank ends, narrow dark gaps between the planks, warm honey-brown sun-bleached wood with painted grain, nothing standing on it",
       "tris": 1400,
       "lod": 120,
-      "tex": [2048, 1024],
+      "tex": [
+        2048,
+        1024
+      ],
       "textureQuality": "detailed"
     },
     {
@@ -664,7 +709,10 @@
       "tris": 260,
       "lod": 20,
       "flat": true,
-      "tex": [1024, 512]
+      "tex": [
+        1024,
+        512
+      ]
     },
     {
       "id": "env-pile",
@@ -673,8 +721,15 @@
       "prompt": "a thick round wooden mooring pile of a pier: one tall straight weathered log standing upright, thick rope wrapped five times around it near the top, a flat sawn top with tree rings and cracks, an iron band below the rope, dark wet wood with green algae and barnacles on the lower third",
       "tris": 760,
       "lod": 110,
-      "tex": [512, 512],
-      "stretch": [0.46, 0.6, 7.5]
+      "tex": [
+        512,
+        512
+      ],
+      "stretch": [
+        0.46,
+        0.6,
+        7.5
+      ]
     },
     {
       "id": "env-motorboat",
@@ -754,6 +809,262 @@
         512,
         512
       ]
+    },
+    {
+      "id": "fish-mako",
+      "group": "fish",
+      "sp": "mako",
+      "name": "Акула-мако",
+      "prompt": "a shortfin mako shark: sleek torpedo body, metallic indigo-blue back, bright white belly, pointed conical snout, big black eye, tall pointed first dorsal fin, long pectoral fins, crescent tail with almost equal lobes",
+      "textureQuality": "detailed",
+      "geometry": "detailed"
+    },
+    {
+      "id": "fish-ersh",
+      "group": "fish",
+      "sp": "ersh",
+      "name": "Ёрш",
+      "prompt": "a ruffe: small chunky perch-like fish with a big head, olive-brown body covered in dark speckles, pale yellowish belly, a very large glassy blue-violet eye, one long spiny dorsal fin with rows of dark spots, slimy wet skin",
+      "textureQuality": "detailed"
+    },
+    {
+      "id": "fish-harius",
+      "group": "fish",
+      "sp": "harius",
+      "name": "Хариус",
+      "prompt": "a European grayling: slim silver-grey body with small dark spots near the head, an enormous sail-like dorsal fin with a red-purple edge and iridescent spots, small mouth, forked tail",
+      "textureQuality": "detailed"
+    },
+    {
+      "id": "fish-sig",
+      "group": "fish",
+      "sp": "sig",
+      "name": "Сиг",
+      "prompt": "a whitefish: streamlined silvery body with a darker grey-blue back, small head with a short blunt snout and a small mouth, small adipose fin, deeply forked tail",
+      "textureQuality": "detailed"
+    },
+    {
+      "id": "fish-nalim",
+      "group": "fish",
+      "sp": "nalim",
+      "name": "Налим",
+      "prompt": "a burbot: long eel-like body, olive-brown with yellowish marbled blotches, broad flat head, a single barbel under the chin, a long second dorsal fin and a long anal fin reaching the rounded tail",
+      "textureQuality": "detailed"
+    },
+    {
+      "id": "fish-taimen",
+      "group": "fish",
+      "sp": "taimen",
+      "name": "Таймень",
+      "prompt": "a Siberian taimen: long powerful salmon-like body, copper-olive back with small dark X-shaped spots, wide pike-like head with a big mouth, bright red tail fin and red lower fins",
+      "textureQuality": "detailed"
+    },
+    {
+      "id": "fish-zolforel",
+      "group": "fish",
+      "sp": "zolforel",
+      "name": "Золотая форель",
+      "prompt": "a legendary golden trout: trout body in shining golden-orange with a crimson band along the side, scattered black spots on the back and tail, white-tipped lower fins",
+      "textureQuality": "detailed"
+    },
+    {
+      "id": "fish-osetr",
+      "group": "fish",
+      "sp": "osetr",
+      "name": "Осётр-великан",
+      "prompt": "a giant sturgeon: very long primitive body with five rows of bony diamond-shaped scutes along the back and sides, dark olive-grey back, pale belly, long pointed shovel-like snout with four barbels underneath, shark-like tail with a longer upper lobe",
+      "textureQuality": "detailed",
+      "geometry": "detailed"
+    },
+    {
+      "id": "fish-klown",
+      "group": "fish",
+      "sp": "klown",
+      "name": "Рыба-клоун",
+      "prompt": "a clownfish: small bright orange oval fish with three white bands edged in thin black lines, rounded orange fins with black edges",
+      "textureQuality": "detailed"
+    },
+    {
+      "id": "fish-serzhant",
+      "group": "fish",
+      "sp": "serzhant",
+      "name": "Сержант",
+      "prompt": "a sergeant major damselfish: oval flat body, silvery-white with a yellow back and five bold black vertical bars",
+      "textureQuality": "detailed"
+    },
+    {
+      "id": "fish-babochka",
+      "group": "fish",
+      "sp": "babochka",
+      "name": "Рыба-бабочка",
+      "prompt": "a butterflyfish: almost round disc-shaped flat bright yellow body, a black vertical mask band through the eye, small pointed snout, a black eyespot near the tail",
+      "textureQuality": "detailed"
+    },
+    {
+      "id": "fish-hirurg",
+      "group": "fish",
+      "sp": "hirurg",
+      "name": "Синий хирург",
+      "prompt": "a blue tang surgeonfish: oval flat royal-blue body, a black stripe sweeping along the side like a painter's palette, bright yellow tail, a small sharp spine near the tail",
+      "textureQuality": "detailed"
+    },
+    {
+      "id": "fish-popugai",
+      "group": "fish",
+      "sp": "popugai",
+      "name": "Рыба-попугай",
+      "prompt": "a parrotfish: chunky turquoise-green body with pink-edged scales, a pink belly, a beak-like mouth of fused teeth, lyre-shaped tail",
+      "textureQuality": "detailed"
+    },
+    {
+      "id": "fish-lucian",
+      "group": "fish",
+      "sp": "lucian",
+      "name": "Луциан",
+      "prompt": "a red snapper: deep-bodied bright red fish with yellow fins, pointed head with a large mouth, spiny dorsal fin",
+      "textureQuality": "detailed"
+    },
+    {
+      "id": "fish-krylatka",
+      "group": "fish",
+      "sp": "krylatka",
+      "name": "Крылатка",
+      "prompt": "a lionfish: body with bold red-brown and white vertical stripes, long separate venomous spines of the dorsal fin spread like a fan, large striped feather-like pectoral fins",
+      "textureQuality": "detailed"
+    },
+    {
+      "id": "fish-barrakuda",
+      "group": "fish",
+      "sp": "barrakuda",
+      "name": "Барракуда",
+      "prompt": "a great barracuda: long silver torpedo body with dark diagonal bars and a few black blotches, long jutting lower jaw with sharp teeth, two widely separated dorsal fins, forked tail",
+      "textureQuality": "detailed"
+    },
+    {
+      "id": "fish-karanks",
+      "group": "fish",
+      "sp": "karanks",
+      "name": "Каранкс",
+      "prompt": "a giant trevally: deep powerful silver body with a steep blunt forehead, dark grey back, yellowish fins, a ridge of scutes in front of the forked tail, sickle-shaped fins",
+      "textureQuality": "detailed"
+    },
+    {
+      "id": "fish-murena",
+      "group": "fish",
+      "sp": "murena",
+      "name": "Мурена",
+      "prompt": "a spotted moray eel: long snake-like body without pectoral fins, pale yellow with dense black-brown leopard spots, one continuous fin along the back to the tail",
+      "textureQuality": "detailed"
+    },
+    {
+      "id": "fish-napoleon",
+      "group": "fish",
+      "sp": "napoleon",
+      "name": "Рыба-наполеон",
+      "prompt": "a humphead wrasse (Napoleon fish): huge green-blue body, a prominent hump on the forehead, thick fleshy lips, intricate wavy lines around the eye, rounded tail",
+      "textureQuality": "detailed"
+    },
+    {
+      "id": "fish-imperator",
+      "group": "fish",
+      "sp": "imperator",
+      "name": "Императорский ангел",
+      "prompt": "an emperor angelfish: oval flat body, deep blue with many thin bright yellow horizontal stripes, a black mask band over the eye edged in blue, yellow tail",
+      "textureQuality": "detailed"
+    },
+    {
+      "id": "fish-rifakula",
+      "group": "fish",
+      "sp": "rifakula",
+      "name": "Рифовая акула",
+      "prompt": "a blacktip reef shark: grey-brown streamlined body, white belly, short rounded snout, crisp black tips on all fins, especially the dorsal fin and the tail",
+      "textureQuality": "detailed",
+      "geometry": "detailed"
+    },
+    {
+      "id": "fish-letuchaya",
+      "group": "fish",
+      "sp": "letuchaya",
+      "name": "Летучая рыба",
+      "prompt": "a flying fish: slim torpedo body with a dark blue back and silver belly, extremely large wing-like pectoral fins spread wide, forked tail with a longer lower lobe",
+      "textureQuality": "detailed"
+    },
+    {
+      "id": "fish-korifena",
+      "group": "fish",
+      "sp": "korifena",
+      "name": "Корифена",
+      "prompt": "a mahi-mahi bull (dolphinfish): steep tall square forehead, golden-green body with bright blue speckles, a dorsal fin running the whole length of the back, deeply forked tail",
+      "textureQuality": "detailed"
+    },
+    {
+      "id": "fish-vahu",
+      "group": "fish",
+      "sp": "vahu",
+      "name": "Ваху",
+      "prompt": "a wahoo: very long slender torpedo body, iridescent blue back, many vivid blue vertical bars on silver sides, long beak-like pointed snout, small finlets before the crescent tail",
+      "textureQuality": "detailed"
+    },
+    {
+      "id": "fish-zheltoper",
+      "group": "fish",
+      "sp": "zheltoper",
+      "name": "Желтопёрый тунец",
+      "prompt": "a yellowfin tuna: torpedo body, dark metallic blue back, silver belly, a golden-yellow stripe along the side, very long sickle-shaped bright yellow second dorsal and anal fins, yellow finlets",
+      "textureQuality": "detailed"
+    },
+    {
+      "id": "fish-parusnik",
+      "group": "fish",
+      "sp": "parusnik",
+      "name": "Парусник",
+      "prompt": "a sailfish: long slim body, dark blue back, silver belly with pale vertical stripes, a huge cobalt-blue sail-like dorsal fin raised high along the back with dark spots, a long thin spear bill",
+      "textureQuality": "detailed",
+      "geometry": "detailed"
+    },
+    {
+      "id": "fish-marlin",
+      "group": "fish",
+      "sp": "marlin",
+      "name": "Синий марлин",
+      "prompt": "a blue marlin: massive powerful body, cobalt-blue back with pale blue vertical stripes, silver-white belly, a long round spear bill, a pointed dorsal fin, tall crescent tail",
+      "textureQuality": "detailed",
+      "geometry": "detailed"
+    },
+    {
+      "id": "fish-gigantun",
+      "group": "fish",
+      "sp": "gigantun",
+      "name": "Тунец-гигант",
+      "prompt": "a giant old bluefin tuna: enormous very thick torpedo body, deep navy-blue back with a few old scars, silver sides, short yellow finlets, crescent tail",
+      "textureQuality": "detailed",
+      "geometry": "detailed"
+    },
+    {
+      "id": "fish-belakula",
+      "group": "fish",
+      "sp": "belakula",
+      "name": "Белая акула",
+      "prompt": "a great white shark: massive spindle-shaped body, slate-grey back with a sharp border to the white belly, conical snout, black eye, tall triangular dorsal fin, crescent tail, a few old scars",
+      "textureQuality": "detailed",
+      "geometry": "detailed"
+    },
+    {
+      "id": "fauna-kit",
+      "group": "fish",
+      "name": "Горбатый кит",
+      "prompt": "a humpback whale: long dark slate-grey body with a pale throat with long ventral grooves, very long white-edged pectoral flippers, knobby bumps on the head, a small dorsal hump, broad tail flukes held flat and horizontal",
+      "lead": "A single sea animal, 3D video game asset concept, exact side view, the animal faces left, body straight and horizontal, flippers visible, mouth closed.",
+      "textureQuality": "detailed",
+      "geometry": "detailed"
+    },
+    {
+      "id": "fauna-delfin",
+      "group": "fish",
+      "name": "Дельфин-афалина",
+      "prompt": "a bottlenose dolphin: sleek streamlined grey body with a lighter belly, short beak, curved dorsal fin, pectoral flippers, tail flukes held flat and horizontal",
+      "lead": "A single sea animal, 3D video game asset concept, exact side view, the animal faces left, body straight and horizontal, flippers visible, mouth closed.",
+      "textureQuality": "detailed"
     }
   ],
   "leads": {
