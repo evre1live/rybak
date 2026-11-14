@@ -2,10 +2,11 @@
 // камыш в заводи и по тихим берегам, сруб с костром. Всё собрано из тех же моделей, что и бухта:
 // каждое дерево и камень оставляет запись в ENV (envmodels.js), по ней встаёт готовая модель;
 // процедурная сетка остаётся запасной — для пробной версии без моделей.
+import { kitChimney } from '../kit.js';
 import * as THREE from 'three';
 import { Batch, M, G, BATCH_MAT, BATCH_MAT_2S } from '../batch.js';
 import { ENV } from '../envmodels.js';
-import { pine, roundTree, bush, farPine } from '../flora.js';
+import { pine, roundTree, bush, farSpruce } from '../flora.js';
 import { spot01 } from '../scatter.js';
 import { rng, rockGeo, shade, sstep, TAU, fbm2 } from '../util.js';
 import { BOUNDS, LAKE, ISLET, SHOAL, CABIN, GLADE, CAMPFIRE, BACKWATER, FALLS, CIRCLES, DECK_Y, groundH, waterD, shoreZ, deckAt, shoreAt, cliffAt } from './lake.js';
@@ -63,7 +64,7 @@ function buildForest(scene) {
     if (Math.abs(groundH(x + 3, z) - y) > 4.2 || Math.abs(groundH(x, z + 3) - y) > 4.2) continue; // на скале лес не растёт
     if (rf() > 0.92 - 0.5 * sstep(line - 22, line, y)) continue; // к границе леса редеет
     // темнее обычного — в тон готовым соснам у воды, с разбросом: стена леса не должна быть одного цвета
-    farPine(slope, { x, y: y - 0.4, z, h: (9.5 + rf() * 8) * (1 - 0.3 * sstep(line - 30, line, y)) }, rf, -0.34 + rf() * 0.12);
+    farSpruce(slope, { x, y: y - 0.4, z, h: (9.5 + rf() * 8) * (1 - 0.3 * sstep(line - 30, line, y)) }, rf, -0.2 + rf() * 0.12);
     far2++;
   }
   const mSlope = slope.build(BATCH_MAT, false);
@@ -457,8 +458,9 @@ function buildSmoke(scene) {
   // труба — на коньке, ближе к торцу дома (как у запасного домика: u = 0,33 длины, v ≈ 0)
   const cc = Math.cos(CABIN.ry);
   const sn = Math.sin(CABIN.ry);
-  const u = 0.33 * CABIN.s;
-  const uniforms = { uTime: { value: 0 }, uCol: { value: new THREE.Color('#e9f1f4') }, uAt: { value: new THREE.Vector3(CABIN.x + u * cc, CABIN.y + 0.76 * CABIN.s, CABIN.z - u * sn) } };
+  // у сруба из набора (kit.js) труба на скате, сбоку от конька
+  const [u, h, v] = kitChimney('env-cottage') || [0.33 * CABIN.s, 0.76 * CABIN.s, 0];
+  const uniforms = { uTime: { value: 0 }, uCol: { value: new THREE.Color('#e9f1f4') }, uAt: { value: new THREE.Vector3(CABIN.x + u * cc + v * sn, CABIN.y + h, CABIN.z - u * sn + v * cc) } };
   const m = new THREE.Mesh(g, new THREE.ShaderMaterial({ uniforms, vertexShader: SMOKE_VERT, fragmentShader: SMOKE_FRAG, transparent: true, depthWrite: false, fog: false }));
   m.frustumCulled = false;
   m.renderOrder = 4;

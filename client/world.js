@@ -57,10 +57,11 @@ const sand = C('#f2e2b3');
 const sandWet = C('#e6d6a6');
 const sandWhite = C('#fbf3d6');
 const seabed = C('#9db9ad');
-// трава — жёлто-зелёная, в тон кронам и мху моделей (раньше была чисто зелёной и рядом с ними смотрелась кислотной)
-const grassA = C('#88b752');
-const grassB = C('#70a045');
-const grassC = C('#a9cb66');
+// трава — жёлто-зелёная, в тон кронам и мху моделей (раньше была чисто зелёной и рядом с ними смотрелась кислотной);
+// с 14 ноября бухта — южное море: трава суше, пятнами выгоревшая до соломы (у озера и островков — своя)
+const grassA = C('#9aae55');
+const grassB = C('#7f9d48');
+const grassC = C('#c7bd70');
 const dune = C('#b9d27a');
 // камень рельефа — в тон утёсам-моделям: тёплый серый
 const rockA = C('#827f79');
@@ -112,7 +113,7 @@ function bayTint(c, x, y, z, ny, w) {
     c.lerpColors(sand, sandWet, sstep(0.5, -0.1, y)).multiplyScalar(0.95 + nz2 * 0.08);
   } else {
     c.lerpColors(grassA, grassB, sstep(0.3, 0.7, nz1));
-    c.lerp(grassC, sstep(0.55, 0.9, nz2) * 0.5);
+    c.lerp(grassC, sstep(0.5, 0.85, nz2) * 0.62);
     w[0] = 1;
     w[2] = 0;
     // на склонах камень проступает уже в шейдере — по каждой точке, с рваной границей; здесь цвет травы не трогаем

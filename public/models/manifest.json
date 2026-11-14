@@ -1059,6 +1059,749 @@
         "tris": 110,
         "kb": 5
       }
+    },
+    "kit-pine1": {
+      "file": "models/kit/lake.glb",
+      "node": "kit-pine1",
+      "group": "env",
+      "kit": "lake",
+      "tris": 1670,
+      "size": [
+        0.676,
+        1,
+        0.62
+      ],
+      "lod": {
+        "file": "models/kit/lake.glb",
+        "node": "kit-pine1-lod",
+        "tris": 495
+      }
+    },
+    "kit-pine2": {
+      "file": "models/kit/lake.glb",
+      "node": "kit-pine2",
+      "group": "env",
+      "kit": "lake",
+      "tris": 1670,
+      "size": [
+        0.777,
+        1,
+        0.708
+      ],
+      "lod": {
+        "file": "models/kit/lake.glb",
+        "node": "kit-pine2-lod",
+        "tris": 472
+      }
+    },
+    "kit-pine3": {
+      "file": "models/kit/lake.glb",
+      "node": "kit-pine3",
+      "group": "env",
+      "kit": "lake",
+      "tris": 1361,
+      "size": [
+        0.489,
+        1,
+        0.541
+      ],
+      "lod": {
+        "file": "models/kit/lake.glb",
+        "node": "kit-pine3-lod",
+        "tris": 369
+      }
+    },
+    "kit-pine4": {
+      "file": "models/kit/lake.glb",
+      "node": "kit-pine4",
+      "group": "env",
+      "kit": "lake",
+      "tris": 2110,
+      "size": [
+        0.567,
+        1,
+        0.525
+      ],
+      "lod": {
+        "file": "models/kit/lake.glb",
+        "node": "kit-pine4-lod",
+        "tris": 647
+      }
+    },
+    "kit-pine5": {
+      "file": "models/kit/lake.glb",
+      "node": "kit-pine5",
+      "group": "env",
+      "kit": "lake",
+      "tris": 1646,
+      "size": [
+        0.736,
+        1,
+        0.713
+      ],
+      "lod": {
+        "file": "models/kit/lake.glb",
+        "node": "kit-pine5-lod",
+        "tris": 628
+      }
+    },
+    "kit-birch1": {
+      "file": "models/kit/lake.glb",
+      "node": "kit-birch1",
+      "group": "env",
+      "kit": "lake",
+      "tris": 2809,
+      "size": [
+        0.497,
+        1,
+        0.356
+      ],
+      "lod": {
+        "file": "models/kit/lake.glb",
+        "node": "kit-birch1-lod",
+        "tris": 978
+      }
+    },
+    "kit-birch2": {
+      "file": "models/kit/lake.glb",
+      "node": "kit-birch2",
+      "group": "env",
+      "kit": "lake",
+      "tris": 3095,
+      "size": [
+        0.442,
+        1,
+        0.372
+      ],
+      "lod": {
+        "file": "models/kit/lake.glb",
+        "node": "kit-birch2-lod",
+        "tris": 1097
+      }
+    },
+    "kit-birch3": {
+      "file": "models/kit/lake.glb",
+      "node": "kit-birch3",
+      "group": "env",
+      "kit": "lake",
+      "tris": 5038,
+      "size": [
+        0.597,
+        1,
+        0.394
+      ],
+      "lod": {
+        "file": "models/kit/lake.glb",
+        "node": "kit-birch3-lod",
+        "tris": 1982
+      }
+    },
+    "kit-tree1": {
+      "file": "models/kit/lake.glb",
+      "node": "kit-tree1",
+      "group": "env",
+      "kit": "lake",
+      "tris": 2920,
+      "size": [
+        0.593,
+        1,
+        0.63
+      ],
+      "lod": {
+        "file": "models/kit/lake.glb",
+        "node": "kit-tree1-lod",
+        "tris": 1002
+      }
+    },
+    "kit-tree2": {
+      "file": "models/kit/lake.glb",
+      "node": "kit-tree2",
+      "group": "env",
+      "kit": "lake",
+      "tris": 2799,
+      "size": [
+        0.431,
+        1,
+        0.45
+      ],
+      "lod": {
+        "file": "models/kit/lake.glb",
+        "node": "kit-tree2-lod",
+        "tris": 945
+      }
+    },
+    "kit-bush1": {
+      "file": "models/kit/lake.glb",
+      "node": "kit-bush1",
+      "group": "env",
+      "kit": "lake",
+      "tris": 900,
+      "size": [
+        0.974,
+        0.805,
+        1
+      ],
+      "lod": {
+        "file": "models/kit/lake.glb",
+        "node": "kit-bush1-lod",
+        "tris": 358
+      }
+    },
+    "kit-bush2": {
+      "file": "models/kit/lake.glb",
+      "node": "kit-bush2",
+      "group": "env",
+      "kit": "lake",
+      "tris": 1368,
+      "size": [
+        0.974,
+        0.805,
+        1
+      ],
+      "lod": {
+        "file": "models/kit/lake.glb",
+        "node": "kit-bush2-lod",
+        "tris": 564
+      }
+    },
+    "kit-fern": {
+      "file": "models/kit/lake.glb",
+      "node": "kit-fern",
+      "group": "env",
+      "kit": "lake",
+      "tris": 288,
+      "size": [
+        1,
+        0.297,
+        0.938
+      ],
+      "lod": {
+        "file": "models/kit/lake.glb",
+        "node": "kit-fern-lod",
+        "tris": 160
+      }
+    },
+    "kit-rock1": {
+      "file": "models/kit/lake.glb",
+      "node": "kit-rock1",
+      "group": "env",
+      "kit": "lake",
+      "tris": 342,
+      "size": [
+        1,
+        0.701,
+        0.927
+      ],
+      "lod": {
+        "file": "models/kit/lake.glb",
+        "node": "kit-rock1-lod",
+        "tris": 86
+      }
+    },
+    "kit-rock2": {
+      "file": "models/kit/lake.glb",
+      "node": "kit-rock2",
+      "group": "env",
+      "kit": "lake",
+      "tris": 244,
+      "size": [
+        1,
+        0.623,
+        0.813
+      ],
+      "lod": {
+        "file": "models/kit/lake.glb",
+        "node": "kit-rock2-lod",
+        "tris": 60
+      }
+    },
+    "kit-rock3": {
+      "file": "models/kit/lake.glb",
+      "node": "kit-rock3",
+      "group": "env",
+      "kit": "lake",
+      "tris": 522,
+      "size": [
+        0.984,
+        0.666,
+        1
+      ],
+      "lod": {
+        "file": "models/kit/lake.glb",
+        "node": "kit-rock3-lod",
+        "tris": 130
+      }
+    },
+    "kit-lupine": {
+      "file": "models/kit/lake.glb",
+      "node": "kit-lupine",
+      "group": "env",
+      "kit": "lake",
+      "tris": 1690,
+      "size": [
+        0.716,
+        1,
+        0.55
+      ],
+      "lod": {
+        "file": "models/kit/lake.glb",
+        "node": "kit-lupine-lod",
+        "tris": 824
+      }
+    },
+    "kit-daisy": {
+      "file": "models/kit/lake.glb",
+      "node": "kit-daisy",
+      "group": "env",
+      "kit": "lake",
+      "tris": 755,
+      "size": [
+        0.724,
+        1,
+        0.774
+      ],
+      "lod": {
+        "file": "models/kit/lake.glb",
+        "node": "kit-daisy-lod",
+        "tris": 575
+      }
+    },
+    "kit-cabin": {
+      "file": "models/kit/lake.glb",
+      "node": "kit-cabin",
+      "group": "env",
+      "kit": "lake",
+      "tris": 5400,
+      "size": [
+        1,
+        0.627,
+        0.859
+      ]
+    },
+    "kit-palm1": {
+      "file": "models/kit/keys.glb",
+      "node": "kit-palm1",
+      "group": "env",
+      "kit": "keys",
+      "tris": 472,
+      "size": [
+        0.998,
+        1,
+        0.969
+      ],
+      "lod": {
+        "file": "models/kit/keys.glb",
+        "node": "kit-palm1-lod",
+        "tris": 190
+      }
+    },
+    "kit-palm2": {
+      "file": "models/kit/keys.glb",
+      "node": "kit-palm2",
+      "group": "env",
+      "kit": "keys",
+      "tris": 368,
+      "size": [
+        1,
+        0.946,
+        0.854
+      ],
+      "lod": {
+        "file": "models/kit/keys.glb",
+        "node": "kit-palm2-lod",
+        "tris": 160
+      }
+    },
+    "kit-palm3": {
+      "file": "models/kit/keys.glb",
+      "node": "kit-palm3",
+      "group": "env",
+      "kit": "keys",
+      "tris": 344,
+      "size": [
+        0.959,
+        1,
+        0.905
+      ],
+      "lod": {
+        "file": "models/kit/keys.glb",
+        "node": "kit-palm3-lod",
+        "tris": 160
+      }
+    },
+    "kit-palm4": {
+      "file": "models/kit/keys.glb",
+      "node": "kit-palm4",
+      "group": "env",
+      "kit": "keys",
+      "tris": 472,
+      "size": [
+        0.959,
+        0.737,
+        1
+      ],
+      "lod": {
+        "file": "models/kit/keys.glb",
+        "node": "kit-palm4-lod",
+        "tris": 190
+      }
+    },
+    "kit-plant1": {
+      "file": "models/kit/keys.glb",
+      "node": "kit-plant1",
+      "group": "env",
+      "kit": "keys",
+      "tris": 360,
+      "size": [
+        0.769,
+        1,
+        0.832
+      ],
+      "lod": {
+        "file": "models/kit/keys.glb",
+        "node": "kit-plant1-lod",
+        "tris": 180
+      }
+    },
+    "kit-bushf": {
+      "file": "models/kit/keys.glb",
+      "node": "kit-bushf",
+      "group": "env",
+      "kit": "keys",
+      "tris": 478,
+      "size": [
+        0.985,
+        0.683,
+        1
+      ],
+      "lod": {
+        "file": "models/kit/keys.glb",
+        "node": "kit-bushf-lod",
+        "tris": 190
+      }
+    },
+    "kit-bushl": {
+      "file": "models/kit/keys.glb",
+      "node": "kit-bushl",
+      "group": "env",
+      "kit": "keys",
+      "tris": 276,
+      "size": [
+        1,
+        0.641,
+        0.38
+      ],
+      "lod": {
+        "file": "models/kit/keys.glb",
+        "node": "kit-bushl-lod",
+        "tris": 110
+      }
+    },
+    "kit-krock1": {
+      "file": "models/kit/keys.glb",
+      "node": "kit-krock1",
+      "group": "env",
+      "kit": "keys",
+      "tris": 500,
+      "size": [
+        1,
+        0.853,
+        0.955
+      ],
+      "lod": {
+        "file": "models/kit/keys.glb",
+        "node": "kit-krock1-lod",
+        "tris": 124
+      }
+    },
+    "kit-krock2": {
+      "file": "models/kit/keys.glb",
+      "node": "kit-krock2",
+      "group": "env",
+      "kit": "keys",
+      "tris": 500,
+      "size": [
+        0.746,
+        1,
+        0.723
+      ],
+      "lod": {
+        "file": "models/kit/keys.glb",
+        "node": "kit-krock2-lod",
+        "tris": 124
+      }
+    },
+    "kit-krock3": {
+      "file": "models/kit/keys.glb",
+      "node": "kit-krock3",
+      "group": "env",
+      "kit": "keys",
+      "tris": 500,
+      "size": [
+        1,
+        0.795,
+        0.758
+      ],
+      "lod": {
+        "file": "models/kit/keys.glb",
+        "node": "kit-krock3-lod",
+        "tris": 124
+      }
+    },
+    "kit-hibiscus": {
+      "file": "models/kit/keys.glb",
+      "node": "kit-hibiscus",
+      "group": "env",
+      "kit": "keys",
+      "tris": 1368,
+      "size": [
+        0.974,
+        0.805,
+        1
+      ],
+      "lod": {
+        "file": "models/kit/keys.glb",
+        "node": "kit-hibiscus-lod",
+        "tris": 564
+      }
+    },
+    "kit-olive1": {
+      "file": "models/kit/bay.glb",
+      "node": "kit-olive1",
+      "group": "env",
+      "kit": "bay",
+      "tris": 3551,
+      "size": [
+        0.808,
+        1,
+        0.691
+      ],
+      "lod": {
+        "file": "models/kit/bay.glb",
+        "node": "kit-olive1-lod",
+        "tris": 1217
+      }
+    },
+    "kit-olive2": {
+      "file": "models/kit/bay.glb",
+      "node": "kit-olive2",
+      "group": "env",
+      "kit": "bay",
+      "tris": 3541,
+      "size": [
+        0.557,
+        1,
+        0.486
+      ],
+      "lod": {
+        "file": "models/kit/bay.glb",
+        "node": "kit-olive2-lod",
+        "tris": 1209
+      }
+    },
+    "kit-olive3": {
+      "file": "models/kit/bay.glb",
+      "node": "kit-olive3",
+      "group": "env",
+      "kit": "bay",
+      "tris": 3900,
+      "size": [
+        0.554,
+        1,
+        0.603
+      ],
+      "lod": {
+        "file": "models/kit/bay.glb",
+        "node": "kit-olive3-lod",
+        "tris": 1374
+      }
+    },
+    "kit-pinia1": {
+      "file": "models/kit/bay.glb",
+      "node": "kit-pinia1",
+      "group": "env",
+      "kit": "bay",
+      "tris": 3897,
+      "size": [
+        0.707,
+        1,
+        0.716
+      ],
+      "lod": {
+        "file": "models/kit/bay.glb",
+        "node": "kit-pinia1-lod",
+        "tris": 1367
+      }
+    },
+    "kit-pinia2": {
+      "file": "models/kit/bay.glb",
+      "node": "kit-pinia2",
+      "group": "env",
+      "kit": "bay",
+      "tris": 4216,
+      "size": [
+        0.606,
+        1,
+        0.599
+      ],
+      "lod": {
+        "file": "models/kit/bay.glb",
+        "node": "kit-pinia2-lod",
+        "tris": 1518
+      }
+    },
+    "kit-btree1": {
+      "file": "models/kit/bay.glb",
+      "node": "kit-btree1",
+      "group": "env",
+      "kit": "bay",
+      "tris": 2337,
+      "size": [
+        0.584,
+        1,
+        0.559
+      ],
+      "lod": {
+        "file": "models/kit/bay.glb",
+        "node": "kit-btree1-lod",
+        "tris": 739
+      }
+    },
+    "kit-btree2": {
+      "file": "models/kit/bay.glb",
+      "node": "kit-btree2",
+      "group": "env",
+      "kit": "bay",
+      "tris": 1785,
+      "size": [
+        0.405,
+        1,
+        0.398
+      ],
+      "lod": {
+        "file": "models/kit/bay.glb",
+        "node": "kit-btree2-lod",
+        "tris": 487
+      }
+    },
+    "kit-oleander": {
+      "file": "models/kit/bay.glb",
+      "node": "kit-oleander",
+      "group": "env",
+      "kit": "bay",
+      "tris": 1368,
+      "size": [
+        0.974,
+        0.805,
+        1
+      ],
+      "lod": {
+        "file": "models/kit/bay.glb",
+        "node": "kit-oleander-lod",
+        "tris": 564
+      }
+    },
+    "kit-wild": {
+      "file": "models/kit/bay.glb",
+      "node": "kit-wild",
+      "group": "env",
+      "kit": "bay",
+      "tris": 900,
+      "size": [
+        0.974,
+        0.805,
+        1
+      ],
+      "lod": {
+        "file": "models/kit/bay.glb",
+        "node": "kit-wild-lod",
+        "tris": 358
+      }
+    },
+    "kit-drygrass": {
+      "file": "models/kit/bay.glb",
+      "node": "kit-drygrass",
+      "group": "env",
+      "kit": "bay",
+      "tris": 622,
+      "size": [
+        0.921,
+        1,
+        0.953
+      ],
+      "lod": {
+        "file": "models/kit/bay.glb",
+        "node": "kit-drygrass-lod",
+        "tris": 320
+      }
+    },
+    "kit-brock1": {
+      "file": "models/kit/bay.glb",
+      "node": "kit-brock1",
+      "group": "env",
+      "kit": "bay",
+      "tris": 342,
+      "size": [
+        1,
+        0.701,
+        0.927
+      ],
+      "lod": {
+        "file": "models/kit/bay.glb",
+        "node": "kit-brock1-lod",
+        "tris": 86
+      }
+    },
+    "kit-brock2": {
+      "file": "models/kit/bay.glb",
+      "node": "kit-brock2",
+      "group": "env",
+      "kit": "bay",
+      "tris": 244,
+      "size": [
+        1,
+        0.623,
+        0.813
+      ],
+      "lod": {
+        "file": "models/kit/bay.glb",
+        "node": "kit-brock2-lod",
+        "tris": 60
+      }
+    },
+    "kit-brock3": {
+      "file": "models/kit/bay.glb",
+      "node": "kit-brock3",
+      "group": "env",
+      "kit": "bay",
+      "tris": 522,
+      "size": [
+        0.984,
+        0.666,
+        1
+      ],
+      "lod": {
+        "file": "models/kit/bay.glb",
+        "node": "kit-brock3-lod",
+        "tris": 130
+      }
+    },
+    "kit-lavender": {
+      "file": "models/kit/bay.glb",
+      "node": "kit-lavender",
+      "group": "env",
+      "kit": "bay",
+      "tris": 1690,
+      "size": [
+        0.716,
+        1,
+        0.55
+      ],
+      "lod": {
+        "file": "models/kit/bay.glb",
+        "node": "kit-lavender-lod",
+        "tris": 824
+      }
     }
   }
 }

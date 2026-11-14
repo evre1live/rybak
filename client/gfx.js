@@ -174,6 +174,7 @@ export class Gfx {
     r.info.autoReset = false; // счёт вызовов отрисовки — за весь кадр (тени, отражение, сцена), а не за последний проход
     this.scale = 1; // доля от разрешения ступени качества: её уменьшает автоподбор, когда кадры проседают
     this.warmQ = []; // модели, чьи текстуры ждут очереди к видеокарте (warm)
+    this.sent = new WeakSet(); // текстуры, уже отданные видеокарте через warm
     this.warmFast = true; // за заставкой текстуры уходят без оглядки на кадры; игра выключает (main.js, boot)
     this.warmed = 0;
     this.quality = null;
@@ -273,7 +274,9 @@ export class Gfx {
       for (const m of Array.isArray(o.material) ? o.material : o.material ? [o.material] : []) {
         for (const k of TEX_SLOTS) {
           const t = m[k];
-          if (t && t.isTexture && !t.isRenderTargetTexture && t.image && (t.image.width || t.image.data) && !seen.has(t)) {
+          // уже отданные видеокарте не ставим в очередь: у моделей одного набора текстуры общие, и без этого
+          // очередь из десятков повторов задерживала текстуры рыбы, которая вот-вот клюнет
+          if (t && t.isTexture && !t.isRenderTargetTexture && t.image && (t.image.width || t.image.data) && !seen.has(t) && !this.sent.has(t)) {
             seen.add(t);
             list.push(t);
           }
@@ -293,23 +296,27 @@ export class Gfx {
     const again = () => (fast() ? yieldNow().then(tick) : nextFrame(tick));
     const tick = () => {
       const t0 = performance.now();
+      let again1 = false; // повтор (текстура уже у видеокарты) кадра не стоит — берём следующую сразу
       do {
         const job = this.warmQ[0];
         if (!job) {
           this.pumping = false;
           return;
         }
+        const t = job.list.pop();
+        again1 = this.sent.has(t);
         try {
-          this.renderer.initTexture(job.list.pop());
+          if (!again1) this.renderer.initTexture(t);
+          this.sent.add(t);
         } catch (e) {
           /* эта текстура загрузится при первом показе */
         }
-        this.warmed++;
+        if (!again1) this.warmed++;
         if (!job.list.length) {
           this.warmQ.shift();
           job.ok(job.n);
         }
-      } while (fast() && performance.now() - t0 < 10);
+      } while ((again1 || fast()) && performance.now() - t0 < 10);
       again();
     };
     again();

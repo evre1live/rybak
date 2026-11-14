@@ -1,0 +1,604 @@
+{
+  "about": "Модели из бесплатных наборов для локаций (tools/kit.js). Все наборы — Quaternius, лицензия CC0. Сырые файлы — art/kit/raw/ (вне репозитория).",
+  "sources": {
+    "q": "Stylized Nature MegaKit [Standard], https://quaternius.com/packs/stylizednaturemegakit.html — копия: github.com/series-ai/jam-ready-assets, quaternius-stylized-nature/3D/nature",
+    "usn": "Ultimate Stylized Nature Pack (May 2022), https://quaternius.com/packs/ultimatestylizednature.html — копия: github.com/walterpalladino/urp-shaders, Assets/Quaternius Assets/Ultimate Stylized Nature - May 2022",
+    "pk": "Pirate Kit (Nov 2023), https://quaternius.com/packs/piratekit.html — копия: github.com/castle-engine/conference-dev-days-summer-2024, data/pirates/glTF",
+    "fp": "Fantasy Props MegaKit [Standard], https://quaternius.com/packs/fantasypropsmegakit.html — копия: github.com/series-ai/jam-ready-assets, quaternius-fantasy-props/3D/fantasy/glTF",
+    "mv": "Medieval Village MegaKit [Standard], https://quaternius.com/packs/medievalvillagemegakit.html — копия: github.com/technoiris1/echoes-of-silence, assets/village kit",
+    "an": "Ultimate Animated Animal Pack (Jul 2021), https://quaternius.com/packs/ultimateanimatedanimals.html — копия: github.com/series-ai/jam-ready-assets, quaternius-animated-animals/3D/characters"
+  },
+  "roots": {
+    "q": "q/quaternius-stylized-nature/3D/nature",
+    "usn": "usn/glTF",
+    "usnTex": "usn/Textures",
+    "pk": "pirate/glTF",
+    "fp": "q/quaternius-fantasy-props/3D/fantasy/glTF",
+    "mv": "village",
+    "an": "q/quaternius-animated-animals/3D/characters"
+  },
+  "tex": 512,
+  "packs": {
+    "lake": [
+      {
+        "id": "kit-pine1",
+        "src": "q:Pine_1",
+        "tris": 900,
+        "lod": 120,
+        "lodLeaves": 0.45
+      },
+      {
+        "id": "kit-pine2",
+        "src": "q:Pine_2",
+        "tris": 900,
+        "lod": 120,
+        "lodLeaves": 0.45
+      },
+      {
+        "id": "kit-pine3",
+        "src": "q:Pine_3",
+        "tris": 900,
+        "lod": 120,
+        "lodLeaves": 0.45
+      },
+      {
+        "id": "kit-pine4",
+        "src": "q:Pine_4",
+        "tris": 900,
+        "lod": 120,
+        "lodLeaves": 0.45
+      },
+      {
+        "id": "kit-pine5",
+        "src": "q:Pine_5",
+        "tris": 900,
+        "lod": 120,
+        "lodLeaves": 0.45
+      },
+      {
+        "id": "kit-birch1",
+        "src": "usn:BirchTree_1",
+        "texDir": "usnTex:.",
+        "tris": 900,
+        "lod": 120,
+        "lodLeaves": 0.45,
+        "mats": {
+          "BirchTree_Leaves": {
+            "color": "#a8d270"
+          }
+        }
+      },
+      {
+        "id": "kit-birch2",
+        "src": "usn:BirchTree_2",
+        "texDir": "usnTex:.",
+        "tris": 900,
+        "lod": 120,
+        "lodLeaves": 0.45,
+        "mats": {
+          "BirchTree_Leaves": {
+            "color": "#a8d270"
+          }
+        }
+      },
+      {
+        "id": "kit-birch3",
+        "src": "usn:BirchTree_3",
+        "texDir": "usnTex:.",
+        "tris": 900,
+        "lod": 120,
+        "lodLeaves": 0.45,
+        "mats": {
+          "BirchTree_Leaves": {
+            "color": "#a8d270"
+          }
+        }
+      },
+      {
+        "id": "kit-tree1",
+        "src": "q:CommonTree_1",
+        "tris": 1000,
+        "lod": 140,
+        "lodLeaves": 0.45
+      },
+      {
+        "id": "kit-tree2",
+        "src": "q:CommonTree_3",
+        "tris": 1000,
+        "lod": 140,
+        "lodLeaves": 0.45
+      },
+      {
+        "id": "kit-bush1",
+        "src": "q:Bush_Common",
+        "mats": {
+          "Leaves_TwistedTree": {
+            "tex": "q:Leaves_TwistedTree.png",
+            "color": "#6f9a45"
+          }
+        },
+        "lod": 200,
+        "lodLeaves": 0.4
+      },
+      {
+        "id": "kit-bush2",
+        "src": "q:Bush_Common_Flowers",
+        "mats": {
+          "Leaves_NormalTree": {
+            "color": "#a8c27a"
+          }
+        },
+        "lod": 200,
+        "lodLeaves": 0.4
+      },
+      {
+        "id": "kit-fern",
+        "src": "q:Fern_1",
+        "vc": [
+          0.55,
+          1.0
+        ]
+      },
+      {
+        "id": "kit-rock1",
+        "src": "q:Rock_Medium_1",
+        "pivot": "center"
+      },
+      {
+        "id": "kit-rock2",
+        "src": "q:Rock_Medium_2",
+        "pivot": "center"
+      },
+      {
+        "id": "kit-rock3",
+        "src": "q:Rock_Medium_3",
+        "pivot": "center"
+      },
+      {
+        "id": "kit-lupine",
+        "src": "q:Flower_4_Group",
+        "vc": [
+          0.6,
+          1.0
+        ],
+        "mats": {
+          "Flowers": {
+            "grey": true,
+            "color": "#9a72f2"
+          }
+        }
+      },
+      {
+        "id": "kit-daisy",
+        "src": "q:Flower_3_Group",
+        "vc": [
+          0.6,
+          1.0
+        ],
+        "mats": {
+          "Flowers": {
+            "grey": true,
+            "color": "#ffffff"
+          }
+        }
+      },
+      {
+        "id": "kit-cabin",
+        "pivot": "center",
+        "assemble": [
+          {
+            "gen": "cabin",
+            "len": 6.4,
+            "dep": 4.4,
+            "r": 0.17,
+            "courses": 8,
+            "gable": 6,
+            "tex": "q:Bark_NormalTree.png",
+            "color": "#e2bc92",
+            "roof": {
+              "rise": 2.31,
+              "drop": 0.32,
+              "run": 3.04
+            }
+          },
+          {
+            "src": "mv:Roof_RoundTiles_4x6",
+            "at": [
+              0,
+              2.56,
+              0
+            ],
+            "ry": 90,
+            "scale": [
+              1.1,
+              0.62,
+              1.07
+            ]
+          },
+          {
+            "src": "mv:Prop_Chimney",
+            "at": [
+              2.2,
+              1.9,
+              1.0
+            ]
+          },
+          {
+            "src": "mv:Door_1_Flat",
+            "at": [
+              0.55,
+              0.05,
+              -2.42
+            ],
+            "ry": 180
+          },
+          {
+            "src": "mv:Window_Wide_Flat1",
+            "at": [
+              -2.0,
+              -0.3,
+              -2.45
+            ],
+            "ry": 180
+          },
+          {
+            "src": "mv:Window_Wide_Flat1",
+            "at": [
+              1.9,
+              -0.3,
+              -2.45
+            ],
+            "ry": 180
+          },
+          {
+            "src": "mv:Window_Wide_Flat1",
+            "at": [
+              3.52,
+              -0.3,
+              -0.2
+            ],
+            "ry": 90
+          },
+          {
+            "gen": "boxes",
+            "name": "Porch",
+            "tex": "q:Bark_DeadTree.png",
+            "color": "#b88a5e",
+            "tile": 1.2,
+            "list": [
+              [
+                0,
+                0.12,
+                -2.95,
+                3.6,
+                0.16,
+                1.15
+              ],
+              [
+                -1.7,
+                1.15,
+                -3.4,
+                0.16,
+                2.1,
+                0.16
+              ],
+              [
+                1.7,
+                1.15,
+                -3.4,
+                0.16,
+                2.1,
+                0.16
+              ],
+              [
+                0,
+                0.05,
+                -3.7,
+                1.3,
+                0.1,
+                0.32
+              ],
+              [
+                0,
+                2.25,
+                -3.15,
+                3.8,
+                0.08,
+                1.55
+              ]
+            ]
+          }
+        ],
+        "mats": {
+          "MI_RoundTiles": {
+            "grey": true,
+            "color": "#8494a6"
+          },
+          "MI_WindowGlass": {
+            "glass": "#2a3f58"
+          }
+        },
+        "lod": false
+      }
+    ],
+    "keys": [
+      {
+        "id": "kit-palm1",
+        "src": "usn:PalmTree_1",
+        "texDir": "usnTex:.",
+        "mats": {
+          "PalmTree_Leaves": {
+            "cut": true,
+            "cutoff": 0.5
+          }
+        }
+      },
+      {
+        "id": "kit-palm2",
+        "src": "usn:PalmTree_2",
+        "texDir": "usnTex:.",
+        "mats": {
+          "PalmTree_Leaves": {
+            "cut": true,
+            "cutoff": 0.5
+          }
+        }
+      },
+      {
+        "id": "kit-palm3",
+        "src": "usn:PalmTree_3",
+        "texDir": "usnTex:.",
+        "mats": {
+          "PalmTree_Leaves": {
+            "cut": true,
+            "cutoff": 0.5
+          }
+        }
+      },
+      {
+        "id": "kit-palm4",
+        "src": "usn:PalmTree_4",
+        "texDir": "usnTex:.",
+        "mats": {
+          "PalmTree_Leaves": {
+            "cut": true,
+            "cutoff": 0.5
+          }
+        }
+      },
+      {
+        "id": "kit-plant1",
+        "src": "q:Plant_1_Big",
+        "vc": [
+          0.6,
+          1.0
+        ]
+      },
+      {
+        "id": "kit-bushf",
+        "src": "usn:Bush_Flowers",
+        "texDir": "usnTex:.",
+        "mats": {
+          "Bush_Leaves": {
+            "cut": true
+          },
+          "Flowers": {
+            "cut": true,
+            "grey": true,
+            "color": "#ff5a8e"
+          }
+        },
+        "lod": 200,
+        "lodLeaves": 0.4
+      },
+      {
+        "id": "kit-bushl",
+        "src": "usn:Bush_Large",
+        "texDir": "usnTex:.",
+        "mats": {
+          "Bush_Leaves": {
+            "cut": true
+          }
+        },
+        "lod": 200,
+        "lodLeaves": 0.4
+      },
+      {
+        "id": "kit-krock1",
+        "src": "pk:Environment_Rock_1",
+        "pivot": "center",
+        "tris": 500
+      },
+      {
+        "id": "kit-krock2",
+        "src": "pk:Environment_Rock_2",
+        "pivot": "center",
+        "tris": 500
+      },
+      {
+        "id": "kit-krock3",
+        "src": "pk:Environment_Rock_3",
+        "pivot": "center",
+        "tris": 500
+      },
+      {
+        "id": "kit-hibiscus",
+        "src": "q:Bush_Common_Flowers",
+        "lod": 200,
+        "lodLeaves": 0.4,
+        "mats": {
+          "Leaves_NormalTree": {
+            "color": "#7fb34e"
+          },
+          "Flowers": {
+            "grey": true,
+            "color": "#ff4f7d"
+          }
+        }
+      }
+    ],
+    "bay": [
+      {
+        "id": "kit-olive1",
+        "src": "q:TwistedTree_1",
+        "tris": 1200,
+        "lod": 160,
+        "mats": {
+          "Leaves_TwistedTree": {
+            "tex": "q:Leaves_TwistedTree.png",
+            "color": "#8e9f62"
+          }
+        },
+        "lodLeaves": 0.45
+      },
+      {
+        "id": "kit-olive2",
+        "src": "q:TwistedTree_2",
+        "tris": 1200,
+        "lod": 160,
+        "mats": {
+          "Leaves_TwistedTree": {
+            "tex": "q:Leaves_TwistedTree.png",
+            "color": "#86995c"
+          }
+        },
+        "lodLeaves": 0.45
+      },
+      {
+        "id": "kit-olive3",
+        "src": "q:TwistedTree_4",
+        "tris": 1200,
+        "lod": 160,
+        "mats": {
+          "Leaves_TwistedTree": {
+            "tex": "q:Leaves_TwistedTree.png",
+            "color": "#94a36a"
+          }
+        },
+        "lodLeaves": 0.45
+      },
+      {
+        "id": "kit-pinia1",
+        "src": "q:TwistedTree_3",
+        "tris": 1200,
+        "lod": 160,
+        "lodLeaves": 0.45,
+        "mats": {
+          "Leaves_TwistedTree": {
+            "tex": "q:Leaves_TwistedTree.png",
+            "color": "#4d7a35"
+          }
+        }
+      },
+      {
+        "id": "kit-pinia2",
+        "src": "q:TwistedTree_5",
+        "tris": 1200,
+        "lod": 160,
+        "lodLeaves": 0.45,
+        "mats": {
+          "Leaves_TwistedTree": {
+            "tex": "q:Leaves_TwistedTree.png",
+            "color": "#567f3a"
+          }
+        }
+      },
+      {
+        "id": "kit-btree1",
+        "src": "q:CommonTree_2",
+        "tris": 1000,
+        "lod": 140,
+        "lodLeaves": 0.45
+      },
+      {
+        "id": "kit-btree2",
+        "src": "q:CommonTree_4",
+        "tris": 1000,
+        "lod": 140,
+        "lodLeaves": 0.45
+      },
+      {
+        "id": "kit-oleander",
+        "src": "q:Bush_Common_Flowers",
+        "mats": {
+          "Leaves_NormalTree": {
+            "color": "#86a85a"
+          },
+          "Flowers": {
+            "grey": true,
+            "color": "#f58ab8"
+          }
+        },
+        "lod": 200,
+        "lodLeaves": 0.4
+      },
+      {
+        "id": "kit-wild",
+        "src": "q:Bush_Common",
+        "mats": {
+          "Leaves_TwistedTree": {
+            "tex": "q:Leaves_TwistedTree.png",
+            "color": "#9aa85e"
+          }
+        },
+        "lod": 200,
+        "lodLeaves": 0.4
+      },
+      {
+        "id": "kit-drygrass",
+        "src": "q:Grass_Wispy_Tall",
+        "vc": [
+          0.6,
+          1.0
+        ]
+      },
+      {
+        "id": "kit-brock1",
+        "src": "q:Rock_Medium_1",
+        "pivot": "center",
+        "mats": {
+          "Rocks": {
+            "tex": "q:Rocks_Desert_Diffuse.png"
+          }
+        }
+      },
+      {
+        "id": "kit-brock2",
+        "src": "q:Rock_Medium_2",
+        "pivot": "center",
+        "mats": {
+          "Rocks": {
+            "tex": "q:Rocks_Desert_Diffuse.png"
+          }
+        }
+      },
+      {
+        "id": "kit-brock3",
+        "src": "q:Rock_Medium_3",
+        "pivot": "center",
+        "mats": {
+          "Rocks": {
+            "tex": "q:Rocks_Desert_Diffuse.png"
+          }
+        }
+      },
+      {
+        "id": "kit-lavender",
+        "src": "q:Flower_4_Group",
+        "vc": [
+          0.6,
+          1.0
+        ],
+        "mats": {
+          "Flowers": {
+            "grey": true,
+            "color": "#b294ec"
+          },
+          "Leaves": {
+            "color": "#c8d4a0"
+          }
+        }
+      }
+    ]
+  }
+}

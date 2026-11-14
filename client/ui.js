@@ -1340,7 +1340,8 @@ export class UI {
     this.screen.innerHTML = `<div class="dim"></div><div class="center helpp">
       <div class="helphead"><h1>КАК ИГРАТЬ</h1><span class="sp"></span><div class="seg">${seg('basics', touch ? 'rod' : 'mouse', 'ОСНОВЫ')}${seg('keys', 'keys', touch ? 'КНОПКИ' : 'УПРАВЛЕНИЕ')}</div></div>
       <div class="cbody">${body}
-      ${g.offline || tab === 'basics' ? '' : '<p>Прогресс сохраняется сам — в этом браузере и на сервере игры. Чтобы открыть его на другом устройстве, возьмите код в «Настройках → Сохранение и перенос».</p>'}</div>
+      ${g.offline || tab === 'basics' ? '' : '<p>Прогресс сохраняется сам — в этом браузере и на сервере игры. Чтобы открыть его на другом устройстве, возьмите код в «Настройках → Сохранение и перенос».</p>'}
+      ${tab === 'basics' ? '' : '<p class="credits">Благодарности: деревья, камни, цветы и постройки локаций — из бесплатных наборов Quaternius (quaternius.com, лицензия CC0).</p>'}</div>
       <div class="cfoot"><button class="btn pri big" data-a="${this.popts && this.popts.first ? 'close' : 'back'}"><span>ПОНЯТНО</span>${ic('arrow')}</button></div></div>`;
   }
 

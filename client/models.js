@@ -54,12 +54,57 @@ function shrink(tex, max) {
 }
 const LITE_TEX = { 'env-motorboat': 1024 }; // лодка всегда перед глазами — ей побольше
 
+// Файлы-наборы локаций (tools/kit.js): в одном файле все модели локации узлами с общими текстурами.
+// Файл грузится один раз, модель — его узел по имени (info.node).
+const packs = new Map();
+function loadPack(file) {
+  if (!packs.has(file)) {
+    const p = gltfLoader().then((loader) => new Promise((res, rej) => loader.load(file, res, undefined, rej)));
+    packs.set(file, p);
+    p.catch(() => packs.delete(file));
+  }
+  return packs.get(file);
+}
+/** Узел name из набора — отдельной сценой: в начале координат, со своими сетками (геометрия и текстуры общие). */
+function fromPack(file, name) {
+  return loadPack(file).then((g) => {
+    const node = g.scene.getObjectByName(name);
+    if (!node) throw new Error('в наборе ' + file + ' нет ' + name);
+    const scene = new THREE.Group();
+    const c = node.clone(true);
+    c.position.set(0, 0, 0);
+    c.rotation.set(0, 0, 0);
+    c.scale.set(1, 1, 1);
+    scene.add(c);
+    // материалы — свои у каждой модели: patchModel и подкраска не должны задевать соседей по набору
+    scene.traverse((o) => {
+      if (o.isMesh) o.material = o.material.clone();
+    });
+    return scene;
+  });
+}
+
 export function loadModel(id) {
   if (ready.has(id)) return Promise.resolve(ready.get(id));
   if (pending.has(id)) return pending.get(id);
   const p = loadManifest().then(() => {
     const info = modelInfo(id);
     if (!info) throw new Error('нет модели ' + id);
+    if (info.node)
+      return fromPack(info.file, info.node).then(
+        (scene) =>
+          new Promise((res) => {
+            tune(scene, info);
+            if (isTouch()) scene.traverse((o) => o.isMesh && shrink(o.material.map, 256));
+            const tpl = { id, info, scene };
+            const done = () => {
+              ready.set(id, tpl);
+              res(tpl);
+            };
+            if (warmer) Promise.resolve(warmer(scene)).then(done, done);
+            else done();
+          })
+      );
     return gltfLoader().then(
       (loader) =>
         new Promise((res, rej) => {
@@ -99,6 +144,14 @@ export function loadLod(id) {
   const p = loadManifest().then(() => {
     const info = modelInfo(id);
     if (!info || !info.lod) throw new Error('нет дальней копии ' + id);
+    if (info.lod.node)
+      return fromPack(info.lod.file, info.lod.node).then((scene) => {
+        tune(scene, info);
+        scene.traverse((o) => {
+          if (o.isMesh) o.castShadow = false;
+        });
+        return { id, info, scene };
+      });
     return gltfLoader().then(
       (loader) =>
         new Promise((res, rej) =>

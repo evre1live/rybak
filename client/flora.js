@@ -63,6 +63,18 @@ export function farPine(B, t, r, tone = 0) {
   B.add(FAR_CONE, shade(base, -0.04 + tone), M(t.x, t.y + 0.3 * h, t.z, 0.52 * h, 0.66 * h, 0.52 * h, 0, r() * 3, 0), { grad: [0.55, 1.1], mat: 3 });
   B.add(FAR_CONE, shade(base, 0.06 + tone), M(t.x, t.y + 0.72 * h, t.z, 0.36 * h, 0.56 * h, 0.36 * h, 0, r() * 3, 0), { grad: [0.68, 1.14], mat: 3 });
 }
+/**
+ * Дальняя ель «Соснового озера»: три яруса, узкая и тёмная — в тон елям из набора у воды (kit-pine*).
+ * Прежняя дальняя сосна (два широких конуса) рядом с ними выглядела зелёным колпаком.
+ */
+export function farSpruce(B, t, r, tone = 0) {
+  const base = ['#2e6b3a', '#2a6335', '#357841'][Math.floor(r() * 3)];
+  const h = t.h * 1.05;
+  const turn = r() * 3;
+  B.add(FAR_CONE, shade(base, -0.06 + tone), M(t.x, t.y + 0.24 * h, t.z, 0.4 * h, 0.5 * h, 0.4 * h, 0, turn, 0), { grad: [0.5, 1.08], mat: 3 });
+  B.add(FAR_CONE, shade(base, 0.0 + tone), M(t.x, t.y + 0.5 * h, t.z, 0.31 * h, 0.42 * h, 0.31 * h, 0, turn + 1, 0), { grad: [0.6, 1.12], mat: 3 });
+  B.add(FAR_CONE, shade(base, 0.06 + tone), M(t.x, t.y + 0.76 * h, t.z, 0.2 * h, 0.36 * h, 0.2 * h, 0, turn + 2, 0), { grad: [0.68, 1.16], mat: 3 });
+}
 /** Дальнее лиственное дерево — комок листвы на земле. */
 export function farCrown(B, t, r) {
   const base = ['#62b84e', '#74c75a', '#57a947', '#86cf63'][Math.floor(r() * 4)];

@@ -26,7 +26,14 @@ const TIERS = [
   { name: 'озеро 2 рифовая, мотыль', loc: 'lake', eq: { rod: 'rod2', line: 'line2', reel: 'reel2', hook: 'hook2' }, tackle: 'bloodworm', spots: [['backwater', 2, 0], ['stones', 3, 0], ['deep', 9, 0]] },
   { name: 'озеро 3 разведчик, мушка', loc: 'lake', eq: { rod: 'rod3', line: 'line3', reel: 'reel3', hook: 'hook3' }, tackle: 'fly', spots: [['falls', 4, 0], ['stones', 3, 0]] },
   { name: 'озеро 5 закат, живец яма', loc: 'lake', eq: { rod: 'rod5', line: 'line4', reel: 'reel4', hook: 'hook4' }, tackle: 'live', spots: [['pit', 16, 0], ['falls', 4, 0]] },
-  { name: 'озеро 10 легенда, блесна', loc: 'lake', eq: { rod: 'rod10', line: 'line7', reel: 'reel7', hook: 'hook6', float: 'float6' }, tackle: 'legendlure', spots: [['pit', 16, 0], ['falls', 4, 0], ['backwater', 2, 0]] }
+  { name: 'озеро 10 легенда, блесна', loc: 'lake', eq: { rod: 'rod10', line: 'line7', reel: 'reel7', hook: 'hook6', float: 'float6' }, tackle: 'legendlure', spots: [['pit', 16, 0], ['falls', 4, 0], ['backwater', 2, 0]] },
+  // Коралловые островки (с 5-го уровня)
+  { name: 'остр. 1 старт, червь', loc: 'keys', eq: {}, tackle: 'worm', spots: [['pier', 3, 0], ['shallow', 1.5, 0], ['garden', 3, 0]] },
+  { name: 'остр. 5 закат, креветка сад', loc: 'keys', eq: { rod: 'rod5', line: 'line3', reel: 'reel3', hook: 'hook3' }, tackle: 'shrimp', spots: [['garden', 3, 0], ['pier', 3, 0], ['mid', 4, 0]] },
+  { name: 'остр. 6 прилив, живец протока/край', loc: 'keys', eq: { rod: 'rod6', line: 'line4', reel: 'reel4', hook: 'hook4' }, tackle: 'live', spots: [['channel', 6, 0], ['edge', 9, 0]] },
+  { name: 'остр. 7 звезда, краб сад/край', loc: 'keys', eq: { rod: 'rod7', line: 'line5', reel: 'reel5', hook: 'hook5' }, tackle: 'crab', spots: [['garden', 3, 0], ['edge', 9, 0]] },
+  { name: 'остр. 8 волк, поппер край/море', loc: 'keys', eq: { rod: 'rod8', line: 'line6', reel: 'reel6', hook: 'hook6' }, tackle: 'popper', spots: [['edge', 9, 0], ['sea', 14, 0]] },
+  { name: 'остр. 10 легенда, блесна', loc: 'keys', eq: { rod: 'rod10', line: 'line7', reel: 'reel7', hook: 'hook6', float: 'float6' }, tackle: 'legendlure', spots: [['edge', 9, 0], ['sea', 14, 0], ['garden', 3, 0]] }
 ];
 const N = Number(process.argv[2]) || 4000;
 const rng = mulberry32(12345);

@@ -12,6 +12,7 @@ import { patchModel } from './surface.js';
 import { small } from './smalls.js';
 import { canvasTex, isTouch, TAU } from './util.js';
 import { BOXES, CIRCLES, DECK_Y, groundH, HAS } from './terrain.js';
+import { kitSwap, splitItems, stoneTint, stoneSat, kitSingle } from './kit.js';
 
 /** Что процедурный мир сообщает о себе. */
 export const ENV = {
@@ -206,6 +207,30 @@ export function upgradeEnv(scene) {
   const scatter = new Scatter(scene, { lite: isTouch() });
   const has = (id) => !!modelInfo(id);
   const fail = () => {};
+  // замена из набора локации (kit.js): есть, если все её модели собраны
+  const swapped = (id) => {
+    const sw = kitSwap(id);
+    return sw && sw.use.every(([vid]) => has(vid)) ? sw : null;
+  };
+  /** Деревья и кусты: своей моделью или моделями набора локации. */
+  const addFlora = (id, list, opt) => {
+    const sw = swapped(id);
+    if (!sw) return scatter.add(id, list, opt);
+    const parts = splitItems(sw, list, (it) => spot01(it.x, it.z, 7));
+    const k = sw.k || 1;
+    // у варианта может быть своя настройка (третий элемент: прежняя модель среди новых — со своей подкраской)
+    const own = new Map(sw.use.map(([vid, , o]) => [vid, o || {}]));
+    return Promise.all(
+      [...parts].map(([vid, items]) => {
+        const { k: kv = 1, ...o } = own.get(vid);
+        const kk = k * kv; // у варианта может быть своя поправка роста
+        // куски сетки крупнее обычного: моделей набора несколько на одно место, и с мелкими кусками вызовов отрисовки
+        // становится слишком много (на телефоне это дороже треугольников)
+        const all = { ...opt, tint: null, sat: 1, ...sw.opt, ...o };
+        return scatter.add(vid, kk === 1 ? items : items.map((it) => ({ ...it, s: it.s * kk })), { ...all, cell: Math.max(all.cell || 64, 160) });
+      })
+    );
+  };
   loadManifest().then(() => {
     // ── деревья и кусты: лес целиком меняется, когда загрузились все породы ──
     const trees = ['env-pine', 'env-oak', 'env-birch', 'env-bush'];
@@ -223,15 +248,17 @@ export function upgradeEnv(scene) {
         // (на Коралловых островках кусты светлее и сочнее: там это тропическая зелень под пальмами, а не подлесок)
         'env-bush': HAS.keys ? { sway: 0.006, near: 22, tint: { r: 0.88, g: 1.14, b: 0.9 }, sat: 0.92 } : { sway: 0.006, near: 22, tint: { r: 0.74, g: 0.94, b: 0.9 }, sat: 0.78 }
       };
-      Promise.all(trees.map((id) => loadModel(id)))
-        .then(() => Promise.all(trees.map((id) => scatter.add(id, ENV.flora[id], { cell: 104, near: 55, vary: 0.55, ...opt[id] }))))
+      // ждём все породы разом (своей модели или моделей набора), чтобы лес сменился целиком
+      const need = (id) => (swapped(id) ? Promise.all(swapped(id).use.map(([v]) => loadModel(v))) : ENV.flora[id].length ? loadModel(id) : null);
+      Promise.all(trees.map(need))
+        .then(() => Promise.all(trees.map((id) => addFlora(id, ENV.flora[id], { cell: 104, near: 55, vary: 0.55, ...opt[id] }))))
         .then(() => {
           drop(scene, 'trees');
           state.trees = true;
         }, fail);
     }
     if (has('env-palm'))
-      scatter.add('env-palm', ENV.flora['env-palm'], { cell: 90, near: 60, sway: 0.02, vary: 0.4, tint: GREY(1.1) }).then(() => {
+      addFlora('env-palm', ENV.flora['env-palm'], { cell: 90, near: 60, sway: 0.02, vary: 0.4, tint: GREY(1.1) }).then(() => {
         drop(scene, 'palms');
         state.palms = true;
       }, fail);
@@ -239,9 +266,10 @@ export function upgradeEnv(scene) {
     const rocks = ['env-rock1', 'env-rock2', 'env-rock3', 'env-cliff1', 'env-cliff2'];
     let turned = 0; // сколько утёсов встало «боком»
     if (rocks.every(has)) {
-      const items = (id) => {
-        const size = modelInfo(id).size;
-        return ENV.rocks[id].map((r) => {
+      // id — чьи записи, as — какой моделью рисовать (у замены из набора свои размеры)
+      const items = (id, list = ENV.rocks[id], as = id) => {
+        const size = modelInfo(as).size;
+        return list.map((r) => {
           let { w, d, ry } = r;
           if (r.turn) {
             // «боком»: наружу смотрит другая грань той же модели. Только если её не придётся растягивать заметно сильнее обычного
@@ -258,12 +286,18 @@ export function upgradeEnv(scene) {
           };
         });
       };
-      Promise.all(rocks.map((id) => loadModel(id)))
+      const addRocks = (id, opt) => {
+        const sw = swapped(id);
+        if (!sw) return scatter.add(id, items(id), { ...opt, tint: stoneTint(opt.tint), sat: stoneSat(opt.sat) });
+        const parts = splitItems(sw, ENV.rocks[id], (r) => spot01(r.x, r.z, 7));
+        return Promise.all([...parts].map(([vid, list]) => scatter.add(vid, items(id, list, vid), { ...opt, tint: null, rock: false, ...sw.opt, cell: Math.max((sw.opt && sw.opt.cell) || opt.cell || 64, 160) })));
+      };
+      Promise.all(rocks.map((id) => (swapped(id) ? Promise.all(swapped(id).use.map(([v]) => loadModel(v))) : loadModel(id))))
         // скал в море немного, и они большие — всегда подробные; валуны вдали рисуются грубо.
         // Камень у моделей тёмный, а мир игры светлый — высветляем (и текстуру, и множителем), иначе скалы
         // стоят чёрными столбами
         // утёсы (env-cliff*) — кольцо вокруг острова с маяком и глыбы западного берега: подробные издалека, это главный вид бухты
-        .then(() => Promise.all(rocks.map((id) => scatter.add(id, items(id), ROCK_OPT[id]))))
+        .then(() => Promise.all(rocks.map((id) => addRocks(id, ROCK_OPT[id]))))
         .then(() => {
           drop(scene, 'rocks');
           state.rocks = true;
@@ -278,7 +312,8 @@ export function upgradeEnv(scene) {
         state.piles = ENV.docks.length;
       }, fail);
     // ── одиночные модели на местах процедурных ──
-    for (const p of ENV.singles) {
+    for (const p0 of ENV.singles) {
+      const p = kitSingle(p0); // на этой локации вместо прежней модели может стоять своя (kit.js)
       if (!has(p.id)) continue;
       loadModel(p.id).then((tpl) => {
         if (p.gain && !tpl.gained) {

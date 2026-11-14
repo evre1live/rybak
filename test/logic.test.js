@@ -33,7 +33,7 @@ test('каждую рыбу можно поймать хоть где-то и х
   for (const loc of LOCATIONS) {
     const caught = new Set();
     for (const zone of Object.keys(ZONES)) for (const tk of tackles) for (const hour of [6, 12, 19, 23]) {
-      const spot = { zone, depth: zone === 'deep' || zone === 'arch' || zone === 'pit' ? 12 : 3, pier: zone === 'pier', hot: true };
+      const spot = { zone, depth: ['deep', 'arch', 'pit', 'sea', 'edge', 'channel'].includes(zone) ? 12 : 3, pier: zone === 'pier', hot: true };
       for (const e of L.speciesWeights(spot, tk, hour, loc.id)) caught.add(e.f.id);
       const c = L.rollFish(spot, tk, hour, r, loc.id);
       assert.ok(c.w > 0 && (c.junk || FISH_BY_ID[c.sp]));
@@ -51,7 +51,7 @@ test('каждую рыбу можно поймать хоть где-то и х
 });
 
 test('локации: список, подписи зон, кто может открыть комнату', () => {
-  assert.deepEqual(LOCATIONS.map((l) => l.id), ['bay', 'lake']);
+  assert.deepEqual(LOCATIONS.map((l) => l.id), ['bay', 'lake', 'keys']);
   for (const l of LOCATIONS) {
     assert.ok(l.name.length > 3 && l.sub && l.about && l.place && /^img\/place-\w+\.webp$/.test(l.img) && l.pin.length === 2 && l.level >= 1, l.id);
     assert.ok(l.say.enter && l.say.back && l.say.top, `${l.id}: слова для сообщений`);

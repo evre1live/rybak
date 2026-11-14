@@ -95,8 +95,9 @@ export const PALETTES = {
   tropic: {
     name: 'Тропики',
     tone: { sat: 1.3, vib: 0.1, con: 1.1, toe: 0.62, sh: [0.93, 1.0, 1.08], hi: [1.05, 1.0, 0.93] },
-    keys: DAY,
-    water: { clear: 0.085, pathMin: 0.34, fres: 0.72, net: 0.33, deepAt: 26, netDeep: 0.8, netTint: 0.6, seaDeep: 0.8, bedNet: 0.95, bedTint: 0.6, bedFog: 0.055, bedDeep: 0.7, moonPath: [4, 42] },
+    // вода — своя у каждой локации (его решение 14 ноября): в бухте глубже и синее, чем бирюза островков
+    keys: vary(DAY, { wS: [0.075, 0.92, 0.84], wD: [0.025, 1.0, 0.8] }),
+    water: { clear: 0.1, pathMin: 0.34, fres: 0.72, net: 0.33, deepAt: 18, netDeep: 0.8, netTint: 0.6, seaDeep: 0.8, bedNet: 0.95, bedTint: 0.6, bedFog: 0.055, bedDeep: 0.7, moonPath: [4, 42] },
     post: { bloom: 0.13, thr: 1.0, vig: 0.28 },
     fog: { near: 170, far: 1700 }
   },
@@ -108,7 +109,8 @@ export const PALETTES = {
     tone: { sat: 1.24, vib: 0.1, con: 1.1, toe: 0.64, sh: [0.92, 1.0, 1.09], hi: [1.05, 1.0, 0.94] },
     keys: vary(DAY, {
       zen: [0.006, 0.96, 0.95], hor: [0.004, 0.9, 1.0], sun: [0, 0.94, 1.0], sunI: 0.97, hemiS: [0.004, 0.96, 0.98], hemiG: [0.06, 0.8, 0.9], hemiI: 0.98,
-      fog: [0.006, 0.8, 1.02], wS: [-0.012, 0.74, 0.72], wD: [-0.02, 0.86, 0.72], cloud: [0, 0.92, 1.0]
+      // вода зеленовато-нефритовая (его решение 14 ноября)
+      fog: [0.006, 0.8, 1.02], wS: [-0.05, 0.62, 0.7], wD: [-0.1, 0.66, 0.6], cloud: [0, 0.92, 1.0]
     }),
     water: { clear: 0.12, pathMin: 0.3, fres: 0.8, net: 0.22, deepAt: 15, netDeep: 0.8, netTint: 0.5, seaDeep: 0.4, bedNet: 0.7, bedTint: 0.62, bedFog: 0.07, bedDeep: 0.62, moonPath: [4, 42] },
     post: { bloom: 0.13, thr: 1.0, vig: 0.3 },
@@ -120,7 +122,8 @@ export const PALETTES = {
   coral: {
     name: 'Коралловые островки',
     tone: { sat: 1.32, vib: 0.1, con: 1.08, toe: 0.6, sh: [0.94, 1.0, 1.07], hi: [1.04, 1.0, 0.94] },
-    keys: vary(DAY, { wS: [0.004, 1.0, 1.05], wD: [-0.022, 0.92, 1.1], fog: [0, 0.92, 1.03], hor: [0, 0.96, 1.02] }),
+    // вода бирюзовее, чем в бухте и на озере (его решение 14 ноября)
+    keys: vary(DAY, { wS: [-0.012, 1.0, 1.1], wD: [-0.035, 0.95, 1.08], fog: [0, 0.92, 1.03], hor: [0, 0.96, 1.02] }),
     water: { clear: 0.062, pathMin: 0.4, fres: 0.66, net: 0.36, deepAt: 22, netDeep: 0.8, netTint: 0.6, seaDeep: 0.85, bedNet: 0.85, bedTint: 0.36, bedFog: 0.04, bedDeep: 0.75, moonPath: [4, 42], surf: [0.5, 0.95] },
     post: { bloom: 0.13, thr: 1.0, vig: 0.26 },
     fog: { near: 190, far: 1800 }

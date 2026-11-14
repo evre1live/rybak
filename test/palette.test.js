@@ -9,7 +9,7 @@ const NUMS = ['h', 'sunI', 'hemiI', 'stars', 'glit', 'exp'];
 const fin = (o, keys, where) => { for (const k of keys) assert.ok(Number.isFinite(o[k]), `${where}: ${k} = ${o[k]}`); };
 
 test('палитры: полный набор чисел, сутки по порядку от 0 до 24 и без шва в полночь', () => {
-  assert.deepEqual(Object.keys(PALETTES), ['now', 'tropic', 'pine', 'pastel', 'cinema']); // pine — палитра «Соснового озера»
+  assert.deepEqual(Object.keys(PALETTES), ['now', 'tropic', 'pine', 'coral', 'pastel', 'cinema']); // pine — палитра «Соснового озера»
   for (const [id, P] of Object.entries(PALETTES)) {
     assert.ok(P.name.length > 2, id);
     fin(P.tone, ['sat', 'vib', 'con', 'toe'], `${id}.tone`);

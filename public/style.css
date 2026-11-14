@@ -635,6 +635,7 @@ body.blur .bench.run .cbody{-webkit-backdrop-filter:none;backdrop-filter:none;ba
 .tprize .ic{width:1em;height:1em}.tprize .sep{width:1px;height:1em;background:rgba(255,255,255,.4)}
 /* как играть: четыре карточки и строка клавиш; вторая вкладка — всё управление списком */
 .center.helpp{width:min(60em,94vw)}
+.helpp .credits{font-size:.82em;opacity:.62;margin-top:1.1em}
 .helphead{display:flex;align-items:flex-end;gap:1em}
 .helphead h1{flex:none}
 .helphead .sp{flex:1}
