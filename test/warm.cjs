@@ -53,6 +53,10 @@ const loc = process.argv[3] || ''; // другая локация — свой �
   };
   const row = (label) => rows.find((x) => x.label === label);
   console.log(`ПРОГРЕВ, качество «${tier}»${loc ? ', локация ' + loc : ''}`);
+  // заставка ждёт модели, но не те, которых на локации нет: ожидание кончается само, а не по истечении двенадцати секунд
+  const waits = await p.evaluate(() => RYBAK.bootWaits);
+  console.log(`  заставка ждала модели ${(waits / 10).toFixed(1)} с`);
+  assert.ok(waits < 115, `заставка дождалась моделей, а не истечения времени: ${waits}`);
   await mark('после заставки');
   await frame(2);
   await mark('заставка, два кадра');

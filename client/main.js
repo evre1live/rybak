@@ -2445,8 +2445,10 @@ class Game {
         for (let i = 0; i < 120; i++) {
           // не дольше 12 секунд: на медленной сети остальное догрузится уже на заставке
           const e = sc.envState();
-          const got = [e.trees, e.palms, e.rocks, e.lighthouse, e.kiosk, e.lamps > 0, !sc.propsState().fallback].filter(Boolean).length;
+          // чего на локации нет (маяка на озере), того и не ждём — иначе заставка стояла бы все двенадцать секунд
+          const got = [e.trees, e.palms, e.rocks, e.lighthouse || !HAS.lighthouse, e.kiosk, e.lamps > 0, !sc.propsState().fallback].filter(Boolean).length;
           say(0.3 + 0.3 * (got / 7));
+          this.bootWaits = i; // сколько раз ждали модели (по 0,1 с) — для проверок
           // модель рыбы для сборки «рыбьих» шейдеров ждём не дольше четырёх секунд: не успела — соберутся в фоне
           if (got === 7 && (this.warmDone || i >= 40)) break;
           await wait(100);
