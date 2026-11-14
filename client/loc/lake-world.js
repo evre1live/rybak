@@ -5,8 +5,8 @@ import { sstep, fbm2 } from '../util.js';
 import { BOUNDS, BACKWATER, GLADE, CABIN, CAMPFIRE, waterD, shoreZ } from './lake.js';
 
 const C = (hex) => new THREE.Color(hex);
-const sand = C('#e6d9ae');
-const sandWet = C('#cfc39a');
+const sand = C('#cfc6a8'); // у базы — светлый крупный песок с галькой, холоднее южного
+const sandWet = C('#ada68f');
 const pebble = C('#b3ad9c');
 const pebbleWet = C('#8f8d82');
 const bedDeep = C('#586e66'); // тёмный ил на глубине: вода над ним — густой сине-зелёной

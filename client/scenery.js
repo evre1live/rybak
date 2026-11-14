@@ -4,7 +4,7 @@ import { Batch, M, G, BATCH_MAT, BATCH_MAT_2S } from './batch.js';
 import { loadManifest } from './hero.js';
 import { modelInfo, loadModels, spawn } from './models.js';
 import { buildPlaces } from './places.js';
-import { ENV, upgradeEnv, envNight, envState } from './envmodels.js';
+import { ENV, upgradeEnv, envNight, envState, addTorch } from './envmodels.js';
 import { spot01 } from './scatter.js';
 import { rng, rockGeo, canvasTex, shade, sstep, TAU, fbm2 } from './util.js';
 import { DECKS, CIRCLES, DECK_Y, groundH, shoreZ, islandR, ISLAND, ARCH, ARCH_LEGS, REEF, CAPE, capeDist, FALLS, LIGHTHOUSE, COTTAGE, CAMPFIRE, cottageUV, BACKWATER, deckAt, SCHOOL_HOMES, SEA_HOMES, SKERRIES, BUOYS, MARKS, HAS, GULL_SPOTS } from './terrain.js';
@@ -161,6 +161,17 @@ function ropeCoil(B, x, y, z) {
   for (let k = 0; k < 3; k++) B.add(G.torus(0.22, 14), ROPE, M(x, y + 0.05 + k * 0.075, z, 0.6 - k * 0.04, 0.6 - k * 0.04, 0.5, Math.PI / 2, k, 0));
 }
 
+// Лавка-рынок у причала у каждой локации своя: в бухте — белёный домик под черепицей с синими рамами (юг),
+// на озере — бревенчатый сруб под тёмной дранкой, на островках — бамбуковая хижина под соломой.
+// teal — прежняя лавка из крашеных досок (запасная).
+const SHACK = {
+  teal: { kind: 'boards', wall: '#3fb0a8', trim: '#f1efe6', roof: '#b5533c', roofMat: 7, ridge: '#8f3d2c', rib: '#9c4532', awn: ['#e2452f', '#f6f1e7'], glass: '#24405c' },
+  bay: { kind: 'plaster', wall: '#efe7d6', trim: '#2f6fb0', roof: '#c8673f', roofMat: 7, ridge: '#a24a2e', rib: '#a85536', awn: ['#2f6fb0', '#f6f1e7'], glass: '#1f3550' },
+  lake: { kind: 'logs', wall: '#94643a', trim: '#e8dcc0', roof: '#5a4d42', roofMat: 7, ridge: '#3e342c', rib: '#463b32', awn: ['#2f7a4f', '#efe6cf'], glass: '#22344a' },
+  keys: { kind: 'bamboo', wall: '#d2bf93', trim: '#a07a3c', roof: '#b99358', roofMat: 5, ridge: '#8a6a36', rib: '#9a7842', awn: ['#14a39a', '#f6f1e7'], glass: '#2a3a3a', thatch: true }
+};
+export const SHACK_STYLE = LOC_ID in SHACK ? LOC_ID : 'teal';
+
 function buildShack(B, P, scene, r) {
   const x0 = -13;
   const x1 = -7.2;
@@ -170,28 +181,65 @@ function buildShack(B, P, scene, r) {
   const cz = (z0 + z1) / 2;
   const by = DECK_Y;
   const H = 2.7;
-  const TEAL = '#3fb0a8';
-  const wall = (ax, az, bx, bz, ya, yb) => {
+  const S = SHACK[SHACK_STYLE];
+  const TEAL = S.wall;
+  // стена от (ax, az) до (bx, bz) высотой от ya до yb; full — во всю высоту (у бревенчатой — торцы брёвен на углах)
+  const wall = (ax, az, bx, bz, ya, yb, full = false) => {
     const len = Math.hypot(bx - ax, bz - az);
     const ry = Math.atan2(-(bz - az), bx - ax);
-    B.add(G.box(), TEAL, M((ax + bx) / 2, by + (ya + yb) / 2, (az + bz) / 2, len, yb - ya, 0.12, 0, ry, 0), { grad: [0.85, 1.04], mat: 6 });
-    const n = Math.max(1, Math.round(len / 0.42));
-    for (let i = 0; i <= n; i++) {
-      const t = i / n;
-      B.add(G.box(), shade(TEAL, -0.2), M(ax + (bx - ax) * t, by + (ya + yb) / 2, az + (bz - az) * t, 0.045, yb - ya, 0.17, 0, ry, 0));
+    const mx = (ax + bx) / 2;
+    const mz = (az + bz) / 2;
+    if (S.kind === 'boards') {
+      B.add(G.box(), TEAL, M(mx, by + (ya + yb) / 2, mz, len, yb - ya, 0.12, 0, ry, 0), { grad: [0.85, 1.04], mat: 6 });
+      const n = Math.max(1, Math.round(len / 0.42));
+      for (let i = 0; i <= n; i++) {
+        const t = i / n;
+        B.add(G.box(), shade(TEAL, -0.2), M(ax + (bx - ax) * t, by + (ya + yb) / 2, az + (bz - az) * t, 0.045, yb - ya, 0.17, 0, ry, 0));
+      }
+    } else if (S.kind === 'plaster') {
+      // штукатурка: ровная белёная стена, внизу — тёмная полоса цоколя
+      B.add(G.box(), TEAL, M(mx, by + (ya + yb) / 2, mz, len, yb - ya, 0.16, 0, ry, 0), { grad: [0.9, 1.03] });
+      if (ya < 0.01) B.add(G.box(), '#b9ad97', M(mx, by + 0.14, mz, len + 0.02, 0.28, 0.18, 0, ry, 0), { grad: [0.9, 1.0] });
+    } else if (S.kind === 'logs') {
+      // сруб: брёвна лежат друг на друге; за ними — тёмная стенка, чтобы в щели не просвечивало
+      B.add(G.box(), shade(TEAL, -0.45), M(mx, by + (ya + yb) / 2, mz, len, yb - ya, 0.1, 0, ry, 0));
+      const d = 0.27;
+      const n = Math.max(1, Math.round((yb - ya) / d));
+      const step = (yb - ya) / n;
+      const over = full ? 0.32 : 0;
+      for (let i = 0; i < n; i++) {
+        const c = shade(TEAL, (spot01(mx + i, mz - i, 3) - 0.5) * 0.22);
+        B.add(G.cyl(9), c, M(mx, by + ya + step * (i + 0.5), mz, step * 1.04, len + over, step * 1.04, 0, ry, Math.PI / 2), { grad: [0.8, 1.06], mat: 1 });
+      }
+    } else {
+      // бамбук: плетёная циновка, по ней — стебли рамы (низ, верх, стойки)
+      B.add(G.box(), TEAL, M(mx, by + (ya + yb) / 2, mz, len, yb - ya, 0.1, 0, ry, 0), { grad: [0.86, 1.05], mat: 5 });
+      const pole = (px, pz, h0, h1) => B.add(G.cyl(7), S.trim, M(px, by + (h0 + h1) / 2, pz, 0.1, h1 - h0, 0.1), { grad: [0.85, 1.08], mat: 1 });
+      const n = Math.max(1, Math.round(len / 0.95));
+      const nx = Math.sin(ry) * 0.07;
+      const nz = Math.cos(ry) * 0.07;
+      for (let i = 0; i <= n; i++) {
+        const t = i / n;
+        pole(ax + (bx - ax) * t + nx, az + (bz - az) * t + nz, ya, yb);
+        pole(ax + (bx - ax) * t - nx, az + (bz - az) * t - nz, ya, yb);
+      }
+      for (const h of [ya + 0.08, yb - 0.08])
+        for (const sgn of [-1, 1]) B.add(G.cyl(7), S.trim, M(mx + sgn * nx, by + h, mz + sgn * nz, 0.09, len, 0.09, 0, ry, Math.PI / 2), { grad: [0.85, 1.08], mat: 1 });
     }
   };
-  wall(x0, z0, x1, z0, 0, H);
-  wall(x0, z1, x1, z1, 0, H);
-  wall(x0, z0, x0, z1, 0, H);
+  wall(x0, z0, x1, z0, 0, H, true);
+  wall(x0, z1, x1, z1, 0, H, true);
+  wall(x0, z0, x0, z1, 0, H, true);
   // восточная стена с окном прилавка
   wall(x1, z0, x1, z0 + 0.9, 0, H);
   wall(x1, z1 - 0.9, x1, z1, 0, H);
   wall(x1, z0 + 0.9, x1, z1 - 0.9, 0, 1.0);
   wall(x1, z0 + 0.9, x1, z1 - 0.9, 2.2, H);
-  B.add(G.box(), '#f1efe6', M(x1 + 0.02, by + H / 2, z0 + 0.9, 0.16, H, 0.14));
-  B.add(G.box(), '#f1efe6', M(x1 + 0.02, by + H / 2, z1 - 0.9, 0.16, H, 0.14));
-  for (const [px, pz] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) B.add(G.box(), '#f1efe6', M(px, by + H / 2, pz, 0.2, H + 0.04, 0.2));
+  const post = S.kind === 'bamboo' ? (px, pz, w, h, y) => B.add(G.cyl(8), S.trim, M(px, y, pz, w * 0.8, h, w * 0.8), { grad: [0.85, 1.08], mat: 1 }) : (px, pz, w, h, y) => B.add(G.box(), S.trim, M(px, y, pz, w, h, w), S.kind === 'logs' ? { mat: 1 } : null);
+  post(x1 + 0.02, z0 + 0.9, 0.16, H, by + H / 2);
+  post(x1 + 0.02, z1 - 0.9, 0.16, H, by + H / 2);
+  // углы: у сруба брёвна сами выходят за угол, столбы не нужны
+  if (S.kind !== 'logs') for (const [px, pz] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) post(px, pz, 0.2, H + 0.04, by + H / 2);
   // нутро лавки: дощатая задняя стенка, полки с товаром, тёплая лампа под потолком
   for (let i = 0; i < 9; i++) B.add(G.box(), shade('#7b5433', (r() - 0.5) * 0.16), M(x1 - 1.5, by + 1.62, cz - 1.38 + i * 0.345, 0.1, 1.36, 0.33));
   B.add(G.box(), '#4a3320', M(x1 - 0.75, by + 0.95, cz, 1.5, 0.08, z1 - z0 - 1.9));
@@ -229,25 +277,49 @@ function buildShack(B, P, scene, r) {
   const rise = 1.45;
   const ang = Math.atan2(rise, half);
   const slab = Math.hypot(half, rise) + 0.35;
+  // солома толще черепицы и свисает ниже; на ней не рёбра, а ряды пучков
+  const thick = S.thatch ? 0.34 : 0.12;
+  const eave = S.thatch ? 0.25 : 0;
   for (const s of [-1, 1]) {
-    B.add(G.box(), '#b5533c', M(cx + s * (half / 2 + 0.1), by + H + rise / 2 - 0.02, cz, slab, 0.12, z1 - z0 + 0.9, 0, 0, -s * ang), { grad: [0.9, 1.05], mat: 7 });
-    for (let i = 1; i < 6; i++) B.add(G.box(), '#9c4532', M(cx + s * (half * (i / 6) + 0.05), by + H + rise * (1 - i / 6) + 0.05, cz, 0.05, 0.03, z1 - z0 + 0.92, 0, 0, -s * ang));
+    const rx = cx + s * (half / 2 + 0.1 + eave * 0.5);
+    const ry = by + H + rise / 2 - 0.02 - eave * 0.35;
+    B.add(G.box(), S.roof, M(rx, ry, cz, slab + eave, thick, z1 - z0 + 0.9 + eave, 0, 0, -s * ang), { grad: [0.9, 1.05], mat: S.roofMat });
+    if (S.thatch) {
+      // бахрома соломы по нижнему краю ската: неровные пучки свисают
+      const ex = rx + s * Math.cos(ang) * (slab + eave) * 0.5;
+      const ey = ry - Math.sin(ang) * (slab + eave) * 0.5;
+      const L = z1 - z0 + 0.9 + eave;
+      for (let i = 0; i < 14; i++) {
+        const zz = cz - L / 2 + (i + 0.5) * (L / 14);
+        const h = 0.2 + spot01(i, s, 5) * 0.14;
+        B.add(G.box(), shade(S.rib, (spot01(i, s, 6) - 0.5) * 0.2), M(ex, ey - h / 2 + 0.02, zz, 0.1, h, L / 14 + 0.02, 0, 0, -s * 0.15), { mat: 5 });
+      }
+    }
+    for (let i = 1; i < 6; i++) B.add(G.box(), S.rib, M(cx + s * (half * (i / 6) + 0.05), by + H + rise * (1 - i / 6) + 0.05 + (thick - 0.12) / 2, cz, S.thatch ? 0.09 : 0.05, S.thatch ? 0.05 : 0.03, z1 - z0 + 0.92 + eave, 0, 0, -s * ang), S.thatch ? { mat: 5 } : null);
   }
-  B.add(G.box(), '#8f3d2c', M(cx, by + H + rise + 0.06, cz, 0.22, 0.14, z1 - z0 + 1));
-  for (const pz of [z0, z1]) B.add(G.prism(), TEAL, M(cx, by + H, pz, x1 - x0, rise, 0.12), { grad: [0.9, 1.02], mat: 6 });
+  B.add(G.box(), S.ridge, M(cx, by + H + rise + 0.06 + (thick - 0.12), cz, S.thatch ? 0.42 : 0.22, S.thatch ? 0.22 : 0.14, z1 - z0 + 1 + eave), S.thatch ? { mat: 5 } : null);
+  const gable = S.kind === 'logs' ? shade(TEAL, -0.12) : TEAL;
+  for (const pz of [z0, z1]) B.add(G.prism(), gable, M(cx, by + H, pz, x1 - x0, rise, 0.12), { grad: [0.9, 1.02], mat: S.kind === 'boards' ? 6 : S.kind === 'logs' ? 1 : S.kind === 'bamboo' ? 5 : 0 });
+  // у белёного домика — синие ставни у окна, у сруба — наличник; печная труба на скате
+  if (S.kind === 'logs') {
+    B.add(G.box(), '#7d7a76', M(x0 + 1.2, by + H + rise * 0.75, z1 - 1.2, 0.5, 1.5, 0.5), { mat: 2 });
+    B.add(G.box(), '#5f5c59', M(x0 + 1.2, by + H + rise * 0.75 + 0.78, z1 - 1.2, 0.58, 0.08, 0.58));
+  }
   // спасательный круг на северной стене
   for (let i = 0; i < 8; i++) P.add(G.torus(0.3, 5, Math.PI / 4 + 0.02), i % 2 ? '#e2452f' : '#f8fafc', M(x0 + 1.4, by + 1.65, z0 - 0.1, 0.74, 0.74, 0.74, 0, 0, (i * Math.PI) / 4));
   place('prop-lifering', x0 + 1.4, by, z0 - 0.29, 0.8, Math.PI, true); // круг стоит на настиле, прислонённый к стене
   // окно на север с ящиком цветов
-  B.add(G.box(), '#f1efe6', M(cx + 0.9, by + 1.6, z0 - 0.04, 1.2, 0.95, 0.1));
-  B.add(G.box(), '#24405c', M(cx + 0.9, by + 1.6, z0 - 0.08, 1.02, 0.78, 0.06));
-  B.add(G.box(), '#f1efe6', M(cx + 0.9, by + 1.6, z0 - 0.1, 0.05, 0.78, 0.05));
+  const wz = z0 - (S.kind === 'logs' ? 0.12 : 0.04);
+  B.add(G.box(), S.trim, M(cx + 0.9, by + 1.6, wz, 1.2, 0.95, 0.1));
+  B.add(G.box(), S.glass, M(cx + 0.9, by + 1.6, wz - 0.04, 1.02, 0.78, 0.06));
+  B.add(G.box(), S.trim, M(cx + 0.9, by + 1.6, wz - 0.06, 0.05, 0.78, 0.05));
+  if (S.kind === 'plaster') for (const sx of [-1, 1]) B.add(G.box(), S.trim, M(cx + 0.9 + sx * 0.88, by + 1.6, wz - 0.05, 0.5, 0.95, 0.06), { grad: [0.85, 1.05], mat: 6 });
   B.add(G.box(), '#a86f3a', M(cx + 0.9, by + 1.05, z0 - 0.18, 1.2, 0.18, 0.24));
   for (let i = 0; i < 7; i++) B.add(G.ico(0), ['#f472b6', '#fde047', '#fb7185', '#ffffff'][i % 4], M(cx + 0.4 + i * 0.17, by + 1.22 + r() * 0.06, z0 - 0.2, 0.14, 0.14, 0.14), { flat: true });
   // навес в красно-белую полоску
   const stripes = canvasTex(256, 64, (g, w, h) => {
     for (let i = 0; i < 8; i++) {
-      g.fillStyle = i % 2 ? '#f6f1e7' : '#e2452f';
+      g.fillStyle = S.awn[i % 2 ? 1 : 0];
       g.fillRect((i * w) / 8, 0, w / 8 + 1, h);
     }
     const sh = g.createLinearGradient(0, 0, 0, h);
@@ -267,7 +339,7 @@ function buildShack(B, P, scene, r) {
   val.position.set(x1 + 1.98, by + 1.89, cz);
   val.rotation.y = Math.PI / 2;
   scene.add(val);
-  for (const pz of [z0 + 0.36, z1 - 0.36]) B.add(G.cyl(8), '#f1efe6', M(x1 + 1.94, by + 1.0, pz, 0.07, 2.0, 0.07));
+  for (const pz of [z0 + 0.36, z1 - 0.36]) B.add(G.cyl(8), S.kind === 'bamboo' || S.kind === 'logs' ? S.trim : '#f1efe6', M(x1 + 1.94, by + 1.0, pz, S.kind === 'bamboo' ? 0.1 : 0.07, 2.0, S.kind === 'bamboo' ? 0.1 : 0.07), S.kind === 'bamboo' ? { mat: 1 } : null);
   // вывеска
   const sign = canvasTex(512, 128, (g, w, h) => {
     g.fillStyle = '#7a4a26';
@@ -474,8 +546,26 @@ function buildLamps(B, scene, nfx) {
     // wake — где горит фонарь (над водой): от него по воде идёт дорожка света; готовая модель столба его передвинет
     const rec = { x, y, z, side, glass: null, light: null, wake: { x: x + side * 0.6, y: y + 2.32, z } };
     ENV.lamps.push(rec);
-    if (nfx) nfx.wake(rec.wake, '#ffb25e', dim ? 0.8 : 1);
     CIRCLES.push({ x, z, r: 0.2 });
+    if (LOC_ID === 'keys') {
+      // факел на бамбуковом шесте: чаша из плетёнки, пламя над ней; свет — там же
+      const fy = y + 3.5;
+      rec.wake = { x, y: fy, z };
+      if (nfx) nfx.wake(rec.wake, '#ff9a48', dim ? 0.8 : 1);
+      B.add(G.cyl(8), '#c9a55a', M(x, y + 1.66, z, 0.11, 3.32, 0.11), { grad: [0.78, 1.08], mat: 1 });
+      for (let k = 1; k < 6; k++) B.add(G.cyl(8), '#9c7a3e', M(x, y + k * 0.58, z, 0.125, 0.035, 0.125));
+      B.add(G.cyl(9, 1, 0.55), '#6b4a2a', M(x, y + 3.36, z, 0.3, 0.26, 0.3), { mat: 5 });
+      B.add(G.cyl(9), '#2b211a', M(x, y + 3.48, z, 0.24, 0.02, 0.24));
+      addTorch(scene, x, fy - 0.03, z, 1);
+      if (dim) continue;
+      const light = new THREE.PointLight('#ff9d52', 0, 13, 1.5);
+      light.position.set(x, fy + 0.15, z);
+      scene.add(light);
+      lamps.push(light);
+      rec.light = light;
+      continue;
+    }
+    if (nfx) nfx.wake(rec.wake, '#ffb25e', dim ? 0.8 : 1);
     B.add(G.cyl(8, 0.8, 1), '#5b3a1e', M(x, y + 1.55, z, 0.16, 3.3, 0.16), { grad: [0.8, 1.05] }); // высотой с готовый столб (3,3 м)
     B.add(G.box(), '#5b3a1e', M(x + side * 0.32, y + 2.7, z, 0.72, 0.07, 0.07));
     B.add(G.box(), '#5b3a1e', M(x + side * 0.2, y + 2.48, z, 0.5, 0.05, 0.05, 0, 0, side * 0.75));

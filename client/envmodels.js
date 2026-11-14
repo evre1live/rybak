@@ -13,6 +13,7 @@ import { small } from './smalls.js';
 import { canvasTex, isTouch, TAU } from './util.js';
 import { BOXES, CIRCLES, DECK_Y, groundH, HAS } from './terrain.js';
 import { kitSwap, splitItems, stoneTint, stoneSat, kitSingle } from './kit.js';
+import { LOC_ID } from './loc/id.js';
 
 /** Что процедурный мир сообщает о себе. */
 export const ENV = {
@@ -49,7 +50,7 @@ const ROCK_OPT = {
 const glows = []; // светящиеся пятна фонарей и маяка: { s, k, day }
 const lits = []; // материалы с окнами, которые загораются ночью: { m, k }
 const gulls = [];
-let fire = null; // костёр: { glow, flames, pool }
+const fires = []; // костёр и факелы: { glow, flames, pool, torch }
 let night = 0;
 
 // маленькая яркая сердцевина и широкий слабый ореол: с ровным пятном свет выглядит наклейкой
@@ -130,6 +131,27 @@ function makeFire(scene, at, s) {
   scene.add(pool);
   return { glow: glow(scene, at.x, at.y + 0.12 * s, at.z, 1.5 * s, '#ff9a3c', 0.35), flames, pool };
 }
+
+/**
+ * Факел (на островках вместо фонарей): два языка пламени в чаше на шесте и ореол. Горит с сумерек до рассвета;
+ * свет от него даёт тот же источник, что у фонаря (scenery.js, buildLamps). at — основание пламени.
+ */
+export function addTorch(scene, x, y, z, s = 1) {
+  const tex = (_flame ||= flameTex());
+  const flames = [];
+  for (const [dx, dz, w, h] of [[0, 0, 0.26, 0.5], [0.06, -0.04, 0.17, 0.32]]) {
+    const f = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+    f.center.set(0.5, 0.04);
+    f.position.set(x + dx * s, y, z + dz * s);
+    f.visible = false;
+    scene.add(f);
+    flames.push({ f, w: w * s, h: h * s, x: f.position.x, ph: x * 1.7 + z * 2.3 + dx * 31 });
+  }
+  const rec = { glow: glow(scene, x, y + 0.18 * s, z, 1.7 * s, '#ff9a3c', 0, 0.2), flames, pool: null, torch: true };
+  fires.push(rec);
+  return rec;
+}
+let _flame = null;
 
 /** Надпись на прозрачном фоне — на готовую вывеску или стрелку указателя. Ширина w, высота h (в единицах родителя). */
 function label(text, w, h, color = '#fff4d6') {
@@ -326,7 +348,7 @@ export function upgradeEnv(scene) {
         if (p.key) drop(scene, p.key);
         if (p.key && p.key in state) state[p.key] = true;
         if (p.block) CIRCLES.push({ x: p.x, z: p.z, r: p.block });
-        if (p.fire) fire = makeFire(scene, new THREE.Vector3(...p.fire).multiplyScalar(p.s).applyEuler(o.rotation).add(o.position), p.s);
+        if (p.fire) fires.push(makeFire(scene, new THREE.Vector3(...p.fire).multiplyScalar(p.s).applyEuler(o.rotation).add(o.position), p.s));
         if (p.lit)
           o.traverse((c) => {
             if (!c.isMesh || !c.material.emissiveMap) return;
@@ -355,7 +377,8 @@ export function upgradeEnv(scene) {
         state.lighthouse = true;
       }, fail);
     // ── фонарные столбы: модель встаёт столбом на место процедурного, свет — в её фонарь ──
-    if (has('env-lamppost'))
+    // готовый фонарный столб — только в бухте: на озере остаются деревянные столбы с фонарём, на островках — факелы
+    if (has('env-lamppost') && LOC_ID === 'bay')
       loadModel('env-lamppost').then((tpl) => {
         for (const l of ENV.lamps) {
           const s = LAMP.h;
@@ -371,6 +394,7 @@ export function upgradeEnv(scene) {
         drop(scene, 'lamps');
         envNight(night);
       }, fail);
+    else state.lamps = ENV.lamps.length; // свои фонари локации собраны кодом и уже стоят: заставке ждать нечего
     // ── будка проката на своей площадке: с ней столб с доской у пирса не нужен ──
     if (has('env-rental'))
       loadModel('env-rental').then((tpl) => {
@@ -463,20 +487,27 @@ export function upgradeEnv(scene) {
         g.turn += (Math.round(k * 1.2) * 0.42 - g.turn) * Math.min(1, dt * 5);
         g.o.rotation.y = g.ry + g.turn;
       }
-      if (fire) {
-        // огонь дрожит: языки тянутся и опадают вразнобой, свет на песке мигает вместе с ними
-        const k = 0.78 + 0.22 * Math.sin(t * 9 + Math.sin(t * 23) * 1.3);
+      for (const fire of fires) {
+        // огонь дрожит: языки тянутся и опадают вразнобой, свет на песке мигает вместе с ними.
+        // Факелы зажигают к вечеру: днём горит только костёр
+        const on = fire.torch ? Math.min(1, Math.max(0, (night - 0.04) * 2.2)) : 1;
+        const k = 0.78 + 0.22 * Math.sin(t * 9 + fire.flames[0].ph + Math.sin(t * 23 + fire.flames[0].ph) * 1.3);
         for (const fl of fire.flames) {
+          fl.f.visible = on > 0.01;
+          if (!fl.f.visible) continue;
+          if (fire.torch) fl.f.material.opacity = on;
           const a = 0.8 + 0.26 * Math.sin(t * (8.5 + fl.ph * 0.07) + fl.ph) + 0.12 * Math.sin(t * 21 + fl.ph * 3);
           fl.f.scale.set(fl.w * (0.92 + 0.14 * Math.sin(t * 6.3 + fl.ph * 2)), fl.h * a, 1);
           fl.f.position.x = fl.x + Math.sin(t * 4.7 + fl.ph) * 0.02;
         }
         const g = fire.glow;
         g.k = k;
-        g.s.material.opacity = Math.min(1, Math.max(g.day, night)) * k * 0.8;
-        g.s.visible = true;
-        fire.pool.material.opacity = night * (0.34 + 0.2 * k);
-        fire.pool.visible = night > 0.03;
+        g.s.material.opacity = Math.min(1, Math.max(g.day, night)) * k * 0.8 * on;
+        g.s.visible = g.s.material.opacity > 0.01;
+        if (fire.pool) {
+          fire.pool.material.opacity = night * (0.34 + 0.2 * k);
+          fire.pool.visible = night > 0.03;
+        }
       }
     }
   };
