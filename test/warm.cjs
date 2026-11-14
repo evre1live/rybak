@@ -1,18 +1,19 @@
 // Проверка «прогрева»: после заставки игра не должна собирать шейдеры на ходу — каждая сборка посреди игры это рывок.
 // Идём по игре (заставка, лобби днём и ночью, бухта, заброс, подсечка, вываживание, рыба в руках, ночь, дождь, туман)
 // и считаем, сколько шейдеров собрано и сколько текстур отправлено видеокарте на каждом шаге.
-// Запуск: PORT=3111 node test/warm.cjs [low|medium|high]   (по умолчанию medium)
+// Запуск: PORT=3111 node test/warm.cjs [low|medium|high] [локация]   (по умолчанию medium, бухта; локация — например lake)
 const { chromium } = require(process.env.PLAYWRIGHT || '/opt/npm-tools/node_modules/playwright');
 const assert = require('node:assert/strict');
 const BASE = `http://127.0.0.1:${process.env.PORT || 3111}`;
 const tier = process.argv[2] || 'medium';
+const loc = process.argv[3] || ''; // другая локация — свой мир и свои шейдеры (туман, дым, водяная пыль): их тоже собирают за заставкой
 
 (async () => {
   const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   const p = await browser.newPage({ viewport: { width: 480, height: 270 } });
   let errors = 0;
   p.on('pageerror', (e) => { errors++; console.log('PAGEERROR', e.message.slice(0, 600)); });
-  await p.goto(`${BASE}/?norender&boot=full&ts=3&q=${tier}&h=13`);
+  await p.goto(`${BASE}/?norender&boot=full&ts=3&q=${tier}&h=13${loc ? '&loc=' + loc : ''}`);
   await p.waitForFunction(() => window.RYBAK && window.__frames > 3 && !RYBAK.booting, null, { timeout: 600000 });
   const frame = async (n = 1) => {
     for (let i = 0; i < n; i++) {
@@ -51,7 +52,7 @@ const tier = process.argv[2] || 'medium';
     return r;
   };
   const row = (label) => rows.find((x) => x.label === label);
-  console.log(`ПРОГРЕВ, качество «${tier}»`);
+  console.log(`ПРОГРЕВ, качество «${tier}»${loc ? ', локация ' + loc : ''}`);
   await mark('после заставки');
   await frame(2);
   await mark('заставка, два кадра');
@@ -67,6 +68,7 @@ const tier = process.argv[2] || 'medium';
 
   // лобби: днём и ночью
   await p.fill('#nm', 'Прогрев');
+  if (loc) await p.evaluate(() => { RYBAK.profile.xp = 5000; }); // локации открываются по уровню
   await p.click('[data-a="solo"]');
   await p.waitForFunction(() => RYBAK.state === 'lobby');
   await p.waitForTimeout(900);
@@ -211,8 +213,8 @@ const tier = process.argv[2] || 'medium';
   }
   // лучи низкого солнца: на «среднем» и «высоком» видны на рассвете, на «низком» их нет; водорослей — по ступени качества
   assert.equal(dawn.rays, tier !== 'low', `лучи на рассвете: ${JSON.stringify(dawn)}`);
-  assert.equal(dawn.flags, 4, 'флаги на месте');
+  assert.ok(loc ? dawn.flags >= 2 : dawn.flags === 4, `флаги на месте: ${dawn.flags}`);
   assert.equal(dawn.kelp.kelp, Math.round(dawn.kelp.of * { high: 1, medium: 0.6, low: 0.3 }[tier]), `водорослей по качеству: ${JSON.stringify(dawn.kelp)}`);
   assert.equal(errors, 0, 'ошибок на странице нет');
-  console.log(`ПРОГРЕВ «${tier}»: всё в порядке — после заставки не собрано ни одного шейдера`);
+  console.log(`ПРОГРЕВ «${tier}»${loc ? ' (' + loc + ')' : ''}: всё в порядке — после заставки не собрано ни одного шейдера`);
 })().catch((e) => { console.error('ПРОВАЛ:', e.message.split('\n').slice(0, 8).join('\n')); process.exit(1); });

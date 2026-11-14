@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { Batch, M, G, BATCH_MAT_2S } from './batch.js';
 import { loft } from './shapes.js';
 import { rng, rockGeo, blobGeo, canvasTex, shade, TAU } from './util.js';
-import { groundH, palmR, PALM, WRECK, DECK_Y, CIRCLES, MOORINGS, CAMPFIRE } from './terrain.js';
+import { groundH, palmR, PALM, WRECK, DECK_Y, CIRCLES, MOORINGS, CAMPFIRE, HAS } from './terrain.js';
 import { ENV } from './envmodels.js';
 
 /** Лист пальмы: дуга вдоль +X с провисанием, по ширине — три точки (ребро приподнято). Длина 1. */
@@ -323,7 +323,7 @@ function buildRentalSign(scene) {
 
 export function buildPlaces(scene) {
   const r = rng(20261112);
-  buildPalmIsland(scene, r);
-  buildWreck(scene, r);
+  if (HAS.palm) buildPalmIsland(scene, r);
+  if (HAS.wreck) buildWreck(scene, r);
   buildRentalSign(scene);
 }

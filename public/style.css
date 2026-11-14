@@ -333,6 +333,8 @@ input.code{text-transform:uppercase;letter-spacing:.3em;text-align:center;font:i
 .title{inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.2em;background:linear-gradient(180deg,rgba(8,9,12,.16),rgba(8,9,12,0) 30%,rgba(8,9,12,.3))}
 .title .logo{font-size:8.2em;margin:0 .3em .18em 0}
 .tcard{width:27em;padding:1.5em;display:flex;flex-direction:column;gap:.9em}
+/* две половины карточки: «кто и где» и «как войти». Обычно идут подряд, одним столбцом; на низком экране (телефон боком) встают рядом */
+.tca,.tcb{display:contents}
 .tcard label{font:italic 600 1.05em/1 var(--disp);letter-spacing:.2em;text-transform:uppercase;margin:0 0 -.35em .4em;text-shadow:var(--tsh)}
 .tcard .row{display:flex;gap:.7em;align-items:center}
 .tcard .row .btn{flex:1}
@@ -341,8 +343,26 @@ input.code{text-transform:uppercase;letter-spacing:.3em;text-align:center;font:i
 .tcard .or::before,.tcard .or::after{content:"";flex:1;height:1px;background:rgba(255,255,255,.5)}
 .tcard .err{color:#ffd9d6;font-size:.95em;min-height:1.2em;margin:-.3em 0 -.3em .4em;text-shadow:var(--tsh)}
 .tcard .note{font-size:.95em;line-height:1.45;text-align:center;margin-top:.6em;text-shadow:var(--tsh)}
+/* заставка: где рыбачим — карточки локаций; выбранная — в бирюзовой кайме, закрытая — приглушена, с замком */
+.locs{display:flex;gap:.7em}
+.locs .loc{flex:1;min-width:0;position:relative;display:flex;flex-direction:column;gap:.28em;padding:.4em .4em .6em;border-radius:1.05em;background:rgba(255,255,255,.07);border:.09em solid rgba(255,255,255,.24);color:var(--cream);cursor:pointer;text-align:left;font:inherit;font-size:1em;transition:transform .15s,border-color .15s,box-shadow .15s,background .15s}
+.locs .loc:hover{transform:translateY(-.1em);border-color:rgba(255,255,255,.6)}
+.locs .loc img{display:block;width:100%;aspect-ratio:16/8.6;object-fit:cover;border-radius:.72em;background:rgba(0,0,0,.25)}
+.locs .loc b{font:italic 800 1.16em/1.05 var(--disp);letter-spacing:.01em;padding:.12em .3em 0;text-shadow:var(--tsh);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.locs .loc i{font:normal 400 .78em/1.2 var(--body);opacity:.82;padding:0 .35em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.locs .loc.on{border-color:var(--tl);background:rgba(46,242,222,.12);box-shadow:0 0 0 .1em rgba(46,242,222,.55),0 0 1.5em var(--glowt)}
+.locs .loc.on::after{content:"✓";position:absolute;right:.62em;top:.62em;width:1.45em;height:1.45em;border-radius:50%;background:var(--teal);color:var(--tld);font:800 .95em/1.5 var(--body);text-align:center;box-shadow:0 .15em .5em rgba(0,0,0,.35)}
+.locs .loc.lock img{filter:saturate(.3) brightness(.62)}
+.locs .loc .lk{position:absolute;left:.7em;top:.7em;display:flex;align-items:center;gap:.3em;padding:.22em .6em .22em .45em;border-radius:1em;background:rgba(14,15,18,.74);color:var(--am);font:italic 800 .78em/1.2 var(--disp);letter-spacing:.05em}
+.locs .loc .lk .ic{width:1em;height:1em}
 .tnote{max-width:27em;margin:.2em auto 0;padding:.6em 1em;border-radius:1.1em;background:var(--g);border:.09em solid var(--gb);color:var(--cream);font-size:.9em;line-height:1.35;text-align:center}
 .tfoot{font-size:.95em;text-align:center;line-height:1.6;text-shadow:var(--tsh)}
+@media (max-height:540px) and (min-aspect-ratio:8/5){
+  .title{gap:.8em}.title .logo{font-size:6.6em;margin-bottom:.05em}
+  .tcard{width:54em;flex-direction:row;gap:1.6em;align-items:stretch;padding:1.3em 1.5em}
+  .tca,.tcb{display:flex;flex-direction:column;gap:.8em;flex:1;min-width:0}.tcb{justify-content:center}
+  .tcard .note{margin-top:.2em}
+}
 .tfoot a{color:var(--tl2);pointer-events:auto;cursor:pointer;text-decoration:underline}
 .tfoot a.warnlink{color:#ffd0c8}
 
@@ -474,6 +494,8 @@ input.code{text-transform:uppercase;letter-spacing:.3em;text-align:center;font:i
 .loadout .sp{flex:1}
 .loadout .keys{display:flex;gap:1.2em;align-items:center;font:italic 800 1.1em/1 var(--disp);letter-spacing:.06em;text-shadow:var(--tsh)}
 .loadout .keys span{display:inline-flex;gap:.5em;align-items:center}
+.jtop{grid-column:1/-1;display:flex;flex-direction:column;gap:.7em;min-width:0}
+.jtabs .tab{height:2.25em;font-size:1.14em;padding:0 1em 0 .8em}.jtabs .tab .ic{width:1.05em;height:1.05em;opacity:.85}
 .jstats{grid-column:1/-1;display:flex;gap:.6em;flex-wrap:wrap}
 .jstats div{background:var(--g);border:.09em solid var(--gb);border-radius:1.1em;padding:.5em 1.1em .55em;font-size:.92em;box-shadow:0 .3em 1em rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.4);text-shadow:var(--tsh)}
 .jstats b{display:block;font:italic 800 1.9em/1.05 var(--disp);color:var(--cream)}

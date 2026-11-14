@@ -1,5 +1,6 @@
 // РЫБАК — правила: клёв, выбор рыбы, вываживание, цены, рынок, профиль игрока.
-import { FISH, FISH_BY_ID, JUNK, JUNK_BY_ID, RARITY, ZONES, ITEMS, RODS, LINES, REELS, HOOKS, FLOATS, BAGS, MARKET_PERIOD, dayPart, isLure } from './data.js';
+import { FISH, FISH_BY_ID, JUNK, JUNK_BY_ID, RARITY, ZONES, ITEMS, RODS, LINES, REELS, HOOKS, FLOATS, BAGS, MARKET_PERIOD, dayPart, isLure, zonesOf, fishOf } from './data.js';
+import { DEFAULT_LOC, locOf } from './locations.js';
 
 export function mulberry32(a) {
   a >>>= 0;
@@ -53,14 +54,15 @@ export function tackleInfo(id) {
 }
 
 // ───── кто клюнет ─────
-// spot: { zone, depth, pier, hot }
-export function speciesWeights(spot, tackleId, hour) {
+// spot: { zone, depth, pier, hot }; loc — локация: у рыбы на каждой свои места (data.js: zones и at)
+export function speciesWeights(spot, tackleId, hour, loc) {
   const tk = tackleInfo(tackleId);
   const part = dayPart(hour);
   const out = [];
   for (const f of FISH) {
-    let z = f.zones[spot.zone] || 0;
-    if (spot.pier && spot.zone !== 'pier') z += (f.zones.pier || 0) * 0.8;
+    const zones = zonesOf(f, loc);
+    let z = zones[spot.zone] || 0;
+    if (spot.pier && spot.zone !== 'pier') z += (zones.pier || 0) * 0.8;
     if (!z) continue;
     if (f.minDepth && spot.depth < f.minDepth) continue;
     const aff = tk.lure ? f.lure * tk.power : f.baits[tk.id] ?? 0.3;
@@ -72,12 +74,12 @@ export function speciesWeights(spot, tackleId, hour) {
   }
   return out;
 }
-export function rollFish(spot, tackleId, hour, rng) {
+export function rollFish(spot, tackleId, hour, rng, loc) {
   const tk = tackleInfo(tackleId);
   // spot.big (0…1) — рыбу выследили: наживка легла рядом с крупной тенью в воде. Тогда это точно рыба, а не хлам,
   // и не мелочь: чем крупнее тень, тем выше нижняя граница веса.
   const junkChance = spot.big ? 0 : tk.lure ? 0.015 : { shallow: 0.07, pier: 0.07, backwater: 0.06, mid: 0.025 }[spot.zone] || 0.008;
-  const list = speciesWeights(spot, tackleId, hour);
+  const list = speciesWeights(spot, tackleId, hour, loc);
   if (!list.length || rng() < junkChance) {
     let j = JUNK[Math.floor(rng() * 4)];
     if (rng() < 0.05) j = JUNK_BY_ID.chest;
@@ -129,17 +131,26 @@ export function activity(spot, tackleId, hour, kit) {
 }
 
 // ───── цены и рынок ─────
-export function marketState(seed, tSec) {
+/**
+ * Рынок комнаты на локации loc: цены на здешнюю рыбу и три вида «в цене» — из тех, что здесь ловятся. Привозная рыба
+ * (с других локаций) тоже продаётся; её цены считаются отдельным счётом, чтобы здешние от неё не зависели:
+ * в бухте всё осталось таким же, каким было до появления других локаций.
+ */
+export function marketState(seed, tSec, loc = DEFAULT_LOC) {
   const period = Math.floor(tSec / MARKET_PERIOD);
   const rng = mulberry32(hashStr(seed + ':' + period));
+  const price = (r) => Math.round((0.85 + r() * 0.35) * 100) / 100;
+  const here = fishOf(loc);
   const mult = {};
-  for (const f of FISH) mult[f.id] = Math.round((0.85 + rng() * 0.35) * 100) / 100;
+  for (const f of here) mult[f.id] = price(rng);
   const pick = (rars) => {
-    const pool = FISH.filter((f) => rars.includes(f.rar));
+    const pool = here.filter((f) => rars.includes(f.rar));
     return pool[Math.floor(rng() * pool.length)].id;
   };
   const hot = [pick([0]), pick([1]), pick([2, 3])];
   for (const id of hot) mult[id] = 1.6;
+  const far = mulberry32(hashStr(seed + ':' + period + ':far'));
+  for (const f of FISH) if (!(f.id in mult)) mult[f.id] = price(far);
   return { period, mult, hot, nextIn: MARKET_PERIOD - (tSec - period * MARKET_PERIOD) };
 }
 export function fishValue(c, market) {
@@ -610,7 +621,8 @@ const num = (v) => String(Math.round(v * 10) / 10).replace('.', ',');
 const fishWord = (n) => plural(n, 'рыбу', 'рыбы', 'рыб');
 const Q_ZONE = {
   pier: 'у свай причала', shallow: 'на мелководье', backwater: 'в заводи', reef: 'у рифа', falls: 'у водопада',
-  sea: 'в открытом море', lagoon: 'в лагуне Пальмового острова', wreck: 'у затонувшего корабля'
+  sea: 'в открытом море', lagoon: 'в лагуне Пальмового острова', wreck: 'у затонувшего корабля',
+  stones: 'у камней', pit: 'над ямой'
 };
 const Q_SPECIES = [
   ['bychok', 'plotva', 'okun', 'kefal', 'karas', 'stavrida'],
@@ -622,12 +634,21 @@ const Q_POOL = [
   [['fish', 8], ['kinds', 4], ['sp', 1], ['zone', ['backwater', 'reef', 'sea', 'falls']], ['sell', 150], ['free', 4], ['kg', 3], ['big', 1], ['rare', 1], ['trophy', 1], ['boat', 3], ['wx', 3]],
   [['fish', 12], ['kinds', 5], ['zone', ['sea', 'lagoon', 'wreck', 'reef']], ['sell', 350], ['kg', 7], ['big', 2.5], ['rare', 2], ['trophy', 2], ['boat', 6]]
 ];
+// Рыба и места у каждой локации свои: задания «поймать такую-то рыбу» и «поймать там-то» на другой локации
+// берут вид и зону из её списков (вид задания и числа остаются теми же — их определяет день).
+const Q_ELSEWHERE = {
+  lake: {
+    sp: [['plotva', 'okun', 'karas', 'ersh'], ['lesh', 'harius', 'sig']],
+    zone: [['pier', 'shallow', 'backwater'], ['backwater', 'falls', 'stones'], ['pit', 'falls', 'stones']]
+  }
+};
 const Q_REWARD = [{ coins: 25, xp: 20 }, { coins: 60, xp: 45 }, { coins: 130, xp: 90 }];
 export const QUEST_BONUS = 50; // премия за все три задания дня (растёт с уровнем, как и награды)
 const lvlK = (lvl, step, max) => Math.min(max, 1 + step * (Math.max(1, lvl) - 1));
 /** Номер дня по местному времени игрока — задания меняются в полночь. */
 export const questDay = (ms, tzOffsetMin = 0) => Math.floor((ms - tzOffsetMin * 60000) / 86400000);
-export function makeQuests(day, lvl = 1) {
+export function makeQuests(day, lvl = 1, loc = DEFAULT_LOC) {
+  const there = Q_ELSEWHERE[loc];
   const rng = mulberry32(hashStr('quests:' + day));
   const used = new Set();
   const list = [];
@@ -638,12 +659,15 @@ export function makeQuests(day, lvl = 1) {
     const q = { k, tier, n: 1, c: 0, done: false };
     const pick = rng();
     if (k === 'sp') {
-      const ids = Q_SPECIES[spec];
+      const ids = (there ? there.sp : Q_SPECIES)[spec];
       q.a = ids[Math.floor(pick * ids.length)];
       q.n = spec === 0 ? 3 : 2;
+      if (there) q.loc = loc;
     } else if (k === 'zone') {
-      q.a = spec[Math.floor(pick * spec.length)];
+      const zs = there ? there.zone[tier] : spec;
+      q.a = zs[Math.floor(pick * zs.length)];
       q.n = 3 + tier;
+      if (there) q.loc = loc;
     } else if (k === 'rare') {
       q.a = spec; // редкость не ниже этой: 1 — необычная, 2 — редкая
     } else if (k === 'big') q.n = Math.round(spec * lvlK(lvl, 0.25, 6) * 10) / 10;
@@ -655,13 +679,21 @@ export function makeQuests(day, lvl = 1) {
   }
   return list;
 }
-export function questText(q) {
+/** Можно ли выполнить задание на локации loc: «поймать такую-то рыбу» и «поймать там-то» привязаны к месту. */
+export function questHere(q, loc = DEFAULT_LOC) {
+  if (q.k === 'sp') return !!FISH_BY_ID[q.a] && Object.keys(zonesOf(FISH_BY_ID[q.a], loc)).length > 0;
+  if (q.k === 'zone') return fishOf(loc).some((f) => zonesOf(f, loc)[q.a] > 0);
+  return true;
+}
+/** Текст задания. here — локация, где его читают: задание, которое выполняется не здесь, подписано своей локацией. */
+export function questText(q, here) {
   const n = q.n;
+  const away = here && !q.done && !questHere(q, here) ? ` (${locOf(q.loc || DEFAULT_LOC).name})` : '';
   switch (q.k) {
     case 'fish': return `Поймать ${n} ${fishWord(n)}`;
     case 'kinds': return `Поймать рыбу ${n} разных видов`;
-    case 'sp': return `Поймать: ${(FISH_BY_ID[q.a] || { name: '?' }).name.toLowerCase()} — ${n} шт.`;
-    case 'zone': return `Поймать ${n} ${fishWord(n)} ${Q_ZONE[q.a] || ''}`;
+    case 'sp': return `Поймать: ${(FISH_BY_ID[q.a] || { name: '?' }).name.toLowerCase()} — ${n} шт.${away}`;
+    case 'zone': return `Поймать ${n} ${fishWord(n)} ${Q_ZONE[q.a] || ''}${away}`;
     case 'sell': return `Продать улов на ${n} монет`;
     case 'free': return `Отпустить ${n} ${fishWord(n)}`;
     case 'kg': return `Наловить ${num(n)} кг рыбы`;
@@ -690,10 +722,22 @@ function validQuests(qs) {
   return !!qs && typeof qs === 'object' && Number.isFinite(qs.day) && Array.isArray(qs.list) && qs.list.length === 3 &&
     qs.list.every((q) => q && typeof q.k === 'string' && Number.isFinite(q.n) && Number.isFinite(q.c) && (q.k !== 'kinds' || Array.isArray(q.s)));
 }
-/** Задания на сегодня: если день сменился (или заданий ещё нет) — выдаём новые. Возвращает true, если выдали. */
-export function syncQuests(p, day) {
-  if (validQuests(p.quests) && p.quests.day === day) return false;
-  p.quests = { day, list: makeQuests(day, levelInfo(p.xp).lvl), bonus: false };
+/**
+ * Задания на сегодня: если день сменился (или заданий ещё нет) — выдаём новые, под локацию loc. Возвращает true,
+ * если выдали. В тот же день на другой локации задания остаются, но те, что здесь не выполнить («поймать кефаль»
+ * на озере) и к которым ещё не приступали, подменяются здешними того же вида и трудности.
+ */
+export function syncQuests(p, day, loc = DEFAULT_LOC) {
+  if (validQuests(p.quests) && p.quests.day === day) {
+    let here = null;
+    p.quests.list.forEach((q, i) => {
+      if (q.done || q.c || questHere(q, loc)) return;
+      here = here || makeQuests(day, levelInfo(p.xp).lvl, loc);
+      if (here[i] && here[i].k === q.k) Object.assign(q, { a: here[i].a, n: here[i].n, loc });
+    });
+    return false;
+  }
+  p.quests = { day, list: makeQuests(day, levelInfo(p.xp).lvl, loc), bonus: false };
   return true;
 }
 /**
@@ -757,10 +801,11 @@ export const TOUR_LENS = [180, 300, 600]; // сколько длится, сек
 export const TOUR_COUNTDOWN = 5; // от объявления до старта, сек
 export const tourBlank = () => ({ n: 0, sum: 0, best: 0, sp: '', at: 0 });
 /** Улов в зачёт: хлам не считается, вес — не больше, чем бывает у вида. at — когда поймано (при равенстве выше тот, кто раньше). */
-export function tourAdd(s, c, at = 0) {
+export function tourAdd(s, c, at = 0, loc = null) {
   const f = c && !c.junk ? FISH_BY_ID[c.sp] : null;
   const w = f ? Math.round(clamp(Number(c.w) || 0, 0, f.w[1] * 1.02) * 1000) / 1000 : 0;
   if (!f || w <= 0) return false;
+  if (loc && !Object.keys(zonesOf(f, loc)).length) return false; // такой рыбы на локации комнаты нет
   s.n++;
   s.sum = Math.round((s.sum + w) * 1000) / 1000;
   if (w > s.best) {

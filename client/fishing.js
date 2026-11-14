@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { ITEMS, FISH_BY_ID, JUNK_BY_ID, RARITY, isLure } from '../shared/data.js';
 import { kitStats, biteDelay, rollFish, fightInit, fightStep, fightAssist, dangerAt, spendTackle, addCatch, recordCatch, activity, T_DANGER, T_LOW } from '../shared/logic.js';
 import { spotAt } from './terrain.js';
+import { LOC_ID } from './loc/id.js';
 import { waveH } from './water.js';
 import { buildFloat, buildLure } from './gear3d.js';
 import { buildFish, wiggleFish } from './fish3d.js';
@@ -516,7 +517,7 @@ export class Fishing {
 
   hook(dist) {
     const p = this.profile;
-    const c = this.rollOnce || rollFish(this.spot, p.equip.tackle, this.hour(), Math.random);
+    const c = this.rollOnce || rollFish(this.spot, p.equip.tackle, this.hour(), Math.random, LOC_ID);
     const forced = !!this.rollOnce; // проверки и снимки: рыба задана заранее, наживка не тратится
     this.rollOnce = null;
     if (!this.lure && !forced) {
@@ -605,6 +606,11 @@ export class Fishing {
       this.pendingGear = false;
       this.refreshGear();
     }
+  }
+  /** Для проверок: что за место в точке (x, z) и кто там клюнет — по тем же правилам, что и при настоящем забросе. */
+  probe(x, z, hour = this.hour()) {
+    const spot = spotAt(x, z);
+    return spot ? { spot, c: rollFish(spot, this.profile.equip.tackle, hour, Math.random, LOC_ID) } : null;
   }
   /** Для проверок и снимков: сразу начать вываживание рыбы sp (u — размер от 0 до 1) в dist метрах перед собой. */
   startFight(sp, u = 0.5, dist = 9) {

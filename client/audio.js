@@ -28,6 +28,8 @@ export class Audio2 {
     this.ctx = null;
     this.night = 0;
     this.tension = null;
+    /** Звук места: surf — громкость волны у берега (1 — морской прибой), gulls — кричат ли чайки, birds — поют ли лесные птицы. Ставит игра по локации. */
+    this.site = { surf: 1, gulls: true, birds: false };
   }
   /** Запуск по первому нажатию — раньше браузер не разрешит. */
   start() {
@@ -295,13 +297,15 @@ export class Audio2 {
       lfo.start();
       return { s, g, lfo, lg };
     };
-    let surf = [mk('lowpass', 420, 0.5, 0.2, 0.09, 0.09), mk('bandpass', 1300, 0.7, 0.045, 0.23, 0.035), mk('bandpass', 260, 0.4, 0.05, 0.05, 0.03)];
-    this.bed('waves', 0.4); // запись прибоя начинает грузиться сразу
+    const sk = this.site.surf ?? 1;
+    let surf = [mk('lowpass', 420, 0.5, 0.2 * sk, 0.09, 0.09 * sk), mk('bandpass', 1300, 0.7, 0.045 * sk, 0.23, 0.035 * sk), mk('bandpass', 260, 0.4, 0.05 * sk, 0.05, 0.03 * sk)];
+    const surfVol = () => 0.4 * (this.site.surf ?? 1); // на озере волна тише, чем прибой в бухте
+    this.bed('waves', surfVol()); // запись прибоя начинает грузиться сразу
     const loop = () => {
       if (!this.ctx) return;
       const t = c.currentTime;
       // море: как только запись прибоя загрузилась, она сменяет синтез
-      if (surf && this.bed('waves', 0.4, { tc: 1.5 })) {
+      if (surf && this.bed('waves', surfVol(), { tc: 1.5 })) {
         const old = surf;
         surf = null;
         for (const n of old) {
@@ -310,7 +314,9 @@ export class Audio2 {
         }
         setTimeout(() => old.forEach((n) => (n.s.stop(), n.lfo.stop(), n.g.disconnect())), 6000);
       }
-      if (this.night < 0.5 && Math.random() < 0.5 * (1 - (this.wet || 0))) this.gull(t);
+      if (this.site.gulls !== false && this.night < 0.5 && Math.random() < 0.5 * (1 - (this.wet || 0))) this.gull(t);
+      // лес у озера: днём поют птицы (в дождь молчат), ночью их сменяют сверчки
+      if (this.site.birds && this.night < 0.35 && Math.random() < 0.8 * (1 - (this.wet || 0))) this.bird(t);
       // сверчки: ночью — запись, а пока её нет — синтез
       const crickets = this.bed('crickets', this.night > 0.4 ? 0.075 * this.night * (1 - 0.7 * (this.wet || 0)) : 0, { tc: 2.5 });
       if (this.night > 0.4 && !crickets) this.cricket(t);
@@ -358,6 +364,63 @@ export class Audio2 {
       o.start(t0);
       o.stop(t0 + 0.3);
     }
+  }
+  /**
+   * Лесная птица — синтез: короткая песенка из чистых тонов где-то в стороне. Три манеры: трель из частых посвистов,
+   * «фью-фью-фить» и кукушка вдалеке. Записей для озера нет — и не нужно: чистый тон и есть птичий свист.
+   */
+  bird(t) {
+    const c = this.ctx;
+    const out = c.createGain();
+    const pan = c.createStereoPanner ? c.createStereoPanner() : null;
+    if (pan) {
+      pan.pan.value = rnd(-0.9, 0.9);
+      out.connect(pan);
+      pan.connect(this.amb);
+    } else out.connect(this.amb);
+    const far = rnd(0.45, 1); // одни птицы ближе, другие дальше
+    const note = (t0, f0, f1, dur, vol) => {
+      const o = c.createOscillator();
+      const g = c.createGain();
+      o.frequency.setValueAtTime(f0, t0);
+      o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(vol * far, t0 + Math.min(0.03, dur * 0.3));
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      o.connect(g);
+      g.connect(out);
+      o.start(t0);
+      o.stop(t0 + dur + 0.02);
+    };
+    const kind = Math.random();
+    let len;
+    if (kind < 0.14) {
+      // кукушка: «ку» повыше, «ку» пониже — раз, другой, третий
+      const n = 2 + Math.floor(Math.random() * 4);
+      for (let i = 0; i < n; i++) {
+        note(t + i * 1.05, 690, 672, 0.2, 0.034);
+        note(t + i * 1.05 + 0.32, 548, 532, 0.27, 0.034);
+      }
+      len = n * 1.05;
+    } else if (kind < 0.56) {
+      // трель: частые короткие посвисты одной высоты, каждый чуть взлетает
+      const f = rnd(3100, 4700);
+      const n = 4 + Math.floor(Math.random() * 6);
+      const step = rnd(0.07, 0.11);
+      for (let i = 0; i < n; i++) note(t + i * step, f * rnd(0.98, 1.02), f * rnd(1.12, 1.24), step * 0.7, 0.013);
+      len = n * step;
+    } else {
+      // «фью-фью-фить»: два-три нисходящих свиста и короткий росчерк вверх
+      const f = rnd(2500, 3700);
+      const n = 2 + Math.floor(Math.random() * 2);
+      for (let i = 0; i < n; i++) note(t + i * 0.26, f * 1.25, f, 0.2, 0.015);
+      note(t + n * 0.26, f, f * 1.5, 0.09, 0.013);
+      len = n * 0.26 + 0.1;
+    }
+    setTimeout(() => {
+      out.disconnect();
+      if (pan) pan.disconnect();
+    }, (len + 0.6) * 1000);
   }
   cricket(t) {
     const c = this.ctx;

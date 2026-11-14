@@ -1,7 +1,10 @@
 // Мир «Солнечной бухты»: рельеф, небо, облака, свет по времени суток — и сборка всего остального.
 import * as THREE from 'three';
 import { clamp, lerp, sstep, damp, fbm2, canvasTex, rng, TAU, isTouch } from './util.js';
-import { groundH, shoreZ, BOUNDS, WORLD, PALM, WRECK, palmR, capeDist, CAPE, ISLAND, islandR, MAP_VIEW, DECKS, DECK_Y, LIGHTHOUSE, ARCH, MOORINGS, SKERRIES } from './terrain.js';
+import { groundH, shoreZ, BOUNDS, WORLD, PALM, WRECK, palmR, capeDist, CAPE, ISLAND, islandR, MAP_VIEW, DECKS, DECK_Y, LIGHTHOUSE, ARCH, MOORINGS, SKERRIES, HAS, deckAt } from './terrain.js';
+import { LOC_ID, LOC } from './loc/id.js';
+import { lakeTint, buildLakeTerrain } from './loc/lake-world.js';
+import { buildMist } from './loc/lake-nature.js';
 import { createWater, createFoamRings, sea } from './water.js';
 import { FAR_ISLES, farH, farWood } from './farisles.js';
 import { buildScenery, FOAM_SPOTS } from './scenery.js';
@@ -42,7 +45,8 @@ export function moonDirection(h, out) {
   const hh = ((h % 24) + 24) % 24;
   const u = hh >= 21 ? (hh - 21) / 8 : hh < 5 ? (hh + 3) / 8 : hh < 13 ? 1 : 0;
   const phi = u * Math.PI;
-  return out.set(Math.cos(phi) * 0.82, 0.11 + 0.13 * Math.sin(phi), -(0.38 + 0.42 * Math.sin(phi))).normalize();
+  const [low, arc] = LOC.moon || [0.11, 0.13]; // над морем луна идёт низко; в горах — выше хребта
+  return out.set(Math.cos(phi) * 0.82, low + arc * Math.sin(phi), -(0.38 + 0.42 * Math.sin(phi))).normalize();
 }
 
 const TERRAIN_MAT = patchSurface(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96 }), { terrain: true });
@@ -64,7 +68,7 @@ const path = C('#dccb93');
  * Цвет земли в точке: песок, трава, камень, дно. ny — насколько склон пологий (1 — ровно).
  * w — что это за поверхность, для рисованных текстур (surface.js): [трава, камень, песок, тропа].
  */
-function groundTint(c, x, y, z, ny, w) {
+function bayTint(c, x, y, z, ny, w) {
   const nz1 = fbm2(x * 0.11, z * 0.11, 3);
   const nz2 = fbm2(x * 0.5 + 9, z * 0.5 + 4, 2);
   const pr = palmR(x, z);
@@ -125,6 +129,8 @@ function groundTint(c, x, y, z, ny, w) {
     }
   }
 }
+/** Краски земли — у каждой локации свои. */
+const groundTint = LOC_ID === 'lake' ? lakeTint : bayTint;
 const _w = [0, 0, 1, 0];
 /** Цвет земли в точке и сколько там травы (0…1) — для пучков травы (grass.js). На склонах, где проступает камень, травы нет. */
 function grassTint(x, z, c) {
@@ -403,7 +409,7 @@ export class World {
   constructor() {
     const scene = (this.scene = new THREE.Scene());
     scene.fog = new THREE.Fog('#a9dcff', 170, 1700);
-    this.terrain = buildTerrain();
+    this.terrain = LOC_ID === 'lake' ? buildLakeTerrain(buildGround) : buildTerrain();
     scene.add(this.terrain);
     this.water = createWater();
     scene.add(this.water.mesh);
@@ -479,8 +485,10 @@ export class World {
       { x: -12.6, z: 5.0, y: DECK_Y, h: 3.8, len: 1.7, wide: 1.05, cols: STRIPES('#22d3ee', '#ffffff') }, // у лавки на берегу
       { x: -19.4, z: -77.6, y: DECK_Y, h: 3.2, len: 1.3, wide: 0.8, cols: ['#ffd60a', '#0e2140'], pennant: true }, // причал у маяка
       { x: 209.8, z: -193.6, y: DECK_Y, h: 3.2, len: 1.3, wide: 0.8, cols: ['#ff8a3d', '#ffffff', '#ff8a3d'], pennant: true } // Пальмовый остров
-    ]);
+    ].filter((f) => deckAt(f.x, f.z, -0.8))); // флаг стоит только там, где на этой локации есть причал
     this.rays = new SunRays(scene);
+    // утренний туман над водой — там, где он бывает (озеро)
+    this.mist = LOC.wx && LOC.wx.mist ? buildMist(scene, surfaceU.uDet) : null;
     this.rings = FOAM_SPOTS.length ? createFoamRings(FOAM_SPOTS, this.water.uniforms) : null;
     if (this.rings) scene.add(this.rings);
     this.sunDir = new THREE.Vector3(0, 1, 0);
@@ -503,6 +511,12 @@ export class World {
     this.wet = dt > 0 ? damp(this.wet, c.rain, c.rain > this.wet ? 0.07 : 0.014, dt) : c.rain;
   }
 
+  /** Утренняя дымка локации в этот час: 0…k (LOC.wx.mist в shared/locations.js). */
+  mistAt(h) {
+    const m = LOC.wx && LOC.wx.mist;
+    if (!m) return 0;
+    return m.k * sstep(m.from, m.from + 1, h) * (1 - sstep(m.to - 1.4, m.to, h));
+  }
   /** Освещение на заданный час суток. */
   setClock(h) {
     this.hours = h;
@@ -518,7 +532,9 @@ export class World {
     // блики на воде и сетка света на дне гаснут; туман и дождь съедают даль.
     const W = this.wx;
     const cov = W.cover;
-    const fogK = W.fog;
+    // утренняя дымка локации складывается с погодой: над озером до девятого часа стоит туман
+    const mist = this.mistAt(h);
+    const fogK = Math.max(W.fog, mist);
     const lum = k.hor.r * 0.3 + k.hor.g * 0.5 + k.hor.b * 0.2;
     _ov.setRGB(lum * 0.72, lum * 0.77, lum * 0.84);
     if (cov > 0.001 || fogK > 0.001) {
@@ -614,6 +630,7 @@ export class World {
     this.night = clamp(kStars * 1.15, 0, 1);
     this.exposure = k.exp;
     this.scenery.setNight(this.night, 1 - this.night);
+    if (this.mist) this.mist.set(Math.min(1, mist * 3.8 + W.fog * 0.6) * (1 - 0.5 * W.rain), _c1.copy(k.fog).lerp(_ov.setRGB(1, 1, 1), 0.5));
     this.nightfx.setNight(this.night * (1 - 0.7 * fogK)); // в тумане огни тонут
   }
 
@@ -633,6 +650,7 @@ export class World {
     this.water.uniforms.uTime.value = t;
     this.water.follow(camera);
     this.nightfx.update();
+    if (this.mist) this.mist.update(t);
     surfaceU.uTimeS.value = t;
     this.skyU.uTime.value = t;
     this.sky.position.copy(camera.position);
@@ -656,6 +674,7 @@ export class World {
  * Юг большого острова (куда лодке не доплыть) в него не входит — так море на карте крупнее.
  */
 export const SEA_VIEW = (() => {
+  if (!HAS.sea) return MAP_VIEW; // моря нет — карта одна
   const k = (MAP_VIEW.x1 - MAP_VIEW.x0) / (MAP_VIEW.z1 - MAP_VIEW.z0);
   const z0 = WORLD.z0 - 20;
   const z1 = 130;
@@ -721,19 +740,23 @@ export function drawMinimap(w = 512, h = 276, view = MAP_VIEW) {
     g.fillStyle = '#e07a5f';
     g.fillRect(X(-13), Z(10.4), X(-7.2) - X(-13), Z(15.4) - Z(10.4));
   }
-  g.fillStyle = '#fff';
-  g.strokeStyle = '#e05a4a';
-  g.lineWidth = sea ? 1.6 : 2.5;
-  g.beginPath();
-  g.arc(X(LIGHTHOUSE.x), Z(LIGHTHOUSE.z), sea ? 2.6 : 4.5, 0, TAU);
-  g.fill();
-  g.stroke();
-  g.fillStyle = '#9aa3ae';
-  g.beginPath();
-  const ak = sea ? 0.45 : 1;
-  g.ellipse(X(ARCH.x), Z(ARCH.z), 4 * ak, 9 * ak, -0.35, 0, TAU);
-  g.fill();
-  if (sea) {
+  if (HAS.lighthouse) {
+    g.fillStyle = '#fff';
+    g.strokeStyle = '#e05a4a';
+    g.lineWidth = sea ? 1.6 : 2.5;
+    g.beginPath();
+    g.arc(X(LIGHTHOUSE.x), Z(LIGHTHOUSE.z), sea ? 2.6 : 4.5, 0, TAU);
+    g.fill();
+    g.stroke();
+  }
+  if (HAS.arch) {
+    g.fillStyle = '#9aa3ae';
+    g.beginPath();
+    const ak = sea ? 0.45 : 1;
+    g.ellipse(X(ARCH.x), Z(ARCH.z), 4 * ak, 9 * ak, -0.35, 0, TAU);
+    g.fill();
+  }
+  if (sea && HAS.wreck) {
     // затонувший корабль: тёмный корпус с мачтой
     const wx = X(WRECK.x);
     const wz = Z(WRECK.z);

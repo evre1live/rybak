@@ -24,9 +24,11 @@ import { loadProfile, saveProfile, saveProfileNow, lockProfile, hooks as profile
 import { Cloud } from './cloud.js';
 import { S, FLAG, MARKS } from './proto.js';
 import { cardText, cardFile, drawCard } from './postcard.js';
-import { DECK_Y, MARKET, MOORINGS, RENT_DESK, MAP_VIEW, WRECK, SEA, ISLAND, WORLD, SKERRIES, palmR, canStand, FALLS, CAMPFIRE } from './terrain.js';
+import { DECK_Y, MARKET, MOORINGS, RENT_DESK, MAP_VIEW, WORLD, canStand, FALLS, CAMPFIRE, AREAS, areaAt, HAS } from './terrain.js';
+import { LOC_ID, LOC } from './loc/id.js';
+import { DEFAULT_LOC, cleanLoc, canHost, locOf } from '../shared/locations.js';
 import { route, routeReady } from './route.js';
-import { ITEMS, FISH_BY_ID, JUNK, JUNK_BY_ID, RARITY, ZONES, BAITS, LURES, clockHours, dayPart, fmtW, fmtCoins, isLure } from '../shared/data.js';
+import { ITEMS, FISH_BY_ID, JUNK, JUNK_BY_ID, RARITY, zoneInfo, BAITS, LURES, clockHours, dayPart, fmtW, fmtCoins, isLure } from '../shared/data.js';
 import {
   marketState, hashStr, buy, equip, sell, kitStats, levelInfo, tackleCount, fishValue, newProfile, speciesWeights,
   weatherAt, WEATHER, syncQuests, questEvent, questText, questDay,
@@ -40,6 +42,7 @@ import { initCache, wakeServer } from './offline.js';
 
 const SPAWNS = [[-2, 9], [0.6, 9.4], [-4, 8.2], [2.6, 8.6], [-1, 11], [1.6, 11.4], [-3.6, 11], [3.6, 10.4]];
 const LINE_Z = 7;
+const HOME_AREA = Object.keys(AREAS)[0]; // часть мира, где стоит база: там лавка и прокат (первая в списке локации)
 const MENU_HOUR = 19.2; // который час на заставке и в лобби: золотой час (см. palette.js — ключ 19,3)
 const BUMP_FAR = 80; // с какого расстояния слышен удар чужой лодки о преграду, м
 const FLOCK_FAR = 130; // с какого расстояния слышны чайки над морским косяком, м
@@ -57,6 +60,13 @@ const ASSIST_NO = {
 const CALIB_V = 4; // версия правил подбора качества: сменились пороги — запомненный итог не годится, меряем заново
 const lineX = (slot) => -5.0 + slot * 1.32;
 const v3 = new THREE.Vector3();
+/** Адрес страницы локации (и комнаты на ней): бухта — как раньше, без приставки; у остальных — ?loc=… */
+const locUrl = (loc, code = '') => {
+  const q = [];
+  if (code) q.push('room=' + code);
+  if (loc !== DEFAULT_LOC) q.push('loc=' + loc);
+  return q.length ? '?' + q.join('&') : location.pathname;
+};
 /** Адрес комнаты в строке браузера; во встроенной рамке это может быть запрещено — тогда просто молчим. */
 function setUrl(u) {
   try {
@@ -65,19 +75,7 @@ function setUrl(u) {
     /* адрес не меняем */
   }
 }
-// части мира: что написать в углу экрана и чем место интересно рыбаку
-const AREAS = {
-  bay: ['БУХТА', ''],
-  light: ['ОСТРОВ С МАЯКОМ', 'Остров с маяком: у водопадов берут форель и лосось, а с причала — глубина: судак, скумбрия, скат'],
-  palm: ['ПАЛЬМОВЫЙ ОСТРОВ', 'Пальмовый остров: в бирюзовой лагуне ходят дорада, кефаль и сарган'],
-  wreck: ['ЗАТОНУВШИЙ КОРАБЛЬ', 'Затонувший корабль: морской окунь, угорь — а в трюме, говорят, живёт Старик'],
-  sea: ['ОТКРЫТОЕ МОРЕ', 'Открытое море: скумбрия, тунец, а если повезёт — рыба-меч. Косяк ищите по чайкам: где кружит стая — там рыба'],
-  // скалы в открытом море (SKERRIES в terrain.js)
-  teeth: ['СКАЛЫ ЗУБЬЯ', 'Зубья: под скалами отмель — у камней держится рифовая рыба, а вокруг ходит морская'],
-  gullrock: ['ЧАЯЧИЙ КАМЕНЬ', 'Чаячий камень: отмель на востоке — у камней рифовая рыба, вокруг морская'],
-  westrocks: ['ЗАПАДНЫЕ КАМНИ', 'Западные камни: отмель у самого края моря — сюда редко кто доходит']
-};
-const VENDOR = ['Свежая рыба — хорошая цена. Показывай улов!', 'Клюёт сегодня? У меня глаз намётан: вижу — клюёт.', 'Старика под аркой видел кто? Сорок лет ловят — не поймали.', 'Бери плетёнку, не пожалеешь. Карп стартовую леску рвёт как нитку.', 'На рассвете в заводи, говорят, золотой кои ходит.', 'Ночью угорь под сваями берёт на червя. Проверено.'];
+const VENDOR = LOC.vendor; // что говорит торговец — у каждой локации свои байки (shared/locations.js)
 
 class Game {
   constructor() {
@@ -162,6 +160,7 @@ class Game {
     this.fill = new THREE.DirectionalLight('#fff1dc', 0);
     this.scene.add(this.fill, this.fill.target);
     this.audio = new Audio2();
+    if (!HAS.sea) this.audio.site = { surf: 0.4, gulls: false, birds: true }; // озеро: волна у берега тише морского прибоя, чаек нет — в лесу поют птицы
     // шаги: доски причала, земля, вода по колено
     this.player.onStep = (land) => {
       const p = this.player;
@@ -305,7 +304,7 @@ class Game {
   market() {
     const t = Math.max(0, this.nowSec());
     if (!this._m || this._m.period !== Math.floor(t / 600) || this._mseed !== this.seed) {
-      this._m = marketState(this.seed, t);
+      this._m = marketState(this.seed, t, LOC_ID);
       this._mseed = this.seed;
       this.world.scenery.setBoard(this._m.hot.map((id) => FISH_BY_ID[id].name));
       if (this._mAnnounced && this.state === 'world') this.ui.feed(`Рынок обновил цены. В цене: <b>${this._m.hot.map((id) => FISH_BY_ID[id].name).join(', ')}</b>`);
@@ -343,7 +342,48 @@ class Game {
       /* не дали — играем в окне */
     }
   }
-  startSolo() {
+  /**
+   * Мир другой локации собирается заново: страница открывается с ?loc=…, а что делать после загрузки (go:
+   * { a: 'solo' | 'create' | 'join', code? }) — запоминается до неё. Остальные параметры адреса сохраняются.
+   */
+  switchLoc(loc, go) {
+    try {
+      sessionStorage.setItem('rybak.go', JSON.stringify({ ...go, at: Date.now() }));
+    } catch {
+      /* без хранилища просто откроется заставка новой локации */
+    }
+    saveProfileNow(this.profile);
+    this.net.closed = true; // связь оборвётся вместе со страницей — не пытаться её вернуть
+    const q = new URLSearchParams(location.search);
+    q.delete('loc');
+    q.delete('room');
+    if (go && go.code) q.set('room', go.code);
+    if (loc !== DEFAULT_LOC) q.set('loc', loc);
+    const str = q.toString().replace(/=(&|$)/g, '$1');
+    this.ui.toast(`${locOf(loc).name}: собираем мир…`, 'gold', 8000);
+    location.assign(str ? '?' + str : location.pathname);
+  }
+  /** Что просили сделать перед сменой локации (см. switchLoc): выполняется один раз, сразу после загрузки. */
+  resumeGo() {
+    let go = null;
+    try {
+      go = JSON.parse(sessionStorage.getItem('rybak.go'));
+      sessionStorage.removeItem('rybak.go');
+    } catch {
+      go = null;
+    }
+    if (!go || !(Date.now() - go.at < 120000) || !this.profile.name) return;
+    if (go.a === 'solo') this.startSolo();
+    else if (go.a === 'create' && !this.offline) this.createRoom();
+    else if (go.a === 'join' && go.code && !this.offline) this.joinRoom(String(go.code));
+  }
+  /** Может ли игрок сам открыть рыбалку на локации (по уровню); в гости к другу — всегда. */
+  canOpen(loc) {
+    return canHost(loc, levelInfo(this.profile.xp).lvl);
+  }
+  startSolo(loc = LOC_ID) {
+    if (!this.canOpen(loc)) return this.ui.toast(`${locOf(loc).name} открывается с ${locOf(loc).level}-го уровня`, 'bad', 3200);
+    if (loc !== LOC_ID) return this.switchLoc(loc, { a: 'solo' });
     this.goFullscreen();
     this.audio.start();
     this.solo = true;
@@ -354,11 +394,13 @@ class Game {
     this.hostId = 1;
     this.toLobbyState();
   }
-  createRoom() {
+  createRoom(loc = LOC_ID) {
+    if (!this.canOpen(loc)) return this.ui.toast(`${locOf(loc).name} открывается с ${locOf(loc).level}-го уровня`, 'bad', 3200);
+    if (loc !== LOC_ID) return this.switchLoc(loc, { a: 'create' });
     this.goFullscreen();
     this.audio.start();
     this.solo = false;
-    this.net.create();
+    this.net.create(LOC_ID);
     this.ui.toast('Создаю комнату…');
   }
   joinRoom(code) {
@@ -372,6 +414,10 @@ class Game {
   netHandlers() {
     return {
       joined: (m, back) => {
+        // комната — на другой локации (вошли по коду или по старой ссылке): открываем её мир и входим заново —
+        // место в комнате за нами уже записано, вернёмся на него по жетону
+        const loc = cleanLoc(m.loc);
+        if (loc !== LOC_ID) return this.switchLoc(loc, { a: 'join', code: m.code });
         this.code = m.code;
         this.seed = m.seed;
         this.t0 = m.t0;
@@ -382,7 +428,7 @@ class Game {
         for (const p of m.players) this.addPlayer(p);
         this.tour = null;
         if (m.tour) this.setTour(m.tour, true);
-        setUrl('?room=' + m.code);
+        setUrl(locUrl(LOC_ID, m.code));
         this.urlCode = m.code;
         if (back) {
           this.ui.toast('Связь вернулась', 'good');
@@ -395,7 +441,7 @@ class Game {
         const had = this.players.has(m.p.id);
         this.addPlayer(m.p);
         if (!m.back && !had) {
-          this.ui.feed(`<b>${esc(m.p.card.name)}</b> заходит в бухту`);
+          this.ui.feed(`<b>${esc(m.p.card.name)}</b> ${LOC.say.enter}`);
           this.audio.tone(660, 0.12, 'triangle', 0.1);
           this.audio.tone(880, 0.16, 'triangle', 0.1, null, 0.1);
         }
@@ -537,7 +583,7 @@ class Game {
     }
   }
   copyLink() {
-    const url = `${location.origin}/?room=${this.code}`;
+    const url = `${location.origin}/${locUrl(LOC_ID, this.code).replace(/^\//, '')}`; // у комнат не в бухте в ссылке есть локация: друг сразу откроет нужный мир
     const done = () => this.ui.toast(`Ссылка скопирована: ${url}`, 'good', 3500);
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, () => this.ui.toast(url, '', 8000));
     else this.ui.toast(url, '', 8000);
@@ -618,7 +664,7 @@ class Game {
     this.solo = false;
     this.tour = null;
     this.ui.tourHud(null);
-    setUrl(location.pathname);
+    setUrl(locUrl(LOC_ID));
     this.urlCode = '';
     this.backToTitle('');
   }
@@ -934,16 +980,11 @@ class Game {
     const m = MOORINGS[0];
     this.player.place(m.sx, m.sz, m.syaw);
     this.ui.closePanel();
-    this.ui.toast(rode ? 'Вы снова в Солнечной бухте' : this.ownBoat() ? 'Вы снова в Солнечной бухте. Лодка — у пирса' : 'Вы снова в Солнечной бухте. Лодка сдана', 'good', 3000);
+    this.ui.toast(rode ? LOC.say.back : this.ownBoat() ? `${LOC.say.back}. Лодка — у пирса` : `${LOC.say.back}. Лодка сдана`, 'good', 3000);
   }
   /** В какой части мира точка. */
   areaAt(x, z) {
-    if (palmR(x, z) < 2.6) return 'palm';
-    if (Math.hypot(x - WRECK.x, z - WRECK.z) < WRECK.r + 14) return 'wreck';
-    // остров с маяком и его причал, вынесенный на запад
-    if (Math.hypot(x - ISLAND.x, z - ISLAND.z) < 44 || (x > -24 && x < -2 && z > -82 && z < -62)) return 'light';
-    for (const s of SKERRIES) if (Math.hypot(x - s.x, z - s.z) < s.r + 24) return s.id;
-    return Math.hypot(x - SEA.x, z - SEA.z) > SEA.r ? 'sea' : 'bay';
+    return areaAt(x, z);
   }
 
   // ───── покупки ─────
@@ -1015,7 +1056,8 @@ class Game {
     const t = cardText({
       c, name: this.profile.name, lvl: lv.lvl, title: lv.title, zone: c && f.spot ? f.spot.zone : '', date,
       isNew: !!c && !c.junk && (!jn || jn.n === 0), record: !!c && !c.junk && !!jn && jn.n > 0 && c.w > jn.best,
-      site: /^https?:$/.test(location.protocol) && !/^(localhost|127\.)/.test(location.hostname) ? location.host : ''
+      site: /^https?:$/.test(location.protocol) && !/^(localhost|127\.)/.test(location.hostname) ? location.host : '',
+      loc: LOC_ID
     });
     let cv;
     try {
@@ -1269,7 +1311,7 @@ class Game {
   preloadCatch() {
     const f = this.fishing;
     if (!f.spot) return;
-    const all = speciesWeights(f.spot, this.profile.equip.tackle, this.hours).sort((a, b) => b.w - a.w);
+    const all = speciesWeights(f.spot, this.profile.equip.tackle, this.hours, LOC_ID).sort((a, b) => b.w - a.w);
     // берём тех, на кого приходится девять поклёвок из десяти (на телефоне — не больше пяти видов: памяти мало);
     // редкий гость подгрузится при подсечке, как раньше, — шейдеры для него уже собраны
     const total = all.reduce((s, e) => s + e.w, 0);
@@ -1568,17 +1610,21 @@ class Game {
   /** Задания на сегодня (день — по часам игрока). Возвращает true, если выданы новые. */
   syncQuests() {
     const d = new Date();
-    if (!syncQuests(this.profile, questDay(d.getTime(), d.getTimezoneOffset()))) return false;
-    saveProfile(this.profile);
+    const p = this.profile;
+    const was = p.quests ? p.quests.list.map((q) => q.a).join() : '';
+    const fresh = syncQuests(p, questDay(d.getTime(), d.getTimezoneOffset()), LOC_ID);
+    // на другой локации задания могли подмениться здешними (см. shared/logic.js) — это тоже нужно записать и показать
+    if (!fresh && was === p.quests.list.map((q) => q.a).join()) return false;
+    saveProfile(p);
     this.ui.questTracker();
-    return true;
+    return fresh;
   }
   /** Событие игры (улов, продажа, турнир) → задания: счёт, награды, сообщения. */
   questEv(ev) {
     const p = this.profile;
     const r = questEvent(p, ev);
     if (r.done.length) {
-      for (const q of r.done) this.ui.toast(`Задание выполнено: ${questText(q)}`, 'gold', 4200);
+      for (const q of r.done) this.ui.toast(`Задание выполнено: ${questText(q, LOC_ID)}`, 'gold', 4200);
       this.ui.toast(`Награда: +${fmtCoins(r.coins)} монет, опыт +${r.xp}`, 'good', 4200);
       if (r.bonus) this.ui.toast(`Все задания дня выполнены! Премия +${fmtCoins(r.bonus)} монет`, 'gold', 5200);
       this.audio.coin(3);
@@ -1818,7 +1864,7 @@ class Game {
         }
         if (goal && bd < 14) return null; // пришли: косяк под бортом
       }
-      if (!goal && (full || this.area !== 'bay')) goal = { x: MOORINGS[0].x, z: MOORINGS[0].z, kind: 'home' };
+      if (!goal && (full || this.area !== HOME_AREA)) goal = { x: MOORINGS[0].x, z: MOORINGS[0].z, kind: 'home' };
       if (!goal) return null;
       const key = `${goal.kind}|${Math.round(goal.x / 6)}|${Math.round(goal.z / 6)}`;
       this.navT = (this.navT || 0) - dt;
@@ -1838,7 +1884,7 @@ class Game {
       return { pts, len, sail: true, kind: goal.kind };
     }
     this.navKey = '';
-    if (p.cooler.length && this.area === 'bay') {
+    if (p.cooler.length && this.area === HOME_AREA) {
       const d = Math.hypot(MARKET.x - pl.x, MARKET.z - pl.z);
       if (d > 7) return { pts: [[pl.x, pl.z], [MARKET.x, MARKET.z]], len: d, sail: false, kind: 'market' };
     }
@@ -2162,7 +2208,7 @@ class Game {
       const aim = f.aim;
       if (!ui.panel && ((f.state === 'idle' && i.enabled && (i.grab || i.touch.on)) || f.state === 'charge')) {
         v3.set(aim.x, 0.05, aim.z).project(cam);
-        ui.castMark({ x: (v3.x * 0.5 + 0.5) * this.gfx.w, y: (-v3.y * 0.5 + 0.5) * this.gfx.h, ok: aim.ok, hot: aim.spot && aim.spot.hot, clamped: aim.clamped, dist: aim.dist, zone: aim.spot ? ZONES[aim.spot.zone].name : '', depth: aim.spot ? aim.spot.depth : 0, act: aim.act });
+        ui.castMark({ x: (v3.x * 0.5 + 0.5) * this.gfx.w, y: (-v3.y * 0.5 + 0.5) * this.gfx.h, ok: aim.ok, hot: aim.spot && aim.spot.hot, clamped: aim.clamped, dist: aim.dist, zone: aim.spot ? zoneInfo(aim.spot.zone, LOC_ID).name : '', depth: aim.spot ? aim.spot.depth : 0, act: aim.act });
       } else ui.castMark(null);
       ui.power(f.state === 'charge' ? f.power : null, aim.dist / kit.cast);
       $('#cross').className = !i.grab && !i.touch.on ? 'off' : f.state === 'idle' && !aim.ok ? 'bad' : '';
@@ -2302,7 +2348,7 @@ class Game {
       ui.weather(wx);
       if (wx.kind !== this.wxKind) {
         const add = Math.round((WEATHER[wx.kind].bite - 1) * 100);
-        if (this.wxKind) ui.feed({ clear: 'Распогодилось — снова солнце', cloudy: `Небо затянуло. Рыба берёт охотнее: клёв <b class="y">+${add}%</b>`, rain: `Пошёл дождь. В дождь клюёт лучше всего: <b class="y">+${add}%</b>`, fog: `На бухту лёг туман. Клёв <b class="y">+${add}%</b>` }[wx.kind]);
+        if (this.wxKind) ui.feed({ clear: 'Распогодилось — снова солнце', cloudy: `Небо затянуло. Рыба берёт охотнее: клёв <b class="y">+${add}%</b>`, rain: `Пошёл дождь. В дождь клюёт лучше всего: <b class="y">+${add}%</b>`, fog: `${LOC.say.fog}. Клёв <b class="y">+${add}%</b>` }[wx.kind]);
         this.wxKind = wx.kind;
       }
       if ((this.questT = (this.questT || 0) + 1) % 120 === 0 && this.syncQuests()) ui.toast('Новый день — новые задания (клавиша K)', 'gold', 4000);
@@ -2311,7 +2357,7 @@ class Game {
       if (area !== this.area) {
         this.area = area;
         $('#locName').textContent = AREAS[area][0];
-        this.areaSeen = this.areaSeen || new Set(['bay']);
+        this.areaSeen = this.areaSeen || new Set([HOME_AREA]);
         if (!this.areaSeen.has(area)) {
           this.areaSeen.add(area);
           ui.toast(AREAS[area][1], 'gold', 5200);
@@ -2383,6 +2429,7 @@ class Game {
    */
   async boot() {
     const el = $('#boot'), fill = $('#bootFill'), txt = $('#bootTxt');
+    if (txt) txt.textContent = LOC.say.build; // в странице написано про бухту; у другой локации — своё слово
     const say = (k, text) => {
       if (fill) fill.style.transform = `scaleX(${k.toFixed(3)})`;
       if (txt && text) txt.textContent = text;
@@ -2463,6 +2510,7 @@ class Game {
     this.manual = false;
     this.last = performance.now();
     requestAnimationFrame((t) => this.frame(t));
+    this.resumeGo(); // страницу открыли ради другой локации — продолжаем с того, что просил игрок
   }
   /**
    * Первый показ — за заставкой. Собранный шейдер видеокарта доводит до дела только при первой отрисовке с ним

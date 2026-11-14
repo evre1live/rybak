@@ -6,7 +6,7 @@
 // один меш на пучки, один на цветы, в них подкладываются копии из ближних клеток.
 import * as THREE from 'three';
 import { fbm2, TAU } from './util.js';
-import { groundH, shoreZ, deckAt, blocksAt, ISLAND, PALM, palmR } from './terrain.js';
+import { groundH, shoreZ, deckAt, blocksAt, ISLAND, PALM, palmR, HAS } from './terrain.js';
 import { surfaceU } from './surface.js';
 
 const CELL = 12; // размер клетки, по которым разложены места
@@ -204,9 +204,9 @@ export class GrassField {
       return d > 1.5 && d < 62;
     });
     // остров с маяком
-    scan(ISLAND.x - 40, ISLAND.x + 40, ISLAND.z - 40, ISLAND.z + 40, (x, z) => Math.hypot(x - ISLAND.x, z - ISLAND.z) < 40 && groundH(x, z) > 5);
+    if (HAS.island) scan(ISLAND.x - 40, ISLAND.x + 40, ISLAND.z - 40, ISLAND.z + 40, (x, z) => Math.hypot(x - ISLAND.x, z - ISLAND.z) < 40 && groundH(x, z) > 5);
     // дюна Пальмового острова
-    scan(PALM.x - PALM.rx, PALM.x + PALM.rx, PALM.z - PALM.rz, PALM.z + PALM.rz, (x, z) => palmR(x, z) < 1);
+    if (HAS.palm) scan(PALM.x - PALM.rx, PALM.x + PALM.rx, PALM.z - PALM.rz, PALM.z + PALM.rz, (x, z) => palmR(x, z) < 1);
     for (const [k, a] of tufts) this.cells.set(k, { tufts: new Float32Array(a), flowers: new Float32Array(flowers.get(k) || []) });
     for (const [k, a] of flowers) if (!this.cells.has(k)) this.cells.set(k, { tufts: new Float32Array(0), flowers: new Float32Array(a) });
     this.total = { tufts: [...tufts.values()].reduce((s, a) => s + a.length / 8, 0), flowers: [...flowers.values()].reduce((s, a) => s + a.length / 8, 0) };

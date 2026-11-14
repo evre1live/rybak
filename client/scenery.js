@@ -6,8 +6,11 @@ import { modelInfo, loadModels, spawn } from './models.js';
 import { buildPlaces } from './places.js';
 import { ENV, upgradeEnv, envNight, envState } from './envmodels.js';
 import { spot01 } from './scatter.js';
-import { rng, rockGeo, blobGeo, canvasTex, shade, sstep, TAU, fbm2 } from './util.js';
-import { DECKS, CIRCLES, DECK_Y, groundH, shoreZ, islandR, ISLAND, ARCH, ARCH_LEGS, REEF, CAPE, capeDist, FALLS, LIGHTHOUSE, COTTAGE, CAMPFIRE, cottageUV, BACKWATER, deckAt, SCHOOL_HOMES, SEA_HOMES, SKERRIES, BUOYS, MARKS } from './terrain.js';
+import { rng, rockGeo, canvasTex, shade, sstep, TAU, fbm2 } from './util.js';
+import { DECKS, CIRCLES, DECK_Y, groundH, shoreZ, islandR, ISLAND, ARCH, ARCH_LEGS, REEF, CAPE, capeDist, FALLS, LIGHTHOUSE, COTTAGE, CAMPFIRE, cottageUV, BACKWATER, deckAt, SCHOOL_HOMES, SEA_HOMES, SKERRIES, BUOYS, MARKS, HAS } from './terrain.js';
+import { LOC_ID } from './loc/id.js';
+import { buildLakeNature } from './loc/lake-nature.js';
+import { pine, roundTree, bush, farPine, farCrown } from './flora.js';
 import { waveH, swellMax } from './water.js';
 import { FAR_ISLES, farTrees, farCliffs } from './farisles.js';
 import { Fauna } from './fauna.js';
@@ -19,11 +22,15 @@ const DARK_WOOD = '#7a5230';
 const ROPE = '#ead9a7';
 // Столбы стоят на настиле у самого края (раньше — снаружи, у сваи: тонкому столбу это шло, а у готового
 // с тумбой основание висело в воздухе). x, z, в какую сторону вынос с фонарём, без источника света.
+// Первые пять — на базе (она одинакова на всех локациях); дальние причалы есть не везде — столб ставится,
+// только если под ним есть настил.
 export const LAMP_POSTS = [
   [1.32, -9, -1], [-5.72, -22.28, 1], [5.72, 4.28, -1], [-29.28, 12.22, -1], [-6.5, 9.7, 1],
   // на дальних причалах фонари только светятся сами: лишние источники света дорого стоят всей сцене
-  [-19.72, -78.22, 1, true], [209.28, -194.22, 1, true]
-];
+  [-19.72, -78.22, 1, true], [209.28, -194.22, 1, true],
+  // мостки у избушки на Сосновом озере
+  [-26.72, -96.78, 1, true]
+].filter(([x, z]) => deckAt(x, z, -0.7));
 
 /** Сваи, стоящие в воде: вокруг них пена и круги (water.js). */
 export const FOAM_SPOTS = [];
@@ -364,21 +371,31 @@ function buildProps(B, P, r, X) {
   place('prop-anchor', 7.7, groundH(7.7, 12.6) - 0.06, 12.6, 1.45, -0.7, false, { rz: 0.16 });
   place('prop-tacklebox', 1.95, y + 0.5, 15.33, 0.44, -0.35);
   place('prop-lantern', 5.65, y, -25.4, 0.46, 0.6);
-  // причал у маяка
-  place('prop-crate', -19.2, y, -71.2, 0.62, 0.4);
-  place('prop-barrel', -16.2, y, -77.6, 0.95, 1.2);
-  place('prop-ropecoil', -15.9, y, -70.9, 0.7, 0.3);
-  place('prop-trap', -19.3, y, -77.4, 0.9, 1.4);
-  // Пальмовый остров: мостки и пляж
-  place('prop-crate', 213.2, y, -193.6, 0.6, 0.3);
-  place('prop-netpile', 209.9, y, -186.6, 0.95, 2.1);
-  place('prop-lantern', 213.5, y, -186.0, 0.44, 0.9);
-  place('prop-anchor', 262.5, groundH(262.5, -176.5) - 0.05, -176.5, 1.4, 0.9, false, { rz: 0.2 });
-  // у хижины: бочка и ящик со снастями сверху — в стороне от стен и крыльца
-  place('prop-barrel', 257.9, groundH(257.9, -181.2), -181.2, 0.95, 0.5);
-  const pc = place('prop-crate', 252.9, groundH(252.9, -180.4), -180.4, 0.7, 0.9);
-  place('prop-tacklebox', 252.9, groundH(252.9, -180.4) + 0.62, -180.4, 0.44, 0.3, false, { on: pc });
-  place('prop-buoy', 249.5, groundH(249.5, -198) - 0.1, -198, 1.5, 0.4, false, { rz: 0.5 });
+  if (HAS.lighthouse) {
+    // причал у маяка
+    place('prop-crate', -19.2, y, -71.2, 0.62, 0.4);
+    place('prop-barrel', -16.2, y, -77.6, 0.95, 1.2);
+    place('prop-ropecoil', -15.9, y, -70.9, 0.7, 0.3);
+    place('prop-trap', -19.3, y, -77.4, 0.9, 1.4);
+  }
+  if (HAS.cabin) {
+    // мостки у избушки (Сосновое озеро)
+    place('prop-crate', -17.9, y, -100.3, 0.62, 0.4);
+    place('prop-ropecoil', -26.2, y, -100.2, 0.7, 0.3);
+    place('prop-trap', -18.1, y, -97.4, 0.9, 1.4);
+  }
+  if (HAS.palm) {
+    // Пальмовый остров: мостки и пляж
+    place('prop-crate', 213.2, y, -193.6, 0.6, 0.3);
+    place('prop-netpile', 209.9, y, -186.6, 0.95, 2.1);
+    place('prop-lantern', 213.5, y, -186.0, 0.44, 0.9);
+    place('prop-anchor', 262.5, groundH(262.5, -176.5) - 0.05, -176.5, 1.4, 0.9, false, { rz: 0.2 });
+    // у хижины: бочка и ящик со снастями сверху — в стороне от стен и крыльца
+    place('prop-barrel', 257.9, groundH(257.9, -181.2), -181.2, 0.95, 0.5);
+    const pc = place('prop-crate', 252.9, groundH(252.9, -180.4), -180.4, 0.7, 0.9);
+    place('prop-tacklebox', 252.9, groundH(252.9, -180.4) + 0.62, -180.4, 0.44, 0.3, false, { on: pc });
+    place('prop-buoy', 249.5, groundH(249.5, -198) - 0.1, -198, 1.5, 0.4, false, { rz: 0.5 });
+  }
   // скамейка у берега
   const bx = 1.4;
   const bz = 15.35;
@@ -518,41 +535,6 @@ function buildLamps(B, scene, nfx) {
       nfx.wake({ x: p0.x + (p1.x - p0.x) * k, y: p0.y + (p1.y - p0.y) * k - 0.5, z: p0.z + (p1.z - p0.z) * k }, '#ffc680', 0.55, 2.2);
   }
   return { lamps, glassMat };
-}
-
-const BLOBS = [blobGeo(3, 2), blobGeo(8, 2), blobGeo(15, 2), blobGeo(22, 2)];
-const BLOBS_FAR = [blobGeo(3, 1, 0.16), blobGeo(15, 1, 0.16)]; // вдали хватит и грубой кроны
-const blobOf = (B, r) => (B.far ? BLOBS_FAR[Math.floor(r() * BLOBS_FAR.length)] : BLOBS[Math.floor(r() * BLOBS.length)]);
-// Каждое дерево, кроме процедурной сетки, оставляет запись «где и какого роста»: по ним потом встают готовые модели.
-function pine(B, x, y, z, s, r) {
-  B.add(G.cyl(6, 0.6, 1), '#7a5230', M(x, y + 0.7 * s, z, 0.34 * s, 1.5 * s, 0.34 * s), { grad: [0.7, 1], mat: 1 });
-  const tiers = 3 + (r() < 0.5 ? 1 : 0);
-  if (!B.ghost) ENV.flora['env-pine'].push({ x, y, z, s: (1.1 + 1.02 * tiers) * s * 1.06, ry: spot01(x, z, 3) * TAU });
-  const base = ['#2f8f4e', '#2a8246', '#37a058'][Math.floor(r() * 3)];
-  for (let i = 0; i < tiers; i++) {
-    const k = i / tiers;
-    const rad = (1.5 - k * 0.95) * s;
-    B.add(G.cone(8), shade(base, i * 0.07), M(x, y + (1.25 + i * 1.02) * s, z, rad * 2, 1.75 * s, rad * 2, 0, r() * 3, 0), { grad: [0.62, 1.12], mat: 3 });
-  }
-}
-function roundTree(B, x, y, z, s, r) {
-  B.add(G.cyl(6, 0.7, 1), '#8a5f3a', M(x, y + 0.9 * s, z, 0.36 * s, 1.9 * s, 0.36 * s, 0, 0, (r() - 0.5) * 0.12), { grad: [0.7, 1], mat: 1 });
-  // лиственное дерево — дуб, каждое третье — берёза (она выше и уже)
-  const birch = spot01(x, z, 5) < 0.3;
-  if (!B.ghost) ENV.flora[birch ? 'env-birch' : 'env-oak'].push({ x, y, z, s: (birch ? 5.0 : 4.4) * s, ry: spot01(x, z, 3) * TAU });
-  const base = ['#62b84e', '#74c75a', '#57a947', '#86cf63'][Math.floor(r() * 4)];
-  const n = 3 + Math.floor(r() * 2);
-  for (let i = 0; i < n; i++) {
-    const a = r() * TAU;
-    const d = i ? (0.55 + r() * 0.4) * s : 0;
-    const rad = (i ? 1.0 + r() * 0.5 : 1.55) * s;
-    B.add(blobOf(B, r), shade(base, (r() - 0.5) * 0.12), M(x + Math.cos(a) * d, y + (2.25 + (i ? r() * 0.7 : 0.35)) * s, z + Math.sin(a) * d, rad * 1.04, rad * 0.9, rad * 1.04, r() * 0.4, r() * 3, 0), { grad: [0.55, 1.16], mat: 3 });
-  }
-}
-function bush(B, x, y, z, s, r) {
-  if (!B.ghost) ENV.flora['env-bush'].push({ x, y: y - 0.04, z, s: 1.5 * s, ry: spot01(x, z, 3) * TAU });
-  const base = ['#58b848', '#4aa63f', '#6cc956'][Math.floor(r() * 3)];
-  for (let i = 0; i < 2; i++) B.add(blobOf(B, r), shade(base, (r() - 0.5) * 0.1), M(x + (r() - 0.5) * s, y + 0.3 * s, z + (r() - 0.5) * s, (0.52 + r() * 0.26) * s, 0.42 * s, (0.52 + r() * 0.26) * s, 0, r() * 3, 0), { grad: [0.55, 1.14], mat: 3 });
 }
 
 function buildVegetation(scene, r) {
@@ -926,33 +908,6 @@ function buildRocks(scene, r) {
   }
 }
 
-// Деревья дальних островов: до них сотни метров, поэтому крона — два конуса или один комок листвы, без ствола.
-const FAR_CONE = (() => {
-  const pos = [];
-  for (let i = 0; i < 6; i++) {
-    const a0 = (i / 6) * TAU, a1 = ((i + 1) / 6) * TAU;
-    pos.push(0, 0.5, 0, Math.cos(a1) * 0.5, -0.5, Math.sin(a1) * 0.5, Math.cos(a0) * 0.5, -0.5, Math.sin(a0) * 0.5);
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.computeVertexNormals();
-  return g;
-})();
-const FAR_CROWNS = [blobGeo(5, 0, 0.14), blobGeo(19, 0, 0.14)];
-function farPine(B, t, r) {
-  const base = ['#2f8f4e', '#2a8246', '#37a058'][Math.floor(r() * 3)];
-  const h = t.h;
-  B.add(FAR_CONE, shade(base, -0.04), M(t.x, t.y + 0.3 * h, t.z, 0.52 * h, 0.66 * h, 0.52 * h, 0, r() * 3, 0), { grad: [0.55, 1.1], mat: 3 });
-  B.add(FAR_CONE, shade(base, 0.06), M(t.x, t.y + 0.72 * h, t.z, 0.36 * h, 0.56 * h, 0.36 * h, 0, r() * 3, 0), { grad: [0.68, 1.14], mat: 3 });
-}
-function farCrown(B, t, r) {
-  const base = ['#62b84e', '#74c75a', '#57a947', '#86cf63'][Math.floor(r() * 4)];
-  const h = t.h * 0.8;
-  const w = h * (0.5 + r() * 0.16);
-  // комок листвы стоит на земле (низ чуть утоплен): издали это купа деревьев, а не шар, повисший над лугом
-  B.add(FAR_CROWNS[Math.floor(r() * FAR_CROWNS.length)], shade(base, -0.06 + (r() - 0.5) * 0.12), M(t.x, t.y + 0.4 * h, t.z, w, h * 0.56, w, 0, r() * 3, 0), { grad: [0.5, 1.12], mat: 3 });
-}
-
 function buildLighthouse(scene, r) {
   const H = new Batch(); // домик смотрителя и заборчик — остаются
   const B = new Batch(); // башня: запасная, пока не загрузилась готовая модель
@@ -1070,13 +1025,22 @@ function buildLighthouse(scene, r) {
 }
 
 const FALL_VERT = /* glsl */ `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+// облако водяной пыли: прямоугольник всегда повёрнут к смотрящему
+const SPRAY_VERT = /* glsl */ `uniform vec3 uAt; uniform vec2 uSize; varying vec2 vUv;
+void main(){ vUv = uv; vec4 mv = viewMatrix * vec4(uAt, 1.0); mv.xy += (uv - 0.5) * uSize; gl_Position = projectionMatrix * mv; }`;
 const FALL_FRAG = /* glsl */ `
-uniform float uTime, uLight, uDisc; varying vec2 vUv;
+uniform float uTime, uLight, uDisc, uStrand; varying vec2 vUv;
 float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f); return mix(mix(h(i), h(i+vec2(1,0)), f.x), mix(h(i+vec2(0,1)), h(i+vec2(1,1)), f.x), f.y); }
 void main(){
   vec3 c; float a;
-  if (uDisc > 0.5) {
+  if (uDisc > 1.5) {
+    // водяная пыль у подножия: мягкое облако, клубится и поднимается
+    vec2 q = vUv * 2.0 - 1.0; float r = length(q * vec2(1.0, 1.25));
+    float s = n(q * 2.6 + vec2(0.0, -uTime * 0.55)) * 0.6 + n(q * 6.0 + vec2(uTime * 0.25, -uTime * 0.9)) * 0.4;
+    a = (1.0 - smoothstep(0.15, 1.0, r)) * smoothstep(0.18, 0.78, s) * 0.62;
+    c = vec3(0.95, 0.98, 1.0);
+  } else if (uDisc > 0.5) {
     vec2 q = vUv * 2.0 - 1.0; float r = length(q);
     float s = n(vec2(atan(q.y, q.x) * 3.0, r * 6.0 - uTime * 2.0)) * 0.6 + n(q * 9.0 + uTime) * 0.4;
     a = (1.0 - smoothstep(0.35, 1.0, r)) * smoothstep(0.25, 0.75, s + (1.0 - r) * 0.5);
@@ -1086,6 +1050,8 @@ void main(){
     float edge = smoothstep(0.0, 0.2, vUv.x) * smoothstep(1.0, 0.8, vUv.x);
     c = mix(vec3(0.5, 0.82, 0.95), vec3(1.0), smoothstep(0.35, 0.78, s));
     a = edge * (0.78 + 0.22 * s) * smoothstep(1.0, 0.94, vUv.y);
+    // широкая струя (горный водопад) — не сплошная лента: между прядями воды просвечивает скала
+    a *= mix(1.0, 0.5 + 0.5 * smoothstep(0.22, 0.6, n(vec2(vUv.x * 7.0, vUv.y * 2.2 + uTime * 1.5))), uStrand);
   }
   gl_FragColor = vec4(c * uLight, a);
   #include <tonemapping_fragment>
@@ -1097,18 +1063,18 @@ function buildFalls(scene) {
   for (const f of FALLS) {
     const tx = -f.nz;
     const tz = f.nx;
-    const R0 = Math.hypot(f.x - ISLAND.x, f.z - ISLAND.z) + 0.6;
     const pos = [];
     const uv = [];
     const idx = [];
     const N = 14;
     for (let k = 0; k <= N; k++) {
       const t = k / N;
-      const rr = R0 + 2.3 - t * 8.2;
-      const px = ISLAND.x + f.nx * rr;
-      const pz = ISLAND.z + f.nz * rr;
+      // f.x, f.z — кромка обрыва, n — от скалы к воде: полоса идёт от воды (2,9 м от кромки) вглубь уступа (5,3 м)
+      const rr = 2.9 - t * 8.2;
+      const px = f.x + f.nx * rr;
+      const pz = f.z + f.nz * rr;
       const y = Math.max(0.02, groundH(px, pz)) + 0.32;
-      const w = 1.25 + 0.5 * (1 - t);
+      const w = (f.w || 1.25) + 0.5 * (1 - t);
       pos.push(px - tx * w + f.nx * 0.35, y, pz - tz * w + f.nz * 0.35, px + tx * w + f.nx * 0.35, y, pz + tz * w + f.nz * 0.35);
       uv.push(0, t, 1, t);
       if (k < N) idx.push(k * 2, k * 2 + 1, k * 2 + 2, k * 2 + 1, k * 2 + 3, k * 2 + 2);
@@ -1117,14 +1083,23 @@ function buildFalls(scene) {
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     g.setIndex(idx);
-    const m = new THREE.Mesh(g, new THREE.ShaderMaterial({ uniforms: { uTime, uLight, uDisc: { value: 0 } }, vertexShader: FALL_VERT, fragmentShader: FALL_FRAG, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
+    const wide = f.w > 1.6 ? 1 : 0;
+    const m = new THREE.Mesh(g, new THREE.ShaderMaterial({ uniforms: { uTime, uLight, uDisc: { value: 0 }, uStrand: { value: wide } }, vertexShader: FALL_VERT, fragmentShader: FALL_FRAG, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
     m.renderOrder = 3;
     scene.add(m);
-    const d = new THREE.Mesh(new THREE.PlaneGeometry(7, 7), new THREE.ShaderMaterial({ uniforms: { uTime, uLight, uDisc: { value: 1 } }, vertexShader: FALL_VERT, fragmentShader: FALL_FRAG, transparent: true, depthWrite: false }));
+    const ds = 7 * Math.max(1, (f.w || 1.25) / 1.25) ** 0.8;
+    const d = new THREE.Mesh(new THREE.PlaneGeometry(ds, ds), new THREE.ShaderMaterial({ uniforms: { uTime, uLight, uDisc: { value: 1 }, uStrand: { value: 0 } }, vertexShader: FALL_VERT, fragmentShader: FALL_FRAG, transparent: true, depthWrite: false }));
     d.rotation.x = -Math.PI / 2;
     d.position.set(f.bx, 0.12, f.bz);
     d.renderOrder = 3;
     scene.add(d);
+    if (f.spray) {
+      // водяная пыль у подножия большого водопада
+      const sp = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({ uniforms: { uTime, uLight, uDisc: { value: 2 }, uStrand: { value: 0 }, uAt: { value: new THREE.Vector3(f.bx + f.nx * 1.2, f.spray * 0.26, f.bz + f.nz * 1.2) }, uSize: { value: new THREE.Vector2(f.spray * 1.35, f.spray) } }, vertexShader: SPRAY_VERT, fragmentShader: FALL_FRAG, transparent: true, depthWrite: false }));
+      sp.frustumCulled = false;
+      sp.renderOrder = 4;
+      scene.add(sp);
+    }
   }
   return { uTime, uLight };
 }
@@ -1308,7 +1283,7 @@ function buildGulls(scene) {
 function buildSchools(fauna) {
   const PER = 9;
   const N = 6; // обычные косяки: стоят где угодно — в бухте, у островов, в море
-  const SEA_N = FLOCKS; // морские: всегда в открытом море, над ними чайки
+  const SEA_N = SEA_HOMES.length ? FLOCKS : 0; // морские: всегда в открытом море, над ними чайки (на озере моря нет)
   const centers = [];
   for (let i = 0; i < N + SEA_N; i++) centers.push({ x: 0, z: 0, on: 0, sea: i >= N });
   return {
@@ -1360,8 +1335,8 @@ function buildSchools(fauna) {
 /** Дорожки света на воде от лавки, маяка, домика и костра (от фонарей и гирлянд их кладёт buildLamps). */
 function buildNightLife(nfx, shack, lh) {
   nfx.wake(shack.glow.position, '#ffcf98', 0.8, 1.8);
-  nfx.wake(lh.beam.position, '#ffe6a8', 1.15, 3.2); // фонарь маяка: готовая башня поднимет его на свою высоту
-  nfx.wake({ x: COTTAGE.x, y: COTTAGE.y + 2.2, z: COTTAGE.z }, '#ffc56b', 0.5, 2.6);
+  if (lh) nfx.wake(lh.beam.position, '#ffe6a8', 1.15, 3.2); // фонарь маяка: готовая башня поднимет его на свою высоту
+  if (HAS.cottage) nfx.wake({ x: COTTAGE.x, y: COTTAGE.y + 2.2, z: COTTAGE.z }, '#ffc56b', 0.5, 2.6);
   nfx.wake({ x: CAMPFIRE.x, y: Math.max(0.6, groundH(CAMPFIRE.x, CAMPFIRE.z) + 0.5), z: CAMPFIRE.z }, '#ff9a3c', 0.9, 1.6);
 }
 
@@ -1387,13 +1362,18 @@ export function buildScenery(scene, nfx = null) {
   }
   const fallback = P.build();
   scene.add(fallback);
-  buildVegetation(scene, r);
-  buildRocks(scene, r);
-  const lh = buildLighthouse(scene, r);
+  // природа и постройки — у каждой локации свои; база (причалы, лавка, фонари) общая
+  let lh = null;
+  if (LOC_ID === 'lake') buildLakeNature(scene);
+  else {
+    buildVegetation(scene, r);
+    buildRocks(scene, r);
+    lh = buildLighthouse(scene, r);
+  }
   const falls = buildFalls(scene);
   const floaters = buildFloaters(scene);
   let dark = 0; // насколько стемнело: по нему горят огни вех
-  const gulls = buildGulls(scene);
+  const gulls = HAS.gulls ? buildGulls(scene) : null;
   const fauna = new Fauna(scene, FOAM_SPOTS);
   const schools = buildSchools(fauna);
   buildPlaces(scene);
@@ -1424,9 +1404,11 @@ export function buildScenery(scene, nfx = null) {
       for (const l of lamps.lamps) l.intensity = night * 9;
       shack.glow.intensity = 6 + night * 6;
       lamps.glassMat.emissiveIntensity = 0.05 + night * 1.9;
-      lh.lampMat.emissiveIntensity = 0.25 + night * 2.4;
-      lh.beamMat.uniforms.opacity.value = Math.max(0, night - 0.4) * 0.9;
-      lh.winMat.emissiveIntensity = night * 1.6;
+      if (lh) {
+        lh.lampMat.emissiveIntensity = 0.25 + night * 2.4;
+        lh.beamMat.uniforms.opacity.value = Math.max(0, night - 0.4) * 0.9;
+        lh.winMat.emissiveIntensity = night * 1.6;
+      }
       falls.uLight.value = 0.14 + 0.86 * light;
       envNight(night);
     },
@@ -1436,7 +1418,7 @@ export function buildScenery(scene, nfx = null) {
         cullSmall(camera);
       }
       falls.uTime.value = t;
-      lh.beam.rotation.y = t * 0.45;
+      if (lh) lh.beam.rotation.y = t * 0.45;
       for (const f of floaters) {
         const p = f.o.position;
         p.y = f.y + waveH(p.x, p.z, t);
@@ -1451,7 +1433,7 @@ export function buildScenery(scene, nfx = null) {
         l.s.visible = o > 0.02;
         l.s.position.y = l.f.o.position.y + (l.f.y < -0.5 ? 2.95 : 2.3);
       }
-      gulls.update(t, schools.sea, camera);
+      if (gulls) gulls.update(t, schools.sea, camera);
     }
   };
 }

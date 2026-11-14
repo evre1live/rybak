@@ -3,7 +3,8 @@
 // Подписи (cardText) собираются отдельно от рисования — их проверяют тесты без холста. Рисование (drawCard) кладёт
 // кадр игры на холст 1600 × 900, затемняет низ и пишет поверх теми же шрифтами, что и вся игра: название, вес и отметки —
 // наклонным, как заголовки меню; кто и где — прямым.
-import { FISH_BY_ID, JUNK_BY_ID, RARITY, ZONES, fmtW } from '../shared/data.js';
+import { FISH_BY_ID, JUNK_BY_ID, RARITY, ZONES, zoneInfo, fmtW } from '../shared/data.js';
+import { locOf, DEFAULT_LOC } from '../shared/locations.js';
 
 export const CARD_W = 1600;
 export const CARD_H = 900;
@@ -15,12 +16,14 @@ export const cardDate = (d) => `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFu
  * Что написать на открытке.
  * c — улов ({ sp, w, len, trophy, stalked, help }) или null (тогда это просто вид бухты);
  * name, lvl, title — рыбак; zone — зона ловли (ключ ZONES); date — Date; record, isNew — личный рекорд и новый вид;
- * site — адрес игры (пусто — не пишем).
+ * site — адрес игры (пусто — не пишем); loc — локация (по умолчанию бухта).
  */
-export function cardText({ c = null, name = '', lvl = 1, title = '', zone = '', date = new Date(), record = false, isNew = false, site = '' } = {}) {
+export function cardText({ c = null, name = '', lvl = 1, title = '', zone = '', date = new Date(), record = false, isNew = false, site = '', loc = DEFAULT_LOC } = {}) {
   const who = String(name || 'Рыбак').slice(0, 16);
-  const place = ZONES[zone] ? ZONES[zone].name : 'Солнечная бухта';
-  const out = { who: `${who} · уровень ${lvl}${title ? `, ${title}` : ''}`, when: `${cardDate(date)} · ${place}`, site: String(site || ''), tags: [], rar: null, head: 'Солнечная бухта', sub: '' };
+  const L = locOf(loc);
+  // в бухте — как раньше: зона ловли или название бухты; на других локациях к зоне добавляется название места
+  const place = ZONES[zone] ? (loc === DEFAULT_LOC ? ZONES[zone].name : `${L.place}, ${zoneInfo(zone, loc).name.toLowerCase()}`) : L.place;
+  const out = { who: `${who} · уровень ${lvl}${title ? `, ${title}` : ''}`, when: `${cardDate(date)} · ${place}`, site: String(site || ''), tags: [], rar: null, head: L.place, sub: '' };
   if (!c) return out;
   const f = FISH_BY_ID[c.sp];
   const j = JUNK_BY_ID[c.sp];

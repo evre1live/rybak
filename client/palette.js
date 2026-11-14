@@ -5,6 +5,7 @@
 // Палитру «Солнечной бухты» выбрал пользователь 13 ноября 2026 из трёх вариантов: «Тропики» (tropic).
 // Для сравнения: ?pal=имя — взять другой набор (см. PALETTES).
 import * as THREE from 'three';
+import { LOC_ID } from './loc/id.js';
 
 /**
  * Ключевой час суток. zen, hor — небо в зените и у горизонта; sun, sunI — цвет и сила солнца (ночью — луны);
@@ -99,6 +100,20 @@ export const PALETTES = {
     fog: { near: 170, far: 1700 }
   },
 
+  // «Сосновое озеро»: те же сутки, но прохладнее — небо чище и глубже, зелень леса спокойнее, вода сине-зелёная
+  // и темнее (под ней ил и галька, а не белый песок), дымка ближе: горы тают в воздухе
+  pine: {
+    name: 'Сосновое озеро',
+    tone: { sat: 1.24, vib: 0.1, con: 1.1, toe: 0.64, sh: [0.92, 1.0, 1.09], hi: [1.05, 1.0, 0.94] },
+    keys: vary(DAY, {
+      zen: [0.006, 0.96, 0.95], hor: [0.004, 0.9, 1.0], sun: [0, 0.94, 1.0], sunI: 0.97, hemiS: [0.004, 0.96, 0.98], hemiG: [0.06, 0.8, 0.9], hemiI: 0.98,
+      fog: [0.006, 0.8, 1.02], wS: [-0.012, 0.74, 0.72], wD: [-0.02, 0.86, 0.72], cloud: [0, 0.92, 1.0]
+    }),
+    water: { clear: 0.12, pathMin: 0.3, fres: 0.8, net: 0.22, deepAt: 15, netDeep: 0.8, netTint: 0.5, seaDeep: 0.4, bedNet: 0.7, bedTint: 0.62, bedFog: 0.07, bedDeep: 0.62, moonPath: [4, 42] },
+    post: { bloom: 0.13, thr: 1.0, vig: 0.3 },
+    fog: { near: 120, far: 1250 }
+  },
+
   // Б. «Пастель»: мягко и светло — молочная дымка, кремовый свет, мятная вода, низкий контраст
   pastel: {
     name: 'Пастель',
@@ -128,6 +143,8 @@ export const PALETTES = {
 
 /** Палитра игры. Остальные наборы — для сравнения: ?pal=now (как было до этапа 20), ?pal=pastel, ?pal=cinema. */
 export const DEFAULT_PALETTE = 'tropic';
+/** У локации может быть своя палитра (иначе — палитра игры). */
+export const LOC_PALETTE = { lake: 'pine' };
 const asked = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('pal') : null;
 /** Действующая палитра. Поля меняются на месте (usePalette), поэтому читать их нужно в момент использования. */
 export const PAL = { id: '' };
@@ -137,4 +154,4 @@ export function usePalette(id) {
   Object.assign(PAL, PALETTES[id], { id });
   return PAL;
 }
-usePalette(asked || DEFAULT_PALETTE);
+usePalette(asked || LOC_PALETTE[LOC_ID] || DEFAULT_PALETTE);

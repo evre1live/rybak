@@ -1,4 +1,5 @@
-// РЫБАК — игровые данные: рыба, снасти, зоны бухты. Общие для браузера, сервера и тестов.
+// РЫБАК — игровые данные: рыба, снасти, зоны ловли. Общие для браузера, сервера и тестов.
+import { locOf, DEFAULT_LOC } from './locations.js';
 
 export const RARITY = [
   { key: 'common', name: 'Обычная', color: '#dbe4ee', mult: 1 },
@@ -20,8 +21,13 @@ export const ZONES = {
   // куда добираются на лодке
   sea: { name: 'Открытое море', hint: 'Далеко от берега — только на лодке', act: 0.9 },
   lagoon: { name: 'Лагуна', hint: 'Бирюзовая отмель у Пальмового острова', act: 1.15 },
-  wreck: { name: 'Затонувший корабль', hint: 'Отмель с кораблём на северо-западе', act: 0.85 }
+  wreck: { name: 'Затонувший корабль', hint: 'Отмель с кораблём на северо-западе', act: 0.85 },
+  // Сосновое озеро
+  stones: { name: 'Каменная гряда', hint: 'Валуны у островка и на отмели', act: 1.1 },
+  pit: { name: 'Яма', hint: 'Самое глубокое место озера — между пирсом и избушкой', act: 0.84 }
 };
+/** Зона ловли так, как её зовут на локации: у локации могут быть свои подписи (shared/locations.js). */
+export const zoneInfo = (id, loc = DEFAULT_LOC) => ({ ...(ZONES[id] || { name: '', hint: '', act: 1 }), ...(locOf(loc).zones[id] || {}) });
 
 export const DAY_PARTS = { dawn: 'Рассвет', day: 'День', dusk: 'Закат', night: 'Ночь' };
 
@@ -29,7 +35,9 @@ const fish = (id, name, rar, wMin, wMax, price, str, zones, baits, lure, time, l
   id, name, rar, w: [wMin, wMax], price, str, zones, baits, lure, time: time || {}, look, desc, ...extra
 });
 
-// price — монет за рыбу среднего размера; str — характер при вываживании
+// price — монет за рыбу среднего размера; str — характер при вываживании.
+// zones — где и как охотно рыба берёт в Солнечной бухте; at.<локация> — то же на других локациях
+// (нет записи — рыба там не водится). Рыба озера, которой в бухте нет, идёт в конце списка с пустыми zones.
 export const FISH = [
   fish('bychok', 'Бычок', 0, 0.04, 0.28, 9, 0.6, { pier: 6, shallow: 5, reef: 2, mid: 1, lagoon: 2 }, { worm: 1.4, maggot: 1.2, shrimp: 1.3, bread: 0.7 }, 0, null,
     { shape: 'goby', back: '#6b5a3c', side: '#a08a5f', belly: '#e8dcc0', fin: '#7a6a48', pat: 'marble', patC: '#4a3d27', lenK: 31 },
@@ -109,8 +117,53 @@ export const FISH = [
     'Приносит удачу. Показывается в заводи на рассвете — и то не каждому.'),
   fish('starik', 'Мероу «Старик»', 4, 35, 140, 8000, 2.4, { arch: 1.0, wreck: 1.6 }, { live: 1.6, squid: 1.6 }, 1.0, { dusk: 1.5, night: 1.3 },
     { shape: 'grouper', back: '#4a3a2a', side: '#8a6f4f', belly: '#d9c9a8', fin: '#5a4532', pat: 'marble', patC: '#cdb890', lenK: 31 },
-    'Старожил арки. Смотрители маяка рассказывают о нём уже сорок лет — а кто-то видел его в трюме затонувшего корабля.')
+    'Старожил арки. Смотрители маяка рассказывают о нём уже сорок лет — а кто-то видел его в трюме затонувшего корабля.'),
+
+  // ── Сосновое озеро ──
+  fish('ersh', 'Ёрш', 0, 0.02, 0.2, 8, 0.6, {}, { worm: 1.5, maggot: 1.3, bread: 0.6 }, 0, { night: 1.2 },
+    { shape: 'std', back: '#5d5a3a', side: '#a79c62', belly: '#ece6c4', fin: '#7f7a4c', pat: 'dots', patC: '#2d2a18', lenK: 30, bigEye: true },
+    'Колючий сорванец озёрных свай. Червя не пропустит никогда — даже если вы ждали кого-то другого.',
+    { at: { lake: { pier: 6, shallow: 4, stones: 3, mid: 2 } } }),
+  fish('harius', 'Хариус', 1, 0.2, 1.9, 62, 1.3, {}, { maggot: 1.5, worm: 1.2, corn: 0.8 }, 1.4, { dawn: 1.4, dusk: 1.3, night: 0.6 },
+    { shape: 'std', back: '#56646e', side: '#b9c1c6', belly: '#f0f1f0', fin: '#8f5aa6', pat: 'dots', patC: '#2b2f36', lenK: 37 },
+    'Серебряный, с парусом-плавником. Живёт только в самой чистой и холодной воде — под водопадами.',
+    { at: { lake: { falls: 7, stones: 2, mid: 1.5, shallow: 1 } } }),
+  fish('sig', 'Сиг', 1, 0.3, 3.6, 56, 1.1, {}, { maggot: 1.4, worm: 1.0, corn: 0.9 }, 0.8, { dawn: 1.2, day: 1.1 },
+    { shape: 'slim', back: '#5a7078', side: '#d3dadc', belly: '#f6f7f7', fin: '#7b8a90', pat: 'scales', lenK: 36 },
+    'Ходит стаями над глубиной. Клюёт деликатно — подсекайте без промедления.',
+    { at: { lake: { deep: 5, mid: 3.5, pit: 3 } } }),
+  fish('nalim', 'Налим', 2, 0.4, 6.5, 205, 1.4, {}, { worm: 1.5, live: 1.5, maggot: 0.8 }, 0, { night: 2.3, dusk: 1.3, day: 0.25, dawn: 0.7 },
+    { shape: 'cat', back: '#4a4630', side: '#7d7448', belly: '#e2dab4', fin: '#57512f', pat: 'marble', patC: '#2b2817', lenK: 46 },
+    'Пятнистый ночной житель ямы. Днём лежит под камнями, а в темноте выходит на охоту.',
+    { at: { lake: { pit: 5, deep: 4, stones: 3, pier: 1 } } }),
+  fish('taimen', 'Таймень', 3, 3, 42, 1350, 2.1, {}, { live: 1.7, worm: 0.5 }, 1.8, { dawn: 1.6, dusk: 1.5, day: 0.7, night: 0.8 },
+    { shape: 'slim', back: '#5a5f4a', side: '#b5a892', belly: '#f1e9da', fin: '#c0452e', pat: 'dots', patC: '#2a2a22', band: '#c9665a', lenK: 44 },
+    'Красный хвост, пасть как у щуки, сила как у лосося. Выходит к водопадам на заре — и рвёт слабую леску.',
+    { at: { lake: { falls: 3, pit: 3, deep: 2 } }, minDepth: 3 }),
+  fish('zolforel', 'Золотая форель', 4, 0.8, 6.5, 5200, 1.7, {}, { maggot: 1.3, worm: 1.1 }, 1.5, { dawn: 1.9, dusk: 1.1 },
+    { shape: 'std', back: '#c98a1c', side: '#f2c544', belly: '#fff0b8', fin: '#e0661c', pat: 'dots', patC: '#7a3a10', band: '#e8502a', lenK: 38 },
+    'Легенда Соснового озера. Говорят, на рассвете она поднимается к самой струе водопада — и сияет, как монета.',
+    { at: { lake: { falls: 1.3 } } })
 ];
+// рыба бухты, которая живёт и в озере: свои места там
+const AT_LAKE = {
+  plotva: { backwater: 5, shallow: 5, pier: 3, mid: 2 },
+  okun: { pier: 5, stones: 5, shallow: 2, backwater: 2, mid: 1 },
+  karas: { backwater: 6, shallow: 1 },
+  lesh: { backwater: 4, mid: 3, deep: 2 },
+  shuka: { backwater: 5, stones: 2.5, shallow: 2, mid: 1 },
+  forel: { falls: 8, stones: 1, mid: 1 },
+  sudak: { deep: 5, pit: 3.5, mid: 2 },
+  som: { pit: 3, backwater: 2, deep: 2 }
+};
+for (const f of FISH) if (AT_LAKE[f.id]) f.at = { ...(f.at || {}), lake: AT_LAKE[f.id] };
+/** Где и как охотно рыба берёт на локации: { зона: вес }. Пусто — на этой локации её нет. */
+export const zonesOf = (f, loc = DEFAULT_LOC) => (loc === DEFAULT_LOC ? f.zones : (f.at && f.at[loc]) || NO_ZONES);
+const NO_ZONES = Object.freeze({});
+/** Рыба локации — в том же порядке, что в общем списке. */
+export const fishOf = (loc = DEFAULT_LOC) => FISH.filter((f) => Object.keys(zonesOf(f, loc)).length > 0);
+/** На каких локациях водится рыба: ['bay', 'lake']. */
+export const locsOf = (f) => [...(Object.keys(f.zones).length ? [DEFAULT_LOC] : []), ...Object.keys(f.at || {})];
 
 // Манера при вываживании: у каждого вида своя. Подпись и совет видит игрок, правила — в shared/logic.js (STYLE_K).
 export const FIGHT_STYLES = {
@@ -127,7 +180,8 @@ const STYLE_OF = {
   kambala: 'flat', skumbria: 'runner', lesh: 'bulldog', morokun: 'snag', sargan: 'jumper', karp: 'bulldog',
   shuka: 'jumper', sudak: 'plain', forel: 'jumper', dorado: 'runner', sibas: 'runner', ugor: 'snag',
   som: 'bulldog', tunec: 'runner', losos: 'jumper', skat: 'flat',
-  mech: 'jumper', koi: 'snag', starik: 'bulldog'
+  mech: 'jumper', koi: 'snag', starik: 'bulldog',
+  ersh: 'thrash', harius: 'jumper', sig: 'plain', nalim: 'snag', taimen: 'runner', zolforel: 'jumper'
 };
 for (const f of FISH) f.style = STYLE_OF[f.id] || 'plain';
 

@@ -129,6 +129,35 @@ test('перезапуск сервера: игроки возвращаются
   two.srv.close();
 });
 
+test('перезапуск сервера: комната помнит свою локацию; старые записи без неё — бухта', async (t) => {
+  await ready;
+  const one = await start(t, { store, saveMs: 60000 });
+  const a = await one.join({ t: 'create', card: { name: 'Финн', lvl: 5 }, loc: 'lake' });
+  const ja = await a.wait('joined');
+  assert.equal(ja.loc, 'lake');
+  await one.srv.shutdown();
+  await a.gone;
+  one.srv.close();
+  const row = await store.loadRoom(ja.code, 0);
+  assert.equal(row.data.loc, 'lake', 'локация записана в базу');
+  const two = await start(t, { store, saveMs: 60000 });
+  const a2 = await two.join({ t: 'join', code: ja.code, token: ja.token, card: { name: 'Финн' } });
+  const ja2 = await a2.wait('joined');
+  assert.deepEqual([ja2.code, ja2.loc, ja2.id], [ja.code, 'lake', ja.id]);
+  assert.deepEqual(two.notes, [`комната ${ja.code} вернулась из базы: мест 1, локация lake`]);
+  await a2.close();
+  two.srv.close();
+  // запись старого образца: поля loc нет
+  const old = { ...row.data };
+  delete old.loc;
+  await store.saveRoom('QLDX', old, Date.now());
+  const three = await start(t, { store, saveMs: 60000 });
+  const b = await three.join({ t: 'join', code: 'QLDX', token: ja.token, card: { name: 'Финн' } });
+  assert.equal((await b.wait('joined')).loc, 'bay');
+  await b.close();
+  three.srv.close();
+});
+
 test('сервер упал без предупреждения: в базе комната не старше пары секунд', async (t) => {
   await ready;
   const one = await start(t, { store, saveMs: 30 });

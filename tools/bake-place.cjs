@@ -10,8 +10,10 @@ const sharp = require('sharp');
 const ROOT = path.resolve(__dirname, '..');
 const OUT = path.join(ROOT, 'public/img');
 // откуда и куда смотрит камера (метры мира), угол обзора, который час; pin — точка мира, куда встаёт булавка (причал, с которого рыбачат)
+// loc — локация (?loc=): по умолчанию бухта
 const PLACES = {
-  bay: { p: [-70, 62, 46], t: [18, 0, -52], fov: 38, hour: 13, pin: [0.6, 1.2, -20] }
+  bay: { p: [-70, 62, 46], t: [18, 0, -52], fov: 38, hour: 13, pin: [0.6, 1.2, -20] },
+  lake: { loc: 'lake', p: [-88, 74, 72], t: [8, 2, -58], fov: 40, hour: 13, pin: [0.6, 1.2, -20] }
 };
 const W = 1120;
 const H = 600;
@@ -30,11 +32,14 @@ const ids = args.filter((a) => !a.startsWith('--'));
       console.log('нет такого места:', id);
       continue;
     }
-    await page.goto(`http://127.0.0.1:${process.env.PORT || 3111}/?q=high&norender&h=${c.hour}&w=clear`);
+    await page.goto(`http://127.0.0.1:${process.env.PORT || 3111}/?q=high&norender&h=${c.hour}&w=clear${c.loc ? '&loc=' + c.loc : ''}`);
     await page.waitForFunction(() => window.RYBAK && window.__frames > 3, null, { timeout: 120000 });
     await page.fill('#nm', 'Рыбак');
+    await page.evaluate(() => { window.RYBAK.profile.xp = 1e6; }); // локации открываются по уровню — снимку это не помеха
     await page.click('[data-a="solo"]');
     await page.waitForFunction(() => window.RYBAK.state === 'lobby');
+    // лес и скалы — готовые модели: ждём, пока встанут
+    await page.waitForFunction(() => { const e = window.RYBAK.world.scenery.envState(); return e.trees && e.rocks; }, null, { timeout: 60000 }).catch(() => {});
     await page.waitForTimeout(1500);
     const r = await page.evaluate(async (c) => {
       const g = window.RYBAK;

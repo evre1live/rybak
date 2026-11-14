@@ -1,6 +1,6 @@
 // Вода бухты: бирюзовая на мели, синяя на глубине, с бликами, сеткой света и пеной у берега.
 import * as THREE from 'three';
-import { groundH, BOUNDS, WORLD, BACKWATER, SEA } from './terrain.js';
+import { groundH, BOUNDS, WORLD, BACKWATER, SEA, HAS } from './terrain.js';
 import { surfaceU } from './surface.js';
 import { farH, farBounds } from './farisles.js';
 
@@ -155,10 +155,10 @@ function depthTexture(B, w, h, floor = groundH) {
 }
 // всё море и дальние острова за его краем — грубее: шаг около 2,5 м
 const SEA_B = { x0: WORLD.x0 - 60, x1: WORLD.x1 + 60, z0: WORLD.z0 - 60, z1: WORLD.z1 + 60 };
-const FB = farBounds();
+const FB = HAS.farIsles ? farBounds() : SEA_B; // дальние острова есть только в бухте
 const FAR = { x0: Math.min(SEA_B.x0, FB.x0), x1: Math.max(SEA_B.x1, FB.x1), z0: Math.min(SEA_B.z0, FB.z0), z1: Math.max(SEA_B.z1, FB.z1) };
 /** Дно и суша для грубой карты: в море, по которому ходит лодка, — рельеф бухты и островов, за его краем — дальние острова. */
-const farFloor = (x, z) => Math.max(x > SEA_B.x0 && x < SEA_B.x1 && z > SEA_B.z0 && z < SEA_B.z1 ? groundH(x, z) : -14, farH(x, z));
+const farFloor = HAS.farIsles ? (x, z) => Math.max(x > SEA_B.x0 && x < SEA_B.x1 && z > SEA_B.z0 && z < SEA_B.z1 ? groundH(x, z) : -14, farH(x, z)) : groundH;
 const boundsVec = (B) => new THREE.Vector4(B.x0, B.z0, 1 / (B.x1 - B.x0), 1 / (B.z1 - B.z0));
 // глубина в точке: в бухте — по подробной карте, дальше — по грубой, у границы плавный переход
 const DEPTH_GLSL = /* glsl */ `
@@ -368,7 +368,8 @@ export function createWater() {
     uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uSunCol: { value: new THREE.Color('#fff4e0') }, uFogCol: { value: new THREE.Color('#a6dcff') },
     // отражение мира (gfx.js): буфер, матрица «точка мира → место в буфере», сила (0 — отражается только небо)
     uRefl: { value: null }, uReflM: { value: new THREE.Matrix4() }, uReflK: { value: 0 },
-    uCalm: { value: new THREE.Vector3(BACKWATER.x, BACKWATER.z, BACKWATER.r) }, // тихая заводь: прибоя в ней нет
+    // тихая заводь: прибоя в ней нет. На озере (где моря нет) тихо везде: пенных валов у берега не бывает, только кромка
+    uCalm: { value: HAS.sea ? new THREE.Vector3(BACKWATER.x, BACKWATER.z, BACKWATER.r) : new THREE.Vector3(SEA.x, SEA.z, 1e4) },
     uRain: { value: 0 }, // дождь: круги на воде
     uLight: { value: 1 }, // сколько света от солнца: 1 — ясный день
     uSwell: { value: sea.k }, // сила зыби в открытом море — та же, что у waveH (sea.k)

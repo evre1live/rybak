@@ -144,7 +144,9 @@ export class Cloud {
     this.db = !!st.db;
     this.changed();
     if (!this.db) return;
-    if (this.s.rev > 0) return this.check();
+    // s.sent — запись ушла, а ответа мы не дождались (страницу закрыли или она открылась заново — так меняют локацию):
+    // сначала смотрим, что на сервере. Иначе самое первое сохранение ушло бы второй раз и разошлось бы само с собой
+    if (this.s.rev > 0 || this.s.sent) return this.check();
     if (this.s.dirty || hasProgress(saveSummary(this.profile()))) this.push();
   }
   /** Что на сервере: то же, что у нас, новее или уже ничего. */

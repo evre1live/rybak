@@ -259,3 +259,47 @@ test('в комнату помещается не больше восьми', as
   for (const c of cs) await c.close();
   srv.close();
 });
+
+test('локация комнаты: её выбирает создатель, гости получают её при входе и при проверке кода', async () => {
+  const srv = createServer();
+  await new Promise((r) => srv.server.listen(0, r));
+  const port = srv.server.address().port;
+  const a = client(port);
+  const b = client(port);
+  const c = client(port);
+  await Promise.all([a.open(), b.open(), c.open()]);
+  // без локации и с неизвестной — бухта
+  a.send({ t: 'create', card: { name: 'Финн' } });
+  assert.equal((await a.wait('joined')).loc, 'bay');
+  a.send({ t: 'leave' });
+  await a.wait('left');
+  a.send({ t: 'create', card: { name: 'Финн' }, loc: 'mars' });
+  assert.equal((await a.wait('joined', (m) => a.got.filter((x) => x.t === 'joined').length === 2 && m === a.got.filter((x) => x.t === 'joined')[1])).loc, 'bay');
+  // озеро открывается с третьего уровня: новичку комнату там не создать, в гости — можно (ниже)
+  b.send({ t: 'create', card: { name: 'Нори' }, loc: 'lake' });
+  const no = await b.wait('error');
+  assert.deepEqual([no.code, no.req], ['LOCKED', 'create']);
+  assert.match(no.message, /Сосновое озеро открывается с 3-го уровня/);
+  b.send({ t: 'create', card: { name: 'Нори', lvl: 3 }, loc: 'lake' });
+  const jb = await b.wait('joined');
+  assert.equal(jb.loc, 'lake');
+  c.send({ t: 'peek', code: jb.code });
+  const pk = await c.wait('peek');
+  assert.deepEqual([pk.exists, pk.loc, pk.players], [true, 'lake', 1]);
+  c.send({ t: 'peek', code: 'ZZZZ' });
+  const none = await c.wait('peek', (m) => m.code === 'ZZZZ');
+  assert.deepEqual([none.exists, none.loc], [false, null]);
+  c.send({ t: 'join', code: jb.code, card: { name: 'Пип' } });
+  const jc = await c.wait('joined');
+  assert.equal(jc.loc, 'lake');
+  // турнир на озере: морская рыба в зачёт не идёт, озёрная — идёт
+  b.send({ t: 'tour', kind: 'big', len: 180 });
+  const tour = (await c.wait('tour')).tour;
+  await new Promise((r) => setTimeout(r, Math.max(0, tour.start - Date.now()) + 60));
+  c.send({ t: 'ev', k: 'catch', d: { sp: 'tunec', w: 30 } });
+  c.send({ t: 'ev', k: 'catch', d: { sp: 'taimen', w: 12.5 } });
+  const sc = await b.wait('tscore');
+  assert.deepEqual([sc.row.s.n, sc.row.s.sp, sc.row.s.best], [1, 'taimen', 12.5]);
+  await Promise.all([a.close(), b.close(), c.close()]);
+  srv.close();
+});

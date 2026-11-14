@@ -6,7 +6,7 @@
 // Всё лежит там, где дно видно (до четырёх метров глубины), и рисуется до воды: вода сама приглушает его по глубине.
 import * as THREE from 'three';
 import { Batch, M, G, BATCH_MAT } from './batch.js';
-import { groundH, inRocks, REEF, WRECK, BACKWATER, PALM } from './terrain.js';
+import { groundH, inRocks, REEF, WRECK, BACKWATER, PALM, HAS } from './terrain.js';
 import { rng, TAU, shade, fbm2 } from './util.js';
 import { grassMaterial } from './grass.js';
 
@@ -57,8 +57,8 @@ export class Seabed {
     const AREAS = [
       [-48, 48, -64, -2, 3600],
       [BACKWATER.x - 15, BACKWATER.x + 15, BACKWATER.z - 13, BACKWATER.z + 13, 600],
-      [PALM.x - 72, PALM.x - 28, PALM.z - 16, PALM.z + 26, 900],
-      [WRECK.x - 15, WRECK.x + 15, WRECK.z - 15, WRECK.z + 15, 500]
+      ...(HAS.palm ? [[PALM.x - 72, PALM.x - 28, PALM.z - 16, PALM.z + 26, 900]] : []),
+      ...(HAS.wreck ? [[WRECK.x - 15, WRECK.x + 15, WRECK.z - 15, WRECK.z + 15, 500]] : [])
     ];
     const kelp = [];
     const B = new Batch();
@@ -101,8 +101,8 @@ export class Seabed {
           const s = 0.09 + k * 0.1;
           B.add(G.cone(6), SHELL[Math.floor(r() * SHELL.length)], M(x, y + s * 0.2, z, s * 1.5, s * 0.8, s, 1.2 + r() * 0.5, yaw, 0));
         } else {
-          // морская звезда: пять лучей на дне
-          if (d > 3.2) continue;
+          // морская звезда: пять лучей на дне (в пресной воде их не бывает)
+          if (d > 3.2 || !HAS.sea) continue;
           const s = 0.2 + k * 0.2;
           const c = STAR[Math.floor(r() * STAR.length)];
           for (let j = 0; j < 5; j++) {

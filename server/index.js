@@ -14,6 +14,7 @@ import { createApi } from './api.js';
 import { openStore, selfCheck } from './store.js';
 import { MAX_PLAYERS } from '../shared/data.js';
 import { TOURS, TOUR_LENS, TOUR_COUNTDOWN, tourBlank, tourAdd, tourTable } from '../shared/logic.js';
+import { cleanLoc, canHost, locOf } from '../shared/locations.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -172,9 +173,10 @@ export function createServer({ now = () => Date.now(), store = null, storeSoon =
     const raw = JSON.stringify(msg);
     for (const p of room.players.values()) if (p.ws && p.ws !== except && p.ws.readyState === 1) p.ws.send(raw);
   }
-  function makeRoom() {
+  /** Новая комната. loc — локация: её выбирает создатель, комната помнит её до конца (в том числе после перезапуска). */
+  function makeRoom(loc) {
     const code = makeCode(rooms, keep.taken);
-    const room = { code, seed: crypto.randomBytes(6).toString('hex'), t0: now(), players: new Map(), hostId: 0, nextId: 1, lastActive: now(), hold: 0 };
+    const room = { code, loc: cleanLoc(loc), seed: crypto.randomBytes(6).toString('hex'), t0: now(), players: new Map(), hostId: 0, nextId: 1, lastActive: now(), hold: 0 };
     rooms.set(code, room);
     keep.miss.delete(code);
     return room;
@@ -210,7 +212,7 @@ export function createServer({ now = () => Date.now(), store = null, storeSoon =
   }
   /** Что из комнаты нужно, чтобы вернуть её после перезапуска. Положения игроков не нужны: их пришлют заново. */
   const snapshot = (room) => ({
-    v: 1, seed: room.seed, t0: room.t0, hostId: room.hostId, nextId: room.nextId, tourN: room.tourN || 0,
+    v: 1, loc: room.loc, seed: room.seed, t0: room.t0, hostId: room.hostId, nextId: room.nextId, tourN: room.tourN || 0,
     tour: room.tour ? pubTour(room.tour) : null,
     players: [...room.players.values()].map((p) => ({ id: p.id, th: p.th, slot: p.slot, card: p.card, mode: p.mode }))
   });
@@ -257,7 +259,8 @@ export function createServer({ now = () => Date.now(), store = null, storeSoon =
   /** Вернуть комнату из записи в базе: все её игроки — «потеряли связь» и ждут возвращения, турнир и часы — как были. */
   function revive(code, d) {
     const t = now();
-    const room = { code, seed: String(d.seed || ''), t0: Number(d.t0) || t, players: new Map(), hostId: 0, nextId: 1, lastActive: t, hold: t + HOLD_MS, tourN: Number(d.tourN) || 0 };
+    // у комнат, записанных до появления локаций, поля loc нет — это бухта
+    const room = { code, loc: cleanLoc(d.loc), seed: String(d.seed || ''), t0: Number(d.t0) || t, players: new Map(), hostId: 0, nextId: 1, lastActive: t, hold: t + HOLD_MS, tourN: Number(d.tourN) || 0 };
     for (const q of Array.isArray(d.players) ? d.players : []) {
       const id = Number(q && q.id) | 0;
       if (id <= 0 || typeof q.th !== 'string' || room.players.has(id) || room.players.size >= MAX_PLAYERS) continue;
@@ -275,7 +278,7 @@ export function createServer({ now = () => Date.now(), store = null, storeSoon =
     rooms.set(code, room);
     keep.taken.delete(code);
     keep.restored++;
-    log(`комната ${code} вернулась из базы: мест ${room.players.size}${room.tour ? ', идёт турнир' : ''}`);
+    log(`комната ${code} вернулась из базы: мест ${room.players.size}${room.loc !== 'bay' ? `, локация ${room.loc}` : ''}${room.tour ? ', идёт турнир' : ''}`);
     return room;
   }
   /** Стоит ли искать комнату в базе: код похож на настоящий, база есть (или вот-вот будет) и мы не искали его только что. */
@@ -356,7 +359,7 @@ export function createServer({ now = () => Date.now(), store = null, storeSoon =
     }
     touch(room.code);
     send(ws, {
-      t: 'joined', code: room.code, id: p.id, token: p.token, slot: p.slot, seed: room.seed, t0: room.t0, now: now(), host: room.hostId,
+      t: 'joined', code: room.code, loc: room.loc, id: p.id, token: p.token, slot: p.slot, seed: room.seed, t0: room.t0, now: now(), host: room.hostId,
       players: [...room.players.values()].filter((o) => o.ws && o.id !== p.id).map(pub),
       tour: room.tour ? pubTour(room.tour) : null // турнир уже идёт — опоздавший сразу видит таблицу
     });
@@ -432,8 +435,12 @@ export function createServer({ now = () => Date.now(), store = null, storeSoon =
     if (info.wait) return; // ищем комнату этого соединения в базе: положения и события придут снова
     switch (msg.t) {
       case 'create': {
+        // локация открывается по уровню (в гости — с любым): уровень приходит с карточкой игрока. Игра сама не даст
+        // создать комнату раньше времени; здесь — та же проверка для тех, кто шлёт сообщения мимо неё
+        const loc = cleanLoc(msg.loc);
+        if (!canHost(loc, cleanCard(msg.card).lvl)) throw new GameError('LOCKED', `${locOf(loc).name} открывается с ${locOf(loc).level}-го уровня`);
         if (info.playerId) leaveRoom(ws);
-        const room = makeRoom();
+        const room = makeRoom(loc);
         return attach(ws, room, addPlayer(room, msg.card));
       }
       case 'join': {
@@ -446,7 +453,7 @@ export function createServer({ now = () => Date.now(), store = null, storeSoon =
       }
       case 'peek': {
         const code = String(msg.code || '').trim().toUpperCase();
-        const tell = (room) => send(ws, { t: 'peek', code: String(msg.code || ''), exists: !!room, players: room ? [...room.players.values()].filter((p) => p.ws).length : 0 });
+        const tell = (room) => send(ws, { t: 'peek', code: String(msg.code || ''), exists: !!room, loc: room ? room.loc : null, players: room ? [...room.players.values()].filter((p) => p.ws).length : 0 });
         return rooms.has(code) ? tell(rooms.get(code)) : later(ws, msg, code, tell);
       }
       default:
@@ -492,7 +499,7 @@ export function createServer({ now = () => Date.now(), store = null, storeSoon =
         if (msg.k === 'catch' && d && tr && now() >= tr.start && now() < tr.end) {
           let row = tr.scores.get(p.id);
           if (!row) row = { id: p.id, name: p.card.name, slot: p.slot, s: tourBlank() };
-          if (tourAdd(row.s, { sp: String(d.sp || ''), w: Number(d.w) }, now() - tr.start)) {
+          if (tourAdd(row.s, { sp: String(d.sp || ''), w: Number(d.w) }, now() - tr.start, room.loc)) { // рыба — только с локации комнаты
             row.name = p.card.name;
             tr.scores.set(p.id, row);
             touch(room.code);

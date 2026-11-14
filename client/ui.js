@@ -1,6 +1,8 @@
 // Интерфейс: экран игры (HUD) по макетам этапа 19 — стеклянные панели, команда с фигурками, мини-карта с маршрутом;
 // лобби, снасти и магазин, рынок, журнал, выбор героя, настройки.
-import { CATS, ITEMS, FISH, FISH_BY_ID, FIGHT_STYLES, JUNK_BY_ID, RARITY, ZONES, DAY_PARTS, RODS, MAX_PLAYERS, fmtW, fmtCoins, fmtClock } from '../shared/data.js';
+import { CATS, ITEMS, FISH, FISH_BY_ID, FIGHT_STYLES, JUNK_BY_ID, RARITY, zoneInfo, zonesOf, locsOf, fishOf, DAY_PARTS, RODS, MAX_PLAYERS, fmtW, fmtCoins, fmtClock } from '../shared/data.js';
+import { LOCATIONS, locOf } from '../shared/locations.js';
+import { LOC_ID, LOC } from './loc/id.js';
 import {
   kitStats, rodBars, owns, tackleCount, priceOf, fishValue, coolerValue, levelInfo, fightGrade, T_LOW, T_DANGER, T_TIGHT, dangerAt, liftNeed,
   WEATHER, questText, questCount, questReward, QUEST_BONUS, TOURS, TOUR_LENS, tourTable, tourScoreText, tourTargets, tourPrize, medalPrize, MEDALS
@@ -8,7 +10,7 @@ import {
 import { itemIcon, fishIcon, faceIcon } from './icons.js';
 import { heroes, heroOf, heroTemplate } from './hero.js';
 import { MARKS, markSvg } from './proto.js';
-import { MAP_VIEW, MARKET, MOORINGS, WRECK } from './terrain.js';
+import { MAP_VIEW, MARKET, MOORINGS, WRECK, HAS } from './terrain.js';
 import { settings, saveSettings } from './profile.js';
 import { showCode, saveSummary, agoText, plural } from '../shared/cloud.js';
 import { $, $$, el, esc, clamp } from './util.js';
@@ -72,7 +74,7 @@ const coin = (n) => `${ic('coin', 'coin')}${fmtCoins(n)}`;
 // логотип: пальма, название, подпись (пальма нарисована в стилях — маской)
 const LOGO = '<div class="logo"><span class="palm"></span>РЫБАК<small>РЫБАЛКА С ДРУЗЬЯМИ</small></div>';
 // место рыбалки на карточке в лобби: вид сверху запечён заранее (tools/bake-place.cjs), pin — где на нём причал, в процентах
-const PLACE = { name: 'Солнечная бухта', img: 'img/place-bay.webp', pin: [55.8, 68] };
+const PLACE = { name: LOC.name, img: LOC.img, pin: LOC.pin }; // место на карточке лобби — локация этой страницы
 // в пробной версии одним файлом картинки лежат внутри страницы (tools/artifact.js)
 const imgUrl = (f) => (window.RYBAK_IMG && window.RYBAK_IMG[f]) || f;
 // цвет редкости для подписи на светлом стекле: тот же тон, но светлее — читается на любом фоне
@@ -85,6 +87,7 @@ export class UI {
     this.screen = $('#screen');
     this.hud = $('#hud');
     for (const e of $$('[data-ic]')) e.innerHTML = SVG[e.dataset.ic] || '';
+    $('#placeName').textContent = LOC.place; // название локации этой страницы — в углу экрана игры
     this.cmp = $('#compass').getContext('2d');
     this.map = $('#minimap').getContext('2d');
     this.mapBase = null;
@@ -193,11 +196,13 @@ export class UI {
   weather(wx) {
     const add = Math.round((wx.bite - 1) * 100);
     const night = this.g.world.night > 0.6;
-    const key = wx.kind + '|' + add + '|' + night;
+    // у локации бывает свой утренний туман (над озером он стоит до девятого часа): в ясную погоду так и пишем
+    const mist = wx.kind === 'clear' && this.g.world.mistAt(this.g.hours) > 0.12;
+    const key = wx.kind + '|' + add + '|' + night + '|' + mist;
     if (key === this.wxKey) return;
     this.wxKey = key;
-    $('#wxIc').innerHTML = SVG[wx.kind === 'clear' && night ? 'moon' : WX_ICON[wx.kind]];
-    $('#wxName').innerHTML = `${WEATHER[wx.kind].name}${add > 0 ? `<em>клёв +${add}%</em>` : ''}`;
+    $('#wxIc').innerHTML = SVG[mist ? WX_ICON.fog : wx.kind === 'clear' && night ? 'moon' : WX_ICON[wx.kind]];
+    $('#wxName').innerHTML = `${mist ? 'Утренний туман' : WEATHER[wx.kind].name}${add > 0 ? `<em>клёв +${add}%</em>` : ''}`;
   }
   /** Задания дня в углу экрана: что осталось и сколько сделано. */
   questTracker() {
@@ -207,7 +212,7 @@ export class UI {
     box.classList.toggle('hidden', !qs);
     if (!qs) return;
     const html = `<div class="qh"><span class="cap">Задания дня</span><kbd class="g">K</kbd>${left ? '' : '<span class="ok">все выполнены</span>'}</div>` +
-      qs.list.filter((q) => !q.done).map((q) => `<div class="q"><span>${esc(questText(q))}</span><b>${esc(questCount(q))}</b></div>`).join('');
+      qs.list.filter((q) => !q.done).map((q) => `<div class="q"><span>${esc(questText(q, LOC_ID))}</span><b>${esc(questCount(q))}</b></div>`).join('');
     if (html !== this.questKey) {
       this.questKey = html;
       box.innerHTML = html;
@@ -499,7 +504,7 @@ export class UI {
       g.fill();
       g.stroke();
       // куда можно доплыть: причалы и корабль за краем карты — белые стрелки у рамки
-      for (const m of [...MOORINGS, WRECK]) {
+      for (const m of [...MOORINGS, ...(HAS.wreck ? [WRECK] : [])]) {
         const mx = X(m.x);
         const mz = Z(m.z);
         if (mx > 0 && mx < W && mz > 0 && mz < H) continue;
@@ -652,17 +657,29 @@ export class UI {
     const p = this.g.profile;
     const code = this.g.urlCode || '';
     const go = (a, text, cls = 'pri') => `<button class="btn ${cls}" data-a="${a}"><span>${text}</span>${cls === 'pri' ? ic('arrow') : ''}</button>`;
+    // где рыбачим: карточки локаций. Выбор действует на «создать комнату» и «в одиночку»; по коду комната сама
+    // знает свою локацию. Закрытая локация видна, но открыть рыбалку на ней нельзя, пока не дорос уровень.
+    if (!this.pickLoc) this.pickLoc = LOC_ID;
+    const lvl = levelInfo(p.xp).lvl;
+    const locs = this.g.offline ? '' : `<label>Где рыбачим</label><div class="locs">${LOCATIONS.map((l) => {
+      const lock = lvl < l.level;
+      return `<button class="loc${l.id === this.pickLoc ? ' on' : ''}${lock ? ' lock' : ''}" data-a="loc" data-id="${l.id}" title="${esc(l.about)}"><img src="${imgUrl(l.img)}" alt="">${lock ? `<em class="lk">${ic('lock')}С ${l.level} УРОВНЯ</em>` : ''}<b>${esc(l.name)}</b><i>${esc(l.sub)}</i></button>`;
+    }).join('')}</div>`;
     this.screen.innerHTML = `<div class="title">
       ${LOGO}
       <div class="tcard">
+        <div class="tca">
         <label for="nm">Как вас зовут</label>
         <input class="in" id="nm" maxlength="16" placeholder="Имя" value="${esc(p.name || '')}" autocomplete="off">
         <div class="err" id="terr">${esc(err)}</div>
+        ${locs}
+        </div><div class="tcb">
         ${this.g.offline ? `${go('solo', 'НАЧАТЬ РЫБАЛКУ')}
         <div class="note">Пробная версия для одного. Комнаты для друзей и голосовой чат работают в полной игре на сервере.</div>` : `${code ? go('join', `ВОЙТИ В КОМНАТУ ${esc(code)}`) : go('create', 'СОЗДАТЬ КОМНАТУ ДЛЯ ДРУЗЕЙ')}
         <div class="row"><input class="in code" id="code" maxlength="4" placeholder="КОД" value="${esc(code)}" autocomplete="off">${go('joincode', 'ВОЙТИ ПО КОДУ', 'cy')}</div>
         <div class="or">или</div>
         ${go('solo', 'РЫБАЧИТЬ В ОДИНОЧКУ', 'ghost')}`}
+        </div>
       </div>
       <div class="tnote${this.g.serverUp === false ? '' : ' hidden'}" id="srvNote">Сервер просыпается — комнаты заработают через минуту. В одиночку можно рыбачить уже сейчас.</div>
       <div class="tfoot">${this.g.offline ? 'Прогресс хранится в этом браузере' : `Голосовой чат включается в комнате · <span id="saveNote">${this.saveNote()}</span>`}<br><a data-a="help">Как играть</a>${this.g.offline ? '' : ' · <a data-a="open" data-p="top">Рекорды</a>'} · <a data-a="settings">Настройки</a></div>
@@ -712,7 +729,7 @@ export class UI {
         <div class="mechip"><div class="ava"><img src="${faceIcon(p.look)}" alt=""><i class="on"></i></div><div><div class="nm">${esc(p.name || 'Рыбак')}</div><div class="lv">Уровень ${lv.lvl}<div class="pbar"><i style="width:${Math.round((lv.cur / lv.need) * 100)}%"></i></div></div></div></div>
         ${g.solo ? '' : `<div class="crewrow">${crew.filter((r) => !r.me).map(friend).join('')}<button class="plus" data-a="copy" title="Позвать друзей — скопировать ссылку" aria-label="Позвать друзей">+</button><button class="codepill" data-a="copy" title="Скопировать ссылку для друзей">${ic('link')}<span>КОД ${esc(g.code)}</span><i class="sep"></i><span>${n}/${MAX_PLAYERS}</span></button></div>`}
       </div>
-      <div class="lob-br">${g.offline ? '' : round('top', 'cup', 'Рекорды бухты')}${round('help', 'help', 'Как играть')}${round('settings', 'gear', 'Настройки')}<button class="btn sm ghost" data-a="leave"><kbd class="b">ESC</kbd><span>${g.solo ? 'В МЕНЮ' : 'ВЫЙТИ ИЗ КОМНАТЫ'}</span></button></div>`;
+      <div class="lob-br">${g.offline ? '' : round('top', 'cup', LOC.say.top)}${round('help', 'help', 'Как играть')}${round('settings', 'gear', 'Настройки')}<button class="btn sm ghost" data-a="leave"><kbd class="b">ESC</kbd><span>${g.solo ? 'В МЕНЮ' : 'ВЫЙТИ ИЗ КОМНАТЫ'}</span></button></div>`;
   }
 
   openPanel(name, opts = {}) {
@@ -862,22 +879,32 @@ export class UI {
 
   renderJournal() {
     const p = this.g.profile;
-    this.js = this.js || FISH[0].id;
+    // рыба — по локациям: сначала здешняя (что можно поймать, не уезжая), рядом — другие места и общий список
+    const jl = (this.jloc = this.jloc || LOC_ID);
+    const list = jl === 'all' ? FISH : fishOf(jl);
+    if (!this.js || !list.some((x) => x.id === this.js)) this.js = list[0].id;
     const f = FISH_BY_ID[this.js];
     const j = p.journal[f.id];
     const got = Object.keys(p.journal).length;
-    const tiles = FISH.map((x) => {
+    const tabs = [...LOCATIONS.map((l) => [l.id, l.name, fishOf(l.id)]), ['all', 'Вся рыба', FISH]]
+      .map(([id, name, fs]) => `<button class="tab${id === jl ? ' on' : ''}" data-a="jloc" data-id="${id}">${id === 'all' ? '' : ic('pin')}${esc(name)} · ${fs.filter((x) => p.journal[x.id]).length}/${fs.length}</button>`).join('');
+    const tiles = list.map((x) => {
       const jj = p.journal[x.id];
       return `<div class="tile ${x.id === this.js ? 'sel' : ''} ${jj ? '' : 'unk lock'}" data-a="jpick" data-id="${x.id}">${jj ? `<span class="tg cnt">×${jj.n}</span>` : ''}<img src="${fishIcon(x.id)}" alt=""><div class="nm" style="color:${jj ? rarTint(x.rar) : 'rgba(255,255,255,.7)'}">${jj ? esc(x.name) : '???'}</div></div>`;
     }).join('');
-    const zones = Object.entries(f.zones).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([z]) => ZONES[z].name.toLowerCase()).join(', ');
+    // где ловится: на этой локации — зоны; если рыба живёт не здесь — на какой локации её искать
+    const here = Object.keys(zonesOf(f, LOC_ID)).length > 0;
+    const home = here ? LOC_ID : locsOf(f)[0];
+    const zlist = Object.entries(zonesOf(f, home)).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([z]) => zoneInfo(z, home).name.toLowerCase()).join(', ');
+    const zones = here ? zlist : `${locOf(home).name} — ${zlist}`;
     const baits = [...Object.entries(f.baits).filter(([, v]) => v >= 1).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([b]) => ITEMS[b].name.toLowerCase()), ...(f.lure >= 1 ? ['блёсны и воблеры'] : [])].join(', ');
     const times = Object.entries(f.time).filter(([, v]) => v > 1.1).map(([t]) => DAY_PARTS[t].toLowerCase()).join(', ') || 'в любое время';
     const lv = levelInfo(p.xp);
     const s = p.stats;
     this.screen.innerHTML = `<div class="dim"></div><div class="panel">
       ${this.panelHead('ЖУРНАЛ')}
-      <div class="jstats"><div><b>${lv.lvl}</b>уровень · ${esc(lv.title)}</div><div><b>${got}/${FISH.length}</b>видов открыто</div><div><b>${s.caught}</b>поймано</div><div><b>${fmtCoins(s.earned)}</b>заработано</div><div><b>${s.best ? fmtW(s.best.w) : '—'}</b>${s.best ? esc(FISH_BY_ID[s.best.sp].name) + ' — рекорд' : 'самый тяжёлый улов'}</div><div><b>${s.snaps}</b>обрывов лески</div>${s.stalked ? `<div><b>${s.stalked}</b>выслежено</div>` : ''}${s.assists ? `<div><b>${s.assists}</b>подсачено друзьям</div>` : ''}</div>
+      <div class="jtop"><div class="jstats"><div><b>${lv.lvl}</b>уровень · ${esc(lv.title)}</div><div><b>${got}/${FISH.length}</b>видов открыто</div><div><b>${s.caught}</b>поймано</div><div><b>${fmtCoins(s.earned)}</b>заработано</div><div><b>${s.best ? fmtW(s.best.w) : '—'}</b>${s.best ? esc(FISH_BY_ID[s.best.sp].name) + ' — рекорд' : 'самый тяжёлый улов'}</div><div><b>${s.snaps}</b>обрывов лески</div>${s.stalked ? `<div><b>${s.stalked}</b>выслежено</div>` : ''}${s.assists ? `<div><b>${s.assists}</b>подсачено друзьям</div>` : ''}</div>
+        <div class="tabs2 jtabs">${tabs}</div></div>
       <div class="grid g5">${tiles}</div>
       <div class="detail jdetail">
         <img class="big ${j ? '' : 'unk'}" src="${fishIcon(f.id)}" alt="">
@@ -1122,7 +1149,7 @@ export class UI {
     this.screen.innerHTML = `<div class="dim${run ? ' clear' : ''}"></div><div class="center bench${run ? ' run' : ''}">
       <h1>ПРОВЕРКА КОМПЬЮТЕРА</h1>
       <div class="cbody">
-      ${run ? `<div class="hint">Смотрим четыре вида бухты: ${esc(run.name || '…')}</div><div class="bbar"><i style="transform:scaleX(${(run.k || 0).toFixed(2)})"></i></div>`
+      ${run ? `<div class="hint">Смотрим четыре вида: ${esc(run.name || '…')}</div><div class="bbar"><i style="transform:scaleX(${(run.k || 0).toFixed(2)})"></i></div>`
         : r ? `<div class="verdict">${esc(r.verdict)}</div><pre class="report">${esc(r.text)}</pre>
       <div class="hint">Если игра тормозит — скопируйте этот текст и пришлите: по нему видно, что именно мешает.</div>
       <button class="btn pri" data-a="benchcopy"><span>СКОПИРОВАТЬ</span></button>
@@ -1188,7 +1215,7 @@ export class UI {
     const cards = (qs ? qs.list : []).map((q) => {
       const r = questReward(q, lv);
       const k = q.done ? 1 : clamp(q.c / q.n, 0, 1);
-      return `<div class="qcard ${q.done ? 'done' : ''}"><div class="qt"><span class="tier t${q.tier}">${TIER[q.tier] || ''}</span><b>${esc(questText(q))}</b>${q.done ? ic('check') : ''}</div>
+      return `<div class="qcard ${q.done ? 'done' : ''}"><div class="qt"><span class="tier t${q.tier}">${TIER[q.tier] || ''}</span><b>${esc(questText(q, LOC_ID))}</b>${q.done ? ic('check') : ''}</div>
         <div class="pbar"><i style="width:${Math.round(k * 100)}%"></i></div>
         <div class="qr"><span>${esc(questCount(q)) || (q.done ? 'готово' : 'ещё не сделано')}</span><span class="rw">${coin(r.coins)}<i class="sep"></i>ОПЫТ +${r.xp}</span></div></div>`;
     }).join('');
@@ -1324,9 +1351,17 @@ export class UI {
           return;
         }
         g.setName(name);
-        if (a === 'solo') g.startSolo();
-        else if (a === 'create') g.createRoom();
+        if (a === 'solo') g.startSolo(this.pickLoc || LOC_ID);
+        else if (a === 'create') g.createRoom(this.pickLoc || LOC_ID);
         else g.joinRoom(a === 'join' ? g.urlCode : code);
+        return;
+      }
+      case 'loc': {
+        // выбор локации на заставке: поля ввода не трогаем — меняем только подсветку карточек
+        this.pickLoc = t.dataset.id;
+        for (const e of $$('.locs .loc')) e.classList.toggle('on', e.dataset.id === this.pickLoc);
+        const L = locOf(this.pickLoc);
+        $('#terr').textContent = g.canOpen(this.pickLoc) ? '' : `${L.name} открывается с ${L.level}-го уровня — пока можно зайти в гости к другу`;
         return;
       }
       case 'help': return this.openPanel('help');
@@ -1355,6 +1390,9 @@ export class UI {
       case 'sellall': return g.sell(null);
       case 'jpick':
         this.js = id;
+        return this.renderJournal();
+      case 'jloc':
+        this.jloc = id;
         return this.renderJournal();
       case 'tkind':
         this.tr.kind = id;

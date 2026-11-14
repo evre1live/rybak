@@ -5,11 +5,11 @@ export class Net {
   constructor(on) {
     this.on = on; // { joined, in, out, card, mode, sts, ev, chat, host, error, down(n, restart), voice(msg), bin(buf) }
     this.ws = null;
-    this.room = null; // { code, id, token, seed, t0, host }
+    this.room = null; // { code, id, token, seed, t0, host, slot, loc }
     this.offset = 0; // serverNow − clientNow
     this.rtt = 0;
     this.retry = 0;
-    this.want = null; // что хотим: { t:'create'|'join', code, card }
+    this.want = null; // что хотим: { t:'create', loc } | { t:'join', code, token }
     this.closed = true;
     this.pingT = null;
     this.restart = false; // сервер сам предупредил, что перезапускается: комната вернётся вместе с ним
@@ -43,7 +43,7 @@ export class Net {
       clearInterval(this.pingT);
       this.pingT = setInterval(() => this.ping(), 5000);
       const w = this.want;
-      if (w) this.send(w.t === 'create' ? { t: 'create', card: this.getCard() } : { t: 'join', code: w.code, token: w.token, card: this.getCard() });
+      if (w) this.send(w.t === 'create' ? { t: 'create', card: this.getCard(), loc: w.loc } : { t: 'join', code: w.code, token: w.token, card: this.getCard() });
     };
     ws.onmessage = (e) => {
       if (typeof e.data !== 'string') return this.on.bin(e.data);
@@ -88,7 +88,7 @@ export class Net {
       }
       case 'joined': {
         const back = !!this.room && this.room.code === m.code;
-        this.room = { code: m.code, id: m.id, token: m.token, seed: m.seed, t0: m.t0, host: m.host, slot: m.slot };
+        this.room = { code: m.code, id: m.id, token: m.token, seed: m.seed, t0: m.t0, host: m.host, slot: m.slot, loc: m.loc };
         this.offset = this.rtt ? this.offset : m.now - Date.now();
         this.retry = 0;
         this.restart = false;
@@ -116,10 +116,11 @@ export class Net {
     }
   }
   // getCard() задаёт игра: карточка игрока всегда свежая, в том числе при возвращении после обрыва
-  create() {
-    this.want = { t: 'create' };
+  /** Создать комнату на локации loc (её запомнит сервер; гостям она придёт при входе). */
+  create(loc) {
+    this.want = { t: 'create', loc };
     this.retry = 0;
-    if (this.open) this.send({ t: 'create', card: this.getCard() });
+    if (this.open) this.send({ t: 'create', card: this.getCard(), loc });
     else this.connect();
   }
   join(code, token) {

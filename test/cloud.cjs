@@ -291,7 +291,7 @@ const openSave = async (page) => {
   await shot(a, 'c4-top-anglers');
   await a.click('[data-a="toptab"][data-id="records"]');
   const rec = await a.$$eval('.ttable.rec .trow:not(.hd)', (els) => els.map((e) => ({ name: e.querySelector('.nm').textContent, w: e.querySelector('.w').textContent, who: e.querySelector('.who').textContent.trim(), me: e.classList.contains('me'), my: e.querySelector('.my').textContent })));
-  assert.equal(rec.length, 25, 'в таблице — все виды рыбы');
+  assert.equal(rec.length, 31, 'в таблице — все виды рыбы, со всех локаций');
   const karp = rec.find((r) => r.name === 'Карп');
   assert.ok(karp && /Нори/.test(karp.who) && !karp.me && karp.my !== '—', `рекорд по карпу — у Нори, свой вес показан рядом: ${JSON.stringify(karp)}`);
   const okun = rec.find((r) => r.name === 'Окунь');

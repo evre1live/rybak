@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FISH, FISH_BY_ID, FIGHT_STYLES, ITEMS, RODS, ZONES, CATS, clockHours, dayPart, fmtClock, DAY_REAL_SEC } from '../shared/data.js';
+import { FISH, FISH_BY_ID, FIGHT_STYLES, ITEMS, RODS, ZONES, CATS, clockHours, dayPart, fmtClock, DAY_REAL_SEC, zonesOf, fishOf, locsOf, zoneInfo } from '../shared/data.js';
+import { LOCATIONS, LOC_BY_ID, cleanLoc, canHost } from '../shared/locations.js';
 import * as L from '../shared/logic.js';
 
 const rng = () => L.mulberry32(42);
@@ -12,6 +13,11 @@ test('данные согласованы: у каждой рыбы есть з�
     ids.add(f.id);
     assert.ok(f.w[0] > 0 && f.w[1] > f.w[0], f.id);
     for (const z of Object.keys(f.zones)) assert.ok(ZONES[z], `${f.id}: зона ${z}`);
+    for (const [loc, zs] of Object.entries(f.at || {})) {
+      assert.ok(LOC_BY_ID[loc] && loc !== 'bay', `${f.id}: локация ${loc}`);
+      for (const z of Object.keys(zs)) assert.ok(ZONES[z], `${f.id}: зона ${z} на локации ${loc}`);
+    }
+    assert.ok(locsOf(f).length >= 1, `${f.id}: водится хоть на одной локации`);
     for (const b of Object.keys(f.baits)) assert.ok(ITEMS[b] && ITEMS[b].cat === 'tackle', `${f.id}: наживка ${b}`);
     assert.ok(f.look && f.look.shape && f.look.lenK, f.id);
     assert.ok(Object.keys(f.baits).length || f.lure > 0, f.id);
@@ -20,17 +26,51 @@ test('данные согласованы: у каждой рыбы есть з�
   assert.equal(new Set(itemIds).size, itemIds.length);
 });
 
-test('каждую рыбу можно поймать хоть где-то и хоть на что-то', () => {
-  const caught = new Set();
+test('каждую рыбу можно поймать хоть где-то и хоть на что-то — на своей локации, и только на ней', () => {
   const r = rng();
   const tackles = Object.values(ITEMS).filter((i) => i.count).map((i) => i.id);
-  for (const zone of Object.keys(ZONES)) for (const tk of tackles) for (const hour of [6, 12, 19, 23]) {
-    const spot = { zone, depth: zone === 'deep' || zone === 'arch' ? 12 : 3, pier: zone === 'pier', hot: true };
-    for (const e of L.speciesWeights(spot, tk, hour)) caught.add(e.f.id);
-    const c = L.rollFish(spot, tk, hour, r);
-    assert.ok(c.w > 0 && (c.junk || FISH_BY_ID[c.sp]));
+  const all = new Set();
+  for (const loc of LOCATIONS) {
+    const caught = new Set();
+    for (const zone of Object.keys(ZONES)) for (const tk of tackles) for (const hour of [6, 12, 19, 23]) {
+      const spot = { zone, depth: zone === 'deep' || zone === 'arch' || zone === 'pit' ? 12 : 3, pier: zone === 'pier', hot: true };
+      for (const e of L.speciesWeights(spot, tk, hour, loc.id)) caught.add(e.f.id);
+      const c = L.rollFish(spot, tk, hour, r, loc.id);
+      assert.ok(c.w > 0 && (c.junk || FISH_BY_ID[c.sp]));
+      assert.ok(c.junk || Object.keys(zonesOf(FISH_BY_ID[c.sp], loc.id)).length, `${loc.id}: ${c.sp} здесь не водится`);
+    }
+    const here = fishOf(loc.id);
+    assert.deepEqual([...caught].sort(), here.map((f) => f.id).sort(), `${loc.id}: ловится ровно рыба этой локации`);
+    assert.ok(here.length >= 12, `${loc.id}: видов ${here.length}`);
+    for (const id of caught) all.add(id);
   }
-  assert.equal(caught.size, FISH.length, FISH.filter((f) => !caught.has(f.id)).map((f) => f.id).join());
+  assert.equal(all.size, FISH.length, FISH.filter((f) => !all.has(f.id)).map((f) => f.id).join());
+  // без указания локации — бухта, как раньше
+  assert.deepEqual(L.speciesWeights({ zone: 'pier', depth: 3, pier: true }, 'worm', 12).map((e) => e.f.id), L.speciesWeights({ zone: 'pier', depth: 3, pier: true }, 'worm', 12, 'bay').map((e) => e.f.id));
+  assert.equal(fishOf('bay').length, 25);
+});
+
+test('локации: список, подписи зон, кто может открыть комнату', () => {
+  assert.deepEqual(LOCATIONS.map((l) => l.id), ['bay', 'lake']);
+  for (const l of LOCATIONS) {
+    assert.ok(l.name.length > 3 && l.sub && l.about && l.place && /^img\/place-\w+\.webp$/.test(l.img) && l.pin.length === 2 && l.level >= 1, l.id);
+    assert.ok(l.say.enter && l.say.back && l.say.top, `${l.id}: слова для сообщений`);
+    for (const z of Object.keys(l.zones)) assert.ok(ZONES[z], `${l.id}: зона ${z}`);
+  }
+  assert.equal(cleanLoc('lake'), 'lake');
+  assert.equal(cleanLoc('mars'), 'bay');
+  assert.equal(cleanLoc(undefined), 'bay');
+  assert.equal(cleanLoc({ toString: () => 'lake' }), 'bay');
+  assert.ok(canHost('bay', 1) && !canHost('lake', 1) && canHost('lake', LOC_BY_ID.lake.level));
+  assert.equal(zoneInfo('falls').hint, ZONES.falls.hint);
+  assert.notEqual(zoneInfo('falls', 'lake').hint, ZONES.falls.hint);
+  assert.equal(zoneInfo('falls', 'lake').name, ZONES.falls.name);
+  // турнир: рыба не с этой локации в зачёт не идёт
+  const s = L.tourBlank();
+  assert.equal(L.tourAdd(s, { sp: 'tunec', w: 20 }, 1, 'lake'), false);
+  assert.equal(L.tourAdd(s, { sp: 'taimen', w: 20 }, 1, 'lake'), true);
+  assert.equal(L.tourAdd(s, { sp: 'taimen', w: 20 }, 2, 'bay'), false);
+  assert.equal(L.tourAdd(s, { sp: 'tunec', w: 20 }, 3), true);
 });
 
 test('вес рыбы в пределах вида, трофеи редки', () => {
@@ -918,4 +958,70 @@ test('открытка: подписи про улов и про вид бухт
   // чужие данные не ломают подпись: неизвестный вид — как вид бухты, длинное имя режется
   assert.equal(cardText({ c: { sp: 'нет такой', w: 1 }, date }).head, 'Солнечная бухта');
   assert.equal(cardText({ name: 'Очень-очень длинное имя рыбака', date }).who.startsWith('Очень-очень длин ·'), true);
+});
+
+test('задания дня: на другой локации — здешние рыба и места', () => {
+  // за сто дней на озере не бывает заданий про рыбу и места бухты
+  for (let day = 20000; day < 20100; day++) {
+    const bay = L.makeQuests(day, 5);
+    const lake = L.makeQuests(day, 5, 'lake');
+    assert.deepEqual(lake.map((q) => [q.k, q.tier]), bay.map((q) => [q.k, q.tier]), 'виды заданий в этот день одни и те же на всех локациях');
+    for (const q of lake) {
+      assert.ok(L.questHere(q, 'lake'), `задание выполнимо на озере: ${L.questText(q)}`);
+      if (q.k === 'sp' || q.k === 'zone') assert.equal(q.loc, 'lake');
+      else assert.deepEqual(q, bay[lake.indexOf(q)], 'задания, не привязанные к месту, совпадают с бухтой');
+      assert.ok(L.questText(q, 'lake').length > 8 && !/бухта/.test(L.questText(q, 'lake')));
+    }
+    for (const q of bay) assert.ok(L.questHere(q, 'bay'));
+  }
+  // день, когда в бухте выпало задание про место, которого на озере нет
+  let day = 20000;
+  while (!L.makeQuests(day, 5).some((q) => !L.questHere(q, 'lake'))) day++;
+  const p = L.newProfile();
+  assert.equal(L.syncQuests(p, day), true);
+  const i = p.quests.list.findIndex((q) => !L.questHere(q, 'lake'));
+  const was = { ...p.quests.list[i] };
+  assert.match(L.questText(was, 'lake'), /\(Солнечная бухта\)$/, 'на озере такое задание подписано бухтой');
+  assert.ok(!/бухта/.test(L.questText(was, 'bay')) && !/бухта/.test(L.questText(was)));
+  // перешли на озеро: нетронутое задание подменилось здешним того же вида и трудности, остальные — как были
+  const others = p.quests.list.filter((q, k) => k !== i).map((q) => JSON.stringify(q));
+  assert.equal(L.syncQuests(p, day, 'lake'), false, 'новых заданий не выдано — день тот же');
+  const now = p.quests.list[i];
+  assert.ok(now.k === was.k && now.tier === was.tier && now.a !== was.a && now.loc === 'lake' && L.questHere(now, 'lake'), JSON.stringify([was, now]));
+  assert.deepEqual(p.quests.list.filter((q, k) => k !== i).map((q) => JSON.stringify(q)), others);
+  // вернулись в бухту: теперь оно «озёрное», и, пока не начато, снова подменяется здешним
+  assert.equal(L.syncQuests(p, day, 'bay'), false);
+  assert.ok(L.questHere(p.quests.list[i], 'bay'));
+  // начатое задание не подменяется: оно ждёт на своей локации
+  const q2 = p.quests.list[i];
+  const keep = q2.a;
+  q2.c = 1;
+  L.syncQuests(p, day, 'lake');
+  assert.equal(p.quests.list[i].a, keep);
+  if (!L.questHere(q2, 'lake')) assert.match(L.questText(q2, 'lake'), /\(Солнечная бухта\)$/);
+});
+
+test('рынок локации: в цене — только здешняя рыба; в бухте всё как было до озера', () => {
+  const bayIds = fishOf('bay').map((f) => f.id);
+  const lakeIds = fishOf('lake').map((f) => f.id);
+  for (let i = 0; i < 300; i++) {
+    const seed = 'комната' + i;
+    const bay = L.marketState(seed, i * 613);
+    const lake = L.marketState(seed, i * 613, 'lake');
+    assert.ok(bay.hot.every((id) => bayIds.includes(id)), `в бухте в цене рыба бухты: ${bay.hot}`);
+    assert.ok(lake.hot.every((id) => lakeIds.includes(id)), `на озере в цене рыба озера: ${lake.hot}`);
+    assert.deepEqual(lake.hot.map((id) => Math.min(2, FISH.find((f) => f.id === id).rar)), [0, 1, 2], 'простая, необычная и редкая');
+    for (const f of FISH) for (const m of [bay, lake]) assert.ok(m.mult[f.id] >= 0.85 && m.mult[f.id] <= 1.6, 'цена есть у любой рыбы — привозную тоже покупают');
+    // как считалось раньше, когда рыба была только в бухте
+    const rng = L.mulberry32(L.hashStr(seed + ':' + Math.floor((i * 613) / 600)));
+    const old = {};
+    const first = FISH.slice(0, bayIds.length);
+    assert.deepEqual(first.map((f) => f.id), bayIds, 'рыба бухты стоит в общем списке первой');
+    for (const f of first) old[f.id] = Math.round((0.85 + rng() * 0.35) * 100) / 100;
+    const pick = (rars) => { const pool = first.filter((f) => rars.includes(f.rar)); return pool[Math.floor(rng() * pool.length)].id; };
+    const hot = [pick([0]), pick([1]), pick([2, 3])];
+    for (const id of hot) old[id] = 1.6;
+    assert.deepEqual(bay.hot, hot);
+    for (const id of bayIds) assert.equal(bay.mult[id], old[id]);
+  }
 });

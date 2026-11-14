@@ -20,6 +20,7 @@
     "test:sound": "node test/sound.cjs",
     "test:frames": "node test/frames.cjs",
     "test:restart": "node test/restart.cjs",
+    "test:locations": "node test/locations.cjs",
     "solo": "node tools/artifact.js"
   },
   "engines": {
