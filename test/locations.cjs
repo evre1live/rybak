@@ -48,6 +48,14 @@ async function clickAndReload(page, sel) {
   const imgs = await G(a, () => [...document.querySelectorAll('.locs .loc img')].map((i) => [i.getAttribute('src'), i.complete && i.naturalWidth]));
   assert.deepEqual(imgs.map((i) => i[0]), ['img/place-bay.webp', 'img/place-lake.webp', 'img/place-keys.webp']);
   assert.ok(imgs.every((i) => i[1] > 300), `картинки локаций загрузились: ${JSON.stringify(imgs)}`);
+  // подписи не вылезают за карточку и не наезжают на соседнюю (с тремя карточками названия длиннее карточки)
+  const spill = await G(a, () =>
+    [...document.querySelectorAll('.locs .loc')].flatMap((c) => {
+      const r = c.getBoundingClientRect();
+      return [...c.querySelectorAll('b, i')].map((t) => t.getBoundingClientRect()).filter((q) => q.left < r.left - 0.5 || q.right > r.right + 0.5).map((q) => `${c.dataset.id}: ${Math.round(q.left)}–${Math.round(q.right)} при карточке ${Math.round(r.left)}–${Math.round(r.right)}`);
+    })
+  );
+  assert.deepEqual(spill, [], 'подписи карточек в своих границах');
   await a.fill('#nm', 'Жамшид');
   await a.click('.locs [data-id="lake"]');
   assert.match(await a.textContent('#terr'), /открывается с 3-го уровня/);

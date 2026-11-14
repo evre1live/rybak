@@ -347,11 +347,11 @@ input.code{text-transform:uppercase;letter-spacing:.3em;text-align:center;font:i
 .tcard .note{font-size:.95em;line-height:1.45;text-align:center;margin-top:.6em;text-shadow:var(--tsh)}
 /* заставка: где рыбачим — карточки локаций; выбранная — в бирюзовой кайме, закрытая — приглушена, с замком */
 .locs{display:flex;gap:.7em}
-.locs .loc{flex:1;min-width:0;position:relative;display:flex;flex-direction:column;gap:.28em;padding:.4em .4em .6em;border-radius:1.05em;background:rgba(255,255,255,.07);border:.09em solid rgba(255,255,255,.24);color:var(--cream);cursor:pointer;text-align:left;font:inherit;font-size:1em;transition:transform .15s,border-color .15s,box-shadow .15s,background .15s}
+.locs .loc{flex:1;min-width:0;position:relative;display:flex;flex-direction:column;align-items:stretch;white-space:normal;gap:.28em;padding:.4em .4em .6em;border-radius:1.05em;background:rgba(255,255,255,.07);border:.09em solid rgba(255,255,255,.24);color:var(--cream);cursor:pointer;text-align:left;font:inherit;font-size:1em;transition:transform .15s,border-color .15s,box-shadow .15s,background .15s}
 .locs .loc:hover{transform:translateY(-.1em);border-color:rgba(255,255,255,.6)}
 .locs .loc img{display:block;width:100%;aspect-ratio:16/8.6;object-fit:cover;border-radius:.72em;background:rgba(0,0,0,.25)}
-.locs .loc b{font:italic 800 1.16em/1.05 var(--disp);letter-spacing:.01em;padding:.12em .3em 0;text-shadow:var(--tsh);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.locs .loc i{font:normal 400 .78em/1.2 var(--body);opacity:.82;padding:0 .35em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.locs .loc b{font:italic 800 1.06em/1.05 var(--disp);letter-spacing:0;padding:.12em .35em 0 .3em;text-shadow:var(--tsh);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;min-width:0}
+.locs .loc i{font:normal 400 .78em/1.2 var(--body);opacity:.82;padding:0 .35em;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;min-width:0}
 .locs .loc.on{border-color:var(--tl);background:rgba(46,242,222,.12);box-shadow:0 0 0 .1em rgba(46,242,222,.55),0 0 1.5em var(--glowt)}
 .locs .loc.on::after{content:"✓";position:absolute;right:.62em;top:.62em;width:1.45em;height:1.45em;border-radius:50%;background:var(--teal);color:var(--tld);font:800 .95em/1.5 var(--body);text-align:center;box-shadow:0 .15em .5em rgba(0,0,0,.35)}
 .locs .loc.lock img{filter:saturate(.3) brightness(.62)}
