@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { fbm2, TAU } from './util.js';
 import { groundH, shoreZ, deckAt, blocksAt, ISLAND, PALM, palmR, HAS } from './terrain.js';
+import { ROCK, SAND } from './loc/keys.js';
 import { surfaceU } from './surface.js';
 
 const CELL = 12; // размер клетки, по которым разложены места
@@ -207,6 +208,11 @@ export class GrassField {
     if (HAS.island) scan(ISLAND.x - 40, ISLAND.x + 40, ISLAND.z - 40, ISLAND.z + 40, (x, z) => Math.hypot(x - ISLAND.x, z - ISLAND.z) < 40 && groundH(x, z) > 5);
     // дюна Пальмового острова
     if (HAS.palm) scan(PALM.x - PALM.rx, PALM.x + PALM.rx, PALM.z - PALM.rz, PALM.z + PALM.rz, (x, z) => palmR(x, z) < 1);
+    // Коралловые островки: зелёная макушка скалы с аркой и дюна песчаного островка
+    if (HAS.keys) {
+      scan(ROCK.x - 24, ROCK.x + 24, ROCK.z - 24, ROCK.z + 24, (x, z) => groundH(x, z) > ROCK.top - 2.5);
+      scan(SAND.x - SAND.rx, SAND.x + SAND.rx, SAND.z - SAND.rz, SAND.z + SAND.rz, (x, z) => groundH(x, z) > 1.1);
+    }
     for (const [k, a] of tufts) this.cells.set(k, { tufts: new Float32Array(a), flowers: new Float32Array(flowers.get(k) || []) });
     for (const [k, a] of flowers) if (!this.cells.has(k)) this.cells.set(k, { tufts: new Float32Array(0), flowers: new Float32Array(a) });
     this.total = { tufts: [...tufts.values()].reduce((s, a) => s + a.length / 8, 0), flowers: [...flowers.values()].reduce((s, a) => s + a.length / 8, 0) };

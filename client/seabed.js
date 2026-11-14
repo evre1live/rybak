@@ -9,6 +9,7 @@ import { Batch, M, G, BATCH_MAT } from './batch.js';
 import { groundH, inRocks, REEF, WRECK, BACKWATER, PALM, HAS } from './terrain.js';
 import { rng, TAU, shade, fbm2 } from './util.js';
 import { grassMaterial } from './grass.js';
+import { gardenK } from './loc/keys.js';
 
 const depthAt = (x, z) => -groundH(x, z);
 
@@ -56,7 +57,8 @@ export class Seabed {
     // где искать места: [x0, x1, z0, z1, попыток] — бухта у причалов, заводь, лагуна Пальмового острова, остов
     const AREAS = [
       [-48, 48, -64, -2, 3600],
-      [BACKWATER.x - 15, BACKWATER.x + 15, BACKWATER.z - 13, BACKWATER.z + 13, 600],
+      // на Коралловых островках тихая отмель — луг морской травы: там её гуще
+      [BACKWATER.x - 15, BACKWATER.x + 15, BACKWATER.z - 13, BACKWATER.z + 13, HAS.keys ? 2000 : 600],
       ...(HAS.palm ? [[PALM.x - 72, PALM.x - 28, PALM.z - 16, PALM.z + 26, 900]] : []),
       ...(HAS.wreck ? [[WRECK.x - 15, WRECK.x + 15, WRECK.z - 15, WRECK.z + 15, 500]] : [])
     ];
@@ -76,9 +78,13 @@ export class Seabed {
         if (!(d > 0.45 && d < 4.2) || inRocks(x, z)) continue;
         const y = -d;
         const patch = fbm2(x * 0.085 + 7, z * 0.085 - 3); // заросли идут пятнами
-        if (kind < 0.42) {
+        // Коралловые островки: в садах вместо водорослей растут кораллы (loc/keys-reef.js), а на тихой отмели трава сплошь
+        const meadow = HAS.keys && Math.hypot(x - BACKWATER.x, z - BACKWATER.z) < BACKWATER.r + 3;
+        if (HAS.keys && gardenK(x, z) > 0.1) continue;
+        if (kind < (meadow ? 0.8 : 0.42)) {
           // водоросли: только там, где вода глубже колена, и не выше трёх четвертей глубины
-          if (d < 0.9 || patch < 0.5) continue;
+          // (вне отмели на островках трава редкая: дно лагуны — песок и кораллы)
+          if (d < (meadow ? 0.5 : 0.9) || (patch < (HAS.keys ? 0.68 : 0.5) && !meadow)) continue;
           const tint = Math.floor(r() * 5);
           // куртина: несколько кустов рядом, один цвет
           const n = 2 + Math.floor(r() * 3);
@@ -86,8 +92,8 @@ export class Seabed {
             const kx = x + (j ? (r() - 0.5) * 1.1 : 0);
             const kz = z + (j ? (r() - 0.5) * 1.1 : 0);
             const kd = depthAt(kx, kz);
-            if (kd < 0.9 || inRocks(kx, kz)) continue;
-            const h = Math.min(kd * 0.72, 0.55 + r() * 1.25) * (0.8 + patch * 0.4);
+            if (kd < (meadow ? 0.5 : 0.9) || inRocks(kx, kz)) continue;
+            const h = Math.min(kd * 0.72, meadow ? 0.35 + r() * 0.5 : 0.55 + r() * 1.25) * (0.8 + patch * 0.4);
             kelp.push([kx, -kd - 0.03, kz, h, 0.8 + r() * 0.8, r() * TAU, tint]);
           }
         } else if (kind < 0.8) {
@@ -169,7 +175,8 @@ export class Seabed {
     scene.add(this.mesh);
 
     // водоросли: зелёные, оливковые и бурые
-    const TINT = ['#2f7a2a', '#4d8f1e', '#1f6a40', '#6d7f1c', '#7a4a20'].map((h) => new THREE.Color(h));
+    // (на Коралловых островках — морская трава: только зелёная, бурых водорослей в лагуне нет)
+    const TINT = (HAS.keys ? ['#3f9a3a', '#5fae3a', '#2f8a4e', '#7fb83a', '#4a9a5a'] : ['#2f7a2a', '#4d8f1e', '#1f6a40', '#6d7f1c', '#7a4a20']).map((h) => new THREE.Color(h));
     this.U = { uFar: { value: 70 } };
     const n = kelp.length;
     const m = (this.kelp = new THREE.InstancedMesh(kelpGeometry(), grassMaterial(this.U), Math.max(1, n)));

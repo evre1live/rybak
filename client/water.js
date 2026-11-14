@@ -209,6 +209,7 @@ precision highp float;
 uniform float uTime, uGlitter, uFogNear, uFogFar, uSwell, uWind;
 uniform vec2 uPath; // во сколько раз усилить дорожку от светила: сами блики и широкое мягкое пятно вокруг них (ночью — лунная дорожка)
 uniform vec4 uWat; // из палитры: прозрачность толщи, наименьший «косинус взгляда» для неё, сила отражения неба, сетка света на поверхности
+uniform vec2 uSurfD; // до какой глубины идут пенные валы прибоя: [начинают таять, пропали]. В лагуне с садами у самой поверхности — мельче, иначе пена обводит каждый коралловый бугор
 uniform vec4 uWat2; // до какой глубины вода бирюзовая; насколько сетка света гаснет над глубиной; насколько она в цвет воды, а не солнца; насколько темнее и синее открытое море
 uniform sampler2D uNormal, uCaustic, uDet;
 uniform float uCloudK;
@@ -317,7 +318,7 @@ void main() {
   // Крутизна дна — насколько глубина меняется на метр, по соседним точкам кадра.
   float slope = length(vec2(dFdx(depth), dFdy(depth))) / max(length(vec2(dFdx(p.x), dFdy(p.x))) + length(vec2(dFdx(p.y), dFdy(p.y))), 1e-4) * 1.6;
   float gentle = 1.0 - ss(0.3, 0.75, slope);
-  float band = crest * mix(1.0, lace, ss(0.03, 0.3, ph)) * ss(0.05, 0.2, depth) * (1.0 - ss(1.0, 2.3, depth)) * surf * gentle;
+  float band = crest * mix(1.0, lace, ss(0.03, 0.3, ph)) * ss(0.05, 0.2, depth) * (1.0 - ss(uSurfD.x, uSurfD.y, depth)) * surf * gentle;
   // у самого берега после наката остаётся тонкое кружево пены — узкой полоской, без молочной каши на мели
   float wash = lace * (1.0 - ss(0.0, 0.13, depth)) * (0.5 + 0.4 * swash) * surf;
   float foam = clamp(edge + band + wash * 0.35 + caps * 0.85, 0.0, 1.0) * step(0.004, dv);
@@ -327,7 +328,10 @@ void main() {
   c = mix(c, mix(foamCol, mix(c, foamCol, 0.5), caps * (1.0 - uLight)), foam * 0.85);
 
   float alpha = max(max(body, 0.1), max(fres * 0.92, foam));
-  alpha = max(alpha, ss(70.0, 170.0, dist)); // вдали вода сплошная: дна всё равно не разглядеть
+  // вдали вода сплошная: дна всё равно не разглядеть. Чем выше камера, тем дальше видно дно (с высоты взгляд идёт
+  // сквозь воду почти отвесно) — с причала и из лодки всё как раньше, а на снимке сверху лагуна прозрачна
+  float hi = max(cameraPosition.y - 4.0, 0.0);
+  alpha = max(alpha, ss(70.0 + 2.4 * hi, 170.0 + 4.5 * hi, dist));
   c *= 1.0 - uCloudK * 0.2 * ss(0.5, 0.68, texture2D(uDet, p * 0.0019 + uTime * vec2(0.0021, 0.0012)).r); // тени облаков
   float fog = ss(uFogNear, uFogFar, dist);
   c = mix(c, uFogCol, fog);
@@ -359,7 +363,7 @@ export function createWater() {
   geo.setIndex(idx);
   const uniforms = {
     uTime: { value: 0 }, uGlitter: { value: 1 }, uPath: { value: new THREE.Vector2(1, 1) }, uFogNear: { value: 150 }, uFogFar: { value: 1400 },
-    uWat: { value: new THREE.Vector4(0.16, 0.18, 0.8, 0.27) }, uWat2: { value: new THREE.Vector4(14, 0.55, 0, 0.45) }, // прозрачность воды, отражение неба и сетка света — из палитры (palette.js)
+    uWat: { value: new THREE.Vector4(0.16, 0.18, 0.8, 0.27) }, uWat2: { value: new THREE.Vector4(14, 0.55, 0, 0.45) }, uSurfD: { value: new THREE.Vector2(1.0, 2.3) }, // прозрачность воды, отражение неба и сетка света — из палитры (palette.js)
     uDepth: { value: depthTexture(BOUNDS, 400, 400) }, uDepthFar: { value: depthTexture(FAR, Math.round((FAR.x1 - FAR.x0) / 2.5), Math.round((FAR.z1 - FAR.z0) / 2.5), farFloor) },
     uNormal: { value: normalTexture() }, uCaustic: { value: causticTexture() }, uDet: surfaceU.uDet, uCloudK: surfaceU.uCloudK,
     uBounds: { value: boundsVec(BOUNDS) }, uBoundsFar: { value: boundsVec(FAR) },

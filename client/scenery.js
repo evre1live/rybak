@@ -7,9 +7,10 @@ import { buildPlaces } from './places.js';
 import { ENV, upgradeEnv, envNight, envState } from './envmodels.js';
 import { spot01 } from './scatter.js';
 import { rng, rockGeo, canvasTex, shade, sstep, TAU, fbm2 } from './util.js';
-import { DECKS, CIRCLES, DECK_Y, groundH, shoreZ, islandR, ISLAND, ARCH, ARCH_LEGS, REEF, CAPE, capeDist, FALLS, LIGHTHOUSE, COTTAGE, CAMPFIRE, cottageUV, BACKWATER, deckAt, SCHOOL_HOMES, SEA_HOMES, SKERRIES, BUOYS, MARKS, HAS } from './terrain.js';
+import { DECKS, CIRCLES, DECK_Y, groundH, shoreZ, islandR, ISLAND, ARCH, ARCH_LEGS, REEF, CAPE, capeDist, FALLS, LIGHTHOUSE, COTTAGE, CAMPFIRE, cottageUV, BACKWATER, deckAt, SCHOOL_HOMES, SEA_HOMES, SKERRIES, BUOYS, MARKS, HAS, GULL_SPOTS } from './terrain.js';
 import { LOC_ID } from './loc/id.js';
 import { buildLakeNature } from './loc/lake-nature.js';
+import { buildKeysNature } from './loc/keys-nature.js';
 import { pine, roundTree, bush, farPine, farCrown } from './flora.js';
 import { waveH, swellMax } from './water.js';
 import { FAR_ISLES, farTrees, farCliffs } from './farisles.js';
@@ -29,7 +30,9 @@ export const LAMP_POSTS = [
   // на дальних причалах фонари только светятся сами: лишние источники света дорого стоят всей сцене
   [-19.72, -78.22, 1, true], [209.28, -194.22, 1, true],
   // мостки у избушки на Сосновом озере
-  [-26.72, -96.78, 1, true]
+  [-26.72, -96.78, 1, true],
+  // Коралловые островки: мостки песчаного островка и пляжа под скалой
+  [15.28, -94.22, 1, true], [-21.22, -89.72, 1, true]
 ].filter(([x, z]) => deckAt(x, z, -0.7));
 
 /** Сваи, стоящие в воде: вокруг них пена и круги (water.js). */
@@ -383,6 +386,14 @@ function buildProps(B, P, r, X) {
     place('prop-crate', -17.9, y, -100.3, 0.62, 0.4);
     place('prop-ropecoil', -26.2, y, -100.2, 0.7, 0.3);
     place('prop-trap', -18.1, y, -97.4, 0.9, 1.4);
+  }
+  if (HAS.keys) {
+    // Коралловые островки: мостки песчаного островка и пляжа под скалой
+    place('prop-crate', 19.2, y, -86.3, 0.6, 0.3);
+    place('prop-netpile', 15.9, y, -93.4, 0.95, 2.1);
+    place('prop-lantern', 19.4, y, -93.9, 0.44, 0.9);
+    place('prop-trap', -13.3, y, -86.4, 0.9, 1.4);
+    place('prop-ropecoil', -20.7, y, -86.2, 0.7, 0.3);
   }
   if (HAS.palm) {
     // Пальмовый остров: мостки и пляж
@@ -1209,10 +1220,12 @@ function buildGulls(scene) {
   geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   geo.setAttribute('aWing', new THREE.Float32BufferAttribute(wing, 1));
   geo.computeVertexNormals();
-  const centers = [[20, 34, -98, 28], [0, 16, -20, 20], [-30, 22, -40, 30], [50, 26, -50, 24], [5, 13, 4, 14]];
+  // где кружат чайки: [x, высота, z, радиус круга]. У локации может быть свой список (GULL_SPOTS); в бухте — над островом
+  // с маяком, пирсом, аркой и площадкой
+  const centers = GULL_SPOTS ? GULL_SPOTS.map((c) => [...c]) : [[20, 34, -98, 28], [0, 16, -20, 20], [-30, 22, -40, 30], [50, 26, -50, 24], [5, 13, 4, 14]];
   // на Чаячьем камне птицы живут: три кружат над скалой всегда
   const GR = SKERRIES.find((s) => s.id === 'gullrock');
-  centers.push([GR.x, 15, GR.z, 13], [GR.x + 3, 11, GR.z - 2, 8], [GR.x - 2, 19, GR.z + 3, 18]);
+  if (GR) centers.push([GR.x, 15, GR.z, 13], [GR.x + 3, 11, GR.z - 2, 8], [GR.x - 2, 19, GR.z + 3, 18]);
   // кроме них — стаи над морскими косяками (FLOCKS стай по FLOCK птиц): пока косяка нет, птицы спрятаны
   const N = centers.length + FLOCKS * FLOCK;
   const flap = new THREE.InstancedBufferAttribute(new Float32Array(N), 1);
@@ -1365,6 +1378,7 @@ export function buildScenery(scene, nfx = null) {
   // природа и постройки — у каждой локации свои; база (причалы, лавка, фонари) общая
   let lh = null;
   if (LOC_ID === 'lake') buildLakeNature(scene);
+  else if (LOC_ID === 'keys') buildKeysNature(scene);
   else {
     buildVegetation(scene, r);
     buildRocks(scene, r);

@@ -693,7 +693,8 @@ const fishWord = (n) => plural(n, 'рыбу', 'рыбы', 'рыб');
 const Q_ZONE = {
   pier: 'у свай причала', shallow: 'на мелководье', backwater: 'в заводи', reef: 'у рифа', falls: 'у водопада',
   sea: 'в открытом море', lagoon: 'в лагуне Пальмового острова', wreck: 'у затонувшего корабля',
-  stones: 'у камней', pit: 'над ямой'
+  stones: 'у камней', pit: 'над ямой',
+  garden: 'в коралловом саду', channel: 'в протоке', edge: 'на краю рифа'
 };
 const Q_SPECIES = [
   ['bychok', 'plotva', 'okun', 'kefal', 'karas', 'stavrida'],
@@ -711,6 +712,10 @@ const Q_ELSEWHERE = {
   lake: {
     sp: [['plotva', 'okun', 'karas', 'ersh'], ['lesh', 'harius', 'sig']],
     zone: [['pier', 'shallow', 'backwater'], ['backwater', 'falls', 'stones'], ['pit', 'falls', 'stones']]
+  },
+  keys: {
+    sp: [['serzhant', 'klown', 'babochka', 'hirurg', 'kefal'], ['popugai', 'lucian', 'krylatka', 'sargan']],
+    zone: [['pier', 'shallow', 'garden'], ['garden', 'channel', 'sea'], ['edge', 'sea', 'channel']]
   }
 };
 const Q_REWARD = [{ coins: 25, xp: 20 }, { coins: 60, xp: 45 }, { coins: 130, xp: 90 }];

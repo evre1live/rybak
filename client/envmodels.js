@@ -11,7 +11,7 @@ import { Scatter, spot01 } from './scatter.js';
 import { patchModel } from './surface.js';
 import { small } from './smalls.js';
 import { canvasTex, isTouch, TAU } from './util.js';
-import { BOXES, CIRCLES, DECK_Y, groundH } from './terrain.js';
+import { BOXES, CIRCLES, DECK_Y, groundH, HAS } from './terrain.js';
 
 /** Что процедурный мир сообщает о себе. */
 export const ENV = {
@@ -220,7 +220,8 @@ export function upgradeEnv(scene) {
         'env-pine': { sway: 0.01, tint: { r: 1.28, g: 1.36, b: 1.34 }, sat: 0.92 },
         'env-oak': { sway: 0.012, tint: { r: 1.0, g: 1.1, b: 1.1 }, sat: 0.86 },
         'env-birch': { sway: 0.016, tint: { r: 1.05, g: 1.2, b: 1.15 }, sat: 0.82 },
-        'env-bush': { sway: 0.006, near: 22, tint: { r: 0.74, g: 0.94, b: 0.9 }, sat: 0.78 }
+        // (на Коралловых островках кусты светлее и сочнее: там это тропическая зелень под пальмами, а не подлесок)
+        'env-bush': HAS.keys ? { sway: 0.006, near: 22, tint: { r: 0.88, g: 1.14, b: 0.9 }, sat: 0.92 } : { sway: 0.006, near: 22, tint: { r: 0.74, g: 0.94, b: 0.9 }, sat: 0.78 }
       };
       Promise.all(trees.map((id) => loadModel(id)))
         .then(() => Promise.all(trees.map((id) => scatter.add(id, ENV.flora[id], { cell: 104, near: 55, vary: 0.55, ...opt[id] }))))

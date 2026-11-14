@@ -82,7 +82,8 @@ export const PALETTES = {
     // deepAt — до какой глубины (м) вода бирюзовая, дальше синяя; netDeep — насколько сетка света гаснет над глубиной;
     // netTint — насколько она в цвет воды, а не солнца; seaDeep — насколько открытое море темнее и синее бухты;
     // bedNet — сетка света на дне; bedTint — насколько дно окрашивается в цвет воды; bedFog — как быстро дно тонет в глубине;
-    // bedDeep — насколько тёмная эта глубина; moonPath — во сколько раз лунная дорожка ярче, чем дал бы ночной свет: [блики, мягкая полоса под луной]
+    // bedDeep — насколько тёмная эта глубина; moonPath — во сколько раз лунная дорожка ярче, чем дал бы ночной свет: [блики, мягкая полоса под луной];
+    // surf — до какой глубины (м) идут пенные валы прибоя: [начинают таять, пропали] (по умолчанию 1,0 и 2,3)
     water: { clear: 0.16, pathMin: 0.18, fres: 0.8, net: 0.27, deepAt: 14, netDeep: 0.55, netTint: 0, seaDeep: 0.45, bedNet: 0.62, bedTint: 0.7, bedFog: 0.075, bedDeep: 0.5 },
     // bloom, thr — сила свечения и с какой яркости оно начинается; vig — затемнение по краям кадра
     post: { bloom: 0.115, thr: 1.0, vig: 0.32 },
@@ -112,6 +113,17 @@ export const PALETTES = {
     water: { clear: 0.12, pathMin: 0.3, fres: 0.8, net: 0.22, deepAt: 15, netDeep: 0.8, netTint: 0.5, seaDeep: 0.4, bedNet: 0.7, bedTint: 0.62, bedFog: 0.07, bedDeep: 0.62, moonPath: [4, 42] },
     post: { bloom: 0.13, thr: 1.0, vig: 0.3 },
     fog: { near: 120, far: 1250 }
+  },
+
+  // «Коралловые островки»: те же сутки, но вода прозрачнее и светлее — сквозь неё видны кораллы; дно почти
+  // не окрашивается в цвет воды (иначе розовые и лиловые кораллы уходят в серо-зелёное), дымка дальше
+  coral: {
+    name: 'Коралловые островки',
+    tone: { sat: 1.32, vib: 0.1, con: 1.08, toe: 0.6, sh: [0.94, 1.0, 1.07], hi: [1.04, 1.0, 0.94] },
+    keys: vary(DAY, { wS: [0.004, 1.0, 1.05], wD: [-0.022, 0.92, 1.1], fog: [0, 0.92, 1.03], hor: [0, 0.96, 1.02] }),
+    water: { clear: 0.062, pathMin: 0.4, fres: 0.66, net: 0.36, deepAt: 22, netDeep: 0.8, netTint: 0.6, seaDeep: 0.85, bedNet: 0.85, bedTint: 0.36, bedFog: 0.04, bedDeep: 0.75, moonPath: [4, 42], surf: [0.5, 0.95] },
+    post: { bloom: 0.13, thr: 1.0, vig: 0.26 },
+    fog: { near: 190, far: 1800 }
   },
 
   // Б. «Пастель»: мягко и светло — молочная дымка, кремовый свет, мятная вода, низкий контраст
@@ -144,7 +156,7 @@ export const PALETTES = {
 /** Палитра игры. Остальные наборы — для сравнения: ?pal=now (как было до этапа 20), ?pal=pastel, ?pal=cinema. */
 export const DEFAULT_PALETTE = 'tropic';
 /** У локации может быть своя палитра (иначе — палитра игры). */
-export const LOC_PALETTE = { lake: 'pine' };
+export const LOC_PALETTE = { lake: 'pine', keys: 'coral' };
 const asked = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('pal') : null;
 /** Действующая палитра. Поля меняются на месте (usePalette), поэтому читать их нужно в момент использования. */
 export const PAL = { id: '' };

@@ -1,14 +1,16 @@
 // Рельеф локации этой страницы: высота земли и дна, причалы, зоны ловли, где можно ходить и плыть.
 //
-// Сам рельеф живёт в модулях локаций (loc/bay.js — Солнечная бухта, loc/lake.js — Сосновое озеро); здесь выбирается
+// Сам рельеф живёт в модулях локаций (loc/bay.js — Солнечная бухта, loc/lake.js — Сосновое озеро,
+// loc/keys.js — Коралловые островки); здесь выбирается
 // тот, что нужен странице (loc/id.js: ?loc= в адресе), и отдаётся под общими именами. Остальной игре всё равно,
 // какая локация: она спрашивает groundH, canStand, spotAt… Чего на локации нет (маяк, арка, Пальмовый остров),
 // стоит далеко за краем мира, а что на ней есть из необязательного — сказано в HAS.
 import * as bay from './loc/bay.js';
 import * as lake from './loc/lake.js';
+import * as keys from './loc/keys.js';
 import { LOC_ID } from './loc/id.js';
 
-const T = { bay, lake }[LOC_ID] || bay;
+const T = { bay, lake, keys }[LOC_ID] || bay;
 
 export const HAS = T.HAS;
 export const DECK_Y = T.DECK_Y;
@@ -54,6 +56,10 @@ export const inRocks = T.inRocks;
 export const spotAt = T.spotAt;
 export const SCHOOL_HOMES = T.SCHOOL_HOMES;
 export const SEA_HOMES = T.SEA_HOMES;
+/** Дорога дельфинов: замкнутая петля по открытому морю (на озере — за краем мира). */
+export const DOLPHIN_WAY = T.DOLPHIN_WAY;
+/** Где кружат чайки: [x, высота, z, радиус] — если у локации свои места (иначе — как в бухте). */
+export const GULL_SPOTS = T.GULL_SPOTS || null;
 /** Части мира: подписи в углу экрана (ключ → [название, что там ловится]) и в какой из них точка. */
 export const AREAS = T.AREAS;
 export const areaAt = T.areaAt;

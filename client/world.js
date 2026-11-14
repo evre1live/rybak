@@ -4,6 +4,8 @@ import { clamp, lerp, sstep, damp, fbm2, canvasTex, rng, TAU, isTouch } from './
 import { groundH, shoreZ, BOUNDS, WORLD, PALM, WRECK, palmR, capeDist, CAPE, ISLAND, islandR, MAP_VIEW, DECKS, DECK_Y, LIGHTHOUSE, ARCH, MOORINGS, SKERRIES, HAS, deckAt } from './terrain.js';
 import { LOC_ID, LOC } from './loc/id.js';
 import { lakeTint, buildLakeTerrain } from './loc/lake-world.js';
+import { keysTint, buildKeysTerrain } from './loc/keys-world.js';
+import { buildReef } from './loc/keys-reef.js';
 import { buildMist } from './loc/lake-nature.js';
 import { createWater, createFoamRings, sea } from './water.js';
 import { FAR_ISLES, farH, farWood } from './farisles.js';
@@ -130,7 +132,7 @@ function bayTint(c, x, y, z, ny, w) {
   }
 }
 /** Краски земли — у каждой локации свои. */
-const groundTint = LOC_ID === 'lake' ? lakeTint : bayTint;
+const groundTint = { lake: lakeTint, keys: keysTint }[LOC_ID] || bayTint;
 const _w = [0, 0, 1, 0];
 /** Цвет земли в точке и сколько там травы (0…1) — для пучков травы (grass.js). На склонах, где проступает камень, травы нет. */
 function grassTint(x, z, c) {
@@ -409,7 +411,7 @@ export class World {
   constructor() {
     const scene = (this.scene = new THREE.Scene());
     scene.fog = new THREE.Fog('#a9dcff', 170, 1700);
-    this.terrain = LOC_ID === 'lake' ? buildLakeTerrain(buildGround) : buildTerrain();
+    this.terrain = LOC_ID === 'lake' ? buildLakeTerrain(buildGround) : LOC_ID === 'keys' ? buildKeysTerrain(buildGround) : buildTerrain();
     scene.add(this.terrain);
     this.water = createWater();
     scene.add(this.water.mesh);
@@ -479,6 +481,8 @@ export class World {
     this.grass = new GrassField(scene, grassTint, isTouch() ? { max: 3000, maxFlowers: 500 } : {});
     // дно, флаги на шестах (показывают ветер) и лучи низкого солнца
     this.seabed = new Seabed(scene);
+    // коралловые сады на дне лагуны (Коралловые островки)
+    this.reef = HAS.keys ? buildReef(scene) : null;
     const STRIPES = (a, b) => [a, b, a, b, a];
     this.flags = new Flags(scene, [
       { x: -5.4, z: -26.4, y: DECK_Y, h: 3.4, len: 1.5, wide: 0.9, cols: ['#f04438', '#ffffff', '#f04438'], pennant: true }, // вымпел на конце главного пирса
@@ -599,6 +603,7 @@ export class World {
     const PW = PAL.water;
     w.uWat.value.set(PW.clear, PW.pathMin, PW.fres, PW.net);
     w.uWat2.value.set(PW.deepAt, PW.netDeep, PW.netTint, PW.seaDeep);
+    w.uSurfD.value.set(...(PW.surf || [1.0, 2.3]));
     surfaceU.uBed.value.set(PW.bedNet, PW.bedTint, PW.bedFog, PW.bedDeep);
     surfaceU.uSunC.value.copy(k.sun);
     surfaceU.uWaterS.value.copy(k.wS);
@@ -637,7 +642,10 @@ export class World {
   update(dt, t, camera) {
     this.grass.setRange(detail.grass);
     this.grass.update(camera);
-    if (this.kelpK !== detail.kelp) this.seabed.setDetail((this.kelpK = detail.kelp));
+    if (this.kelpK !== detail.kelp) {
+      this.seabed.setDetail((this.kelpK = detail.kelp));
+      if (this.reef) this.reef.setDetail(detail.kelp);
+    }
     this.flags.update(t, this.wx.wind);
     {
       // лучи — только когда солнце низко: на рассвете и на закате; в пасмурную погоду и в тумане их нет
@@ -753,7 +761,7 @@ export function drawMinimap(w = 512, h = 276, view = MAP_VIEW) {
     g.fillStyle = '#9aa3ae';
     g.beginPath();
     const ak = sea ? 0.45 : 1;
-    g.ellipse(X(ARCH.x), Z(ARCH.z), 4 * ak, 9 * ak, -0.35, 0, TAU);
+    g.ellipse(X(ARCH.x), Z(ARCH.z), 4 * ak, 9 * ak, Math.PI / 2 - ARCH.ry, 0, TAU); // вытянута вдоль опор
     g.fill();
   }
   if (sea && HAS.wreck) {

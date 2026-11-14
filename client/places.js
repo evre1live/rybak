@@ -35,7 +35,7 @@ const FROND = (() => {
   return g;
 })();
 
-function palmTree(B, x, y, z, s, r) {
+export function palmTree(B, x, y, z, s, r) {
   const dir = r() * TAU;
   const H = (5.0 + r() * 2.6) * s;
   const off = (0.1 + r() * 0.22) * H; // на столько верхушка уходит в сторону

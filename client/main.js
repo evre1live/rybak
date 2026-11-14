@@ -2153,8 +2153,11 @@ class Game {
           // взгляд игрока — вдоль (−sin yaw, −cos yaw); справа от него — (cos yaw, −sin yaw)
           this.audio.place(name, d, far, vol, d > 0.01 ? (dx * Math.cos(pl.yaw) - dz * Math.sin(pl.yaw)) / d : 0);
         };
-        const fall = FALLS.reduce((a, b) => (Math.hypot(a.bx - pl.x, a.bz - pl.z) < Math.hypot(b.bx - pl.x, b.bz - pl.z) ? a : b));
-        hear('waterfall', fall.bx, fall.bz, 60, 0.55);
+        // (водопады есть не на каждой локации)
+        if (FALLS.length) {
+          const fall = FALLS.reduce((a, b) => (Math.hypot(a.bx - pl.x, a.bz - pl.z) < Math.hypot(b.bx - pl.x, b.bz - pl.z) ? a : b));
+          hear('waterfall', fall.bx, fall.bz, 60, 0.55);
+        }
         hear('fire', CAMPFIRE.x, CAMPFIRE.z, 16, 0.5);
         // чайки над морским косяком: чем ближе стая, тем чаще и громче крики — и с той стороны, где она кружит
         this.flockT = (this.flockT || 2) - dt;

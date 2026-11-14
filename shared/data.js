@@ -24,7 +24,11 @@ export const ZONES = {
   wreck: { name: 'Затонувший корабль', hint: 'Отмель с кораблём на северо-западе', act: 0.85 },
   // Сосновое озеро
   stones: { name: 'Каменная гряда', hint: 'Валуны у островка и на отмели', act: 1.1 },
-  pit: { name: 'Яма', hint: 'Самое глубокое место озера — между пирсом и избушкой', act: 0.84 }
+  pit: { name: 'Яма', hint: 'Самое глубокое место озера — между пирсом и избушкой', act: 0.84 },
+  // Коралловые островки
+  garden: { name: 'Коралловый сад', hint: 'Кораллы на дне лагуны и за гребнем рифа', act: 1.15 },
+  channel: { name: 'Протока', hint: 'Глубокая вода между садами и в проходах рифа', act: 0.95 },
+  edge: { name: 'Край рифа', hint: 'За гребнем: стена рифа уходит в синеву', act: 1.0 }
 };
 /** Зона ловли так, как её зовут на локации: у локации могут быть свои подписи (shared/locations.js). */
 export const zoneInfo = (id, loc = DEFAULT_LOC) => ({ ...(ZONES[id] || { name: '', hint: '', act: 1 }), ...(locOf(loc).zones[id] || {}) });
@@ -37,7 +41,7 @@ const fish = (id, name, rar, wMin, wMax, price, str, zones, baits, lure, time, l
 
 // price — монет за рыбу среднего размера; str — характер при вываживании.
 // zones — где и как охотно рыба берёт в Солнечной бухте; at.<локация> — то же на других локациях
-// (нет записи — рыба там не водится). Рыба озера, которой в бухте нет, идёт в конце списка с пустыми zones.
+// (нет записи — рыба там не водится). Рыба озера и островков, которой в бухте нет, идёт в конце списка с пустыми zones.
 export const FISH = [
   fish('bychok', 'Бычок', 0, 0.04, 0.28, 9, 0.6, { pier: 6, shallow: 5, reef: 2, mid: 1, lagoon: 2 }, { worm: 1.4, maggot: 1.2, shrimp: 1.3, bread: 0.7 }, 0, null,
     { shape: 'goby', back: '#6b5a3c', side: '#a08a5f', belly: '#e8dcc0', fin: '#7a6a48', pat: 'marble', patC: '#4a3d27', lenK: 31 },
@@ -143,7 +147,57 @@ export const FISH = [
   fish('zolforel', 'Золотая форель', 4, 0.8, 6.5, 5200, 1.7, {}, { maggot: 1.3, worm: 1.1 }, 1.5, { dawn: 1.9, dusk: 1.1 },
     { shape: 'std', back: '#c98a1c', side: '#f2c544', belly: '#fff0b8', fin: '#e0661c', pat: 'dots', patC: '#7a3a10', band: '#e8502a', lenK: 38 },
     'Легенда Соснового озера. Говорят, на рассвете она поднимается к самой струе водопада — и сияет, как монета.',
-    { at: { lake: { falls: 1.3 } } })
+    { at: { lake: { falls: 1.3 } } }),
+
+  // ── Коралловые островки ──
+  fish('klown', 'Рыба-клоун', 0, 0.02, 0.14, 16, 0.5, {}, { bloodworm: 1.5, shrimp: 1.3, maggot: 1.2, bread: 0.8 }, 0, null,
+    { shape: 'std', back: '#e8641c', side: '#ff8a2a', belly: '#ffb25a', fin: '#f0701c', pat: 'clown', patC: '#ffffff', lenK: 30 },
+    'Оранжевая, в трёх белых поясах. Живёт среди щупалец актинии и от дома далеко не отходит.',
+    { at: { keys: { garden: 6, pier: 2.5, shallow: 1 } } }),
+  fish('serzhant', 'Сержант', 0, 0.05, 0.32, 13, 0.7, {}, { bread: 1.4, maggot: 1.3, bloodworm: 1.3, shrimp: 1.1, worm: 1.0 }, 0, null,
+    { shape: 'tall', back: '#c9c23a', side: '#dfe6e2', belly: '#f5f7f4', fin: '#3a4650', pat: 'bars', patC: '#1c2530', lenK: 29 },
+    'Пять чёрных полос, как нашивки. Стайка сержантов встречает у причала каждого, кто бросит в воду хлеб.',
+    { at: { keys: { pier: 6, shallow: 4, garden: 3, mid: 2, backwater: 2 } } }),
+  fish('babochka', 'Рыба-бабочка', 0, 0.06, 0.4, 22, 0.7, {}, { bloodworm: 1.5, shrimp: 1.4, maggot: 1.0 }, 0, null,
+    { shape: 'disc', back: '#f2c81e', side: '#fbe36a', belly: '#fff6c8', fin: '#f2b61e', pat: 'mask', patC: '#14181c', lenK: 26 },
+    'Жёлтый диск с чёрной маской на глазах. Порхает над кораллами парами и берёт только мелкую наживку.',
+    { at: { keys: { garden: 6, pier: 1.5, backwater: 1 } } }),
+  fish('hirurg', 'Синий хирург', 0, 0.1, 0.7, 26, 0.9, {}, { bread: 1.3, bloodworm: 1.2, corn: 1.1, shrimp: 1.0 }, 0, null,
+    { shape: 'disc', back: '#1d4fd0', side: '#2c6cf0', belly: '#5a8ff5', fin: '#f5d21e', pat: 'palette', patC: '#0b1640', lenK: 28 },
+    'Синий, с жёлтым хвостом и чёрным росчерком по боку. У хвоста — шип острее скальпеля: берите подсачеком.',
+    { at: { keys: { garden: 5, mid: 3, edge: 1.5, shallow: 1 } } }),
+  fish('popugai', 'Рыба-попугай', 1, 0.4, 5, 54, 1.2, {}, { shrimp: 1.4, crab: 1.3, bread: 1.2, corn: 1.1 }, 0, { day: 1.2, night: 0.5 },
+    { shape: 'carp', back: '#1fae9a', side: '#3fd0b0', belly: '#f59ac0', fin: '#f070a8', pat: 'parrot', patC: '#f5d04a', lenK: 30 },
+    'Бирюзовая, с розовым брюхом и клювом, которым грызёт кораллы. Белый песок островков — её работа.',
+    { at: { keys: { garden: 6, shallow: 2.5, edge: 2, mid: 1 } } }),
+  fish('lucian', 'Луциан', 1, 0.3, 4.2, 62, 1.3, {}, { shrimp: 1.5, squid: 1.3, live: 1.2, worm: 0.8 }, 1.1, { dusk: 1.3, night: 1.2 },
+    { shape: 'std', back: '#c8402c', side: '#f0705a', belly: '#fbd0c0', fin: '#f2c21e', pat: 'scales', lenK: 33 },
+    'Красный, с жёлтыми плавниками. Ходит стаями по протоке и под аркой, после заката смелеет.',
+    { at: { keys: { channel: 5, garden: 3, arch: 3, edge: 3, pier: 1 } } }),
+  fish('krylatka', 'Крылатка', 1, 0.2, 1.5, 78, 1.0, {}, { shrimp: 1.5, live: 1.5, bloodworm: 0.9 }, 0.8, { night: 1.7, dusk: 1.5, day: 0.6 },
+    { shape: 'lion', back: '#8a2a1c', side: '#e8d9c8', belly: '#f6efe6', fin: '#b0402c', pat: 'zebra', patC: '#8a2a1c', lenK: 30 },
+    'Полосатая, в веере ядовитых лучей. Днём висит под кораллом, на охоту выходит в сумерках.',
+    { at: { keys: { garden: 3.5, arch: 3, pier: 1.2, edge: 1 } } }),
+  fish('barrakuda', 'Барракуда', 2, 1.5, 19, 250, 1.8, {}, { live: 1.8, squid: 1.1 }, 1.8, { dawn: 1.4, dusk: 1.3 },
+    { shape: 'pike', back: '#4a5a66', side: '#c5cfd4', belly: '#f4f6f6', fin: '#3d4852', pat: 'tiger', patC: '#2c3640', lenK: 50 },
+    'Серебряная торпеда с пастью, полной зубов. Стоит в протоке и бьёт блесну с разгона.',
+    { at: { keys: { channel: 5, edge: 4, sea: 2, mid: 1, arch: 1 } }, minDepth: 3 }),
+  fish('karanks', 'Каранкс', 2, 1.2, 26, 270, 2.0, {}, { live: 1.6, squid: 1.3, shrimp: 1.1 }, 2.0, { dawn: 1.5, dusk: 1.4 },
+    { shape: 'jack', back: '#5a6a78', side: '#cfd6da', belly: '#f6f7f5', fin: '#2c3640', pat: 'none', lenK: 33 },
+    'Лобастый силач края рифа. Гонит малька к самой поверхности — на поппер берёт так, что удилище гнётся в дугу.',
+    { at: { keys: { edge: 5, channel: 3, sea: 3, arch: 1 } }, minDepth: 4 }),
+  fish('murena', 'Мурена', 2, 0.8, 10, 255, 1.6, {}, { squid: 1.7, live: 1.4, crab: 1.3, shrimp: 1.2 }, 0, { night: 2.1, dusk: 1.4, day: 0.35, dawn: 0.7 },
+    { shape: 'eel', back: '#5a4a22', side: '#8a742e', belly: '#d9c98a', fin: '#5a4a22', pat: 'spots', patC: '#f0d04a', lenK: 72 },
+    'Пятнистая хозяйка расщелин под аркой. Днём из норы торчит одна голова, ночью выходит вся.',
+    { at: { keys: { arch: 5, edge: 2.5, garden: 2, pier: 0.6 } } }),
+  fish('napoleon', 'Рыба-наполеон', 3, 8, 65, 1750, 2.1, {}, { crab: 2.0, squid: 1.5, live: 1.3, shrimp: 0.8 }, 0.7, { dusk: 1.5, dawn: 1.3 },
+    { shape: 'grouper', back: '#1f6a7a', side: '#3aa0a0', belly: '#a8d8c8', fin: '#2a7a8a', pat: 'marble', patC: '#16485a', lenK: 30 },
+    'Губастый великан с шишкой на лбу. Поднимается из синевы к краю рифа и под арку — за крабом.',
+    { at: { keys: { edge: 2.6, arch: 2.2, channel: 0.8 } }, minDepth: 5 }),
+  fish('imperator', 'Императорский ангел', 4, 0.4, 3.2, 5000, 1.4, {}, { shrimp: 1.5, bloodworm: 1.4, crab: 1.2 }, 0, { dawn: 1.9, dusk: 1.2 },
+    { shape: 'disc', back: '#16306a', side: '#1f4fb0', belly: '#f2c81e', fin: '#f2c81e', pat: 'lines', patC: '#f5d21e', lenK: 27 },
+    'Легенда островков: синий, в золотых струнах. Говорят, на рассвете он обходит свой коралловый сад — и берёт у того, кто пришёл раньше солнца.',
+    { at: { keys: { garden: 1.3, arch: 0.6 } } })
 ];
 // рыба бухты, которая живёт и в озере: свои места там
 const AT_LAKE = {
@@ -157,6 +211,20 @@ const AT_LAKE = {
   som: { pit: 2, backwater: 2, deep: 1.5 }
 };
 for (const f of FISH) if (AT_LAKE[f.id]) f.at = { ...(f.at || {}), lake: AT_LAKE[f.id] };
+// рыба бухты, которая живёт и у коралловых островков
+const AT_KEYS = {
+  kefal: { backwater: 5, shallow: 4, mid: 2 },
+  stavrida: { sea: 5, mid: 4, channel: 3, edge: 2 },
+  kambala: { mid: 3, backwater: 2, channel: 2 },
+  skumbria: { sea: 7, edge: 3, channel: 1.5 },
+  sargan: { mid: 5, backwater: 3, shallow: 2, channel: 2 },
+  morokun: { arch: 3, edge: 3, garden: 1 },
+  dorado: { garden: 3, mid: 2, edge: 2 },
+  tunec: { sea: 6, edge: 1.5 },
+  skat: { channel: 3, sea: 2, edge: 1, mid: 0.8 },
+  mech: { sea: 1.6, edge: 0.3 }
+};
+for (const f of FISH) if (AT_KEYS[f.id]) f.at = { ...(f.at || {}), keys: AT_KEYS[f.id] };
 // Наживки этапа 22: кому они по вкусу (остальная рыба берёт на незнакомую наживку неохотно — 0,3, см. speciesWeights)
 const BAIT_EXTRA = {
   bloodworm: { ersh: 1.7, plotva: 1.5, lesh: 1.5, karas: 1.3, okun: 1.3, bychok: 1.3, sig: 1.1, harius: 1.0, nalim: 0.9 },
@@ -169,7 +237,7 @@ export const zonesOf = (f, loc = DEFAULT_LOC) => (loc === DEFAULT_LOC ? f.zones 
 const NO_ZONES = Object.freeze({});
 /** Рыба локации — в том же порядке, что в общем списке. */
 export const fishOf = (loc = DEFAULT_LOC) => FISH.filter((f) => Object.keys(zonesOf(f, loc)).length > 0);
-/** На каких локациях водится рыба: ['bay', 'lake']. */
+/** На каких локациях водится рыба: ['bay', 'lake', 'keys']. */
 export const locsOf = (f) => [...(Object.keys(f.zones).length ? [DEFAULT_LOC] : []), ...Object.keys(f.at || {})];
 
 // Манера при вываживании: у каждого вида своя. Подпись и совет видит игрок, правила — в shared/logic.js (STYLE_K).
@@ -188,7 +256,9 @@ const STYLE_OF = {
   shuka: 'jumper', sudak: 'plain', forel: 'jumper', dorado: 'runner', sibas: 'runner', ugor: 'snag',
   som: 'bulldog', tunec: 'runner', losos: 'jumper', skat: 'flat',
   mech: 'jumper', koi: 'snag', starik: 'bulldog',
-  ersh: 'thrash', harius: 'jumper', sig: 'plain', nalim: 'snag', taimen: 'runner', zolforel: 'jumper'
+  ersh: 'thrash', harius: 'jumper', sig: 'plain', nalim: 'snag', taimen: 'runner', zolforel: 'jumper',
+  klown: 'thrash', serzhant: 'plain', babochka: 'plain', hirurg: 'thrash', popugai: 'bulldog', lucian: 'runner', krylatka: 'thrash',
+  barrakuda: 'jumper', karanks: 'runner', murena: 'snag', napoleon: 'bulldog', imperator: 'snag'
 };
 for (const f of FISH) f.style = STYLE_OF[f.id] || 'plain';
 

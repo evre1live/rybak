@@ -293,6 +293,8 @@ export const SCHOOL_HOMES = [
   [62, -44], [26, -92], [-52, -70], [-84, -62], [-30, -90], [74, -84], [104, -52], [-90, -46], [PIT.x, PIT.z], [PIT.x + 14, PIT.z - 6]
 ];
 export const SEA_HOMES = [];
+/** Дельфинов на озере нет: их «дорога» лежит далеко за краем мира. */
+export const DOLPHIN_WAY = [[NOWHERE, NOWHERE], [NOWHERE + 60, NOWHERE], [NOWHERE + 60, NOWHERE + 60], [NOWHERE, NOWHERE + 60]];
 
 // части озера: что написать в углу экрана и чем место интересно рыбаку
 export const AREAS = {
