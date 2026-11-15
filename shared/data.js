@@ -37,7 +37,10 @@ export const ZONES = {
   snags: { name: 'Коряги', hint: 'Затопленные деревья у восточного берега', act: 1.1 },
   // Мангровая протока
   roots: { name: 'Корни мангров', hint: 'У берегов и островков, под арками корней', act: 1.1 },
-  mouth: { name: 'Устье', hint: 'Протока выходит в море — далеко на северо-востоке', act: 0.95 }
+  mouth: { name: 'Устье', hint: 'Протока выходит в море — далеко на северо-востоке', act: 0.95 },
+  // Пальмовая марина
+  lights: { name: 'У огней', hint: 'Под огнями яхт и понтонов: ночью сюда идёт рыба', act: 1.1 },
+  bridge: { name: 'Под мостом', hint: 'Яма у опор моста через канал', act: 0.95 }
 };
 /** Зона ловли так, как её зовут на локации: у локации могут быть свои подписи (shared/locations.js). */
 export const zoneInfo = (id, loc = DEFAULT_LOC) => ({ ...(ZONES[id] || { name: '', hint: '', act: 1 }), ...(locOf(loc).zones[id] || {}) });
@@ -333,7 +336,36 @@ export const FISH = [
   fish('pila', 'Рыба-пила', 4, 20, 160, 8200, 2.1, {}, { live: 1.6, squid: 1.4, crab: 1.2 }, 0.4, { night: 1.6, dusk: 1.3 },
     { shape: 'sword', back: '#6a6448', side: '#8a8460', belly: '#ece6d6', fin: '#5a5440', pat: 'none', lenK: 60 },
     'Живая легенда протоки: длиной с лодку, с пилой во всю морду — зубы по обе стороны. Ходит по дну в устье и в Омуте, ворошит пилой ил. Говорят, берёт раз в жизни.',
-    { at: { mangrove: { mouth: 0.6, pit: 0.6, deep: 0.3 } }, giant: true, minDepth: 5 })
+    { at: { mangrove: { mouth: 0.6, pit: 0.6, deep: 0.3 } }, giant: true, minDepth: 5 }),
+  // ── Пальмовая марина ──
+  fish('pompano', 'Помпано', 0, 0.3, 3.5, 70, 1.25, {}, { shrimp: 1.7, crab: 1.4, worm: 1.0, bread: 0.6 }, 0.8, { day: 1.2, dawn: 1.1 },
+    { shape: 'jack', back: '#8a98a4', side: '#e2e8ec', belly: '#f2d64a', fin: '#f2c43a', pat: 'none', lenK: 34 },
+    'Серебряный, с золотым брюхом и жёлтыми плавниками. Стайками ходит у городского пляжа по колено в воде и подбирает креветок прямо из-под ног.',
+    { at: { marina: { backwater: 6, shallow: 5, pier: 3, mid: 1.5 } } }),
+  fish('kalmar', 'Кальмар', 1, 0.2, 2.5, 160, 1.2, {}, { shrimp: 1.3, live: 1.2 }, 2.6, { night: 2.6, dusk: 1.4, dawn: 0.6, day: 0.15 },
+    { shape: 'slim', back: '#d88a8a', side: '#f0c8c0', belly: '#f8e8e2', fin: '#e8a8a0', pat: 'dots', patC: '#b04a3a', lenK: 40 },
+    'Ночью поднимается к огням причалов охотиться на мальков. Лучше всего берёт на джиг — и выпускает облако чернил прямо у борта.',
+    { at: { marina: { lights: 6, deep: 2, mouth: 1.5, mid: 1 } } }),
+  fish('ezh', 'Рыба-ёж', 1, 0.3, 2.8, 120, 1.05, {}, { crab: 1.8, shrimp: 1.6, squid: 1.2, worm: 0.8 }, 0.2, { night: 1.5, dusk: 1.2, day: 0.7 },
+    { shape: 'goby', back: '#a8905c', side: '#d8c49a', belly: '#f2ead6', fin: '#c8b07a', pat: 'dots', patC: '#4a3420', lenK: 26, bigEye: true },
+    'На крючке раздувается в колючий шар и смотрит огромными глазами. Живёт под сваями и в канале, ночью хрустит крабами и ракушками.',
+    { at: { marina: { pier: 4, bridge: 3, channel: 3, lights: 1.5 } } }),
+  fish('lufar', 'Луфарь', 2, 1, 9, 300, 1.65, {}, { live: 1.8, squid: 1.5, shrimp: 1.0 }, 2.2, { dawn: 1.5, dusk: 1.5, day: 0.9, night: 0.6 },
+    { shape: 'std', back: '#3a7a8a', side: '#c8d8dc', belly: '#f2f4f2', fin: '#6a8a92', pat: 'none', lenK: 40 },
+    'Голубой разбойник с зубами как бритва: стаей загоняет мальков к поверхности так, что вода кипит. На рассвете и на закате — у выхода из гавани.',
+    { at: { marina: { mouth: 5, sea: 3, mid: 2, deep: 1 } } }),
+  fish('kobiya', 'Кобия', 2, 3, 40, 420, 1.8, {}, { crab: 1.8, live: 1.6, squid: 1.4, shrimp: 1.0 }, 1.4, { day: 1.2, dawn: 1.1 },
+    { shape: 'pike', back: '#4a3426', side: '#8a6a52', belly: '#ece2d2', fin: '#3a2a20', pat: 'lines', patC: '#f2ead8', lenK: 46 },
+    'Похожа на маленькую акулу: плоская голова и тёмная полоса вдоль бока. Ходит за скатами и всем, что плавает, — даже за буями и лодками.',
+    { at: { marina: { sea: 4, mouth: 3, deep: 1.5 } }, minDepth: 4 }),
+  fish('goliaf', 'Групер-голиаф', 3, 30, 300, 5600, 2.2, {}, { live: 1.7, crab: 1.6, squid: 1.3 }, 0.5, { dusk: 1.4, night: 1.3, day: 0.8 },
+    { shape: 'grouper', back: '#6a5a32', side: '#a8904e', belly: '#d8c89a', fin: '#7a6a3a', pat: 'marble', patC: '#3a2e18', lenK: 32 },
+    'Великан-групер весом с рояль: живёт в яме под мостом и годами не уходит со своего места. Глотает крабов вместе с панцирем, а на крючке уходит к опорам. Без морской удочки и багра не взять.',
+    { at: { marina: { bridge: 1.4, deep: 0.4 } }, giant: true, minDepth: 6 }),
+  fish('molot', 'Рыба-молот', 4, 60, 450, 9500, 2.3, {}, { live: 1.7, squid: 1.5, crab: 1.0 }, 0.3, { night: 1.7, dusk: 1.4, day: 0.5 },
+    { shape: 'shark', back: '#6a7076', side: '#9aa0a4', belly: '#f0f0ec', fin: '#5a6064', pat: 'none', lenK: 50 },
+    'Голова — как молот, с глазами на концах: так ей видно всё море разом. Ночью подходит к выходу из гавани за скатами. Говорят, берёт раз в жизни.',
+    { at: { marina: { sea: 0.7, mouth: 0.4 } }, giant: true, minDepth: 8 })
 ];
 // рыба бухты, которая живёт и в озере: свои места там
 const AT_LAKE = {
@@ -388,6 +420,18 @@ const AT_MANGROVE = {
   skat: { mouth: 3, deep: 2, pit: 1 }
 };
 for (const f of FISH) if (AT_MANGROVE[f.id]) f.at = { ...(f.at || {}), mangrove: AT_MANGROVE[f.id] };
+// рыба, которая живёт и в Пальмовой марине: кефаль и помпано у пляжа, снук и сарган под огнями, угорь и сибас под мостом
+const AT_MARINA = {
+  kefal: { shallow: 4, backwater: 4, pier: 3, lights: 2, mid: 2 },
+  stavrida: { lights: 3, mid: 3, deep: 2, mouth: 2 },
+  sargan: { lights: 4, mid: 2, mouth: 1.5 },
+  sibas: { bridge: 3, lights: 2.5, pier: 2, mouth: 2, deep: 1 },
+  ugor: { bridge: 3, channel: 3, pier: 2, lights: 1 },
+  lucian: { channel: 2.5, bridge: 2, pier: 2, lights: 1.5 },
+  snuk: { lights: 5, bridge: 3, channel: 3, pier: 2 },
+  tarpon: { lights: 1.0, mouth: 1.2, sea: 0.6 }
+};
+for (const f of FISH) if (AT_MARINA[f.id]) f.at = { ...(f.at || {}), marina: AT_MARINA[f.id] };
 // Наживки этапа 22: кому они по вкусу (остальная рыба берёт на незнакомую наживку неохотно — 0,3, см. speciesWeights)
 const BAIT_EXTRA = {
   bloodworm: { ersh: 1.7, plotva: 1.5, lesh: 1.5, karas: 1.3, okun: 1.3, bychok: 1.3, sig: 1.1, harius: 1.0, nalim: 0.9 },
@@ -425,7 +469,8 @@ const STYLE_OF = {
   mako: 'jumper', osetr: 'bulldog', rifakula: 'runner',
   letuchaya: 'jumper', korifena: 'jumper', vahu: 'runner', zheltoper: 'runner', parusnik: 'jumper', marlin: 'jumper', gigantun: 'runner', belakula: 'bulldog',
   tilapiya: 'plain', piranya: 'thrash', diskus: 'plain', skalyariya: 'plain', paku: 'bulldog', krasnohvost: 'bulldog', pavlin: 'jumper', arovana: 'jumper', elugor: 'snag', arapaima: 'bulldog', zoldorada: 'jumper',
-  prygun: 'thrash', chetyrehglazka: 'jumper', brizgun: 'thrash', gorbyl: 'bulldog', snuk: 'jumper', barramundi: 'jumper', tarpon: 'jumper', pila: 'bulldog'
+  prygun: 'thrash', chetyrehglazka: 'jumper', brizgun: 'thrash', gorbyl: 'bulldog', snuk: 'jumper', barramundi: 'jumper', tarpon: 'jumper', pila: 'bulldog',
+  pompano: 'runner', kalmar: 'thrash', ezh: 'bulldog', lufar: 'runner', kobiya: 'bulldog', goliaf: 'bulldog', molot: 'runner'
 };
 for (const f of FISH) f.style = STYLE_OF[f.id] || 'plain';
 
@@ -555,18 +600,22 @@ export const isBait = (id) => !!ITEMS[id] && ITEMS[id].cat === 'tackle';
 // ───── часы бухты: игровые сутки идут 48 минут, ночь короче дня ─────
 export const DAY_REAL_SEC = 48 * 60;
 const DAY_SHARE = 0.78; // доля реального времени на светлую часть (5:00–21:00)
-export function clockHours(tSec, startHour = 8) {
-  // обратное к realFromHour: светлые 16 часов занимают 78% цикла
-  const off = realFromHour(startHour);
+/**
+ * Час суток через tSec секунд от начала: startHour — с какого часа начинается (у локации свой), share — доля
+ * реального времени на светлую часть (у ночной марины ночь длиннее).
+ */
+export function clockHours(tSec, startHour = 8, share = DAY_SHARE) {
+  // обратное к realFromHour: светлые 16 часов занимают share цикла
+  const off = realFromHour(startHour, share);
   let u = ((tSec / DAY_REAL_SEC + off) % 1 + 1) % 1;
-  if (u < DAY_SHARE) return 5 + (u / DAY_SHARE) * 16;
-  return (21 + ((u - DAY_SHARE) / (1 - DAY_SHARE)) * 8) % 24;
+  if (u < share) return 5 + (u / share) * 16;
+  return (21 + ((u - share) / (1 - share)) * 8) % 24;
 }
-function realFromHour(h) {
+function realFromHour(h, share = DAY_SHARE) {
   h = ((h % 24) + 24) % 24;
-  if (h >= 5 && h < 21) return ((h - 5) / 16) * DAY_SHARE;
+  if (h >= 5 && h < 21) return ((h - 5) / 16) * share;
   const n = h >= 21 ? h - 21 : h + 3;
-  return DAY_SHARE + (n / 8) * (1 - DAY_SHARE);
+  return share + (n / 8) * (1 - share);
 }
 export function dayPart(h) {
   if (h >= 5 && h < 8) return 'dawn';

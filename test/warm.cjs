@@ -74,7 +74,7 @@ const loc = process.argv[3] || ''; // другая локация — свой �
 
   // лобби: днём и ночью
   await p.fill('#nm', 'Прогрев');
-  if (loc) await p.evaluate(() => { RYBAK.profile.xp = 12000; }); // локации открываются по уровню (протока — с 12-го)
+  if (loc) await p.evaluate(() => { RYBAK.profile.xp = 20000; }); // локации открываются по уровню (марина — с 15-го)
   await p.click('[data-a="solo"]');
   await p.waitForFunction(() => RYBAK.state === 'lobby');
   await p.waitForTimeout(900);

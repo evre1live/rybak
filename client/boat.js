@@ -40,7 +40,7 @@ const HULLS = {
   'boat-canoe': { len: 5.2, draft: 0.2, bench: 0.6, seatX: 0, seatZ: 1.04, rot: Math.PI / 2, motor: false, pass: [[-0.32, -0.52], [0.32, -0.52]], bow: [0.95, -2.3], half: 2.5, beam: 0.62 }
 };
 /** Какие корпуса пробовать, лучший — первым: в открытом океане Синего простора ходят на катере. */
-const HULL_ORDER = HAS.blue ? ['boat-cutter', 'env-motorboat', 'prop-boat'] : HAS.mangrove ? ['boat-canoe', 'env-motorboat', 'prop-boat'] : ['env-motorboat', 'prop-boat'];
+const HULL_ORDER = HAS.blue || HAS.marina ? ['boat-cutter', 'env-motorboat', 'prop-boat'] : HAS.mangrove ? ['boat-canoe', 'env-motorboat', 'prop-boat'] : ['env-motorboat', 'prop-boat'];
 // bow — где на носу стоит шест с вымпелом у своей (купленной) лодки: [высота над килем, к носу от середины]
 export const BOAT_SEATS = 2; // сколько пассажиров берёт лодка
 export const VMAX = HAS.mangrove ? 9 : 12.5; // полный ход, м/с (каноэ — потише)

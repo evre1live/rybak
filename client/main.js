@@ -2141,7 +2141,7 @@ class Game {
     const T = this.nowSec();
     // Заставка и лобби — всегда в золотой час, как на макетах меню: низкое тёплое солнце, длинные тени. Часы самой
     // рыбалки идут своим чередом; смену света при входе в бухту прикрывает короткое затемнение (ui.dip).
-    this.hours = this.fixedHour != null ? this.fixedHour : this.state === 'world' ? clockHours(T, 8) : MENU_HOUR + 0.12 * Math.sin(now * 0.00002);
+    this.hours = this.fixedHour != null ? this.fixedHour : this.state === 'world' ? clockHours(T, LOC.start ?? 8, LOC.dayShare) : MENU_HOUR + 0.12 * Math.sin(now * 0.00002);
     // погода: на заставке всегда ясно; при входе в бухту ставится сразу, дальше меняется плавно
     const wx = (this.weather = this.state === 'title' ? weatherAt('title', 0) : weatherAt(this.seed, Math.max(0, T), this.forceWx));
     this.world.setWeather(wx, this.wxSeed === this.seed ? dt : 0);

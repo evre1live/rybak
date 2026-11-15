@@ -1348,6 +1348,46 @@
     "env-mangrove2": {
       "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/9xyJt8pKdU5OTRua8hpZ/f7vGT5FhvHrRK5V3rzKj/content.png",
       "model": "d3cf4d22-aa86-4627-8c0b-84c3be6f51be"
+    },
+    "boat-yacht": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/pf9Bx8gXPd7j4ivYbMoP/MCN5QJYqisyKvy7fqX6z/content.png",
+      "model": "5e2802d6-4eb1-451c-a527-a315ef37b9b6"
+    },
+    "fish-goliaf": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/xifEQB6GVxnLcH3MqoMv/j1wAnjfZLQH5vtMutpKo/content.png",
+      "model": "68ccae32-594d-47e7-b3ff-ae1b5c96e902"
+    },
+    "fish-molot": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/CysdQXZuMNOHCrFKRLeN/SXkRPeGPdtWCiWbwdnDc/content.png",
+      "model": "bdad26f2-0f68-4542-b6f3-c5b16885d079"
+    },
+    "fish-kalmar": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/TD8LiPIqsvZFQq47hxDQ/LFETXSdiOApHZ2MOPANR/content.png",
+      "model": "61768c13-f923-4acf-ad75-2224f18ad57d"
+    },
+    "fish-ezh": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/lNpb4hBaXbAJm7PJS1PH/l1xl5AilenzxLGEXkLTl/content.png",
+      "model": "27f538a1-1f7d-44a4-9ed6-30213997da1d"
+    },
+    "fish-kobiya": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/EcYVuhlig85bbTJK0nD2/o9qY0Xo91423tCRX6nHB/content.png",
+      "model": "e6dd7e90-3301-4556-b82c-7d231aaaa219"
+    },
+    "fish-lufar": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/0qO1GvwRaSd8NoITpM2R/ZjqMbMyTfRc7vM9Taruj/content.png",
+      "model": "4385a7de-421f-4a98-8b66-20ce78d20dd0"
+    },
+    "fish-pompano": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/LHz4pE9Qw93TNKuk8yAc/8SM7rjUk3C0WpDjofTd5/content.png",
+      "model": "06b66865-9d88-4975-917b-6210d3661592"
+    },
+    "boat-sail": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/KYA2VAsLQiMMqAROUJ0Q/rVpq4l7w11hNuJ8IoQXl/content.png",
+      "model": "45134a80-7c0b-4846-bf9e-bc1bdd2727f2"
+    },
+    "beast-luna": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/v5xrHLhOZX978R87XDu3/wzNLWBTKfNgsryE81AJh/content.png",
+      "model": "224de192-8d2f-472c-b1a2-0bdc8c40f1a5"
     }
   },
   "ledger": [
@@ -3820,6 +3860,76 @@
       "label": "env-mangrove3 модель",
       "type": "image_to_model",
       "task": "55ef3a46-626d-48b5-a440-41ffd737922c",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-15T18:00:13.067Z",
+      "label": "fish-pompano модель",
+      "type": "image_to_model",
+      "task": "06b66865-9d88-4975-917b-6210d3661592",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-15T18:00:20.731Z",
+      "label": "fish-lufar модель",
+      "type": "image_to_model",
+      "task": "4385a7de-421f-4a98-8b66-20ce78d20dd0",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-15T18:00:22.890Z",
+      "label": "fish-kobiya модель",
+      "type": "image_to_model",
+      "task": "e6dd7e90-3301-4556-b82c-7d231aaaa219",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-15T18:00:43.803Z",
+      "label": "fish-ezh модель",
+      "type": "image_to_model",
+      "task": "27f538a1-1f7d-44a4-9ed6-30213997da1d",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-15T18:01:08.587Z",
+      "label": "fish-kalmar модель",
+      "type": "image_to_model",
+      "task": "61768c13-f923-4acf-ad75-2224f18ad57d",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-15T18:01:09.693Z",
+      "label": "fish-molot модель",
+      "type": "image_to_model",
+      "task": "bdad26f2-0f68-4542-b6f3-c5b16885d079",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-15T18:01:13.833Z",
+      "label": "fish-goliaf модель",
+      "type": "image_to_model",
+      "task": "68ccae32-594d-47e7-b3ff-ae1b5c96e902",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-15T18:01:17.958Z",
+      "label": "boat-yacht модель",
+      "type": "image_to_model",
+      "task": "5e2802d6-4eb1-451c-a527-a315ef37b9b6",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-15T18:02:01.706Z",
+      "label": "beast-luna модель",
+      "type": "image_to_model",
+      "task": "224de192-8d2f-472c-b1a2-0bdc8c40f1a5",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-15T18:02:43.725Z",
+      "label": "boat-sail модель",
+      "type": "image_to_model",
+      "task": "45134a80-7c0b-4846-bf9e-bc1bdd2727f2",
       "credits": 30
     }
   ]

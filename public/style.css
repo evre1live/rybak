@@ -373,6 +373,11 @@ input.code{text-transform:uppercase;letter-spacing:.3em;text-align:center;font:i
 .locs.many{gap:.4em}
 .locs.many .loc{padding:.28em .4em .28em .3em}
 .locs.many .loc img{aspect-ratio:4/2.75}
+/* семь мест и больше: подпись в одну строку, картинки ниже — заставка остаётся в окне 1280×720 */
+.locs.lots{gap:.3em}
+.locs.lots .loc{padding:.2em .4em .2em .24em}
+.locs.lots .loc img{aspect-ratio:4/2.15}
+.locs.lots .loc i{-webkit-line-clamp:1}
 .locs .loc:last-child:nth-child(odd){grid-column:1/-1;grid-template-columns:calc(22% - .1em) minmax(0,1fr)}
 .locs .loc:last-child:nth-child(odd) i{-webkit-line-clamp:1}
 .tnote{max-width:27em;margin:.2em auto 0;padding:.6em 1em;border-radius:1.1em;background:var(--g);border:.09em solid var(--gb);color:var(--cream);font-size:.9em;line-height:1.35;text-align:center}

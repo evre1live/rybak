@@ -1792,6 +1792,79 @@
       "prompt": "(этап 27, образец GPT Image) A single young mangrove tree: a low, dense, rounded crown of glossy green leaves sitting on a wide dome of many arching prop roots, thick and thin, that splay o",
       "tris": 12000,
       "lod": 1600
+    },
+    {
+      "id": "fish-pompano",
+      "group": "fish",
+      "sp": "pompano",
+      "name": "Помпано",
+      "prompt": "(этап 28, образец GPT Image) Florida pompano: deep compressed silvery body, blunt snout, golden-yellow throat and belly, yellow fins, deeply forked tail"
+    },
+    {
+      "id": "fish-ezh",
+      "group": "fish",
+      "sp": "ezh",
+      "name": "Рыба-ёж",
+      "prompt": "(этап 28, образец GPT Image) Porcupinefish, half puffed up: round body covered with long spines, huge eyes, beak-like mouth, sandy-beige with dark brown spots"
+    },
+    {
+      "id": "fish-lufar",
+      "group": "fish",
+      "sp": "lufar",
+      "name": "Луфарь",
+      "prompt": "(этап 28, образец GPT Image) Bluefish: greenish-blue back, silver sides, jutting lower jaw with small sharp teeth, black blotch at the pectoral fin, forked tail"
+    },
+    {
+      "id": "fish-kobiya",
+      "group": "fish",
+      "sp": "kobiya",
+      "name": "Кобия",
+      "prompt": "(этап 28, образец GPT Image) Cobia: torpedo body, flat shark-like head, chocolate-brown back, dark stripe edged with cream lines along the side, short dorsal spines, sickle tail"
+    },
+    {
+      "id": "fish-goliaf",
+      "group": "fish",
+      "sp": "goliaf",
+      "name": "Групер-голиаф",
+      "prompt": "(этап 28, образец GPT Image) Atlantic goliath grouper: enormous heavy grouper, broad head, huge mouth with thick lips, mottled yellow-brown and olive with dark bands, rounded fins"
+    },
+    {
+      "id": "fish-kalmar",
+      "group": "fish",
+      "sp": "kalmar",
+      "name": "Кальмар",
+      "prompt": "(этап 28, образец GPT Image) Squid: torpedo mantle, translucent pink-white skin speckled red-brown, arrow-head fins at the rear, big eye, arms and two tentacles forward"
+    },
+    {
+      "id": "fish-molot",
+      "group": "fish",
+      "sp": "molot",
+      "name": "Рыба-молот",
+      "prompt": "(этап 28, образец GPT Image) Great hammerhead shark: wide hammer-shaped head with eyes at the ends, grey-bronze back, white belly, very tall sickle dorsal fin, long upper tail lobe"
+    },
+    {
+      "id": "beast-luna",
+      "group": "env",
+      "name": "Лунный призрак",
+      "prompt": "(этап 28, образец GPT Image) giant ghostly ocean sunfish (Mola mola): disc body, tall dorsal and anal fins, moon-white pearly skin with crater-like spots",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 9000,
+      "lod": 900
+    },
+    {
+      "id": "boat-yacht",
+      "group": "prop",
+      "name": "Яхта",
+      "prompt": "(этап 28, образец GPT Image) sleek white luxury motor yacht, navy stripe, two decks with dark windows, flybridge with radar arch, teak stern deck",
+      "tris": 9000
+    },
+    {
+      "id": "boat-sail",
+      "group": "prop",
+      "name": "Парусная яхта",
+      "prompt": "(этап 28, образец GPT Image) white cruising sailboat with sails down: tall mast and rigging, mainsail under a navy cover on the boom, low cabin with portholes, teak deck",
+      "tris": 9000
     }
   ],
   "leads": {

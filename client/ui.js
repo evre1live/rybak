@@ -669,7 +669,7 @@ export class UI {
     // знает свою локацию. Закрытая локация видна, но открыть рыбалку на ней нельзя, пока не дорос уровень.
     if (!this.pickLoc) this.pickLoc = LOC_ID;
     const lvl = levelInfo(p.xp).lvl;
-    const locs = this.g.offline ? '' : `<label>Где рыбачим</label><div class="locs${LOCATIONS.length > 4 ? ' many' : ''}">${LOCATIONS.map((l) => {
+    const locs = this.g.offline ? '' : `<label>Где рыбачим</label><div class="locs${LOCATIONS.length > 4 ? ' many' : ''}${LOCATIONS.length > 6 ? ' lots' : ''}">${LOCATIONS.map((l) => {
       const lock = lvl < l.level;
       const st = mastery(p, l.id).stars; // звёзды мастерства — на карточке, если уже есть хоть одна
       return `<button class="loc${l.id === this.pickLoc ? ' on' : ''}${lock ? ' lock' : ''}" data-a="loc" data-id="${l.id}" title="${esc(l.about)}"><img src="${imgUrl(l.img)}" alt="">${lock ? `<em class="lk">${ic('lock')}С ${l.level} УРОВНЯ</em>` : st ? `<em class="lk st">${'★'.repeat(st)}</em>` : ''}<b>${esc(l.name)}</b><i>${esc(l.sub)}</i></button>`;

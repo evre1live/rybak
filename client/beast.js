@@ -19,7 +19,8 @@ const SHAPE = {
   'beast-chudo': { head: -1 },
   'fauna-kit': { head: -1 },
   'beast-kraken': { round: true },
-  'beast-som': { head: 1 }
+  'beast-som': { head: 1 },
+  'beast-luna': { head: 1, stiff: true }
 };
 const esc = (s) => String(s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]);
 
@@ -62,7 +63,7 @@ function beastMesh(tpl, def) {
           : `#include <begin_vertex>
       { float u = (transformed.x + ${half.toFixed(2)}) / ${(2 * half).toFixed(2)}; // 0 — голова, 1 — хвост
         float w = sin(u * 5.5 - uBT * 2.2) * (0.15 + 0.85 * u * u);
-        transformed.z += w * uBAmp * ${(half * 0.16).toFixed(3)}; vBU = u; }`
+        transformed.z += w * uBAmp * ${(half * (sh.stiff ? 0.05 : 0.16)).toFixed(3)}; vBU = u; }`
       );
     s.vertexShader = s.vertexShader.replace('void main() {', 'void main() {\nvBU = 0.0;');
     if (def.tint === 'rainbow') {
@@ -76,6 +77,12 @@ function beastMesh(tpl, def) {
         diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.3 + rbw * 0.8, 0.78);`
         )
         .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += (0.5 + 0.5 * cos(6.2832 * (vBU * 1.7 - uBT * 0.07 + vec3(0.0, 0.33, 0.67)))) * 0.16;');
+    } else if (def.tint === 'ghost') {
+      // Лунный призрак: бледный, как луна, светится изнутри голубоватым светом — ночью его видно издалека
+      s.fragmentShader = s.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform float uBT;\nvarying float vBU;')
+        .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.86, 0.9, 1.0), 0.35);')
+        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vec3(0.42, 0.55, 0.85) * (0.55 + 0.2 * sin(uBT * 1.3 + vBU * 6.0));');
     } else s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vBU;');
   };
   mat.customProgramCacheKey = () => 'beast' + (sh.round ? 'R' : 'L') + half.toFixed(1) + (def.tint || '');

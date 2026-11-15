@@ -54,7 +54,7 @@ test('каждую рыбу можно поймать хоть где-то и х
 });
 
 test('локации: список, подписи зон, кто может открыть комнату', () => {
-  assert.deepEqual(LOCATIONS.map((l) => l.id), ['bay', 'lake', 'keys', 'blue', 'cascade', 'mangrove']);
+  assert.deepEqual(LOCATIONS.map((l) => l.id), ['bay', 'lake', 'keys', 'blue', 'cascade', 'mangrove', 'marina']);
   for (const l of LOCATIONS) {
     assert.ok(l.name.length > 3 && l.sub && l.about && l.place && /^img\/place-\w+\.webp$/.test(l.img) && l.pin.length === 2 && l.level >= 1, l.id);
     assert.ok(l.say.enter && l.say.back && l.say.top, `${l.id}: слова для сообщений`);
@@ -367,10 +367,10 @@ test('баланс манер: мелочь ловится у всех, редк
   const start = L.kitStats(L.newProfile());
   for (const f of FISH.filter((x) => x.rar === 0)) assert.ok(rate(f.id, 0.28, start, 0.5, 40) >= 95, f.id);
   const mid = MID();
-  // рыба океана и джунглей (только «Синий простор» с 8-го уровня и «Водопадная чаша» с 10-го) — на своей снасти:
-  // «Закат Про» с флюорокарбоном
+  // рыба океана, джунглей и марины (только «Синий простор» с 8-го уровня, «Водопадная чаша» с 10-го и «Пальмовая
+  // марина» с 15-го) — на своей снасти: «Закат Про» с флюорокарбоном
   const sea = kitOf('rod5', 'line3', 'reel3', 'hook3', true);
-  const own = (f) => (locsOf(f).every((l) => l === 'blue' || l === 'cascade') ? sea : mid);
+  const own = (f) => (locsOf(f).every((l) => l === 'blue' || l === 'cascade' || l === 'marina') ? sea : mid);
   for (const f of FISH.filter((x) => x.rar === 1 || x.rar === 2)) assert.ok(rate(f.id, 0.28, own(f), 0.5, 40) >= 95, f.id);
   for (const sp of ['som', 'tunec', 'losos', 'skat']) assert.ok(rate(sp, 0.28, mid, 0.85) >= 80, sp);
   const top = TOP();
@@ -1161,7 +1161,7 @@ test('гиганты: только на морскую удочку, у борт
   assert.ok(heavy.heavy && !heavy.gaff && heavy.gaffAt === 1);
   assert.ok(L.speciesWeights(sea, 'squid', 12, 'bay', heavy).some((e) => e.f.id === 'mako'));
   const giants = FISH.filter((f) => f.giant);
-  assert.deepEqual(giants.map((f) => f.id).sort(), ['arapaima', 'belakula', 'gigantun', 'mako', 'marlin', 'osetr', 'parusnik', 'pila', 'rifakula', 'tarpon']);
+  assert.deepEqual(giants.map((f) => f.id).sort(), ['arapaima', 'belakula', 'gigantun', 'goliaf', 'mako', 'marlin', 'molot', 'osetr', 'parusnik', 'pila', 'rifakula', 'tarpon']);
   for (const f of giants) assert.ok(f.rar >= 3 && f.w[1] >= 90 && f.minDepth >= 5, f.id);
   // большой подсак гиганту не помогает: без багра — до конца пути; с багром — с 90 %
   const s = L.fightInit({ sp: 'mako', w: 200 }, heavy, half);

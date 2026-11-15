@@ -14,6 +14,7 @@ import { buildKeysNature } from './loc/keys-nature.js';
 import { buildBlueNature } from './loc/blue-nature.js';
 import { buildCascadeNature } from './loc/cascade-nature.js';
 import { buildMangroveNature } from './loc/mangrove-nature.js';
+import { buildMarinaCity } from './loc/marina-city.js';
 import { buildCurrent } from './loc/blue-sea.js';
 import { pine, roundTree, bush, farPine, farCrown } from './flora.js';
 import { waveH, swellMax } from './water.js';
@@ -178,7 +179,9 @@ const SHACK = {
   // Водопадная чаша: хижина из тёмного бамбука под пальмовой соломой, маркиза — в цвет геликоний
   cascade: { kind: 'bamboo', wall: '#b39a68', trim: '#6e5228', roof: '#8f7a46', roofMat: 5, ridge: '#5f4a24', rib: '#6f5a2e', awn: ['#e8582a', '#f6f1e7'], glass: '#23332a', thatch: true },
   // Мангровая протока: крашенные бирюзой доски под пальмовой соломой — как хижина на сваях напротив
-  mangrove: { kind: 'boards', wall: '#3f9e98', trim: '#e9dfc4', roof: '#a8874e', roofMat: 5, ridge: '#7a5f30', rib: '#8a6c38', awn: ['#e8582a', '#f6f1e7'], glass: '#22343a', thatch: true }
+  mangrove: { kind: 'boards', wall: '#3f9e98', trim: '#e9dfc4', roof: '#a8874e', roofMat: 5, ridge: '#7a5f30', rib: '#8a6c38', awn: ['#e8582a', '#f6f1e7'], glass: '#22343a', thatch: true },
+  // Пальмовая марина: розовая штукатурка с белой отделкой, как дома на набережной; маркиза — розово-белая
+  marina: { kind: 'plaster', wall: '#f6c4d6', trim: '#ffffff', roof: '#e8e2d8', roofMat: 7, ridge: '#d8d0c4', rib: '#cfc6b8', awn: ['#ff5fa8', '#f6f1e7'], glass: '#1c2c40' }
 };
 export const SHACK_STYLE = LOC_ID in SHACK ? LOC_ID : 'teal';
 
@@ -1741,10 +1744,12 @@ export function buildScenery(scene, nfx = null) {
   scene.add(fallback);
   // природа и постройки — у каждой локации свои; база (причалы, лавка, фонари) общая
   let lh = null;
+  let city = null; // город марины: неон, окна, огни у входа в гавань
   if (LOC_ID === 'lake') buildLakeNature(scene);
   else if (LOC_ID === 'keys') buildKeysNature(scene);
   else if (LOC_ID === 'cascade') buildCascadeNature(scene);
   else if (LOC_ID === 'mangrove') buildMangroveNature(scene);
+  else if (LOC_ID === 'marina') city = buildMarinaCity(scene, nfx);
   else if (LOC_ID === 'blue') {
     // остров Маяка: обрывы, рощи, гортензии; маяк с домиком смотрителя — на Маячной скале (те же, что в бухте)
     buildBlueNature(scene);
@@ -1768,6 +1773,8 @@ export function buildScenery(scene, nfx = null) {
   if (nfx) buildNightLife(nfx, shack, lh);
   const env = upgradeEnv(scene);
   return {
+    /** Для проверок: город марины (сколько домов, неона, яхт). */
+    cityState: () => (city ? city.stats() : null),
     /** Для проверок: какие готовые модели локации уже стоят и сколько в них треугольников. */
     envState: () => ({ ...envState(), ...env.scatter.stats() }),
     env,
@@ -1806,6 +1813,7 @@ export function buildScenery(scene, nfx = null) {
       }
       falls.uLight.value = 0.14 + 0.86 * light;
       envNight(night);
+      if (city) city.setNight(night);
     },
     /** Где солнце и видно ли его (0 — ночь, дождь или туман): для радуги в пыли водопадов. */
     setSun(dir, k) {
@@ -1824,6 +1832,7 @@ export function buildScenery(scene, nfx = null) {
         falls.uRain.value = sunK * sstep(0.05, 0.45, -(_v3.x * sunAt.x + _v3.y * sunAt.y + _v3.z * sunAt.z));
       }
       if (lh) lh.beam.rotation.y = t * 0.45;
+      if (city) city.update(dt, t);
       if (current && camera) current.update(camera, t, waveH);
       for (const f of floaters) {
         const p = f.o.position;

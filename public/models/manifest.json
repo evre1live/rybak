@@ -3331,6 +3331,128 @@
         "tris": 1512,
         "kb": 27
       }
+    },
+    "fish-pompano": {
+      "file": "models/fish-pompano.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 202,
+      "size": [
+        1,
+        0.581,
+        0.395
+      ],
+      "icon": "models/icons/fish-pompano.webp"
+    },
+    "fish-ezh": {
+      "file": "models/fish-ezh.glb",
+      "group": "fish",
+      "tris": 7999,
+      "kb": 243,
+      "size": [
+        1,
+        0.653,
+        0.72
+      ],
+      "icon": "models/icons/fish-ezh.webp"
+    },
+    "fish-lufar": {
+      "file": "models/fish-lufar.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 189,
+      "size": [
+        1,
+        0.379,
+        0.43
+      ],
+      "icon": "models/icons/fish-lufar.webp"
+    },
+    "fish-kobiya": {
+      "file": "models/fish-kobiya.glb",
+      "group": "fish",
+      "tris": 7999,
+      "kb": 187,
+      "size": [
+        1,
+        0.36,
+        0.391
+      ],
+      "icon": "models/icons/fish-kobiya.webp"
+    },
+    "fish-goliaf": {
+      "file": "models/fish-goliaf.glb",
+      "group": "fish",
+      "tris": 7999,
+      "kb": 288,
+      "size": [
+        1,
+        0.495,
+        0.441
+      ],
+      "icon": "models/icons/fish-goliaf.webp"
+    },
+    "fish-kalmar": {
+      "file": "models/fish-kalmar.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 239,
+      "size": [
+        1,
+        0.302,
+        0.199
+      ],
+      "icon": "models/icons/fish-kalmar.webp"
+    },
+    "fish-molot": {
+      "file": "models/fish-molot.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 148,
+      "size": [
+        1,
+        0.573,
+        0.737
+      ],
+      "icon": "models/icons/fish-molot.webp"
+    },
+    "beast-luna": {
+      "file": "models/beast-luna.glb",
+      "group": "env",
+      "tris": 8990,
+      "kb": 146,
+      "size": [
+        0.811,
+        1,
+        0.534
+      ],
+      "lod": {
+        "file": "models/beast-luna.lod.glb",
+        "tris": 900,
+        "kb": 13
+      }
+    },
+    "boat-yacht": {
+      "file": "models/boat-yacht.glb",
+      "group": "prop",
+      "tris": 9000,
+      "kb": 253,
+      "size": [
+        1,
+        0.462,
+        0.37
+      ]
+    },
+    "boat-sail": {
+      "file": "models/boat-sail.glb",
+      "group": "prop",
+      "tris": 8998,
+      "kb": 236,
+      "size": [
+        1,
+        0.961,
+        0.343
+      ]
     }
   }
 }

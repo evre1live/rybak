@@ -8,6 +8,7 @@ import { keysTint, buildKeysTerrain } from './loc/keys-world.js';
 import { blueTint, buildBlueTerrain } from './loc/blue-world.js';
 import { cascadeTint, buildCascadeTerrain } from './loc/cascade-world.js';
 import { mangroveTint, buildMangroveTerrain } from './loc/mangrove-world.js';
+import { marinaTint, buildMarinaTerrain } from './loc/marina-world.js';
 import { buildFireflies } from './loc/mangrove-nature.js';
 import { buildReef } from './loc/keys-reef.js';
 import { buildMist } from './loc/lake-nature.js';
@@ -138,7 +139,7 @@ function bayTint(c, x, y, z, ny, w) {
   }
 }
 /** Краски земли — у каждой локации свои. */
-const groundTint = { lake: lakeTint, keys: keysTint, blue: blueTint, cascade: cascadeTint, mangrove: mangroveTint }[LOC_ID] || bayTint;
+const groundTint = { lake: lakeTint, keys: keysTint, blue: blueTint, cascade: cascadeTint, mangrove: mangroveTint, marina: marinaTint }[LOC_ID] || bayTint;
 const _w = [0, 0, 1, 0];
 /** Цвет земли в точке и сколько там травы (0…1) — для пучков травы (grass.js). На склонах, где проступает камень, травы нет. */
 function grassTint(x, z, c) {
@@ -417,7 +418,7 @@ export class World {
   constructor() {
     const scene = (this.scene = new THREE.Scene());
     scene.fog = new THREE.Fog('#a9dcff', 170, 1700);
-    this.terrain = LOC_ID === 'lake' ? buildLakeTerrain(buildGround) : LOC_ID === 'keys' ? buildKeysTerrain(buildGround) : LOC_ID === 'blue' ? buildBlueTerrain(buildGround) : LOC_ID === 'cascade' ? buildCascadeTerrain(buildGround) : LOC_ID === 'mangrove' ? buildMangroveTerrain(buildGround) : buildTerrain();
+    this.terrain = LOC_ID === 'lake' ? buildLakeTerrain(buildGround) : LOC_ID === 'keys' ? buildKeysTerrain(buildGround) : LOC_ID === 'blue' ? buildBlueTerrain(buildGround) : LOC_ID === 'cascade' ? buildCascadeTerrain(buildGround) : LOC_ID === 'mangrove' ? buildMangroveTerrain(buildGround) : LOC_ID === 'marina' ? buildMarinaTerrain(buildGround) : buildTerrain();
     scene.add(this.terrain);
     this.water = createWater();
     scene.add(this.water.mesh);

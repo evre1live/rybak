@@ -165,6 +165,20 @@ export const PALETTES = {
     post: { bloom: 0.17, thr: 0.98, vig: 0.32 },
     fog: { near: 90, far: 1000 }
   },
+  // «Пальмовая марина»: днём — те же тропики, ночью небо лиловее, дымку у горизонта подсвечивает город,
+  // облака розовеют от неона; вода бирюзово-синяя, огни отражаются длинными дорожками
+  marina: {
+    name: 'Пальмовая марина',
+    tone: { sat: 1.32, vib: 0.12, con: 1.1, toe: 0.62, sh: [0.95, 0.96, 1.1], hi: [1.06, 1.0, 0.95] },
+    keys: DAY.map((k) =>
+      vary([k], k.h >= 20.9 || k.h <= 4.6
+        ? { zen: [0.05, 1.05, 1.0], hor: [0.07, 1.1, 1.12], fog: [0.06, 1.1, 1.1], cloud: [0.06, 1.2, 1.2], wS: [-0.02, 1.2, 0.95], wD: [-0.02, 1.1, 0.95] }
+        : { wS: [0.03, 0.98, 0.95], wD: [0.01, 1.0, 0.9] })[0]
+    ),
+    water: { clear: 0.11, pathMin: 0.32, fres: 0.7, net: 0.3, deepAt: 12, netDeep: 0.8, netTint: 0.6, seaDeep: 0.6, bedNet: 0.85, bedTint: 0.62, bedFog: 0.06, bedDeep: 0.7, moonPath: [4, 42], edge: 0.3 },
+    post: { bloom: 0.2, thr: 0.95, vig: 0.3 },
+    fog: { near: 150, far: 1500 }
+  },
 
   // Б. «Пастель»: мягко и светло — молочная дымка, кремовый свет, мятная вода, низкий контраст
   pastel: {
@@ -196,7 +210,7 @@ export const PALETTES = {
 /** Палитра игры. Остальные наборы — для сравнения: ?pal=now (как было до этапа 20), ?pal=pastel, ?pal=cinema. */
 export const DEFAULT_PALETTE = 'tropic';
 /** У локации может быть своя палитра (иначе — палитра игры). */
-export const LOC_PALETTE = { lake: 'pine', keys: 'coral', blue: 'ocean', cascade: 'jungle', mangrove: 'mangrove' };
+export const LOC_PALETTE = { lake: 'pine', keys: 'coral', blue: 'ocean', cascade: 'jungle', mangrove: 'mangrove', marina: 'marina' };
 const asked = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('pal') : null;
 /** Действующая палитра. Поля меняются на месте (usePalette), поэтому читать их нужно в момент использования. */
 export const PAL = { id: '' };

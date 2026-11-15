@@ -714,7 +714,8 @@ const Q_ZONE = {
   stones: 'у камней', pit: 'над ямой',
   garden: 'в коралловом саду', channel: 'в протоке', edge: 'на краю рифа',
   bank: 'на Банке', current: 'в Течении', deep: 'на свале', mid: 'на средней воде', snags: 'у коряг',
-  roots: 'у корней мангров', mouth: 'в устье'
+  roots: 'у корней мангров', mouth: 'в устье',
+  lights: 'у огней причала', bridge: 'под мостом'
 };
 const Q_SPECIES = [
   ['bychok', 'plotva', 'okun', 'kefal', 'karas', 'stavrida'],
@@ -748,13 +749,18 @@ const Q_ELSEWHERE = {
   mangrove: {
     sp: [['kefal', 'prygun', 'chetyrehglazka', 'brizgun'], ['gorbyl', 'snuk', 'lucian', 'brizgun']],
     zone: [['pier', 'shallow', 'backwater'], ['backwater', 'roots', 'channel'], ['channel', 'mouth', 'pit']]
+  },
+  marina: {
+    sp: [['kefal', 'pompano', 'stavrida', 'ezh'], ['sargan', 'kalmar', 'snuk', 'lucian']],
+    zone: [['pier', 'shallow', 'backwater'], ['lights', 'channel', 'bridge'], ['mouth', 'sea', 'bridge']]
   }
 };
 // у локации зона может называться по-своему
 const Q_ZONE_AT = {
   blue: { reef: 'у Тюленьих камней', backwater: 'в тихой бухточке', sea: 'в синеве', mid: 'у острова' },
   cascade: { backwater: 'в заводи викторий', falls: 'у Каскада', pit: 'в Котле', stones: 'у Скалы-черепахи', snags: 'у коряг' },
-  mangrove: { backwater: 'на илистой отмели', channel: 'в узкой протоке', pit: 'в Омуте', mouth: 'в устье', shallow: 'на мелководье лагуны' }
+  mangrove: { backwater: 'на илистой отмели', channel: 'в узкой протоке', pit: 'в Омуте', mouth: 'в устье', shallow: 'на мелководье лагуны' },
+  marina: { backwater: 'у городского пляжа', channel: 'в канале', mouth: 'у выхода из гавани', sea: 'за молом', lights: 'у огней яхт-клуба', bridge: 'под мостом' }
 };
 const Q_REWARD = [{ coins: 25, xp: 20 }, { coins: 60, xp: 45 }, { coins: 130, xp: 90 }];
 export const QUEST_BONUS = 50; // премия за все три задания дня (растёт с уровнем, как и награды)
