@@ -1,7 +1,7 @@
 // Друзья в бухте: персонаж, удочка, леска, поплавок и рыба на крючке — по данным с сервера.
 import * as THREE from 'three';
 import { Character } from './character.js';
-import { buildRod, buildFloat, buildLure, LURE_SIDEWAYS } from './gear3d.js';
+import { buildRod, buildFloat, buildLure, LURE_SIDEWAYS, poseLure } from './gear3d.js';
 import { buildFish, wiggleFish } from './fish3d.js';
 import { FishLine, Dangle } from './line.js';
 import { BoatVisual, moorSpot, wake, VMAX } from './boat.js';
@@ -56,7 +56,7 @@ export class Remote {
       if (this.bob) this.scene.remove(this.bob);
       const lure = isLure(card.fl);
       this.bob = lure ? buildLure(card.fl) : buildFloat(card.fl || 'float1');
-      if (lure) this.bob.scale.setScalar(0.42);
+      if (lure) this.bob.scale.setScalar(this.bob.userData.real);
       this.bob.visible = false;
       this.scene.add(this.bob);
       this.lure = lure;
@@ -206,13 +206,14 @@ export class Remote {
       const dist = Math.hypot(bx - x, bz - z);
       this.line.set(tip, end, fs === 2 ? 0.8 : fs === 5 || fs === 4 ? 0.04 : Math.min(1.2, 0.25 + dist * 0.03), fs === 2 || fs === 5 ? -5 : 0.02);
       if (fs === 2) this.bob.rotation.set(t * 9, 0, t * 5);
+      else if (this.lure) poseLure(this.bob, this.card.fl, bx - x, bz - z, t, fs === 4 ? 0.5 : 0);
       else this.bob.rotation.set(Math.sin(t * 1.7 + bx) * 0.12, 0, Math.cos(t * 1.3) * 0.12 + (fs === 4 ? 0.5 : 0));
-      this.bob.scale.setScalar(this.lure ? 0.42 : 1);
+      this.bob.scale.setScalar(this.lure ? this.bob.userData.real : 1);
       this.hanger.reset();
     } else if (!this.held && fs <= 1 && g.visible) {
       // без заброса снасть висит под кончиком, как у себя (Fishing.hangTackle)
       rod.tip.getWorldPosition(tip);
-      const k = this.lure ? 0.42 : 0.36;
+      const k = this.lure ? this.bob.userData.real : 0.36;
       const h = this.hanger.step(tip, this.lure ? 0.22 : 0.3, Math.min(dt, 0.05));
       this.bob.scale.setScalar(k);
       this.bob.visible = true;

@@ -448,6 +448,21 @@ function hook(B, x, y, z, s, ry = 0) {
 }
 /** Приманки, которые лежат вдоль X (нос — к −X): на леске под кончиком висят носом вверх. */
 export const LURE_SIDEWAYS = new Set(['wobbler', 'popper', 'jig']);
+/** Приманки, что держатся на поверхности (остальные тонут и идут в толще). */
+export const LURE_FLOATS = new Set(['popper', 'wobbler']);
+/**
+ * Приманка в воде лежит, а не стоит: длинной осью к рыбаку (туда тянет леска), блесна — расписной стороной вверх.
+ * dx, dz — от рыбака к приманке; tilt — наклон при поклёвке.
+ */
+export function poseLure(bob, id, dx, dz, t, tilt = 0) {
+  bob.rotation.order = 'YXZ';
+  const wob = Math.sin(t * 1.7 + dx) * 0.1;
+  const roll = Math.cos(t * 1.3) * 0.1 + tilt;
+  if (LURE_SIDEWAYS.has(id)) bob.rotation.set(wob, Math.atan2(-dz, dx), roll); // нос (−X) — к рыбаку
+  else bob.rotation.set(-Math.PI / 2 + wob, Math.atan2(dx, dz), roll); // ушко (+Y) — к рыбаку, лицо (+Z) — вверх
+}
+/** Настоящая длина приманки вместе с крючком, м: заготовку и модель масштабируем под неё (userData.real). */
+const LURE_LEN = { spoon: 0.075, goldspoon: 0.085, legendlure: 0.1, spinner: 0.07, wobbler: 0.09, popper: 0.085, jig: 0.075 };
 
 export function buildLure(id) {
   const it = ITEMS[id] || ITEMS.spoon;
@@ -495,6 +510,9 @@ export function buildLure(id) {
   }
   const g = new THREE.Group();
   g.add(B.build(BATCH_MAT_2S));
+  // во сколько раз уменьшить заготовку, чтобы приманка стала настоящего размера (модель встаёт в ту же рамку)
+  const sz = new THREE.Box3().setFromObject(g).getSize(new THREE.Vector3());
+  g.userData.real = (LURE_LEN[id] || 0.08) / Math.max(sz.x, sz.y, sz.z);
   mountBobModel(g, it.id || id, false);
   return g;
 }

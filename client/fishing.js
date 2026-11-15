@@ -5,7 +5,7 @@ import { kitStats, biteDelay, rollFish, speciesWeights, fightInit, fightStep, fi
 import { spotAt } from './terrain.js';
 import { LOC_ID } from './loc/id.js';
 import { waveH } from './water.js';
-import { buildFloat, buildLure, LURE_SIDEWAYS } from './gear3d.js';
+import { buildFloat, buildLure, LURE_SIDEWAYS, LURE_FLOATS, poseLure } from './gear3d.js';
 import { buildFish, wiggleFish } from './fish3d.js';
 import { FishLine, Dangle } from './line.js';
 import { HANG_K } from './viewmodel.js';
@@ -53,7 +53,7 @@ export class Fishing {
     if (id !== this.bobId) {
       if (this.bob) this.scene.remove(this.bob);
       this.bob = lure ? buildLure(id) : buildFloat(id);
-      this.bobScale = lure ? 0.42 : 1;
+      this.bobScale = lure ? this.bob.userData.real : 1; // приманка — настоящего размера, 7–10 см
       this.bob.scale.setScalar(this.bobScale);
       this.bob.visible = false;
       this.scene.add(this.bob);
@@ -331,9 +331,13 @@ export class Fishing {
       }
       this.reeling = reel;
       this.dip = damp(this.dip, st === 'bite' ? -0.4 + Math.sin(this.t * 30) * 0.05 : 0, st === 'bite' ? 20 : 5, dt);
-      this.by = waveH(this.bx, this.bz, t) + this.dip + (this.lure ? -0.06 : 0);
+      // поппер и воблер держатся на поверхности, остальные приманки чуть притоплены; поплавок — на воде
+      this.by = waveH(this.bx, this.bz, t) + this.dip + (this.lure ? (LURE_FLOATS.has(this.bobId) ? -0.005 : -0.05) : 0);
+      // приманку издалека не видно: где она, подсказывают круги от лески на воде
+      if (this.lure && st === 'wait' && !reel && Math.random() < dt * 0.7) this.fx.ripple(this.bx, this.bz, 0.22, 0.5);
       this.bob.position.set(this.bx, this.by, this.bz);
-      this.bob.rotation.set(Math.sin(t * 1.7 + this.bx) * 0.12, this.lure ? Math.atan2(dx, dz) + Math.PI / 2 : 0, Math.cos(t * 1.3) * 0.12 + (st === 'bite' ? 0.5 : 0));
+      if (this.lure) poseLure(this.bob, this.bobId, dx, dz, t, st === 'bite' ? 0.5 : 0);
+      else this.bob.rotation.set(Math.sin(t * 1.7 + this.bx) * 0.12, 0, Math.cos(t * 1.3) * 0.12 + (st === 'bite' ? 0.5 : 0));
       this.vm.tipWorld(tip);
       end.copy(this.bob.position);
       if (!this.lure) end.y += 0.28;
