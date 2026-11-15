@@ -1272,6 +1272,30 @@
     "fish-arovana": {
       "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/IfuHmUweBJsnQlvcuCul/eXczqkXbSZIThUcemsdb/content.png",
       "model": "c3355225-4462-4074-8b96-2ebee2078df2"
+    },
+    "fish-paku": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/YVOVvrZR3IckOLGPDbCy/S6i139u9tMScYzLhw5vB/content.png",
+      "model": "9eab1f6a-b957-45ac-9299-9125a0560e4e"
+    },
+    "fish-diskus": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/aAm0Zpd4XnYvIRD5sLcz/bMCvEOM6CSedCmAquGu2/content.png",
+      "model": "a6161b62-15ba-487b-a47b-e187db619764"
+    },
+    "fish-krasnohvost": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/CsaslnhP6s9SGu30U6I3/brY30S27GtCd45AXb8U8/content.png",
+      "model": "b6034c28-cdb9-47ed-85e5-268589855f00"
+    },
+    "fish-elugor": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/Fzf1M8Zy0dqrgUox7GWi/exJh57P6rFGJUKogS90h/content.png",
+      "model": "16535731-311f-4288-9ec6-691d6128532a"
+    },
+    "fish-tilapiya": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/5TPQb7LX6HWenBTFJHtS/fXDjJGaAcILCilnW5QNk/content.png",
+      "model": "d10b341f-5795-4df8-aac3-eb3385e5cdbf"
+    },
+    "fish-skalyariya": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/GkP1LKyeencZZ8IERYdH/eRzfBJFi75tGclcP1kCz/content.png",
+      "model": "5526e988-25d1-458b-80d0-71be6d11148a"
     }
   },
   "ledger": [
@@ -3611,6 +3635,48 @@
       "label": "fish-piranya модель",
       "type": "image_to_model",
       "task": "94b8248e-0878-4072-bdd9-977b8628edbd",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-15T14:58:21.712Z",
+      "label": "fish-skalyariya модель",
+      "type": "image_to_model",
+      "task": "5526e988-25d1-458b-80d0-71be6d11148a",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-15T14:58:21.934Z",
+      "label": "fish-tilapiya модель",
+      "type": "image_to_model",
+      "task": "d10b341f-5795-4df8-aac3-eb3385e5cdbf",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-15T14:58:24.647Z",
+      "label": "fish-elugor модель",
+      "type": "image_to_model",
+      "task": "16535731-311f-4288-9ec6-691d6128532a",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-15T14:58:30.486Z",
+      "label": "fish-krasnohvost модель",
+      "type": "image_to_model",
+      "task": "b6034c28-cdb9-47ed-85e5-268589855f00",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-15T14:58:32.115Z",
+      "label": "fish-diskus модель",
+      "type": "image_to_model",
+      "task": "a6161b62-15ba-487b-a47b-e187db619764",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-15T14:58:47.524Z",
+      "label": "fish-paku модель",
+      "type": "image_to_model",
+      "task": "9eab1f6a-b957-45ac-9299-9125a0560e4e",
       "credits": 30
     }
   ]

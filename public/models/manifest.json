@@ -3003,6 +3003,78 @@
         0.394
       ],
       "icon": "models/icons/fish-piranya.webp"
+    },
+    "fish-tilapiya": {
+      "file": "models/fish-tilapiya.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 223,
+      "size": [
+        1,
+        0.531,
+        0.408
+      ],
+      "icon": "models/icons/fish-tilapiya.webp"
+    },
+    "fish-diskus": {
+      "file": "models/fish-diskus.glb",
+      "group": "fish",
+      "tris": 7999,
+      "kb": 371,
+      "size": [
+        1,
+        0.905,
+        0.541
+      ],
+      "icon": "models/icons/fish-diskus.webp"
+    },
+    "fish-skalyariya": {
+      "file": "models/fish-skalyariya.glb",
+      "group": "fish",
+      "tris": 7999,
+      "kb": 213,
+      "size": [
+        1,
+        0.948,
+        0.51
+      ],
+      "icon": "models/icons/fish-skalyariya.webp"
+    },
+    "fish-paku": {
+      "file": "models/fish-paku.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 148,
+      "size": [
+        1,
+        0.583,
+        0.404
+      ],
+      "icon": "models/icons/fish-paku.webp"
+    },
+    "fish-elugor": {
+      "file": "models/fish-elugor.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 177,
+      "size": [
+        1,
+        0.162,
+        0.245
+      ],
+      "icon": "models/icons/fish-elugor.webp"
+    },
+    "fish-krasnohvost": {
+      "file": "models/fish-krasnohvost.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 181,
+      "size": [
+        1,
+        0.403,
+        0.531
+      ],
+      "icon": "models/icons/fish-krasnohvost.webp"
     }
   }
 }

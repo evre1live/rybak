@@ -1654,6 +1654,48 @@
       "geometry": "detailed",
       "tris": 9000,
       "lod": 900
+    },
+    {
+      "id": "fish-tilapiya",
+      "group": "fish",
+      "sp": "tilapiya",
+      "name": "Тиляпия",
+      "prompt": "(этап 26, образец GPT Image) Nile tilapia cichlid: deep oval body, grey-silver with faint dark vertical bars, long spiny dorsal fin running along the back, dorsal and tail fins edged with orange-red, pale cream belly"
+    },
+    {
+      "id": "fish-diskus",
+      "group": "fish",
+      "sp": "diskus",
+      "name": "Дискус",
+      "prompt": "(этап 26, образец GPT Image) Discus fish: almost perfectly round, very flat disc-shaped body, turquoise-blue with wavy red-brown horizontal lines, red eye, orange-yellow chest, dorsal and anal fins following the round outline of the disc, small fan tail"
+    },
+    {
+      "id": "fish-skalyariya",
+      "group": "fish",
+      "sp": "skalyariya",
+      "name": "Скалярия",
+      "prompt": "(этап 26, образец GPT Image) Freshwater angelfish (scalare): tall triangular silver body with four bold black vertical stripes, very long sail-like dorsal and anal fins sweeping back, two long thin trailing pelvic fins below"
+    },
+    {
+      "id": "fish-paku",
+      "group": "fish",
+      "sp": "paku",
+      "name": "Паку",
+      "prompt": "(этап 26, образец GPT Image) Pacu: big deep-bodied round fish, dark charcoal-grey back and sides, bright orange-red belly and chest, blunt rounded head, small dark fins, forked dark tail"
+    },
+    {
+      "id": "fish-elugor",
+      "group": "fish",
+      "sp": "elugor",
+      "name": "Электрический угорь",
+      "prompt": "(этап 26, образец GPT Image) Electric eel: very long thick cylindrical body like a snake, dark olive-brown back, bright orange-yellow throat and belly, flat broad head with small eyes, one long ribbon fin along the whole underside, no dorsal fin, tail tapering to a point"
+    },
+    {
+      "id": "fish-krasnohvost",
+      "group": "fish",
+      "sp": "krasnohvost",
+      "name": "Краснохвостый сом",
+      "prompt": "(этап 26, образец GPT Image) Redtail catfish: big catfish with a wide flat head and long whiskers (barbels), black-grey back with dark spots, a crisp white band along the lower flank and white belly, bright red-orange tail fin and red-edged dorsal fin"
     }
   ],
   "leads": {
