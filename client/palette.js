@@ -140,6 +140,20 @@ export const PALETTES = {
     fog: { near: 210, far: 2300 }
   },
 
+  // «Водопадная чаша»: джунгли — воздух влажный и тёплый, дымка ближе, тени зеленее (отсвет листвы);
+  // вода бирюзово-изумрудная, как на референсе: на мели прозрачная, над Котлом — густо-зелёная
+  jungle: {
+    name: 'Водопадная чаша',
+    tone: { sat: 1.28, vib: 0.12, con: 1.1, toe: 0.64, sh: [0.92, 1.02, 1.04], hi: [1.06, 1.0, 0.92] },
+    keys: vary(DAY, {
+      zen: [0.004, 0.94, 0.97], hor: [-0.01, 0.86, 1.0], sun: [-0.006, 1.02, 1.0], sunI: 0.97, hemiS: [-0.02, 0.92, 0.98], hemiG: [0.1, 0.9, 0.92], hemiI: 1.0,
+      fog: [-0.03, 0.8, 1.0], wS: [-0.035, 0.9, 0.84], wD: [-0.1, 0.82, 0.66], cloud: [0, 0.92, 1.0]
+    }),
+    water: { clear: 0.105, pathMin: 0.32, fres: 0.76, net: 0.28, deepAt: 13, netDeep: 0.8, netTint: 0.55, seaDeep: 0.4, bedNet: 0.85, bedTint: 0.6, bedFog: 0.065, bedDeep: 0.62, moonPath: [4, 42] },
+    post: { bloom: 0.14, thr: 1.0, vig: 0.3 },
+    fog: { near: 110, far: 1150 }
+  },
+
   // Б. «Пастель»: мягко и светло — молочная дымка, кремовый свет, мятная вода, низкий контраст
   pastel: {
     name: 'Пастель',
@@ -170,7 +184,7 @@ export const PALETTES = {
 /** Палитра игры. Остальные наборы — для сравнения: ?pal=now (как было до этапа 20), ?pal=pastel, ?pal=cinema. */
 export const DEFAULT_PALETTE = 'tropic';
 /** У локации может быть своя палитра (иначе — палитра игры). */
-export const LOC_PALETTE = { lake: 'pine', keys: 'coral', blue: 'ocean' };
+export const LOC_PALETTE = { lake: 'pine', keys: 'coral', blue: 'ocean', cascade: 'jungle' };
 const asked = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('pal') : null;
 /** Действующая палитра. Поля меняются на месте (usePalette), поэтому читать их нужно в момент использования. */
 export const PAL = { id: '' };

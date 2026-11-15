@@ -6,6 +6,7 @@ import { LOC_ID, LOC } from './loc/id.js';
 import { lakeTint, buildLakeTerrain } from './loc/lake-world.js';
 import { keysTint, buildKeysTerrain } from './loc/keys-world.js';
 import { blueTint, buildBlueTerrain } from './loc/blue-world.js';
+import { cascadeTint, buildCascadeTerrain } from './loc/cascade-world.js';
 import { buildReef } from './loc/keys-reef.js';
 import { buildMist } from './loc/lake-nature.js';
 import { createWater, createFoamRings, sea } from './water.js';
@@ -135,7 +136,7 @@ function bayTint(c, x, y, z, ny, w) {
   }
 }
 /** Краски земли — у каждой локации свои. */
-const groundTint = { lake: lakeTint, keys: keysTint, blue: blueTint }[LOC_ID] || bayTint;
+const groundTint = { lake: lakeTint, keys: keysTint, blue: blueTint, cascade: cascadeTint }[LOC_ID] || bayTint;
 const _w = [0, 0, 1, 0];
 /** Цвет земли в точке и сколько там травы (0…1) — для пучков травы (grass.js). На склонах, где проступает камень, травы нет. */
 function grassTint(x, z, c) {
@@ -414,7 +415,7 @@ export class World {
   constructor() {
     const scene = (this.scene = new THREE.Scene());
     scene.fog = new THREE.Fog('#a9dcff', 170, 1700);
-    this.terrain = LOC_ID === 'lake' ? buildLakeTerrain(buildGround) : LOC_ID === 'keys' ? buildKeysTerrain(buildGround) : LOC_ID === 'blue' ? buildBlueTerrain(buildGround) : buildTerrain();
+    this.terrain = LOC_ID === 'lake' ? buildLakeTerrain(buildGround) : LOC_ID === 'keys' ? buildKeysTerrain(buildGround) : LOC_ID === 'blue' ? buildBlueTerrain(buildGround) : LOC_ID === 'cascade' ? buildCascadeTerrain(buildGround) : buildTerrain();
     scene.add(this.terrain);
     this.water = createWater();
     scene.add(this.water.mesh);
@@ -497,7 +498,7 @@ export class World {
     ].filter((f) => deckAt(f.x, f.z, -0.8))); // флаг стоит только там, где на этой локации есть причал
     this.rays = new SunRays(scene);
     // утренний туман над водой — там, где он бывает (озеро)
-    this.mist = LOC.wx && LOC.wx.mist ? buildMist(scene, surfaceU.uDet) : null;
+    this.mist = LOC.wx && LOC.wx.mist ? buildMist(scene, surfaceU.uDet, HAS.cabin ? {} : { smoke: false, area: { x: (MAP_VIEW.x0 + MAP_VIEW.x1) / 2, z: (MAP_VIEW.z0 + MAP_VIEW.z1) / 2, a: (MAP_VIEW.x1 - MAP_VIEW.x0) / 2.4, b: (MAP_VIEW.z1 - MAP_VIEW.z0) / 2.6 } }) : null;
     this.rings = FOAM_SPOTS.length ? createFoamRings(FOAM_SPOTS, this.water.uniforms) : null;
     if (this.rings) scene.add(this.rings);
     this.sunDir = new THREE.Vector3(0, 1, 0);

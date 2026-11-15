@@ -50,7 +50,7 @@ function beastMesh(tpl, def) {
     s.uniforms.uBT = uT;
     s.uniforms.uBAmp = uAmp;
     s.vertexShader = s.vertexShader
-      .replace('#include <common>', '#include <common>\nuniform float uBT, uBAmp;')
+      .replace('#include <common>', '#include <common>\nuniform float uBT, uBAmp;\nvarying float vBU;')
       .replace(
         '#include <begin_vertex>',
         sh.round
@@ -61,10 +61,23 @@ function beastMesh(tpl, def) {
           : `#include <begin_vertex>
       { float u = (transformed.x + ${half.toFixed(2)}) / ${(2 * half).toFixed(2)}; // 0 — голова, 1 — хвост
         float w = sin(u * 5.5 - uBT * 2.2) * (0.15 + 0.85 * u * u);
-        transformed.z += w * uBAmp * ${(half * 0.16).toFixed(3)}; }`
+        transformed.z += w * uBAmp * ${(half * 0.16).toFixed(3)}; vBU = u; }`
       );
+    s.vertexShader = s.vertexShader.replace('void main() {', 'void main() {\nvBU = 0.0;');
+    if (def.tint === 'rainbow') {
+      // Радужный змей: чешуя переливается всеми цветами — полосы цвета бегут от головы к хвосту и светятся
+      s.fragmentShader = s.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform float uBT;\nvarying float vBU;')
+        .replace(
+          '#include <color_fragment>',
+          `#include <color_fragment>
+        vec3 rbw = 0.5 + 0.5 * cos(6.2832 * (vBU * 1.7 - uBT * 0.07 + vec3(0.0, 0.33, 0.67)));
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.3 + rbw * 0.8, 0.78);`
+        )
+        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += (0.5 + 0.5 * cos(6.2832 * (vBU * 1.7 - uBT * 0.07 + vec3(0.0, 0.33, 0.67)))) * 0.16;');
+    } else s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vBU;');
   };
-  mat.customProgramCacheKey = () => 'beast' + (sh.round ? 'R' : 'L') + half.toFixed(1);
+  mat.customProgramCacheKey = () => 'beast' + (sh.round ? 'R' : 'L') + half.toFixed(1) + (def.tint || '');
   const m = new THREE.Mesh(g, mat);
   m.castShadow = true;
   m.frustumCulled = false;

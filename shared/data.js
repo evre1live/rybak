@@ -32,7 +32,9 @@ export const ZONES = {
   edge: { name: 'Край рифа', hint: 'За гребнем: стена рифа уходит в синеву', act: 1.0 },
   // Синий простор
   bank: { name: 'Банка', hint: 'Подводное плато среди океана — далеко на юго-востоке', act: 1.05 },
-  current: { name: 'Течение', hint: 'Полоса плавучих водорослей поперёк океана', act: 0.95 }
+  current: { name: 'Течение', hint: 'Полоса плавучих водорослей поперёк океана', act: 0.95 },
+  // Водопадная чаша
+  snags: { name: 'Коряги', hint: 'Затопленные деревья у восточного берега', act: 1.1 }
 };
 /** Зона ловли так, как её зовут на локации: у локации могут быть свои подписи (shared/locations.js). */
 export const zoneInfo = (id, loc = DEFAULT_LOC) => ({ ...(ZONES[id] || { name: '', hint: '', act: 1 }), ...(locOf(loc).zones[id] || {}) });
@@ -249,7 +251,53 @@ export const FISH = [
   fish('belakula', 'Белая акула', 4, 400, 1500, 60000, 2.7, {}, { squid: 1.6, live: 1.4, crab: 1.0 }, 0.8, { dawn: 1.5, dusk: 1.5, night: 0.8 },
     { shape: 'shark', back: '#56606a', side: '#8c96a0', belly: '#f4f5f4', fin: '#4a535c', pat: 'none', lenK: 45 },
     'Легенда Синего простора. На рассвете и в сумерках поднимается к Тюленьим камням — смотрители маяка видели её плавник выше человеческого роста.',
-    { at: { blue: { reef: 0.7, sea: 0.25 } }, giant: true, minDepth: 12 })
+    { at: { blue: { reef: 0.7, sea: 0.25 } }, giant: true, minDepth: 12 }),
+
+  // ── Водопадная чаша ──
+  fish('tilapiya', 'Тиляпия', 0, 0.1, 1.5, 28, 0.85, {}, { bread: 1.4, corn: 1.3, maggot: 1.2, worm: 1.0, bloodworm: 1.1 }, 0, null,
+    { shape: 'tall', back: '#56636c', side: '#a9b5b9', belly: '#ebe7da', fin: '#d0703f', pat: 'bars', patC: '#6a7680', lenK: 30 },
+    'Неприхотливая цихлида: стайками стоит у свай и берёт на хлеб и кукурузу. Первая рыба каждого, кто спустился к чаше.',
+    { at: { cascade: { pier: 5, shallow: 5, backwater: 3, mid: 2 } } }),
+  fish('piranya', 'Пиранья', 0, 0.1, 1.4, 36, 0.95, {}, { live: 1.6, worm: 1.4, shrimp: 1.3, bloodworm: 1.0, squid: 1.0 }, 1.2, null,
+    { shape: 'tall', back: '#4f5a66', side: '#a9b3bc', belly: '#d8402a', fin: '#c43a26', pat: 'dots', patC: '#dfe4ea', lenK: 28, bigEye: true },
+    'Серебристая, с красным брюхом и зубами-бритвами. Стаей налетает на всё, что упало в воду, — снимайте с крючка осторожно.',
+    { at: { cascade: { snags: 5, pier: 4, shallow: 4, stones: 3, mid: 2 } } }),
+  fish('diskus', 'Дискус', 0, 0.05, 0.4, 40, 0.7, {}, { bloodworm: 1.5, maggot: 1.3, bread: 1.0, corn: 0.9 }, 0, null,
+    { shape: 'disc', back: '#2a8fa0', side: '#3fb8c0', belly: '#f0c070', fin: '#c0502a', pat: 'lines', patC: '#c44a2a', lenK: 24 },
+    'Круглый, как блюдце, весь в бирюзовых и красных узорах. Прячется под листьями викторий в заводи.',
+    { at: { cascade: { backwater: 6, shallow: 3, pier: 1.5 } } }),
+  fish('skalyariya', 'Скалярия', 0, 0.03, 0.3, 34, 0.65, {}, { bloodworm: 1.5, maggot: 1.3, bread: 0.9 }, 0, null,
+    { shape: 'disc', back: '#9aa4a8', side: '#e6e8e4', belly: '#f4f2ea', fin: '#c8ccc8', pat: 'bars', patC: '#1c1c1c', lenK: 22 },
+    'Серебряный парус с чёрными полосами: плавники тянутся далеко вверх и вниз. Стайкой стоит в тени свай и листьев викторий.',
+    { at: { cascade: { backwater: 5, pier: 3, shallow: 3 } } }),
+  fish('paku', 'Паку', 1, 1, 14, 120, 1.35, {}, { corn: 1.7, bread: 1.4, maggot: 0.8 }, 0, { day: 1.1 },
+    { shape: 'tall', back: '#2c3036', side: '#5a6068', belly: '#e07a2a', fin: '#3a3e44', pat: 'scales', lenK: 30 },
+    'Родня пираньи, только мирная: грызёт орехи и плоды, что падают с деревьев, — зубы у него почти человеческие. Берёт на кукурузу.',
+    { at: { cascade: { backwater: 4, snags: 4, shallow: 2, mid: 2 } } }),
+  fish('pavlin', 'Павлиний окунь', 1, 0.5, 7, 150, 1.5, {}, { live: 1.7, shrimp: 1.1, worm: 1.0 }, 2.0, { day: 1.15, dawn: 1.2 },
+    { shape: 'std', back: '#5a7a22', side: '#e0c030', belly: '#f07a2a', fin: '#e85a2a', pat: 'bars', patC: '#1a1a14', lenK: 33 },
+    'Золотисто-зелёный, с тремя чёрными полосами и «глазом» на хвосте. Бьёт блесну с разгона у подножия водопадов — за ним едут со всего света.',
+    { at: { cascade: { falls: 5, stones: 4, snags: 3, mid: 2, pier: 1 } } }),
+  fish('arovana', 'Арована', 2, 0.8, 6, 360, 1.6, {}, { live: 1.4, shrimp: 1.2, worm: 0.8 }, 1.6, { dawn: 1.4, dusk: 1.4 },
+    { shape: 'slim', back: '#5a6a5a', side: '#d8d0a8', belly: '#f4f0dc', fin: '#c8a050', pat: 'scales', lenK: 52 },
+    'Серебряная рыба-дракон с усами и крупной чешуёй. Выпрыгивает из воды за жуками с нависших веток — у коряг и под берегом.',
+    { at: { cascade: { snags: 4, shallow: 3, backwater: 2, falls: 1.5 } }, minDepth: 1.5 }),
+  fish('elugor', 'Электрический угорь', 2, 1, 12, 380, 1.6, {}, { live: 1.6, worm: 1.4, shrimp: 1.0 }, 0, { night: 2.2, dusk: 1.3, day: 0.3, dawn: 0.7 },
+    { shape: 'eel', back: '#2f3328', side: '#4a4f3a', belly: '#e0782a', fin: '#3a3e30', pat: 'none', lenK: 76 },
+    'Тёмный, с оранжевым брюхом, бьёт током. Ночью поднимается из Котла и охотится у камней — руками не трогать.',
+    { at: { cascade: { pit: 4, deep: 3, snags: 3, stones: 2 } } }),
+  fish('krasnohvost', 'Краснохвостый сом', 2, 3, 40, 420, 1.7, {}, { live: 1.5, worm: 1.2, squid: 1.1 }, 0.4, { night: 1.8, dusk: 1.3, day: 0.6 },
+    { shape: 'cat', back: '#2a2c30', side: '#3a3c40', belly: '#f0ece0', fin: '#d8481c', pat: 'none', lenK: 44 },
+    'Чёрная спина, белая полоса вдоль брюха и хвост красный, как уголь. Днём лежит в Котле и под корягами, ночью выходит кормиться.',
+    { at: { cascade: { pit: 3, snags: 3, deep: 2 } }, minDepth: 3 }),
+  fish('arapaima', 'Арапайма', 3, 20, 200, 5200, 2.2, {}, { live: 1.7, crab: 1.0, squid: 1.1, worm: 0.6 }, 1.0, { dawn: 1.3, dusk: 1.3, day: 0.9 },
+    { shape: 'pike', back: '#3f4a36', side: '#6f7a5a', belly: '#d8d0b0', fin: '#a8302a', pat: 'scales', band: '#b8302a', lenK: 46 },
+    'Одна из самых больших пресноводных рыб на свете: чешуя как броня, хвост в красных пятнах. Лежит в Котле и то и дело поднимается глотнуть воздуха. Без морской удочки и багра не взять.',
+    { at: { cascade: { pit: 1.3, deep: 0.7, snags: 0.3 } }, giant: true, minDepth: 8 }),
+  fish('zoldorada', 'Золотая дорада', 4, 2, 18, 7500, 1.9, {}, { live: 1.6, worm: 0.6 }, 1.9, { dawn: 1.9, dusk: 1.1 },
+    { shape: 'std', back: '#c88a18', side: '#f2b830', belly: '#fde08a', fin: '#e8501c', pat: 'dots', patC: '#3a2a10', lenK: 40 },
+    'Её зовут речным тигром: золотая, в чёрных точках, с красными плавниками. На заре выходит под Большой каскад и бьёт блесну так, что гнётся крючок. Раз в сезон, говорят, берёт.',
+    { at: { cascade: { falls: 1.2, pit: 0.4, stones: 0.4 } } })
 ];
 // рыба бухты, которая живёт и в озере: свои места там
 const AT_LAKE = {
@@ -290,6 +338,11 @@ const AT_BLUE = {
   mako: { sea: 0.8, current: 0.5, bank: 0.3 }
 };
 for (const f of FISH) if (AT_BLUE[f.id]) f.at = { ...(f.at || {}), blue: AT_BLUE[f.id] };
+// рыба бухты, которая живёт и в Водопадной чаше: сом — хозяин Котла и коряг
+const AT_CASCADE = {
+  som: { pit: 3, deep: 2.5, snags: 2 }
+};
+for (const f of FISH) if (AT_CASCADE[f.id]) f.at = { ...(f.at || {}), cascade: AT_CASCADE[f.id] };
 // Наживки этапа 22: кому они по вкусу (остальная рыба берёт на незнакомую наживку неохотно — 0,3, см. speciesWeights)
 const BAIT_EXTRA = {
   bloodworm: { ersh: 1.7, plotva: 1.5, lesh: 1.5, karas: 1.3, okun: 1.3, bychok: 1.3, sig: 1.1, harius: 1.0, nalim: 0.9 },
@@ -325,7 +378,8 @@ const STYLE_OF = {
   klown: 'thrash', serzhant: 'plain', babochka: 'plain', hirurg: 'thrash', popugai: 'bulldog', lucian: 'runner', krylatka: 'thrash',
   barrakuda: 'jumper', karanks: 'runner', murena: 'snag', napoleon: 'bulldog', imperator: 'snag',
   mako: 'jumper', osetr: 'bulldog', rifakula: 'runner',
-  letuchaya: 'jumper', korifena: 'jumper', vahu: 'runner', zheltoper: 'runner', parusnik: 'jumper', marlin: 'jumper', gigantun: 'runner', belakula: 'bulldog'
+  letuchaya: 'jumper', korifena: 'jumper', vahu: 'runner', zheltoper: 'runner', parusnik: 'jumper', marlin: 'jumper', gigantun: 'runner', belakula: 'bulldog',
+  tilapiya: 'plain', piranya: 'thrash', diskus: 'plain', skalyariya: 'plain', paku: 'bulldog', krasnohvost: 'bulldog', pavlin: 'jumper', arovana: 'jumper', elugor: 'snag', arapaima: 'bulldog', zoldorada: 'jumper'
 };
 for (const f of FISH) f.style = STYLE_OF[f.id] || 'plain';
 

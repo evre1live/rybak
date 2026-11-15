@@ -41,12 +41,12 @@ async function clickAndReload(page, sel) {
 
   // ── заставка: три карточки, выбрана бухта; новичку озеро и островки закрыты ──
   const a = await open(browser, `${BASE}/?${Q}`, 'А');
-  assert.deepEqual(await cards(a), [['bay', true, false], ['lake', false, true], ['keys', false, true], ['blue', false, true]]);
-  assert.deepEqual(await G(a, () => [...document.querySelectorAll('.locs .loc b')].map((e) => e.textContent)), ['Солнечная бухта', 'Сосновое озеро', 'Коралловые островки', 'Синий простор']);
+  assert.deepEqual(await cards(a), [['bay', true, false], ['lake', false, true], ['keys', false, true], ['blue', false, true], ['cascade', false, true]]);
+  assert.deepEqual(await G(a, () => [...document.querySelectorAll('.locs .loc b')].map((e) => e.textContent)), ['Солнечная бухта', 'Сосновое озеро', 'Коралловые островки', 'Синий простор', 'Водопадная чаша']);
   assert.match(await a.textContent('.locs .lock .lk'), /С 3 УРОВНЯ/);
   assert.equal(await place(a), 'Солнечная бухта');
   const imgs = await G(a, () => [...document.querySelectorAll('.locs .loc img')].map((i) => [i.getAttribute('src'), i.complete && i.naturalWidth]));
-  assert.deepEqual(imgs.map((i) => i[0]), ['img/place-bay.webp', 'img/place-lake.webp', 'img/place-keys.webp', 'img/place-blue.webp']);
+  assert.deepEqual(imgs.map((i) => i[0]), ['img/place-bay.webp', 'img/place-lake.webp', 'img/place-keys.webp', 'img/place-blue.webp', 'img/place-cascade.webp']);
   assert.ok(imgs.every((i) => i[1] > 300), `картинки локаций загрузились: ${JSON.stringify(imgs)}`);
   // подписи не вылезают за карточку и не наезжают на соседнюю (с тремя карточками названия длиннее карточки)
   const spill = await G(a, () =>
@@ -56,6 +56,9 @@ async function clickAndReload(page, sel) {
     })
   );
   assert.deepEqual(spill, [], 'подписи карточек в своих границах');
+  // пять карточек: заставка помещается в окно 1280×720 — логотип и кнопка «в одиночку» видны целиком
+  const fit = await G(a, () => { const L = document.querySelector('.title .logo, .title svg, .title h1'); const s = document.querySelector('[data-a="solo"]').getBoundingClientRect(); const l = L ? L.getBoundingClientRect() : { top: 0 }; return { logo: Math.round(l.top), solo: Math.round(s.bottom), h: innerHeight }; });
+  assert.ok(fit.logo >= -2 && fit.solo <= fit.h, `заставка в окне: ${JSON.stringify(fit)}`);
   await a.fill('#nm', 'Жамшид');
   await a.click('.locs [data-id="lake"]');
   assert.match(await a.textContent('#terr'), /открывается с 3-го уровня/);
@@ -71,7 +74,7 @@ async function clickAndReload(page, sel) {
 
   // ── третий уровень: озеро открыто. В одиночку — страница открывается заново, уже с озером, и сама начинает рыбалку ──
   await G(a, () => { RYBAK.profile.xp = 400; RYBAK.profile.seenIntro = true; RYBAK.ui.showTitle(); });
-  assert.deepEqual(await cards(a), [['bay', false, false], ['lake', true, false], ['keys', false, true], ['blue', false, true]], 'выбор карточки помнится, замка больше нет');
+  assert.deepEqual(await cards(a), [['bay', false, false], ['lake', true, false], ['keys', false, true], ['blue', false, true], ['cascade', false, true]], 'выбор карточки помнится, замка больше нет');
   assert.equal(await a.inputValue('#nm'), 'Жамшид');
   await a.click('.locs [data-id="bay"]');
   await a.click('.locs [data-id="lake"]');
@@ -257,7 +260,7 @@ async function clickAndReload(page, sel) {
   await a.waitForSelector('.jstats');
   assert.match(await a.textContent('.jtabs .tab.on'), /Сосновое озеро · 0\/15/);
   assert.equal(await a.locator('.panel .grid .tile').count(), 15);
-  assert.match(await a.textContent('.jstats'), /\/54/);
+  assert.match(await a.textContent('.jstats'), /\/65/);
   await a.click('.panel .tile[data-id="harius"]');
   assert.match(await a.textContent('.jdetail'), /водопад/i);
   assert.ok(!/Сосновое озеро —/.test(await a.textContent('.jdetail')), 'у здешней рыбы — просто места');
@@ -267,15 +270,15 @@ async function clickAndReload(page, sel) {
   await a.click('.panel .tile[data-id="tunec"]');
   assert.match(await a.textContent('.jdetail'), /Солнечная бухта —/);
   await a.click('.jtabs [data-id="all"]');
-  assert.equal(await a.locator('.panel .grid .tile').count(), 54);
-  assert.match(await a.textContent('.jtabs .tab.on'), /Вся рыба · 0\/54/);
+  assert.equal(await a.locator('.panel .grid .tile').count(), 65);
+  assert.match(await a.textContent('.jtabs .tab.on'), /Вся рыба · 0\/65/);
   await G(a, () => RYBAK.ui.closePanel());
 
   // ── выйти в меню: страница остаётся на озере (адрес и выбранная карточка) ──
   await G(a, () => RYBAK.leaveRoom());
   await a.waitForFunction(() => RYBAK.state === 'title');
   assert.match(a.url(), /\?loc=lake$/);
-  assert.deepEqual(await cards(a), [['bay', false, false], ['lake', true, false], ['keys', false, true], ['blue', false, true]]);
+  assert.deepEqual(await cards(a), [['bay', false, false], ['lake', true, false], ['keys', false, true], ['blue', false, true], ['cascade', false, true]]);
 
   // ── комната на озере: создаётся с этой же страницы; в адресе код и локация ──
   await a.click('[data-a="create"]');
@@ -348,7 +351,7 @@ async function clickAndReload(page, sel) {
   await d.close();
   const e = await open(browser, `${BASE}/?loc=lake&${Q}`, 'Д');
   await G(e, () => { RYBAK.profile.xp = 400; RYBAK.ui.showTitle(); });
-  assert.deepEqual(await cards(e), [['bay', false, false], ['lake', true, false], ['keys', false, true], ['blue', false, true]]);
+  assert.deepEqual(await cards(e), [['bay', false, false], ['lake', true, false], ['keys', false, true], ['blue', false, true], ['cascade', false, true]]);
   await e.fill('#nm', 'Мила');
   await e.click('.locs [data-id="bay"]');
   await clickAndReload(e, '[data-a="create"]');

@@ -2807,6 +2807,202 @@
         "kb": 14
       },
       "icon": "models/icons/beast-chudo.webp"
+    },
+    "kit-jtree1": {
+      "file": "models/kit/cascade.glb",
+      "node": "kit-jtree1",
+      "group": "env",
+      "kit": "cascade",
+      "tris": 2300,
+      "size": [
+        0.524,
+        1,
+        0.602
+      ],
+      "lod": {
+        "file": "models/kit/cascade.glb",
+        "node": "kit-jtree1-lod",
+        "tris": 726
+      }
+    },
+    "kit-jtree2": {
+      "file": "models/kit/cascade.glb",
+      "node": "kit-jtree2",
+      "group": "env",
+      "kit": "cascade",
+      "tris": 3167,
+      "size": [
+        0.954,
+        1,
+        0.545
+      ],
+      "lod": {
+        "file": "models/kit/cascade.glb",
+        "node": "kit-jtree2-lod",
+        "tris": 1114
+      }
+    },
+    "kit-jtree3": {
+      "file": "models/kit/cascade.glb",
+      "node": "kit-jtree3",
+      "group": "env",
+      "kit": "cascade",
+      "tris": 1822,
+      "size": [
+        1,
+        0.962,
+        0.829
+      ],
+      "lod": {
+        "file": "models/kit/cascade.glb",
+        "node": "kit-jtree3-lod",
+        "tris": 509
+      }
+    },
+    "kit-jtwist1": {
+      "file": "models/kit/cascade.glb",
+      "node": "kit-jtwist1",
+      "group": "env",
+      "kit": "cascade",
+      "tris": 3551,
+      "size": [
+        0.808,
+        1,
+        0.691
+      ],
+      "lod": {
+        "file": "models/kit/cascade.glb",
+        "node": "kit-jtwist1-lod",
+        "tris": 1217
+      }
+    },
+    "kit-jtwist2": {
+      "file": "models/kit/cascade.glb",
+      "node": "kit-jtwist2",
+      "group": "env",
+      "kit": "cascade",
+      "tris": 3900,
+      "size": [
+        0.554,
+        1,
+        0.603
+      ],
+      "lod": {
+        "file": "models/kit/cascade.glb",
+        "node": "kit-jtwist2-lod",
+        "tris": 1374
+      }
+    },
+    "kit-jplant7": {
+      "file": "models/kit/cascade.glb",
+      "node": "kit-jplant7",
+      "group": "env",
+      "kit": "cascade",
+      "tris": 112,
+      "size": [
+        0.962,
+        0.186,
+        1
+      ],
+      "lod": {
+        "file": "models/kit/cascade.glb",
+        "node": "kit-jplant7-lod",
+        "tris": 64
+      }
+    },
+    "kit-heliconia": {
+      "file": "models/kit/cascade.glb",
+      "node": "kit-heliconia",
+      "group": "env",
+      "kit": "cascade",
+      "tris": 402,
+      "size": [
+        1,
+        0.652,
+        0.395
+      ],
+      "lod": {
+        "file": "models/kit/cascade.glb",
+        "node": "kit-heliconia-lod",
+        "tris": 164
+      }
+    },
+    "kit-palm5": {
+      "file": "models/kit/cascade.glb",
+      "node": "kit-palm5",
+      "group": "env",
+      "kit": "cascade",
+      "tris": 264,
+      "size": [
+        0.964,
+        0.496,
+        1
+      ],
+      "lod": {
+        "file": "models/kit/cascade.glb",
+        "node": "kit-palm5-lod",
+        "tris": 160
+      }
+    },
+    "fish-arapaima": {
+      "file": "models/fish-arapaima.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 261,
+      "size": [
+        1,
+        0.312,
+        0.284
+      ],
+      "icon": "models/icons/fish-arapaima.webp"
+    },
+    "fish-pavlin": {
+      "file": "models/fish-pavlin.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 235,
+      "size": [
+        1,
+        0.483,
+        0.452
+      ],
+      "icon": "models/icons/fish-pavlin.webp"
+    },
+    "fish-zoldorada": {
+      "file": "models/fish-zoldorada.glb",
+      "group": "fish",
+      "tris": 7999,
+      "kb": 304,
+      "size": [
+        1,
+        0.454,
+        0.338
+      ],
+      "icon": "models/icons/fish-zoldorada.webp"
+    },
+    "fish-arovana": {
+      "file": "models/fish-arovana.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 230,
+      "size": [
+        1,
+        0.296,
+        0.304
+      ],
+      "icon": "models/icons/fish-arovana.webp"
+    },
+    "fish-piranya": {
+      "file": "models/fish-piranya.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 262,
+      "size": [
+        1,
+        0.597,
+        0.394
+      ],
+      "icon": "models/icons/fish-piranya.webp"
     }
   }
 }

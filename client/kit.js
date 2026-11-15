@@ -49,6 +49,15 @@ const SWAP = {
     'env-pine': { use: [['kit-pine1', 1], ['kit-pine3', 1], ['kit-pine4', 0.8]], k: 1.05, opt: { near: 40, sway: 0.01, vary: 0.4, tint: { r: 0.82, g: 0.94, b: 0.9 } } },
     'env-bush': { use: [['kit-bush1', 1.3], ['kit-fern', 1.0], ['kit-bush2', 0.5]], k: 1.0, opt: { sway: 0.01, near: 22, vary: 0.4 } },
     ...rocks([['env-rock1', 1]], [['env-seastack', 1], ['env-rock1', 0.6]])
+  },
+  // Водопадная чаша — джунгли: лиственные великаны с тёмной сочной кроной, корявые деревья, пальмы у воды,
+  // подлесок из широколистных растений, папоротника и цветущих геликоний; камень — тёмный мокрый базальт
+  cascade: {
+    'env-oak': { use: [['kit-jtree1', 1], ['kit-jtree3', 1], ['kit-jtwist1', 0.45], ['kit-jtwist2', 0.3]], k: 1.2, opt: { near: 40, sway: 0.012, vary: 0.4 } },
+    'env-birch': { use: [['kit-jtree2', 1], ['kit-jtree3', 0.6]], k: 1.15, opt: { near: 40, sway: 0.014, vary: 0.35 } },
+    'env-bush': { use: [['kit-heliconia', 0.6], ['kit-jplant7', 0.8], ['kit-plant1', 1.0], ['kit-fern', 1.0], ['kit-bushl', 0.8]], k: 1.0, opt: { sway: 0.008, near: 26, vary: 0.4 } },
+    'env-palm': { use: [['kit-palm1', 1], ['kit-palm2', 1], ['kit-palm3', 1], ['kit-palm5', 0.5]], k: 1.0, opt: { cell: 90, near: 70, sway: 0.02, vary: 0.3 } },
+    ...rocks([['env-rock1', 1], ['env-granite', 0.4]], [['env-seastack', 1], ['env-rock1', 0.6]])
   }
 };
 

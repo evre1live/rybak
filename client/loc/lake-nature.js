@@ -377,16 +377,17 @@ void main() {
  * Туман над озером: несколько больших полупрозрачных слоёв в метре-трёх над водой, рисунок плывёт.
  * uDet — общая текстура шума (surface.js). Возвращает { set(k, color), update(t) }: k — плотность 0…1.
  */
-export function buildMist(scene, uDet) {
-  const smoke = buildSmoke(scene);
+export function buildMist(scene, uDet, { area = LAKE, smoke: chimney = true } = {}) {
+  // дым из трубы — только там, где есть избушка (на озере); у другой локации свой овал воды
+  const smoke = chimney ? buildSmoke(scene) : { uCol: { value: new THREE.Color() }, uTime: { value: 0 } };
   const uniforms = { uDet, uTime: { value: 0 }, uK: { value: 0 }, uCol: { value: new THREE.Color('#e9f1f4') } };
   const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: MIST_VERT, fragmentShader: MIST_FRAG, transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false });
   const g = new THREE.Group();
   // семь тонких слоёв: вдоль воды каждый виден полоской, вместе они складываются в мягкую дымку без резких линий
   for (const [y, s] of [[0.5, 1], [1.0, 1.03], [1.6, 1.06], [2.3, 1.1], [3.1, 1.14], [4.0, 1.18], [5.0, 1.22]]) {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(LAKE.a * 2.5 * s, LAKE.b * 2.7 * s), mat);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(area.a * 2.5 * s, area.b * 2.7 * s), mat);
     m.rotation.x = -Math.PI / 2;
-    m.position.set(LAKE.x, y, LAKE.z);
+    m.position.set(area.x, y, area.z);
     m.renderOrder = 4;
     m.frustumCulled = false;
     g.add(m);

@@ -599,6 +599,108 @@
           }
         }
       }
+    ],
+    "cascade": [
+      {
+        "id": "kit-jtree1",
+        "src": "q:CommonTree_5",
+        "tris": 1000,
+        "lod": 140,
+        "lodLeaves": 0.45,
+        "mats": {
+          "Leaves_NormalTree": {
+            "color": "#4c9a3c"
+          }
+        }
+      },
+      {
+        "id": "kit-jtree2",
+        "src": "usn:NormalTree_3",
+        "texDir": "usnTex:.",
+        "tris": 1000,
+        "lod": 140,
+        "lodLeaves": 0.45,
+        "mats": {
+          "NormalTree_Leaves": {
+            "color": "#5aa847"
+          }
+        }
+      },
+      {
+        "id": "kit-jtree3",
+        "src": "usn:NormalTree_5",
+        "texDir": "usnTex:.",
+        "tris": 1000,
+        "lod": 140,
+        "lodLeaves": 0.45,
+        "mats": {
+          "NormalTree_Leaves": {
+            "color": "#3f8f3a"
+          }
+        }
+      },
+      {
+        "id": "kit-jtwist1",
+        "src": "q:TwistedTree_1",
+        "tris": 1200,
+        "lod": 160,
+        "lodLeaves": 0.45,
+        "mats": {
+          "Leaves_TwistedTree": {
+            "tex": "q:Leaves_TwistedTree.png",
+            "color": "#4f9a3c"
+          }
+        }
+      },
+      {
+        "id": "kit-jtwist2",
+        "src": "q:TwistedTree_4",
+        "tris": 1200,
+        "lod": 160,
+        "lodLeaves": 0.45,
+        "mats": {
+          "Leaves_TwistedTree": {
+            "tex": "q:Leaves_TwistedTree.png",
+            "color": "#56a03f"
+          }
+        }
+      },
+      {
+        "id": "kit-jplant7",
+        "src": "q:Plant_7_Big",
+        "vc": [
+          0.6,
+          1.0
+        ]
+      },
+      {
+        "id": "kit-heliconia",
+        "src": "usn:Bush_Large_Flowers",
+        "texDir": "usnTex:.",
+        "mats": {
+          "Bush_Leaves": {
+            "cut": true
+          },
+          "Flowers": {
+            "cut": true,
+            "grey": true,
+            "color": "#ff5a24"
+          }
+        },
+        "lod": 200,
+        "lodLeaves": 0.4
+      },
+      {
+        "id": "kit-palm5",
+        "src": "usn:PalmTree_5",
+        "texDir": "usnTex:.",
+        "mats": {
+          "PalmTree_Leaves": {
+            "cut": true,
+            "cutoff": 0.5
+          }
+        }
+      }
     ]
   }
 }

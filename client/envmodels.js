@@ -512,8 +512,8 @@ export function upgradeEnv(scene) {
         CIRCLES.push({ x: -17.8, z: -78.0, r: 0.65 });
         state.singles++;
       }, fail);
-    // ── цапли на мелководье заводи (озеро): стоят в воде по щиколотку и поворачиваются, не взлетают ──
-    if (LOC_ID === 'lake' && has('env-heron'))
+    // ── цапли на мелководье заводи (озеро и Водопадная чаша): стоят в воде по щиколотку и поворачиваются, не взлетают ──
+    if ((LOC_ID === 'lake' || LOC_ID === 'cascade') && has('env-heron'))
       loadModel('env-heron').then((tpl) => {
         let n = 0;
         for (let i = 0; i < 48 && n < 3; i++) {
@@ -531,7 +531,7 @@ export function upgradeEnv(scene) {
         state.waders = n;
       }, fail);
     // ── чайки на сваях: сидят и вертят головой. На островках вместо них — пеликаны (не взлетают), на озере чаек нет ──
-    const percher = LOC_ID === 'keys' ? 'env-pelican' : LOC_ID === 'lake' ? null : 'env-seagull';
+    const percher = LOC_ID === 'keys' ? 'env-pelican' : LOC_ID === 'lake' || LOC_ID === 'cascade' ? null : 'env-seagull';
     if (percher && has(percher))
       loadModel(percher).then((tpl) => {
         const pel = percher === 'env-pelican';

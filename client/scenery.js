@@ -12,6 +12,7 @@ import { LOC_ID } from './loc/id.js';
 import { buildLakeNature } from './loc/lake-nature.js';
 import { buildKeysNature } from './loc/keys-nature.js';
 import { buildBlueNature } from './loc/blue-nature.js';
+import { buildCascadeNature } from './loc/cascade-nature.js';
 import { buildCurrent } from './loc/blue-sea.js';
 import { pine, roundTree, bush, farPine, farCrown } from './flora.js';
 import { waveH, swellMax } from './water.js';
@@ -172,7 +173,9 @@ const SHACK = {
   lake: { kind: 'logs', wall: '#94643a', trim: '#e8dcc0', roof: '#5a4d42', roofMat: 7, ridge: '#3e342c', rib: '#463b32', awn: ['#2f7a4f', '#efe6cf'], glass: '#22344a' },
   // Синий простор: белёный рыбацкий дом под тёмной черепицей, углы и рамы — чёрный базальт (как на Азорах)
   blue: { kind: 'plaster', wall: '#f2efe8', trim: '#3a3634', roof: '#7c3328', roofMat: 7, ridge: '#5a2219', rib: '#6a2a20', awn: ['#1f4fa0', '#f6f1e7'], glass: '#1c2c40' },
-  keys: { kind: 'bamboo', wall: '#d2bf93', trim: '#a07a3c', roof: '#b99358', roofMat: 5, ridge: '#8a6a36', rib: '#9a7842', awn: ['#14a39a', '#f6f1e7'], glass: '#2a3a3a', thatch: true }
+  keys: { kind: 'bamboo', wall: '#d2bf93', trim: '#a07a3c', roof: '#b99358', roofMat: 5, ridge: '#8a6a36', rib: '#9a7842', awn: ['#14a39a', '#f6f1e7'], glass: '#2a3a3a', thatch: true },
+  // Водопадная чаша: хижина из тёмного бамбука под пальмовой соломой, маркиза — в цвет геликоний
+  cascade: { kind: 'bamboo', wall: '#b39a68', trim: '#6e5228', roof: '#8f7a46', roofMat: 5, ridge: '#5f4a24', rib: '#6f5a2e', awn: ['#e8582a', '#f6f1e7'], glass: '#23332a', thatch: true }
 };
 export const SHACK_STYLE = LOC_ID in SHACK ? LOC_ID : 'teal';
 
@@ -555,7 +558,7 @@ function buildLamps(B, scene, nfx) {
     const rec = { x, y, z, side, glass: null, light: null, wake: { x: x + side * 0.6, y: y + 2.32, z } };
     ENV.lamps.push(rec);
     CIRCLES.push({ x, z, r: 0.2 });
-    if (LOC_ID === 'keys') {
+    if (LOC_ID === 'keys' || LOC_ID === 'cascade') {
       // факел на бамбуковом шесте: чаша из плетёнки, пламя над ней; свет — там же
       const fy = y + 3.5;
       rec.wake = { x, y: fy, z };
@@ -1737,6 +1740,7 @@ export function buildScenery(scene, nfx = null) {
   let lh = null;
   if (LOC_ID === 'lake') buildLakeNature(scene);
   else if (LOC_ID === 'keys') buildKeysNature(scene);
+  else if (LOC_ID === 'cascade') buildCascadeNature(scene);
   else if (LOC_ID === 'blue') {
     // остров Маяка: обрывы, рощи, гортензии; маяк с домиком смотрителя — на Маячной скале (те же, что в бухте)
     buildBlueNature(scene);

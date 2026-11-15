@@ -1,7 +1,7 @@
 // Рельеф локации этой страницы: высота земли и дна, причалы, зоны ловли, где можно ходить и плыть.
 //
 // Сам рельеф живёт в модулях локаций (loc/bay.js — Солнечная бухта, loc/lake.js — Сосновое озеро,
-// loc/keys.js — Коралловые островки, loc/blue.js — Синий простор); здесь выбирается
+// loc/keys.js — Коралловые островки, loc/blue.js — Синий простор, loc/cascade.js — Водопадная чаша); здесь выбирается
 // тот, что нужен странице (loc/id.js: ?loc= в адресе), и отдаётся под общими именами. Остальной игре всё равно,
 // какая локация: она спрашивает groundH, canStand, spotAt… Чего на локации нет (маяк, арка, Пальмовый остров),
 // стоит далеко за краем мира, а что на ней есть из необязательного — сказано в HAS.
@@ -9,9 +9,10 @@ import * as bay from './loc/bay.js';
 import * as lake from './loc/lake.js';
 import * as keys from './loc/keys.js';
 import * as blue from './loc/blue.js';
+import * as cascade from './loc/cascade.js';
 import { LOC_ID } from './loc/id.js';
 
-const T = { bay, lake, keys, blue }[LOC_ID] || bay;
+const T = { bay, lake, keys, blue, cascade }[LOC_ID] || bay;
 
 export const HAS = T.HAS;
 export const DECK_Y = T.DECK_Y;

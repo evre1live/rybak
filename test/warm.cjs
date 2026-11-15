@@ -74,7 +74,7 @@ const loc = process.argv[3] || ''; // другая локация — свой �
 
   // лобби: днём и ночью
   await p.fill('#nm', 'Прогрев');
-  if (loc) await p.evaluate(() => { RYBAK.profile.xp = 5000; }); // локации открываются по уровню
+  if (loc) await p.evaluate(() => { RYBAK.profile.xp = 8000; }); // локации открываются по уровню (чаша — с 10-го)
   await p.click('[data-a="solo"]');
   await p.waitForFunction(() => RYBAK.state === 'lobby');
   await p.waitForTimeout(900);
@@ -133,7 +133,9 @@ const loc = process.argv[3] || ''; // другая локация — свой �
     await mark(`${n}: поплавок на воде`);
     // пока поплавок на воде, подгружаются модели тех, кто здесь клюёт
     const pre = await p.evaluate(() => ({ ids: RYBAK.preIds, left: RYBAK.preQ.length }));
-    assert.ok(pre.ids.length >= 5 && pre.ids.some((x) => x.startsWith('fish-')) && pre.ids.includes('junk-boot'), `подгрузка назначена: ${JSON.stringify(pre)}`);
+    // в чаше у головы пирса днём клюют угорь и краснохвост — их пока рисует код (моделей Tripo нет), подгружать нечего
+    const needFish = loc !== 'cascade';
+    assert.ok(pre.ids.length >= 4 && (!needFish || pre.ids.some((x) => x.startsWith('fish-'))) && pre.ids.includes('junk-boot'), `подгрузка назначена: ${JSON.stringify(pre)}`);
     await bot(true);
     await p.waitForFunction(() => RYBAK.fishing.state === 'fight', null, { timeout: 240000 });
     await mark(`${n}: ожидание и подгрузка`);
@@ -143,7 +145,10 @@ const loc = process.argv[3] || ''; // другая локация — свой �
     await frame(3);
     await mark(`${n}: вываживание`);
     await p.evaluate(() => { window.__hold = false; window.__land = true; if (RYBAK.fishing.fight) RYBAK.fishing.fight.p = 0.97; });
-    await p.waitForFunction(() => RYBAK.fishing.state === 'landed', null, { timeout: 120000 });
+    await p.waitForFunction(() => RYBAK.fishing.state === 'landed', null, { timeout: 120000 }).catch(async (e) => {
+      console.log('  не дошло до «landed»:', JSON.stringify(await p.evaluate(() => { const f = RYBAK.fishing; return { state: f.state, sp: f.catch && f.catch.sp, w: f.catch && f.catch.w, p: f.fight && f.fight.p }; })));
+      throw e;
+    });
     await frame(2);
     await mark(`${n}: рыба летит к рукам`);
     await p.waitForTimeout(1500);
@@ -161,9 +166,11 @@ const loc = process.argv[3] || ''; // другая локация — свой �
   await p.waitForFunction(() => RYBAK.preQ.length === 0 && RYBAK.gfx.warmQ.length === 0, null, { timeout: 60000 });
   const ready = await p.evaluate(() => RYBAK.preIds.map((id) => [id, RYBAK.modelReady(id)]));
   assert.ok(ready.every((x) => x[1]), `назначенные модели загружены: ${JSON.stringify(ready)}`);
-  const sp = ready.map((x) => x[0]).find((id) => id.startsWith('fish-')).slice(5);
+  const pre = ready.map((x) => x[0]).find((id) => id.startsWith('fish-'));
+  // в чаше у пирса днём клюют те, кого пока рисует код, — тогда показываем такую рыбу (её шейдеры тоже собраны заранее)
+  const sp = pre ? pre.slice(5) : 'tilapiya';
   const inst = await p.evaluate((sp) => { RYBAK.fishing.showCatch(sp, 0.5); const m = RYBAK.fishing.fish.userData.model; RYBAK.fishing.finish(true); return m; }, sp);
-  assert.equal(inst, 'fish-' + sp, 'загруженная модель встаёт сразу, без процедурной заглушки');
+  if (pre) assert.equal(inst, 'fish-' + sp, 'загруженная модель встаёт сразу, без процедурной заглушки');
   await frame(2);
   await mark('показ улова из загруженных');
   // улов на леске (без подсака) и в подсаке: сетка, её рукоять и леска показа собраны заранее — новых шейдеров нет

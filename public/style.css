@@ -334,6 +334,8 @@ input.code{text-transform:uppercase;letter-spacing:.3em;text-align:center;font:i
 /* заставка */
 .title{inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.2em;background:linear-gradient(180deg,rgba(8,9,12,.16),rgba(8,9,12,0) 30%,rgba(8,9,12,.3))}
 .title .logo{font-size:8.2em;margin:0 .3em .18em 0}
+/* невысокое окно ноутбука (720–780 px): с пятью карточками мест заставка должна помещаться целиком */
+@media (max-height:780px) and (min-aspect-ratio:4/3){.title{gap:.75em}.title .logo{font-size:6.8em;margin-bottom:0}}
 .tcard{width:27em;padding:1.5em;display:flex;flex-direction:column;gap:.9em}
 /* две половины карточки: «кто и где» и «как войти». Обычно идут подряд, одним столбцом; на низком экране (телефон боком) встают рядом */
 .tca,.tcb{display:contents}
@@ -367,6 +369,12 @@ input.code{text-transform:uppercase;letter-spacing:.3em;text-align:center;font:i
 .locs .loc .lk{left:.5em;top:.5em;font-size:.62em;padding:.18em .45em .18em .35em}
 .locs .loc.on::after{left:.5em;right:auto;top:.5em;width:1.25em;height:1.25em;font-size:.8em;line-height:1.55}
 .locs .loc b{font-size:.98em}
+/* пять мест и больше: карточки ниже, последняя без пары — во всю ширину (картинка той же ширины, что у соседей) */
+.locs.many{gap:.4em}
+.locs.many .loc{padding:.28em .4em .28em .3em}
+.locs.many .loc img{aspect-ratio:4/2.75}
+.locs .loc:last-child:nth-child(odd){grid-column:1/-1;grid-template-columns:calc(22% - .1em) minmax(0,1fr)}
+.locs .loc:last-child:nth-child(odd) i{-webkit-line-clamp:1}
 .tnote{max-width:27em;margin:.2em auto 0;padding:.6em 1em;border-radius:1.1em;background:var(--g);border:.09em solid var(--gb);color:var(--cream);font-size:.9em;line-height:1.35;text-align:center}
 .tfoot{font-size:.95em;text-align:center;line-height:1.6;text-shadow:var(--tsh)}
 @media (max-height:540px) and (min-aspect-ratio:8/5){

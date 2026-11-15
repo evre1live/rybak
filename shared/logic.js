@@ -713,7 +713,7 @@ const Q_ZONE = {
   sea: 'в открытом море', lagoon: 'в лагуне Пальмового острова', wreck: 'у затонувшего корабля',
   stones: 'у камней', pit: 'над ямой',
   garden: 'в коралловом саду', channel: 'в протоке', edge: 'на краю рифа',
-  bank: 'на Банке', current: 'в Течении', deep: 'на свале', mid: 'на средней воде'
+  bank: 'на Банке', current: 'в Течении', deep: 'на свале', mid: 'на средней воде', snags: 'у коряг'
 };
 const Q_SPECIES = [
   ['bychok', 'plotva', 'okun', 'kefal', 'karas', 'stavrida'],
@@ -739,10 +739,17 @@ const Q_ELSEWHERE = {
   blue: {
     sp: [['letuchaya', 'stavrida', 'bychok', 'skumbria'], ['korifena', 'skumbria', 'sargan', 'morokun']],
     zone: [['pier', 'shallow', 'mid'], ['deep', 'reef', 'current'], ['bank', 'current', 'sea']]
+  },
+  cascade: {
+    sp: [['tilapiya', 'piranya', 'diskus', 'skalyariya'], ['paku', 'pavlin', 'piranya']],
+    zone: [['pier', 'shallow', 'backwater'], ['backwater', 'snags', 'stones', 'falls'], ['falls', 'pit', 'snags']]
   }
 };
 // у локации зона может называться по-своему
-const Q_ZONE_AT = { blue: { reef: 'у Тюленьих камней', backwater: 'в тихой бухточке', sea: 'в синеве', mid: 'у острова' } };
+const Q_ZONE_AT = {
+  blue: { reef: 'у Тюленьих камней', backwater: 'в тихой бухточке', sea: 'в синеве', mid: 'у острова' },
+  cascade: { backwater: 'в заводи викторий', falls: 'у Каскада', pit: 'в Котле', stones: 'у Скалы-черепахи', snags: 'у коряг' }
+};
 const Q_REWARD = [{ coins: 25, xp: 20 }, { coins: 60, xp: 45 }, { coins: 130, xp: 90 }];
 export const QUEST_BONUS = 50; // премия за все три задания дня (растёт с уровнем, как и награды)
 const lvlK = (lvl, step, max) => Math.min(max, 1 + step * (Math.max(1, lvl) - 1));

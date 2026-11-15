@@ -1072,6 +1072,41 @@
       "textureQuality": "detailed"
     },
     {
+      "id": "fish-arapaima",
+      "group": "fish",
+      "sp": "arapaima",
+      "name": "Арапайма",
+      "prompt": "(этап 26, образец GPT Image) giant arapaima: long cylindrical olive-grey body, scales edged in crimson toward the tail, flat bony head, paddle tail"
+    },
+    {
+      "id": "fish-pavlin",
+      "group": "fish",
+      "sp": "pavlin",
+      "name": "Павлиний окунь",
+      "prompt": "(этап 26, образец GPT Image) peacock bass: golden-olive body, three black bars, gold-ringed eye-spot on the tail, orange belly and fins"
+    },
+    {
+      "id": "fish-zoldorada",
+      "group": "fish",
+      "sp": "zoldorada",
+      "name": "Золотая дорада",
+      "prompt": "(этап 26, образец GPT Image) golden dorado: golden-orange salmon-like body with rows of dark dots, red fins, black stripe in the tail"
+    },
+    {
+      "id": "fish-arovana",
+      "group": "fish",
+      "sp": "arovana",
+      "name": "Арована",
+      "prompt": "(этап 26, образец GPT Image) silver arowana: long blade body, very large scales, upturned mouth with chin barbels, long rear dorsal and anal fins"
+    },
+    {
+      "id": "fish-piranya",
+      "group": "fish",
+      "sp": "piranya",
+      "name": "Пиранья",
+      "prompt": "(этап 26, образец GPT Image) red-bellied piranha: deep round silver body with speckles, red belly and throat, small triangular teeth"
+    },
+    {
       "id": "gear-rod1",
       "group": "gear",
       "item": "rod1",
