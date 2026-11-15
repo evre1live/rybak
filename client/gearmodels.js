@@ -4,6 +4,7 @@
 // Модели снастей лежат в осях своей картинки-образца (tools/optimize.js, группа gear): X — вправо, Y — вверх,
 // Z — к зрителю, середина — в начале координат, наибольший размер — 1. Здесь они перекладываются в оси удочки
 // (gear3d.js): +Y — к кончику, катушка висит со стороны +Z, ручка катушки — в +X.
+import { rodRS } from './rodspec.js';
 import * as THREE from 'three';
 import { loadModel, modelInfo, modelGeometry } from './models.js';
 import { loadManifest } from './hero.js';
@@ -177,6 +178,9 @@ function handleGeo(tpl, spec) {
   }
   g.computeBoundingBox();
   g.translate(-mx / pos.count, spec.butt - g.boundingBox.min.y, -mz / pos.count);
+  // рукоять тоньше картинки — в настоящую толщину (rodRS): длина прежняя
+  const rs = rodRS(spec);
+  g.scale(rs, 1, rs);
   g.computeBoundingSphere();
   const out = { geometry: g, material: gearMat(tpl, p.material) };
   handleCache.set(tpl.id, out);
@@ -224,7 +228,7 @@ function mountNow(rod, rodId, reelId) {
       (tpl) => {
         done();
         if (rod.gone) return;
-        const seatZ = spec && spec.seatR ? spec.seatR * 0.9 : 0.018;
+        const seatZ = spec && spec.seatR ? spec.seatR * 0.9 * rodRS(spec) : 0.018;
         const r = reelParts(tpl, reelId, seatZ);
         if (!r) return;
         const body = new THREE.Mesh(r.body, r.material);

@@ -2160,7 +2160,8 @@
         1,
         0.41,
         0.593
-      ]
+      ],
+      "icon": "models/icons/fauna-kit.webp"
     },
     "fauna-delfin": {
       "file": "models/fauna-delfin.glb",
@@ -2738,6 +2739,74 @@
         "tris": 284,
         "kb": 7
       }
+    },
+    "beast-nessie": {
+      "file": "models/beast-nessie.glb",
+      "group": "env",
+      "tris": 9000,
+      "kb": 214,
+      "size": [
+        1,
+        0.529,
+        0.916
+      ],
+      "lod": {
+        "file": "models/beast-nessie.lod.glb",
+        "tris": 898,
+        "kb": 13
+      },
+      "icon": "models/icons/beast-nessie.webp"
+    },
+    "beast-kraken": {
+      "file": "models/beast-kraken.glb",
+      "group": "env",
+      "tris": 8996,
+      "kb": 321,
+      "size": [
+        1,
+        0.312,
+        0.764
+      ],
+      "lod": {
+        "file": "models/beast-kraken.lod.glb",
+        "tris": 898,
+        "kb": 15
+      },
+      "icon": "models/icons/beast-kraken.webp"
+    },
+    "beast-serpent": {
+      "file": "models/beast-serpent.glb",
+      "group": "env",
+      "tris": 8998,
+      "kb": 364,
+      "size": [
+        1,
+        0.483,
+        0.334
+      ],
+      "lod": {
+        "file": "models/beast-serpent.lod.glb",
+        "tris": 896,
+        "kb": 14
+      },
+      "icon": "models/icons/beast-serpent.webp"
+    },
+    "beast-chudo": {
+      "file": "models/beast-chudo.glb",
+      "group": "env",
+      "tris": 8990,
+      "kb": 332,
+      "size": [
+        1,
+        0.528,
+        0.532
+      ],
+      "lod": {
+        "file": "models/beast-chudo.lod.glb",
+        "tris": 890,
+        "kb": 14
+      },
+      "icon": "models/icons/beast-chudo.webp"
     }
   }
 }

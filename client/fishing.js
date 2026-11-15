@@ -252,6 +252,8 @@ export class Fishing {
         this.big = seen && !seen.spooked ? Math.max(0.05, seen.big) : 0;
         this.spot.big = this.big;
         this.startBite();
+        // особая приманка в логове или заброс рядом с чудищем, которое уже взяло, — обычной поклёвки не будет (beast.js)
+        if (this.onBeastLand && this.onBeastLand(this.bx, this.bz, this.spot)) this.biteLeft = Infinity;
         if (this.big) this.biteLeft = Math.min(this.biteLeft, 3.2 + Math.random() * 3);
         this.emit('land', { x: this.bx, z: this.bz, zone: this.spot.zone, hot: this.spot.hot, short: this.short, big: this.big, spooked: !!(seen && seen.spooked) });
       }
@@ -367,7 +369,7 @@ export class Fishing {
         if (Math.random() < dt * 40) this.fx.drip(fx, fy + waveH(fx, fz, t), fz, 1, 0.1 + this.fishLen * 0.15);
         if (this.jumpT <= 0) {
           this.fish.rotation.x = 0;
-          this.fx.splash(fx, fz, 0.9 + Math.min(0.6, this.fishLen * 0.3));
+          this.fx.splash(fx, fz, 0.9 + Math.min(1.6, this.fishLen * 0.45));
         }
       } else this.fish.rotation.z = damp(this.fish.rotation.z, 0, 6, dt);
       const pxp = this.bx;
@@ -402,20 +404,22 @@ export class Fishing {
         this.fx.drop(lerp(tip.x, fx, u), lerp(tip.y, 0.05, u), lerp(tip.z, fz, u), (Math.random() - 0.5) * 0.9, 0.3 + Math.random() * 0.8, (Math.random() - 0.5) * 0.9, 0.018 + Math.random() * 0.014, 0.5);
       }
       this.kick -= Math.sign(this.kick) * Math.min(Math.abs(this.kick), dt * 3.2);
+      // Чем крупнее рыба, тем выше всплески: окунь плещет, тунец и акула поднимают столб воды
+      const bigK = Math.min(1.3, Math.log10(1 + (this.catch.w || 0)) / 1.5);
       for (const e of evs) {
         if (e === 'jump') {
           this.jumpT = 0.75;
-          this.fx.splash(fx, fz, 1);
+          this.fx.splash(fx, fz, 0.8 + bigK * 1.3);
           this.emit('jump', { x: fx, z: fz });
         } else if (e === 'run') {
-          this.fx.splash(fx, fz, 0.6);
+          this.fx.splash(fx, fz, 0.5 + bigK * 0.8);
           this.kick = Math.max(this.kick, 0.55);
           this.emit('run', { dir: f.dir });
         } else if (e === 'warn') this.emit('warn');
         else if (e === 'calm') this.emit('calm');
         else if (e === 'rage') {
           // легенда собралась с силами: вода вскипает, леска уходит обратно
-          this.fx.splash(fx, fz, 1.6);
+          this.fx.splash(fx, fz, 1.6 + bigK);
           this.fx.ripple(fx, fz, 3.4, 2.2, 0.25);
           this.fx.ripple(fx, fz, 4.6, 2.8, 0.5);
           this.kick = 1;
@@ -450,6 +454,39 @@ export class Fishing {
       }
       end.set(fx, Math.max(this.by + 0.05, -0.05), fz);
       this.line.set(tip, end, f.T < T_LOW ? 0.5 : 0.02, -5, hot ? 0.014 : sty === 'thrash' ? 0.007 : 0, this.t);
+    } else if (st === 'beast') {
+      // Общий бой с чудищем: своя леска — натяжение и рывки как у гиганта; общий ход ведёт сервер (beast.js).
+      // Подмотка без опасного натяжения копится и уходит серверу; вытащить существо одному нельзя.
+      const f = this.fight;
+      const p0 = f.p;
+      const evs = fightStep(f, { reel: input.hold, steer: input.steer }, dt, this.kit, Math.random);
+      this.reeling = input.hold;
+      if (f.p > p0 && f.T < dangerAt(f)) this.beastGain += f.p - p0;
+      f.p = 0.4; // путь здесь не копится: держим середину, чтобы рыба не «вышла» сама
+      for (const e of evs) {
+        // ослабла леска — существо с крючка не сходит (его держат и другие); рвётся — да
+        if (e === 'escape') {
+          f.result = null;
+          f.slack = 0;
+          continue;
+        }
+        if (e === 'snap') {
+          p.stats.snaps++;
+          this.emit('beastLost', { why: e });
+          this.beastSrc = null;
+          this.toIdle();
+          return;
+        }
+        if (e === 'run' || e === 'rage') this.kick = Math.max(this.kick, 0.7);
+      }
+      this.kick -= Math.sign(this.kick) * Math.min(Math.abs(this.kick), dt * 3.2);
+      this.vm.tipWorld(tip);
+      if (this.beastSrc) this.beastSrc.lineEnd(end);
+      this.bx = end.x;
+      this.by = end.y;
+      this.bz = end.z;
+      const hot = f.T > dangerAt(f);
+      this.line.set(tip, end, f.T < T_LOW ? 0.6 : 0.02, -5, hot ? 0.016 : 0, this.t);
     } else if (st === 'landed') {
       this.landT += dt;
       const sh = this.shown;
@@ -702,22 +739,63 @@ export class Fishing {
   /** Данные для друзей: состояние и где поплавок. */
   net(out) {
     const s = this.state;
-    out.fs = FS[s] ?? 0;
+    out.fs = s === 'beast' ? FS.fight : FS[s] ?? 0; // в бою с чудищем друзья видят вываживание (путь 0 — подсачить нечего)
     out.bx = this.bx;
     out.by = this.by;
     out.bz = this.bz;
-    out.t = s === 'fight' ? this.fight.T : s === 'charge' ? this.power : 0;
+    out.t = s === 'fight' || s === 'beast' ? this.fight.T : s === 'charge' ? this.power : 0;
     out.k = s === 'cast' ? this.castK : s === 'charge' ? this.power : s === 'fight' ? this.fight.p : 0; // в бою — пройденный путь: друг видит, когда можно подсачить
     out.flags = (this.reeling ? FLAG.reel : 0) | (this.lure ? FLAG.lure : 0) | (s === 'fight' && this.fight.giant ? FLAG.giant : 0);
     return out;
   }
   /** Что показывать рукам от первого лица. */
+  /** Чудище взяло (или мы подцепились к общему бою): своя леска — в бой. src — beast.js, def — существо. */
+  beastHook(src, def) {
+    this.beastSrc = src;
+    this.beastGain = 0;
+    const power = def.kg ** 0.55 * 0.02 * def.power;
+    const rho = Math.max(0.95, Math.min(1.5, power / Math.max(1, this.kit.lineKg * 0.9)));
+    this.fight = {
+      power, rho, junk: false, temper: 1.6, giant: true, beast: def.id,
+      stamina: 99, T: 0.5, p: 0.4, strain: 0, slack: 0,
+      phase: 'calm', phaseT: 1.5, pull: 0.4, dir: 0, t: 0, fat: 0, result: null, next: null, warned: false,
+      style: def.id === 'kraken' || def.id === 'chudo' ? 'bulldog' : 'runner', boss: 0, bossMax: 0,
+      rage: false, jumpT: 0, stuck: 0, stuckT: 0, lift: 0, stickCd: 99, wrapT: 0, wrapped: false
+    };
+    this.bob.visible = false;
+    this.state = 'beast';
+    this.kick = 1;
+    this.emit('beastHooked', { id: def.id });
+  }
+  /** Сервер: существо бросается на нас — через полсекунды рывок с силой «второго дыхания»: отпускайте. */
+  beastLunge() {
+    const f = this.fight;
+    if (this.state !== 'beast' || !f) return;
+    f.next = 'run';
+    f.phase = 'calm';
+    f.phaseT = 0.5;
+    f.warned = false;
+    f.rage = true;
+  }
+  /** Сколько общего пути вытянуто с прошлого раза (уходит серверу). */
+  beastTake() {
+    const g = this.beastGain || 0;
+    this.beastGain = 0;
+    return g;
+  }
+  /** Бой кончился (взяли, ушло или нас отцепили): леску сматываем. */
+  beastEnd(won = false) {
+    if (this.state !== 'beast') return;
+    this.beastSrc = null;
+    this.toIdle();
+    if (won) this.kick = 0.6;
+  }
   view() {
     const s = this.state;
     const f = this.fight;
     const sh = this.shown;
     return {
-      mode: s, power: this.power, castK: this.castK, tension: f ? f.T : 0, pull: f && f.phase === 'run' ? f.dir : 0, reel: this.reeling,
+      mode: s === 'beast' ? 'fight' : s, power: this.power, castK: this.castK, tension: f ? f.T : 0, pull: f && f.phase === 'run' ? f.dir : 0, reel: this.reeling,
       kick: this.kick || 0, // толчок: подсечка, начало рывка, «второе дыхание»
       shake: f && f.style === 'thrash' ? (f.phase === 'run' ? 1 : 0.6) : f && f.stuck ? 0.25 : 0, // дрожь удилища
       net: s === 'landed' && sh ? sh.net : false, held: s === 'landed' && !this.fly, landT: this.landT

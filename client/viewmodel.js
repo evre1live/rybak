@@ -14,7 +14,14 @@ const ELBOW_R = new THREE.Vector3(0.44, -0.7, -0.08);
 const ELBOW_L = new THREE.Vector3(-0.16, -0.72, -0.1);
 const HAND_DY = -0.245; // процедурная кисть тоже держит заднюю рукоять, под катушкой
 const WRIST_R = new THREE.Vector3(-0.058, 0.135 + HAND_DY, 0.012);
-const GRIP_Y = -0.1; // где на рукояти лежит правый кулак: на задней рукояти, сразу под катушкой
+const GRIP_Y = -0.1; // где на рукояти лежит процедурная правая кисть: на задней рукояти, сразу под катушкой
+// Кулак героя — у самого катушкодержателя: ножка катушки проходит между пальцами, как у настоящего спиннинга
+// (и как на референсах). Чуть ближе к камере, чем ось рукояти: рукоять уходит в пальцы, а не лежит поверх кулака.
+const GRIP_FIST = new THREE.Vector3(0.015, 0.04, 0);
+// Куда (в осях удочки) смотрят согнутые пальцы правого кулака: вниз, к катушке. Пальцы обхватывают рукоять снизу,
+// большой палец и тыл кисти — сверху, как на эталонных референсах. Локоть при этом остаётся внизу справа:
+// кисть доворачивает предплечье (fparms.js, face).
+const FACE_R = new THREE.Vector3(0, 0, 1);
 const ROLL = 0.8; // удилище довёрнуто вокруг своей оси: катушка видна слева от кисти, как на макете
 const qr = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), ROLL);
 const DEG = Math.PI / 180;
@@ -28,6 +35,7 @@ const v1 = new THREE.Vector3();
 const v2 = new THREE.Vector3();
 const v3 = new THREE.Vector3();
 const v4 = new THREE.Vector3();
+const vS = new THREE.Vector3();
 const v5 = new THREE.Vector3();
 const m4 = new THREE.Matrix4();
 // левая рука героя: локоть (x, y, z), куда смотрит тыл кисти (x, y, z), на сколько пальцы дальше середины кулака
@@ -423,10 +431,10 @@ export class ViewModel {
       this.foreL.scale.set(1, 1, v2.distanceTo(ELBOW_L));
     }
     if (this.arms) {
-      // правый кулак — на рукояти над катушкой, большой палец к кончику удилища
-      v1.set(0, GRIP_Y, 0).applyQuaternion(this.pivot.quaternion).add(this.pivot.position);
+      // правый кулак — на катушкодержателе, большой палец сверху и к кончику удилища, пальцы обхватывают рукоять снизу
+      v1.copy(GRIP_FIST).applyQuaternion(this.pivot.quaternion).add(this.pivot.position);
       v2.copy(AY).applyQuaternion(this.pivot.quaternion);
-      this.arms.arm('R', v1, v2, ELBOW_R);
+      this.arms.arm('R', v1, v2, ELBOW_R, 0, vS.copy(FACE_R).applyQuaternion(this.pivot.quaternion));
       // левый — на ручке катушки, ходит по кругу вместе с ней…
       v1.copy(this.rod.knob).applyAxisAngle(AX, this.crank).add(this.rod.handle.position).applyQuaternion(this.pivot.quaternion).add(this.pivot.position);
       const lh = LEFT;

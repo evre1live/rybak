@@ -520,11 +520,12 @@ export function newProfile() {
     tackle: { worm: 20 },
     cooler: [],
     journal: {},
-    stats: { casts: 0, caught: 0, sold: 0, earned: 0, snaps: 0, escapes: 0, best: null, legends: 0, quests: 0, tours: 0, medals: 0, stalked: 0, assists: 0 },
+    stats: { casts: 0, caught: 0, sold: 0, earned: 0, snaps: 0, escapes: 0, best: null, legends: 0, quests: 0, tours: 0, medals: 0, stalked: 0, assists: 0, beasts: 0 },
     seenIntro: false,
     boatTrips: 0,
     quests: null, // задания на день: появляются при первом входе (syncQuests)
-    mastery: {} // за сколько звёзд мастерства на каждой локации уже получена награда (claimMastery)
+    mastery: {}, // за сколько звёзд мастерства на каждой локации уже получена награда (claimMastery)
+    beasts: {} // сколько раз взяты чудища и киты (общий бой, beast.js): id → раз
   };
 }
 // подлатать сохранение из старой версии или с повреждениями
@@ -532,7 +533,7 @@ export function fixProfile(p) {
   const d = newProfile();
   if (!p || typeof p !== 'object') return d;
   for (const k of Object.keys(d)) if (p[k] === undefined || p[k] === null) p[k] = d[k];
-  for (const k of ['owned', 'equip', 'tackle', 'journal', 'stats']) if (typeof p[k] !== 'object') p[k] = d[k];
+  for (const k of ['owned', 'equip', 'tackle', 'journal', 'stats', 'beasts']) if (typeof p[k] !== 'object' || Array.isArray(p[k])) p[k] = d[k];
   for (const k of Object.keys(d.owned)) p.owned[k] = 1;
   for (const k of Object.keys(d.equip)) if (!ITEMS[p.equip[k]] || (k !== 'tackle' && !p.owned[p.equip[k]])) p.equip[k] = d.equip[k];
   for (const k of Object.keys(d.stats)) if (p.stats[k] === undefined) p.stats[k] = d.stats[k];
@@ -541,7 +542,7 @@ export function fixProfile(p) {
   p.coins = Math.max(0, Math.round(Number(p.coins) || 0));
   p.xp = Math.max(0, Math.round(Number(p.xp) || 0));
   p.boatTrips = Math.max(0, Math.round(Number(p.boatTrips) || 0));
-  for (const k of ['quests', 'tours', 'medals', 'stalked', 'assists']) p.stats[k] = Math.max(0, Math.round(Number(p.stats[k]) || 0));
+  for (const k of ['quests', 'tours', 'medals', 'stalked', 'assists', 'beasts']) p.stats[k] = Math.max(0, Math.round(Number(p.stats[k]) || 0));
   if (!validQuests(p.quests)) p.quests = null;
   if (tackleCount(p, p.equip.tackle) <= 0) p.equip.tackle = 'bread';
   p.v = PROFILE_VERSION;

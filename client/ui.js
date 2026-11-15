@@ -1,5 +1,6 @@
 // Интерфейс: экран игры (HUD) по макетам этапа 19 — стеклянные панели, команда с фигурками, мини-карта с маршрутом;
 // лобби, снасти и магазин, рынок, журнал, выбор героя, настройки.
+import { BEASTS } from '../shared/beasts.js';
 import { CATS, ITEMS, FISH, FISH_BY_ID, FIGHT_STYLES, JUNK_BY_ID, RARITY, zoneInfo, zonesOf, locsOf, fishOf, DAY_PARTS, RODS, MAX_PLAYERS, fmtW, fmtCoins, fmtClock } from '../shared/data.js';
 import { LOCATIONS, locOf } from '../shared/locations.js';
 import { LOC_ID, LOC } from './loc/id.js';
@@ -65,7 +66,7 @@ const SVG = {
 };
 SVG.bag = SVG.fish; // улов в садке — та же рыбка
 // значок раздела снастей
-const CAT_ICON = { rod: 'rod', tackle: 'bait', lure: 'lure', reel: 'reel', line: 'spool', hook: 'hook', float: 'float', bag: 'basket', extra: 'dots' };
+const CAT_ICON = { rod: 'rod', tackle: 'bait', lure: 'lure', reel: 'reel', line: 'spool', hook: 'hook', float: 'float', bag: 'basket', extra: 'dots', beast: 'star' };
 const WX_ICON = { clear: 'sun', cloudy: 'cloud', rain: 'rain', fog: 'fog' };
 const TIER = ['ЛЁГКОЕ', 'СРЕДНЕЕ', 'ТРУДНОЕ'];
 const mmss = (sec) => `${String(Math.floor(Math.max(0, sec) / 60)).padStart(2, '0')}:${String(Math.max(0, sec) % 60).padStart(2, '0')}`;
@@ -798,7 +799,7 @@ export class UI {
     const left = tackleCount(p, p.equip.tackle);
     this.screen.innerHTML = `<div class="dim"></div><div class="panel">
       ${this.panelHead(t.shop ? 'МАГАЗИН' : 'СНАСТИ', t.shop ? `<button class="btn sm cy" data-a="open" data-p="sell">${ic('fish')}<span>ПРОДАТЬ УЛОВ</span></button>` : '')}
-      <div class="tabs2">${CATS.map((c) => `<button class="tab ${c.key === cat.key ? 'on' : ''}" data-a="cat" data-id="${c.key}">${ic(CAT_ICON[c.key])}${c.name}</button>`).join('')}</div>
+      <div class="tabs2${CATS.length > 8 ? ' tight' : ''}">${CATS.map((c) => `<button class="tab ${c.key === cat.key ? 'on' : ''}" data-a="cat" data-id="${c.key}">${ic(CAT_ICON[c.key])}${c.name}</button>`).join('')}</div>
       <div class="grid${cat.items.length > 9 ? ' g4' : ''}">${tiles}</div>
       <div class="detail">${this.itemDetail(it)}</div>
       <div class="loadout"><span class="hd">ТЕКУЩИЙ НАБОР</span>
@@ -922,7 +923,7 @@ export class UI {
     const s = p.stats;
     this.screen.innerHTML = `<div class="dim"></div><div class="panel">
       ${this.panelHead('ЖУРНАЛ')}
-      <div class="jtop"><div class="jstats"><div><b>${lv.lvl}</b>уровень · ${esc(lv.title)}</div><div><b>${got}/${FISH.length}</b>видов открыто</div><div><b>${s.caught}</b>поймано</div><div><b>${fmtCoins(s.earned)}</b>заработано</div><div><b>${s.best ? fmtW(s.best.w) : '—'}</b>${s.best ? esc(FISH_BY_ID[s.best.sp].name) + ' — рекорд' : 'самый тяжёлый улов'}</div><div><b>${s.snaps}</b>обрывов лески</div>${s.stalked ? `<div><b>${s.stalked}</b>выслежено</div>` : ''}${s.assists ? `<div><b>${s.assists}</b>подсачено друзьям</div>` : ''}</div>
+      <div class="jtop"><div class="jstats"><div><b>${lv.lvl}</b>уровень · ${esc(lv.title)}</div><div><b>${got}/${FISH.length}</b>видов открыто</div><div><b>${s.caught}</b>поймано</div><div><b>${fmtCoins(s.earned)}</b>заработано</div><div><b>${s.best ? fmtW(s.best.w) : '—'}</b>${s.best ? esc(FISH_BY_ID[s.best.sp].name) + ' — рекорд' : 'самый тяжёлый улов'}</div><div><b>${s.snaps}</b>обрывов лески</div>${s.stalked ? `<div><b>${s.stalked}</b>выслежено</div>` : ''}${s.assists ? `<div><b>${s.assists}</b>подсачено друзьям</div>` : ''}${s.beasts ? `<div><b>${s.beasts}</b>${esc(Object.entries(p.beasts || {}).map(([id, n]) => `${BEASTS[id] ? BEASTS[id].name : id} ×${n}`).join(', '))}</div>` : ''}</div>
         <div class="tabs2 jtabs">${tabs}${mline}</div></div>
       <div class="grid g5">${tiles}</div>
       <div class="detail jdetail">

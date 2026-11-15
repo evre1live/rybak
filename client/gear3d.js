@@ -5,7 +5,7 @@ import { Batch, M, G, BATCH_MAT, BATCH_MAT_2S } from './batch.js';
 import { METAL_MAT, GLOSS_MAT, RING_MAT, addEnvMat } from './env.js';
 import { loft, tube } from './shapes.js';
 import { shade, mat, canvasTex } from './util.js';
-import { ROD_SPEC } from './rodspec.js';
+import { ROD_SPEC, rodRS } from './rodspec.js';
 import { mountRodModels, mountBobModel } from './gearmodels.js';
 
 const METAL = '#3b424c';
@@ -120,8 +120,9 @@ export function buildRod(rodId, reelId = 'reel1', lineId = 'line1', handleSide =
   const frameMat = gs.frame === 'ring' ? RING_MAT : shiny(mat(gs.frame, 0.3, 0.85));
   const ringMat = gs.ring === 'ring' ? RING_MAT : gs.glow ? mat(gs.ring, 0.22, 0.2, { emissive: gs.ring, emissiveIntensity: 0.5 }) : shiny(mat(gs.ring, 0.22, 0.9));
   const end = spec ? spec.end : 0.26;
-  const R0 = spec ? spec.r0 : 0.0105;
-  const R1 = spec ? spec.r1 : 0.0022;
+  const RS = rodRS(spec); // удочка по картинке, но тоньше: в настоящую толщину
+  const R0 = spec ? spec.r0 * RS : 0.0105;
+  const R1 = spec ? spec.r1 * Math.sqrt(RS) : 0.0022;
   /** радиус бланка на высоте y (у рукояти — R0, у кончика — R1) */
   const radAt = (y) => R0 + (R1 - R0) * Math.min(1, Math.max(0, (y - end) / (tipY - end)));
   const blankR = (u) => radAt(Y0 + u * total);
@@ -140,7 +141,7 @@ export function buildRod(rodId, reelId = 'reel1', lineId = 'line1', handleSide =
   const guides = [];
   // [y, радиус кольца, высота лапки вместе с кольцом]; без замеров — прежняя раскладка
   const GU = spec
-    ? spec.guides
+    ? spec.guides.map(([y, gr, depth]) => [y, gr * Math.sqrt(RS), depth * Math.sqrt(RS)])
     : (gs.roller ? [0.17, 0.38, 0.56, 0.71, 0.84, 1] : [0.15, 0.33, 0.49, 0.63, 0.75, 0.86, 1]).map((u, k, U) => {
         const gr = (gs.roller ? 0.013 : 0.019) - (gs.roller ? 0.006 : 0.0135) * Math.pow(k / (U.length - 1), 0.75);
         return [Y0 + u * total, gr, gr * 2.85 + 0.004];
@@ -304,6 +305,64 @@ export function buildNet() {
   const bag = new THREE.Mesh(new THREE.SphereGeometry(0.5, 28, 9, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), bagMat);
   bag.scale.y = 0.62;
   head.add(bag);
+  // Большой подсак — треугольный, как морские подсаки под крупную рыбу: вершина у ручки, широкая сторона впереди,
+  // углы скруглены. Обруч — трубка по такому контуру, сетка — та же полусфера, растянутая под контур.
+  // контур: треугольник (описанный радиус 0,62) со скруглёнными углами — ломаную по сторонам сглаживаем скользящим средним
+  const tri = [];
+  {
+    const R0 = 0.62;
+    const V = [0, 1, 2].map((i) => {
+      const f = Math.PI / 2 + (i * 2 * Math.PI) / 3;
+      return [Math.cos(f) * R0, Math.sin(f) * R0];
+    });
+    const raw = [];
+    const N = 40;
+    for (let i = 0; i < 3; i++) {
+      const [ax, az] = V[i];
+      const [bx, bz] = V[(i + 1) % 3];
+      for (let j = 0; j < N; j++) raw.push([ax + ((bx - ax) * j) / N, az + ((bz - az) * j) / N]);
+    }
+    const W = 9; // ширина сглаживания: скругление углов
+    for (let i = 0; i < raw.length; i += 2) {
+      let x = 0;
+      let z = 0;
+      for (let k = -W; k <= W; k++) {
+        const q = raw[(i + k + raw.length) % raw.length];
+        x += q[0];
+        z += q[1];
+      }
+      tri.push(new THREE.Vector3(x / (2 * W + 1), 0, z / (2 * W + 1)));
+    }
+  }
+  // радиус контура в направлении phi — для сетки
+  const triR = (phi) => {
+    let best = 0;
+    let bd = 9;
+    for (const p of tri) {
+      let d = Math.abs(Math.atan2(p.z, p.x) - phi);
+      if (d > Math.PI) d = 2 * Math.PI - d;
+      if (d < bd) (bd = d), (best = Math.hypot(p.x, p.z));
+    }
+    return best;
+  };
+  const triCurve = new THREE.CatmullRomCurve3(tri, true);
+  const hoopTri = new THREE.Mesh(new THREE.TubeGeometry(triCurve, 120, 0.019, 8, true), metal);
+  const bandTri = new THREE.Mesh(new THREE.TubeGeometry(triCurve, 120, 0.024, 6, true), dark);
+  bandTri.scale.set(1, 0.55, 1);
+  hoopTri.visible = bandTri.visible = false;
+  head.add(hoopTri, bandTri);
+  const bagRound = bag.geometry;
+  const bagTri = bagRound.clone();
+  {
+    const P = bagTri.attributes.position;
+    for (let i = 0; i < P.count; i++) {
+      const x = P.getX(i);
+      const z = P.getZ(i);
+      const k = triR(Math.atan2(z, x)) / 0.5;
+      P.setXYZ(i, x * k, P.getY(i) * 1.15, z * k);
+    }
+    bagTri.computeVertexNormals();
+  }
   // развилка и ручка с резиновой рукоятью (в метрах, от края обруча)
   for (const sx of [-1, 1]) {
     const strut = new THREE.Mesh(G.cyl(8), metal);
@@ -329,14 +388,15 @@ export function buildNet() {
     if (o.isMesh) o.castShadow = o.receiveShadow = false;
   });
   let size = 0.45;
+  let rimZ = 0.5; // где край обруча у ручки (в долях размера)
   const net = {
     group: g,
     setSize(d) {
       size = d;
       head.scale.setScalar(d);
-      stem.position.z = d * 0.5 - 0.012;
+      stem.position.z = d * rimZ - 0.012;
     },
-    grip: (d = size) => d * 0.5 + 0.31,
+    grip: (d = size) => d * rimZ + 0.31,
     /** net — подсачек: алюминиевый обруч, тёмная сетка, деревянная ручка с пробкой; bignet — большой: всё чёрное, синяя сетка */
     setStyle(id) {
       const big = id === 'bignet';
@@ -348,6 +408,11 @@ export function buildNet() {
       dark.color.set(big ? '#1b1e22' : '#c9a26b'); // рукоять: чёрная пена / пробка
       band.material = big ? metal : capMat;
       capMat.color.set('#1f2329');
+      hoop.visible = band.visible = !big;
+      hoopTri.visible = bandTri.visible = big;
+      bag.geometry = big ? bagTri : bagRound;
+      rimZ = big ? triR(Math.PI / 2) : 0.5; // ручка — у вершины треугольника
+      net.setSize(size);
     }
   };
   net.setStyle('net');

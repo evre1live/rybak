@@ -16,6 +16,7 @@ import { Fishing } from './fishing.js';
 import { Fx } from './fx.js';
 import { Boat, BOAT_PRICE, Ride, BOAT_SEATS, VMAX } from './boat.js';
 import { Remote } from './remote.js';
+import { Beasts } from './beast.js';
 import { Net } from './net.js';
 import { createVoice } from './voice.js';
 import { Audio2, MOTOR_FAR } from './audio.js';
@@ -201,6 +202,15 @@ class Game {
     this.fishing = new Fishing({ scene: this.scene, camera: this.camera, vm: this.vm, fx: this.fx, schools: this.world.scenery.schools, profile: this.profile, hour: () => this.hours, wx: () => this.weather.bite, emit: (t, d) => this.onFish(t, d) });
     // крупная рыба в воде замечает наживку, которая легла рядом (fauna.notice)
     this.fishing.stalk = (x, z, R, soft) => this.fauna.notice(x, z, R, soft);
+    // чудища и киты: общий бой вдвоём и больше (beast.js, server/beast.js)
+    this.beasts = new Beasts(this);
+    this.fishing.onBeastLand = (x, z, spot) => this.beasts.onLand(x, z, spot);
+    this.afterBeast = () => {
+      saveProfile(this.profile);
+      this.sendCard();
+      this.audio.coin(3);
+      this.ui.refreshHud();
+    };
     this.fishing.makeJunk = (id) => {
       // готовая модель стоит на «полу» (y = 0) — опускаем на половину высоты, чтобы в руках она была по центру, как процедурная
       const g = new THREE.Group();
@@ -435,6 +445,7 @@ class Game {
         for (const p of m.players) this.addPlayer(p);
         this.tour = null;
         if (m.tour) this.setTour(m.tour, true);
+        this.beasts.set(m.beast || null);
         setUrl(locUrl(LOC_ID, m.code));
         this.urlCode = m.code;
         if (back) {
@@ -492,6 +503,8 @@ class Game {
       },
       ev: (m) => this.onRemoteEvent(m),
       tour: (m) => this.setTour(m.tour),
+      beast: (m) => this.beasts.set(m.b),
+      beastErr: (m) => this.ui.toast(m.message, 'bad'),
       tscore: (m) => {
         if (!this.tour || this.tour.id !== m.id) return;
         this.tour.scores.set(m.row.id, m.row);
@@ -629,7 +642,7 @@ class Game {
     if (!this.solo) this.net.send({ t: 'mode', m: 'lobby' });
   }
   toLobby() {
-    if (this.fishing.state === 'fight') return this.ui.toast('Сначала вытащите рыбу', 'bad');
+    if (this.fishing.state === 'fight' || this.fishing.state === 'beast') return this.ui.toast('Сначала вытащите рыбу', 'bad');
     this.ui.panel = null;
     this.toLobbyState();
   }
@@ -980,7 +993,7 @@ class Game {
   }
   /** Из меню: сразу домой, откуда бы ни было. Лодка при этом сдаётся. */
   goHome() {
-    if (this.fishing.state === 'fight' || this.fishing.state === 'landed') return this.ui.toast('Сначала вытащите рыбу', 'bad');
+    if (this.fishing.state === 'fight' || this.fishing.state === 'beast' || this.fishing.state === 'landed') return this.ui.toast('Сначала вытащите рыбу', 'bad');
     this.fishing.reelIn(true);
     const rode = !!this.ride;
     if (rode) this.ev('boat', { k: 'off' });
@@ -1147,7 +1160,7 @@ class Game {
       this.audio.error();
       return this.ui.toast(r.why, 'bad', 4200);
     }
-    if (this.fishing.state === 'fight' || this.fishing.state === 'landed') return this.ui.toast('Сначала вытащите рыбу', 'bad');
+    if (this.fishing.state === 'fight' || this.fishing.state === 'beast' || this.fishing.state === 'landed') return this.ui.toast('Сначала вытащите рыбу', 'bad');
     this.pendingSave = r;
     if (this.ui.panel === 'save') this.ui.renderSave();
   }
@@ -1173,7 +1186,7 @@ class Game {
    */
   cloudApply(save, sum, asked) {
     if (!this.fishing || !this.ui) return false; // игра ещё собирается
-    if (this.fishing.state === 'fight' || this.fishing.state === 'landed') return false;
+    if (this.fishing.state === 'fight' || this.fishing.state === 'beast' || this.fishing.state === 'landed') return false;
     const r = importSave(exportSave(save, 0));
     if (!r.ok) {
       this.ui.toast('Сохранение с сервера не читается — оставляем то, что на этом устройстве', 'bad', 6000);
@@ -1222,7 +1235,7 @@ class Game {
   }
   /** Настройки → «Загрузить по коду»: смотрим, что лежит под кодом, и спрашиваем, заменить ли нынешний прогресс. */
   async cloudLookup(text) {
-    if (this.fishing.state === 'fight' || this.fishing.state === 'landed') return this.ui.toast('Сначала вытащите рыбу', 'bad');
+    if (this.fishing.state === 'fight' || this.fishing.state === 'beast' || this.fishing.state === 'landed') return this.ui.toast('Сначала вытащите рыбу', 'bad');
     this.pendingCode = null;
     const r = await this.cloud.lookup(text);
     if (!r.ok) {
@@ -1423,6 +1436,14 @@ class Game {
         a.wrap();
         this.player.shake = Math.max(this.player.shake, 0.7);
         return this.rumble(220, 1);
+      case 'beastHooked':
+        ui.banner('НА КРЮЧКЕ — ВМЕСТЕ!');
+        a.splash && a.splash(1);
+        return;
+      case 'beastLost':
+        this.net.send({ t: 'beast', a: 'snap' });
+        ui.toast(d.why === 'snap' ? 'Леска лопнула! Забросьте рядом с существом снова — успеете подцепиться' : 'Леска ослабла и соскочила — забросьте рядом снова', 'bad');
+        return;
       case 'lost': {
         ui.banner(d.why === 'snap' ? 'ОБРЫВ!' : 'СОШЛА!', 'red', 1600);
         a.strain(-1);
@@ -2224,6 +2245,7 @@ class Game {
         }
         this.player.update(dt, i, free);
         f.update(dt, tw, i, this.player);
+        this.beasts.update(dt, tw);
         const v = f.view();
         v.speed = this.player.speed;
         v.steer = i.steer;
@@ -2268,7 +2290,7 @@ class Game {
           }
         }
       } else this.helperNear = null;
-      ui.fight(f.state === 'fight' ? f.fight : null, i.steer);
+      ui.fight(f.state === 'fight' ? f.fight : f.state === 'beast' ? Object.assign(this.beastFight || (this.beastFight = {}), f.fight, { p: this.beasts.b ? this.beasts.b.P : 0 }) : null, i.steer);
       // музыка слушает игру: вываживание — пульс, тугая леска — тревога, легенда — минор, ночь и дождь — тише и реже
       this.audio.mood({ fight: f.state === 'fight' ? 1 : 0, tension: f.fight ? f.fight.T : 0, run: f.fight && f.fight.phase === 'run' ? 1 : 0, boss: f.fight ? f.fight.bossMax : 0, night: this.world.night, rain: wx.rain });
       // фрикцион трещит, когда рыба в рывке стягивает леску

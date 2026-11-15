@@ -1,4 +1,5 @@
 // РЫБАК — игровые данные: рыба, снасти, зоны ловли. Общие для браузера, сервера и тестов.
+import { BEAST_BAITS } from './beasts.js';
 import { locOf, DEFAULT_LOC } from './locations.js';
 
 export const RARITY = [
@@ -443,7 +444,8 @@ export const CATS = [
   { key: 'hook', name: 'Крючки', items: HOOKS, slot: 'hook' },
   { key: 'float', name: 'Поплавки', items: FLOATS, slot: 'float' },
   { key: 'bag', name: 'Садки', items: BAGS, slot: 'bag' },
-  { key: 'extra', name: 'Разное', items: EXTRAS, slot: null }
+  { key: 'extra', name: 'Разное', items: EXTRAS, slot: null },
+  { key: 'beast', name: 'Для чудищ', items: BEAST_BAITS, slot: 'tackle', count: true }
 ];
 export const ITEMS = {};
 for (const c of CATS) for (const it of c.items) ITEMS[it.id] = { ...it, cat: c.key, slot: c.slot, count: !!c.count };

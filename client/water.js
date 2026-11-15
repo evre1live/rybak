@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { groundH, BOUNDS, WORLD, BACKWATER, SEA, HAS } from './terrain.js';
 import { surfaceU } from './surface.js';
 import { farH, farBounds } from './farisles.js';
+import { LOC_ID } from './loc/id.js';
 
 // три волны: направление (x, z), частота, высота, скорость
 const WAVES = [
@@ -12,10 +13,18 @@ const WAVES = [
 ];
 // Зыбь открытого моря: за пределами бухты к мелким волнам прибавляются две длинные (33 и 20 метров от гребня до гребня).
 // Лодку и поплавок на них заметно качает; в бухте зыби нет, у берегов островов она гаснет вместе с остальными волнами.
-const SWELL = [
-  [0.86, 0.51, 0.19, 0.3, 1.02],
-  [-0.35, 0.94, 0.31, 0.16, 1.45]
-];
+// В открытом океане («Синий простор») зыбь длиннее и выше: три волны по 48, 30 и 20 метров от гребня до гребня.
+const OCEAN = LOC_ID === 'blue';
+const SWELL = OCEAN
+  ? [
+      [0.86, 0.51, 0.13, 0.42, 0.86],
+      [-0.35, 0.94, 0.21, 0.22, 1.12],
+      [0.62, -0.78, 0.31, 0.12, 1.48]
+    ]
+  : [
+      [0.86, 0.51, 0.19, 0.3, 1.02],
+      [-0.35, 0.94, 0.31, 0.16, 1.45]
+    ];
 const SWELL_A = SWELL.reduce((s, w) => s + w[3], 0);
 // где начинается зыбь: от середины бухты (SEA) — ноль до SWELL_R0 метров и в полную силу с SWELL_R1
 const SWELL_R0 = SEA.r - 25;
@@ -287,6 +296,16 @@ void main() {
     float rr = rainRings(p, uTime) * uRain * (1.0 - ss(22.0, 55.0, dist));
     c = mix(c, uSkyHor * 1.15, min(1.0, rr * 0.5));
   }
+  ${OCEAN ? `
+  // Океан: солнце просвечивает сквозь гребни зыби — макушка волны с подветренной от солнца стороны светится
+  // бирюзой, ложбины между волнами темнее и синее. Так зыбь видна издалека, даже без пены.
+  {
+    float cr = hs / ${SWELL_A.toFixed(3)};
+    float back = pow(max(dot(-V, normalize(vec3(uSunDir.x, 0.25, uSunDir.z))), 0.0), 2.0) * ss(0.02, 0.25, uSunDir.y + 0.1);
+    float lift = ss(0.1, 0.95, cr) * open;
+    c = mix(c, c * vec3(0.62, 0.7, 0.86), ss(0.0, -0.8, cr) * open * 0.55);
+    c += vec3(0.05, 0.32, 0.3) * lift * (0.25 + 0.75 * back) * uLight * (1.0 - fres);
+  }` : ''}
   float rs = max(dot(R, uSunDir), 0.0);
   c += uSunCol * (pow(rs, 380.0) * 3.0 * uPath.x + pow(rs, 28.0) * 0.1 * uPath.y) * uGlitter;
 
@@ -298,10 +317,10 @@ void main() {
     float crest = hs / ${SWELL_A.toFixed(3)}; // −1…1: впадина … гребень
     vec4 blot = texture2D(uDet, p * 0.0062 + uTime * vec2(0.0011, 0.0007)); // где вдоль гребня есть пена: пятна в десятки метров
     vec4 clot = texture2D(uDet, p * 0.047 - uTime * vec2(0.004, 0.0025)); // сами клочья: от полуметра до двух
-    float tuft = ss(0.5 - 0.06 * uWind, 0.56 - 0.06 * uWind, blot.r * 0.6 + blot.a * 0.4);
+    float tuft = ss(${OCEAN ? '0.44' : '0.5'} - 0.06 * uWind, ${OCEAN ? '0.5' : '0.56'} - 0.06 * uWind, blot.r * 0.6 + blot.a * 0.4);
     float lace = ss(0.47, 0.55, clot.r * 0.65 + clot.a * 0.35);
     // пена — только у самой макушки гребня: узкая рваная полоса, а не половина волны. Чем сильнее ветер, тем ниже порог
-    float top = 0.9 - 0.3 * uWind;
+    float top = ${OCEAN ? '0.82' : '0.9'} - 0.3 * uWind; // в океане барашки чаще
     caps = ss(top, top + 0.08, crest + (clot.a - 0.5) * 0.16) * tuft * lace * min(open, 1.0) * (1.0 - 0.6 * ss(180.0, 520.0, dist));
   }
   // Прибой. Кромка воды «дышит»: волна накатывает на берег и отходит (тем же ходом темнеет мокрый песок — surface.js).

@@ -1236,6 +1236,22 @@
     "env-fern": {
       "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/5HDsrlpWkRO9297qERgH/am5AC1NA8KjkEHk0CjOZ/content.png",
       "model": "e6b1344e-bb33-4514-b911-d857c76b7633"
+    },
+    "beast-kraken": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/R8nd0vFZ8tiDr78Cq4Z2/c3S8MTJ5BCmZkmyaOM4S/content.png",
+      "model": "5e17682c-5f5f-4cb5-8095-10f728041cf3"
+    },
+    "beast-chudo": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/AbTfaARujjjZS0gnS7lo/e8zPAZIlhTGDECBTyXki/content.png",
+      "model": "649192e1-5e1a-4abe-a241-dd07ae41414d"
+    },
+    "beast-serpent": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/4Vrp8tS688xcwi054lU8/BVPFmBAbMlV1gqqBMN6g/content.png",
+      "model": "52fd83d3-85c7-47cb-94c9-2cc5e0d3d771"
+    },
+    "beast-nessie": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/kwh4rUBCZJi5obuC4nym/kmI52YFxz1Lp9Zm50h3s/content.png",
+      "model": "96603394-0335-4e59-9519-7a2a28394368"
     }
   },
   "ledger": [
@@ -3513,6 +3529,34 @@
       "type": "texture_model",
       "task": "58eb111b-5ebf-4f49-85de-8bae516e8fcb",
       "credits": 20
+    },
+    {
+      "at": "2026-11-15T04:13:13.350Z",
+      "label": "beast-nessie модель",
+      "type": "image_to_model",
+      "task": "96603394-0335-4e59-9519-7a2a28394368",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-15T04:13:19.263Z",
+      "label": "beast-serpent модель",
+      "type": "image_to_model",
+      "task": "52fd83d3-85c7-47cb-94c9-2cc5e0d3d771",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-15T04:13:51.123Z",
+      "label": "beast-chudo модель",
+      "type": "image_to_model",
+      "task": "649192e1-5e1a-4abe-a241-dd07ae41414d",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-15T04:13:58.098Z",
+      "label": "beast-kraken модель",
+      "type": "image_to_model",
+      "task": "5e17682c-5f5f-4cb5-8095-10f728041cf3",
+      "credits": 60
     }
   ]
 }

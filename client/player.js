@@ -207,7 +207,7 @@ export class Player {
     this.sit = false;
   }
   /** Сидим в лодке: место и качку задаёт она, мы только смотрим по сторонам. Лодку к этому кадру уже подвинули. */
-  updateBoat(dt, input) {
+  updateBoat(dt, input, canMove = true) {
     const b = this.boat;
     const sens = 0.0022 * settings.sens;
     // взгляд поворачивается вместе с лодкой — смотришь на нос, и он остаётся перед глазами
@@ -217,6 +217,7 @@ export class Player {
     this.x = _seat.x;
     this.y = _seat.y;
     this.z = _seat.z;
+    this.toRail(b, dt, canMove);
     this.sit = true;
     this.dangle = true;
     this.jump = this.vy = this.wade = this.speed = 0;
@@ -235,9 +236,45 @@ export class Player {
       this.camera.updateProjectionMatrix();
     }
   }
+  /**
+   * Катер: рулят с высокого сиденья за рубкой, а ловят у борта. Катер встал, а мы смотрим вбок или назад — шагаем
+   * от сиденья к борту (или к корме) в ту сторону, куда смотрим: рубка больше не загораживает море. Тронулись —
+   * возвращаемся к рулю. Пока леска в воде (canMove = false), место не меняем.
+   */
+  toRail(b, dt, canMove) {
+    const sp = b.vis && b.vis.spec;
+    if (!sp || !sp.stool || typeof b.v !== 'number') {
+      this.rail = 0;
+      return;
+    }
+    if (this.rail === undefined) (this.rail = 0), (this.railX = sp.seatX), (this.railZ = sp.seatZ);
+    const th = b.yaw;
+    const a = this.yaw - th;
+    const lx = -Math.sin(a);
+    const lz = -Math.cos(a);
+    const xm = sp.beam - 0.3;
+    const zmax = sp.half - 0.3;
+    const zmin = sp.seatZ - 0.15; // вперёд, за рубку, не проходим
+    let t = 3;
+    if (lx > 0.01) t = Math.min(t, (xm - sp.seatX) / lx);
+    if (lx < -0.01) t = Math.min(t, (-xm - sp.seatX) / lx);
+    if (lz > 0.01) t = Math.min(t, (zmax - sp.seatZ) / lz);
+    if (lz < -0.01) t = Math.min(t, (zmin - sp.seatZ) / lz);
+    t = Math.max(0, t);
+    if (canMove) {
+      this.railX = damp(this.railX, sp.seatX + lx * t, 3, dt);
+      this.railZ = damp(this.railZ, sp.seatZ + lz * t, 3, dt);
+    }
+    this.rail = damp(this.rail, Math.abs(b.v) < 0.6 ? 1 : 0, Math.abs(b.v) < 0.6 ? 1.6 : 6, dt);
+    if (this.rail < 0.001) return;
+    const dx = (this.railX - sp.seatX) * this.rail;
+    const dz = (this.railZ - sp.seatZ) * this.rail;
+    this.x += dx * Math.cos(th) + dz * Math.sin(th);
+    this.z += -dx * Math.sin(th) + dz * Math.cos(th);
+  }
   /** canMove: false, когда леска в воде — стоим на месте, только смотрим. */
   update(dt, input, canMove) {
-    if (this.boat) return this.updateBoat(dt, input);
+    if (this.boat) return this.updateBoat(dt, input, canMove);
     const sens = 0.0022 * settings.sens;
     this.yaw -= input.lookDX * sens;
     this.pitch = clamp(this.pitch - input.lookDY * sens * (settings.invertY ? -1 : 1), -1.45, 1.45);

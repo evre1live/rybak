@@ -162,6 +162,7 @@ function prepare(gltf, info) {
   if (info.hands === 'open') curlHands(mesh, node, rest, canon, at, fix, scale, lift);
   // середина кулака в осях кисти куклы (метры от запястья): туда ложится рукоять удилища
   const fist = {};
+  const front = {};
   {
     const P = mesh.geometry.attributes.position;
     const SI = mesh.geometry.attributes.skinIndex;
@@ -175,19 +176,36 @@ function prepare(gltf, info) {
         for (let n = b; n && n.isBone; n = n.parent) if (n === hand) own.add(i);
       });
       const sum = new THREE.Vector3();
-      let n = 0;
+      const frame = rest['h' + s].clone().multiply(canon['h' + s].clone().invert()); // оси кисти куклы в исходной позе героя
+      const inv = frame.clone().invert();
+      const pts = [];
       for (let i = 0; i < P.count; i++) {
         let w = 0;
         for (let k = 0; k < 4; k++) if (own.has(SI.getComponent(i, k))) w += SW.getComponent(i, k);
         if (w < 0.85) continue;
         // вершины хранятся сжатыми, настоящий размер им возвращают кости — поэтому считаем через них
-        sum.add(mesh.applyBoneTransform(i, v.fromBufferAttribute(P, i)).applyMatrix4(mesh.matrixWorld));
-        n++;
+        mesh.applyBoneTransform(i, v.fromBufferAttribute(P, i)).applyMatrix4(mesh.matrixWorld).applyQuaternion(fix).multiplyScalar(scale);
+        v.y += lift;
+        const l = v.sub(at['h' + s]).applyQuaternion(inv).clone();
+        pts.push(l);
+        sum.add(l);
       }
-      sum.multiplyScalar(1 / Math.max(1, n)).applyQuaternion(fix).multiplyScalar(scale);
-      sum.y += lift;
-      const frame = rest['h' + s].clone().multiply(canon['h' + s].clone().invert()); // оси кисти куклы в исходной позе героя
-      fist[s] = n ? sum.sub(at['h' + s]).applyQuaternion(frame.invert()) : new THREE.Vector3(0, -0.085, 0.012);
+      const n = pts.length;
+      fist[s] = n ? sum.multiplyScalar(1 / n) : new THREE.Vector3(0, -0.085, 0.012);
+      // «лицо» кулака — куда смотрят согнутые пальцы (средние фаланги): дальше всего от запястья.
+      // Нужна, чтобы повернуть кулак пальцами под рукоять у любого героя: кулаки у моделей сжаты по-разному.
+      const fr = new THREE.Vector3(0, -1, 0);
+      if (n > 20) {
+        const d = pts.map((p) => p.length()).sort((a, b) => a - b);
+        const cut = d[Math.floor(n * 0.85)];
+        const far = new THREE.Vector3();
+        let m = 0;
+        for (const p of pts) if (p.length() >= cut) far.add(p), m++;
+        far.multiplyScalar(1 / m).sub(fist[s]);
+        far.z = 0;
+        if (far.lengthSq() > 1e-6) fr.copy(far).normalize();
+      }
+      front[s] = fr;
     }
   }
   mesh.frustumCulled = false; // кости уводят сетку далеко от исходных границ
@@ -211,7 +229,7 @@ function prepare(gltf, info) {
   });
   const clips = {};
   for (const c of gltf.animations || []) clips[c.name] = c;
-  return { info, scene, names, fix, scale, lift, canon, at, clips, fist, hipK: at.hips.y / PUPPET_HIP, forearm: at.eR.distanceTo(at.hR) };
+  return { info, scene, names, fix, scale, lift, canon, at, clips, fist, front, hipK: at.hips.y / PUPPET_HIP, forearm: at.eR.distanceTo(at.hR) };
 }
 
 /**

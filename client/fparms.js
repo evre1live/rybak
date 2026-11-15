@@ -21,6 +21,10 @@ const W = new THREE.Vector3();
 const E = new THREE.Vector3();
 const S = new THREE.Vector3();
 const T = new THREE.Vector3();
+const F = new THREE.Vector3();
+const G = new THREE.Vector3();
+const FR = new THREE.Vector3();
+const FRONT0 = new THREE.Vector3(0, -1, 0); // кулак куклы: пальцы смотрят вдоль −Y кисти
 const m4 = new THREE.Matrix4();
 const mA = new THREE.Matrix4();
 const qF = new THREE.Quaternion();
@@ -135,7 +139,7 @@ export class FpArms {
    *   elbow — куда примерно уходит локоть;
    *   tip — если не 0: предмет держим кончиками пальцев (на столько метров дальше середины кулака), а along — куда смотрит тыл кисти.
    */
-  arm(s, grip, along, elbow, tip = 0) {
+  arm(s, grip, along, elbow, tip = 0, face = null) {
     const { b, tpl, L1, L2 } = this;
     const c = tpl.canon;
     // в оси персонажа: x и z меняют знак
@@ -153,8 +157,26 @@ export class FpArms {
       Z2.copy(Z);
       Y2.copy(Y);
     } else {
-      Z.copy(Z2).addScaledVector(Y, -Z2.dot(Y)).normalize();
-      X.crossVectors(Y, Z);
+      if (face) {
+        // Кулак довёрнут вокруг рукояти не туда, куда выходит от локтя, а так, чтобы согнутые пальцы смотрели в face
+        // (под рукоять — большой палец остаётся сверху). У каждого героя кулак сжат по-своему: куда смотрят его пальцы
+        // в осях кисти, знает шаблон (tpl.front). Разницу забирает поворот предплечья вокруг своей оси, как у человека.
+        // середина обхвата — между костяшками (tpl.front) и ладонью (у правой кисти куклы ладонь смотрит в +x)
+        const tf = (tpl.front && tpl.front[s]) || FRONT0;
+        const fr = FR.set(tf.x + (s === 'R' ? 1 : -1), tf.y, 0).normalize();
+        cs(face, F);
+        F.addScaledVector(Z2, -F.dot(Z2)).normalize();
+        G.crossVectors(F, Z2);
+        Y2.copy(F).multiplyScalar(fr.y).addScaledVector(G, -fr.x); // куда при этом смотрит запястье
+        X.crossVectors(Y2, Z2).addScaledVector(Y, -X.dot(Y));
+      }
+      if (face && X.lengthSq() > 1e-4) {
+        X.normalize();
+        Z.crossVectors(X, Y);
+      } else {
+        Z.copy(Z2).addScaledVector(Y, -Z2.dot(Y)).normalize();
+        X.crossVectors(Y, Z);
+      }
       // кисть доворачивается в запястье, чтобы кулак лёг вдоль рукояти (не больше ~50°)
       d = THREE.MathUtils.clamp(Math.atan2(-Z2.dot(Y), Z2.dot(Z)), -0.9, 0.9);
       Z2.copy(Z).multiplyScalar(Math.cos(d)).addScaledVector(Y, -Math.sin(d));

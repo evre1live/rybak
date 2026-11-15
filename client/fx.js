@@ -212,6 +212,17 @@ export class Fx {
     }
     this.ripple(x, z, 0.7 + power * 0.9, 1.1);
     this.ripple(x, z, 1.1 + power * 1.5, 1.6, 0.18);
+    if (power > 1.3) {
+      // крупная рыба: столб воды — тесный пучок капель вверх, второй пузырь водяной пыли и широкий круг пены
+      const m = Math.round(20 * (power - 1.1));
+      for (let i = 0; i < m; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const sp = 0.3 + Math.random() * 0.9;
+        this.drop(x + Math.cos(a) * 0.15, y + 0.1, z + Math.sin(a) * 0.15, Math.cos(a) * sp, 4.2 + Math.random() * 2.6 * power, Math.sin(a) * sp, 0.05 + Math.random() * 0.05);
+      }
+      this.puff(x, y + 0.6 + power * 0.25, z, 0.7 + power * 0.6, 0.9 + power * 0.2);
+      this.ripple(x, z, 2 + power * 1.8, 2.4, 0.35);
+    }
     if (power > 0.5) {
       this.puff(x, y + 0.15, z, 0.5 + power * 0.7, 0.55 + power * 0.15);
       const f = this.foams[this.nextFoam++ % FOAMS];

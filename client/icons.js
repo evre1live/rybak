@@ -1,4 +1,5 @@
 // Иконки предметов, рыб и портреты игроков: маленький отдельный рендерер рисует 3D-модель в картинку.
+import { BEAST_BY_BAIT } from '../shared/beasts.js';
 import { heroes, heroOf, heroTemplate, loadHero } from './hero.js';
 import * as THREE from 'three';
 import { itemModel } from './gear3d.js';
@@ -66,6 +67,10 @@ export function itemIcon(id) {
   if (ITEM_IMG.has(id) && !window.RYBAK_OFFLINE) return `img/items/${id}.webp`; // нарисованный значок рынка (tools/icons.py); пробная версия одним файлом рисует кодом
   const baked = modelInfo('junk-' + id);
   if (baked && baked.icon) return baked.icon;
+  // приманка для чудища — значок самого существа
+  const bb = BEAST_BY_BAIT[id];
+  const bm = bb && modelInfo(bb.model);
+  if (bm && bm.icon) return bm.icon;
   const key = 'i:' + id;
   if (cache.has(key)) return cache.get(key);
   setup();

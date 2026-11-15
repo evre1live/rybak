@@ -1579,6 +1579,46 @@
       "geometry": "detailed",
       "tris": 3000,
       "lod": 300
+    },
+    {
+      "id": "beast-nessie",
+      "group": "env",
+      "name": "Несси",
+      "prompt": "(этап 25, образец GPT Image) Loch Ness monster plesiosaur, long neck, four flippers",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 9000,
+      "lod": 900
+    },
+    {
+      "id": "beast-kraken",
+      "group": "env",
+      "name": "Кракен",
+      "prompt": "(этап 25, образец GPT Image) giant crimson octopus kraken with eight curling tentacles",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 9000,
+      "lod": 900
+    },
+    {
+      "id": "beast-serpent",
+      "group": "env",
+      "name": "Морской змей",
+      "prompt": "(этап 25, образец GPT Image) turquoise sea serpent dragon with fins, long S-curved body",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 9000,
+      "lod": 900
+    },
+    {
+      "id": "beast-chudo",
+      "group": "env",
+      "name": "Чудо-юдо рыба-кит",
+      "prompt": "(этап 25, образец GPT Image) fairy-tale giant fish-whale with golden scales and barnacles",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 9000,
+      "lod": 900
     }
   ],
   "leads": {

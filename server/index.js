@@ -15,6 +15,7 @@ import { openStore, selfCheck } from './store.js';
 import { MAX_PLAYERS } from '../shared/data.js';
 import { TOURS, TOUR_LENS, TOUR_COUNTDOWN, tourBlank, tourAdd, tourTable } from '../shared/logic.js';
 import { cleanLoc, canHost, locOf } from '../shared/locations.js';
+import { beastMsg, beastTick, pubBeast } from './beast.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -361,7 +362,8 @@ export function createServer({ now = () => Date.now(), store = null, storeSoon =
     send(ws, {
       t: 'joined', code: room.code, loc: room.loc, id: p.id, token: p.token, slot: p.slot, seed: room.seed, t0: room.t0, now: now(), host: room.hostId,
       players: [...room.players.values()].filter((o) => o.ws && o.id !== p.id).map(pub),
-      tour: room.tour ? pubTour(room.tour) : null // турнир уже идёт — опоздавший сразу видит таблицу
+      tour: room.tour ? pubTour(room.tour) : null, // турнир уже идёт — опоздавший сразу видит таблицу
+      beast: room.beast ? pubBeast(room.beast) : null // идёт бой с чудищем — опоздавший видит его
     });
     send(ws, { t: 'vroster', list: voice.roster(room.code) });
     broadcast(room, { t: 'in', p: pub(p), back }, ws);
@@ -520,6 +522,20 @@ export function createServer({ now = () => Date.now(), store = null, storeSoon =
         touch(room.code);
         return broadcast(room, { t: 'tour', tour: pubTour(room.tour) });
       }
+      case 'beast': {
+        // общий бой с чудищем или китом: ход ведёт сервер (server/beast.js)
+        if (!info.ev()) return;
+        const was = room.beast ? room.beast.phase : null;
+        const err = beastMsg(room, p, msg, now());
+        if (err) return send(ws, { t: 'beastErr', a: String(msg.a || ''), message: err });
+        const b = room.beast;
+        // смена фазы и состава — сразу всем; подмотка расходится с ходом времени
+        if (b && (msg.a !== 'pull' || b.phase !== was)) {
+          room.beastSent = now();
+          broadcast(room, { t: 'beast', b: pubBeast(b) });
+        }
+        return;
+      }
       case 'chat': {
         const text = String(msg.text || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 200);
         if (!text || !info.chat()) return;
@@ -598,6 +614,14 @@ export function createServer({ now = () => Date.now(), store = null, storeSoon =
         fixHost(room);
       }
       if (room.tour && !room.hold && now() >= room.tour.end) finishTour(room);
+      if (room.beast) {
+        const had = room.beast;
+        const changed = beastTick(room, now());
+        if (changed || (room.beast && now() - (room.beastSent || 0) > 250)) {
+          room.beastSent = now();
+          broadcast(room, { t: 'beast', b: room.beast ? pubBeast(room.beast) : { id: had.id, phase: 'none' } });
+        }
+      }
       const moved = [];
       for (const p of room.players.values()) {
         if (p.dirty && p.ws && p.mode === 'world') moved.push([p.id, p.st]);
