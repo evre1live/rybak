@@ -72,7 +72,8 @@ function buildForest(scene) {
     const y = groundH(x, z);
     if (Math.abs(groundH(x + 3, z) - y) > 5 || Math.abs(groundH(x, z + 3) - y) > 5) continue; // на скале лес не растёт
     if (rf() > 0.94) continue;
-    farJungle(slope, x, y - 0.6, z, 11 + rf() * 9, rf);
+    // дальше 120 м от воды почти половина комков — «редкая»: на «низком» качестве их не рисуют (batch.js)
+    farJungle(d > 120 && spot01(x, z, 7) > 0.55 ? slope.thin : slope, x, y - 0.6, z, 11 + rf() * 9, rf);
     far2++;
   }
   const mSlope = slope.build(BATCH_MAT, false);

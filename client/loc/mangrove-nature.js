@@ -8,6 +8,7 @@ import { ENV, addGlow, addLit } from '../envmodels.js';
 import { roundTree, bush } from '../flora.js';
 import { palmTree } from '../places.js';
 import { bloomBush } from './keys-nature.js';
+import { spot01 } from '../scatter.js';
 import { rng, blobGeo, shade, sstep, TAU, fbm2, clamp } from '../util.js';
 import { BOUNDS, LAGOON, ISLES, FLATS, HUT, DECK_Y, MOORINGS, groundH, waterD, shoreZ, deckAt } from './mangrove.js';
 
@@ -144,7 +145,8 @@ function buildMangroves(scene) {
     if (atBase(x, z, 18)) continue;
     const y = groundH(x, z);
     if (Math.abs(groundH(x + 3, z) - y) > 5) continue;
-    farCanopy(far, x, y - 0.4, z, 7 + rf() * 5 + 8 * sstep(60, 300, d), rf);
+    // дальше 120 м от воды почти половина крон — «редкая»: на «низком» качестве их не рисуют (batch.js)
+    farCanopy(d > 120 && spot01(x, z, 7) > 0.55 ? far.thin : far, x, y - 0.4, z, 7 + rf() * 5 + 8 * sstep(60, 300, d), rf);
     f++;
   }
   const mFall = fall.build();

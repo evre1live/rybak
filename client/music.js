@@ -20,7 +20,14 @@ const CH = {
   A: { bass: 45, pad: [57, 61, 64], tones: [61, 64, 69, 73] },
   Asus: { bass: 45, pad: [57, 62, 64], tones: [62, 64, 69, 74] },
   Em: { bass: 40, pad: [55, 59, 64], tones: [59, 64, 67, 71] },
-  'F#m': { bass: 42, pad: [54, 57, 61], tones: [57, 61, 66, 69] }
+  'F#m': { bass: 42, pad: [54, 57, 61], tones: [57, 61, 66, 69] },
+  // ночная марина: аккорды с септимами и нонами — как в лаунже у воды
+  Dmaj9: { bass: 50, pad: [57, 61, 64], tones: [61, 64, 66, 69] },
+  Bm9: { bass: 47, pad: [54, 57, 61], tones: [57, 61, 62, 66] },
+  Em9: { bass: 40, pad: [55, 59, 62, 66], tones: [59, 62, 66, 67] },
+  A13: { bass: 45, pad: [55, 61, 66], tones: [61, 64, 66, 69] },
+  Gmaj9: { bass: 43, pad: [54, 57, 59], tones: [57, 59, 62, 66] },
+  'F#m7': { bass: 42, pad: [52, 57, 61], tones: [57, 61, 64, 66] }
 };
 // круги по восемь тактов: спокойные и «минорные» — для боя с легендой
 const CALM = [
@@ -29,6 +36,30 @@ const CALM = [
   ['Gmaj7', 'D', 'Em', 'Asus', 'Gmaj7', 'D', 'Bm', 'A']
 ];
 const MINOR = [['Bm', 'Bm', 'G', 'G', 'Em', 'Em', 'F#m', 'F#m'], ['Bm', 'G', 'D', 'A', 'Bm', 'G', 'Em', 'F#m']];
+const LOUNGE = [
+  ['Dmaj9', 'Dmaj9', 'Bm9', 'Bm9', 'Em9', 'Em9', 'A13', 'A13'],
+  ['Gmaj9', 'Gmaj9', 'F#m7', 'Bm9', 'Em9', 'A13', 'Dmaj9', 'Dmaj9'],
+  ['Dmaj9', 'Gmaj9', 'Dmaj9', 'Gmaj9', 'Em9', 'A13', 'Bm9', 'A13']
+];
+/**
+ * Манера музыки у каждой локации: tempo — во сколько раз быстрее, dens — сколько нот мелодии, low — как часто она
+ * уходит на октаву вниз, echo — сколько эха, timbre — голос мелодии (калимба, маримба, электропиано), drum — мягкий
+ * барабан-«бревно», swing — запаздывание слабых долей (свинг), brush — щётка по тарелке на 2 и 4, chords — свои круги.
+ */
+export const STYLES = {
+  calm: {},
+  pine: { tempo: 0.9, dens: 0.85, low: 0.3 },
+  reef: { tempo: 1.12, dens: 1.1, timbre: 'marimba' },
+  ocean: { tempo: 0.85, dens: 0.72, echo: 0.42 },
+  jungle: { dens: 0.9, drum: 1, timbre: 'marimba' },
+  swamp: { tempo: 0.92, dens: 0.82, low: 0.25, drum: 0.6 },
+  lounge: { tempo: 0.94, dens: 0.8, swing: 0.34, chords: LOUNGE, timbre: 'epiano', brush: 1 }
+};
+const TIMBRE = {
+  kalimba: [[1, 1, 0.26], [3, 0.22, 0.045], [2, 0.12, 0.11]],
+  marimba: [[1, 1, 0.2], [4, 0.24, 0.03], [10, 0.05, 0.012]],
+  epiano: [[1, 1, 0.55], [2, 0.24, 0.2], [3, 0.08, 0.07]]
+};
 const SCALE = [57, 59, 62, 64, 66, 69, 71, 74, 76, 78, 81]; // ре-мажорная пентатоника, от ля малой октавы
 const STEP = 60 / 66 / 2; // восьмая при 66 ударах в минуту
 
@@ -62,7 +93,7 @@ export class Music {
     this.echo.connect(ef);
     ef.connect(fb);
     fb.connect(this.echo);
-    const eg = c.createGain();
+    const eg = (this.echoG = c.createGain());
     eg.gain.value = 0.28;
     ef.connect(eg);
     eg.connect(this.dry);
@@ -84,6 +115,16 @@ export class Music {
     this.phrase = 0; // сколько восьмых ещё длится фраза (<0 — пауза)
     this.fightK = 0; // сглаженная «сила боя»
     this.log = null; // в проверке сюда пишется, что сыграно
+    this.st = STYLES.calm;
+    this.stName = 'calm';
+  }
+  /** Манера музыки (STYLES): у каждой локации своя. */
+  style(name) {
+    if (!STYLES[name] || name === this.stName) return;
+    this.st = STYLES[name];
+    this.stName = name;
+    this.echoG.gain.value = this.st.echo ?? 0.28;
+    this.bar0 = -1e9; // новый круг — с ближайшего такта
   }
   /** Отклик зала: затухающий шум, слева и справа разный. */
   room(sec) {
@@ -111,7 +152,7 @@ export class Music {
     if (this.next < now - 0.2 || !this.i) this.next = Math.max(this.next, now + 0.05); // вкладка спала — не догоняем пропущенное; первая нота — чуть погодя
     while (this.next < until) {
       this.step(this.next, this.i++);
-      this.next += STEP;
+      this.next += STEP / (this.st.tempo || 1);
     }
   }
   step(t, i) {
@@ -123,9 +164,9 @@ export class Music {
     if (s === 0) {
       // новый такт: раз в восемь — новый круг; с легендой на крючке — минорный
       const wantMinor = fk > 0.5 && m.boss > 0;
-      if (bar % 8 === 0 || wantMinor !== this.minor) {
+      if (bar % 8 === 0 || wantMinor !== this.minor || bar - this.bar0 > 64) {
         this.minor = wantMinor;
-        const set = wantMinor ? MINOR : CALM;
+        const set = wantMinor ? MINOR : this.st.chords || CALM;
         this.prog = set[Math.floor(this.rnd() * set.length)];
         this.bar0 = bar;
       }
@@ -141,7 +182,8 @@ export class Music {
     if (this.phrase === 0) this.phrase = this.rnd() < 0.72 ? 12 + Math.floor(this.rnd() * 3) * 4 : -(6 + Math.floor(this.rnd() * 2) * 4);
     const play = this.phrase > 0;
     this.phrase += play ? -1 : 1;
-    const dens = (0.56 - 0.26 * m.night - 0.16 * m.rain) * (s % 2 ? 0.6 : 1) + fk * 0.08;
+    const dens = ((0.56 - 0.26 * m.night - 0.16 * m.rain) * (s % 2 ? 0.6 : 1) + fk * 0.08) * (this.st.dens ?? 1);
+    const sw = s % 2 ? (this.st.swing || 0) * (STEP / (this.st.tempo || 1)) : 0; // свинг: слабая доля чуть позже
     if (play && this.rnd() < dens) {
       const strong = s === 0 || s === 4;
       let k = this.mel + [-2, -1, -1, 0, 1, 1, 2][Math.floor(this.rnd() * 7)];
@@ -155,9 +197,18 @@ export class Music {
       }
       this.mel = k;
       if (m.night > 0.5 && this.rnd() < 0.5) note -= 12;
-      this.pluck(Math.max(0, t + (this.rnd() - 0.5) * 0.012), note, (strong ? 0.075 : 0.055) * (0.8 + this.rnd() * 0.4)); // чуть «не в сетку» — живее
+      else if (this.st.low && this.rnd() < this.st.low) note -= 12;
+      this.pluck(Math.max(0, t + sw + (this.rnd() - 0.5) * 0.012), note, (strong ? 0.075 : 0.055) * (0.8 + this.rnd() * 0.4)); // чуть «не в сетку» — живее
       if (this.log) this.log.push({ t, note });
     }
+    // барабан-«бревно» (джунгли, протока) и щётка по тарелке (лаунж) — тихо, под мелодией
+    if (this.st.drum && fk < 0.5) {
+      const dv = 0.05 * this.st.drum * (1 - 0.5 * m.night);
+      if (s === 0) this.logdrum(t, 52, dv);
+      else if (s === 3 && this.rnd() < 0.55) this.logdrum(t, 59, dv * 0.7);
+      else if (s === 6 && this.rnd() < 0.6) this.logdrum(t, 55, dv * 0.8);
+    }
+    if (this.st.brush && (s === 2 || s === 6)) this.brush(t, 0.014 * this.st.brush);
     if (fk > 0.05) {
       // бой: бас восьмыми (тоника — квинта — октава) и шейкер на слабых долях; в рывке шейкер чаще
       const b = this.chord.bass;
@@ -216,7 +267,7 @@ export class Music {
     pan.connect(this.dry);
     pan.connect(this.echo);
     const f = hz(note);
-    for (const [mul, v, tau] of [[1, 1, 0.26], [3, 0.22, 0.045], [2, 0.12, 0.11]]) {
+    for (const [mul, v, tau] of TIMBRE[this.st.timbre || 'kalimba']) {
       const o = c.createOscillator();
       o.type = 'sine';
       o.frequency.value = f * mul;
@@ -244,6 +295,39 @@ export class Music {
     g.connect(this.dry);
     o.start(t);
     o.stop(end);
+  }
+  /** Барабан-«бревно»: глухой тон, который на миг проседает вниз. */
+  logdrum(t, note, vol) {
+    const c = this.ctx;
+    const o = c.createOscillator();
+    o.type = 'sine';
+    const f = hz(note);
+    o.frequency.setValueAtTime(f * 1.5, t);
+    o.frequency.exponentialRampToValueAtTime(f, t + 0.03);
+    const g = c.createGain();
+    const end = this.env(g, t, 0.004, vol, 0.09);
+    o.connect(g);
+    g.connect(this.dry);
+    o.start(t);
+    o.stop(end);
+  }
+  /** Щётка по тарелке: мягкий шорох шума. */
+  brush(t, vol) {
+    const c = this.ctx;
+    const s = c.createBufferSource();
+    s.buffer = this.noise;
+    const f = c.createBiquadFilter();
+    f.type = 'highpass';
+    f.frequency.value = 3800;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.02);
+    g.gain.setTargetAtTime(0, t + 0.02, 0.06);
+    s.connect(f);
+    f.connect(g);
+    g.connect(this.dry);
+    s.start(t, this.rnd() * 0.8);
+    s.stop(t + 0.5);
   }
   shake(t, vol) {
     const c = this.ctx;

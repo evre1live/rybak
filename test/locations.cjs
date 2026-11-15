@@ -109,8 +109,21 @@ async function clickAndReload(page, sel) {
   await G(a, () => { RYBAK.fixedHour = 13; });
   await a.waitForFunction(() => document.querySelector('#wxName').textContent === 'Ясно' && !RYBAK.scene.getObjectByName('lake-mist').visible, null, { timeout: 20000 });
   // звук места: чаек нет, волна тише, в лесу поют птицы (синтез — три манеры, без ошибок)
-  const snd = await G(a, () => { const A = RYBAK.audio; if (A.ctx) for (let i = 0; i < 40; i++) A.bird(A.ctx.currentTime + i * 0.05); return { ...A.site, ctx: !!A.ctx }; });
-  assert.deepEqual([snd.gulls, snd.birds, snd.surf, snd.ctx], [false, true, 0.4, true], JSON.stringify(snd));
+  // (и голоса других мест: тропические птицы, лягушки, фалы о мачты, цикады — тоже синтез и тоже без ошибок)
+  const snd = await G(a, () => {
+    const A = RYBAK.audio;
+    if (A.ctx) {
+      const t = A.ctx.currentTime;
+      for (let i = 0; i < 40; i++) A.bird(t + i * 0.05);
+      for (let i = 0; i < 20; i++) A.tropicBird(t + i * 0.05);
+      for (let i = 0; i < 6; i++) A.frogs(t + i * 0.2);
+      for (let i = 0; i < 6; i++) A.clink(t + i * 0.2);
+      A.cicadas(0.5);
+      A.cicadas(0);
+    }
+    return { ...A.site, ctx: !!A.ctx, style: A.musicStyle };
+  });
+  assert.deepEqual([snd.gulls, snd.birds, snd.surf, snd.ctx, snd.style], [false, 'forest', 0.4, true, 'pine'], JSON.stringify(snd));
   const got = await G(a, () => {
     const g = RYBAK, f = g.fishing;
     const fish = new Set(), zones = {}, names = new Set();

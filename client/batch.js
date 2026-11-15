@@ -1,6 +1,6 @@
 // Склейка неподвижных деталей мира в один меш с цветами по вершинам — сотни досок и камней за один вызов отрисовки.
 import * as THREE from 'three';
-import { patchSurface } from './surface.js';
+import { patchSurface, detail } from './surface.js';
 
 const _v = new THREE.Vector3();
 const _n = new THREE.Vector3();
@@ -80,6 +80,17 @@ function cached(key, make) {
 
 const plain = new WeakMap();
 const flats = new WeakMap();
+
+// Склейки с «редкой» половиной (Batch.thin): на «низком» качестве её не рисуют — дальний лес на телефоне легче
+const THINNED = [];
+let thinLow = null;
+/** Раз в кадр: показывает или прячет редкую половину дальнего леса по качеству графики (detail.lod из gfx.js). */
+export function syncThin() {
+  const low = detail.lod < 0.5;
+  if (low === thinLow) return;
+  thinLow = low;
+  for (const m of THINNED) m.geometry.setDrawRange(0, low ? m.userData.keep : Infinity);
+}
 
 export class Batch {
   constructor() {
@@ -173,7 +184,27 @@ export class Batch {
   get empty() {
     return !this.pos.length;
   }
+  /** «Редкая» половина склейки: её детали встают в конец меша, и на «низком» качестве их не рисуют (syncThin). */
+  get thin() {
+    if (!this._thin) {
+      this._thin = new Batch();
+      this._thin.mat = this.mat;
+      this._thin.auto = this.auto;
+    }
+    return this._thin;
+  }
   build(material, shadow = true) {
+    const t = this._thin && !this._thin.empty ? this._thin : null;
+    const keep = this.pos.length / 3;
+    if (t) {
+      for (const k of ['pos', 'nor', 'col', 'mid', 'tex']) {
+        const a = this[k];
+        const b = t[k];
+        for (let i = 0; i < b.length; i++) a.push(b[i]);
+      }
+      this.hasMat = this.hasMat || t.hasMat;
+      this._thin = null;
+    }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
     g.setAttribute('normal', new THREE.Float32BufferAttribute(this.nor, 3));
@@ -186,6 +217,11 @@ export class Batch {
     const m = new THREE.Mesh(g, material || BATCH_MAT);
     m.castShadow = shadow;
     m.receiveShadow = true;
+    if (t) {
+      m.userData.keep = keep;
+      THINNED.push(m);
+      thinLow = null; // новый меш получит нужную длину в ближайшем кадре
+    }
     this.pos = this.nor = this.col = this.mid = this.tex = null;
     return m;
   }

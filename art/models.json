@@ -1775,7 +1775,7 @@
       "name": "Мангр с корнями-арками",
       "prompt": "(этап 27, образец GPT Image) A single red mangrove tree standing on a tall tangle of thick arching prop roots: a dozen massive reddish-brown roots curve out of the short trunk in wide arche",
       "tris": 14000,
-      "lod": 1600
+      "lod": 800
     },
     {
       "id": "env-mangrove2",
@@ -1783,7 +1783,7 @@
       "name": "Мангр наклонный",
       "prompt": "(этап 27, образец GPT Image) A single tall mangrove tree leaning slightly to one side over the water, its gnarled twisted reddish-brown trunk rising from a cluster of thick arching stilt ro",
       "tris": 14000,
-      "lod": 1600
+      "lod": 800
     },
     {
       "id": "env-mangrove3",
@@ -1791,7 +1791,7 @@
       "name": "Мангр молодой",
       "prompt": "(этап 27, образец GPT Image) A single young mangrove tree: a low, dense, rounded crown of glossy green leaves sitting on a wide dome of many arching prop roots, thick and thin, that splay o",
       "tris": 12000,
-      "lod": 1600
+      "lod": 800
     },
     {
       "id": "fish-pompano",

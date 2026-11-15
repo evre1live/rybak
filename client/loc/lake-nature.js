@@ -64,7 +64,9 @@ function buildForest(scene) {
     if (Math.abs(groundH(x + 3, z) - y) > 4.2 || Math.abs(groundH(x, z + 3) - y) > 4.2) continue; // на скале лес не растёт
     if (rf() > 0.92 - 0.5 * sstep(line - 22, line, y)) continue; // к границе леса редеет
     // темнее обычного — в тон готовым соснам у воды, с разбросом: стена леса не должна быть одного цвета
-    farSpruce(slope, { x, y: y - 0.4, z, h: (9.5 + rf() * 8) * (1 - 0.3 * sstep(line - 30, line, y)) }, rf, -0.2 + rf() * 0.12);
+    // дальше 120 м от воды почти половина елей — «редкая»: на «низком» качестве их не рисуют (batch.js)
+    const S = d > 120 && spot01(x, z, 7) > 0.55 ? slope.thin : slope;
+    farSpruce(S, { x, y: y - 0.4, z, h: (9.5 + rf() * 8) * (1 - 0.3 * sstep(line - 30, line, y)) }, rf, -0.2 + rf() * 0.12);
     far2++;
   }
   const mSlope = slope.build(BATCH_MAT, false);

@@ -78,6 +78,20 @@ function setUrl(u) {
 }
 const VENDOR = LOC.vendor; // что говорит торговец — у каждой локации свои байки (shared/locations.js)
 
+
+/** Звук места по локации (audio.js, site). */
+const SITE_SOUND = {
+  bay: { surf: 1, gulls: true },
+  lake: { surf: 0.4, gulls: false, birds: 'forest' },
+  keys: { surf: 0.85, gulls: true, birds: 'tropic' },
+  blue: { surf: 1, gulls: true },
+  cascade: { surf: 0.4, gulls: false, birds: 'tropic', frogs: true, cicadas: 0.6 },
+  mangrove: { surf: 0.25, gulls: false, birds: 'tropic', frogs: true, cicadas: 1 },
+  marina: { surf: 0.35, gulls: true, clinks: true, crickets: 0.5 }
+};
+/** Манера музыки по локации (music.js, STYLES). */
+const MUSIC_STYLE = { bay: 'calm', lake: 'pine', keys: 'reef', blue: 'ocean', cascade: 'jungle', mangrove: 'swamp', marina: 'lounge' };
+
 class Game {
   constructor() {
     const q = new URLSearchParams(location.search);
@@ -167,7 +181,10 @@ class Game {
     this.fill = new THREE.DirectionalLight('#fff1dc', 0);
     this.scene.add(this.fill, this.fill.target);
     this.audio = new Audio2();
-    if (!HAS.sea) this.audio.site = { surf: 0.4, gulls: false, birds: true }; // озеро: волна у берега тише морского прибоя, чаек нет — в лесу поют птицы
+    // звук места: на озере волна тише морского прибоя и поют лесные птицы; в тропиках — свои птицы, в протоке и джунглях
+    // ночью квакают лягушки и под вечер звенят цикады, в марине фалы звенят о мачты яхт
+    this.audio.site = SITE_SOUND[LOC_ID] || (HAS.sea ? { surf: 1, gulls: true, birds: false } : { surf: 0.4, gulls: false, birds: 'forest' });
+    this.audio.setMusicStyle(MUSIC_STYLE[LOC_ID] || 'calm');
     // шаги: доски причала, земля, вода по колено
     this.player.onStep = (land) => {
       const p = this.player;
@@ -2154,6 +2171,7 @@ class Game {
     this.fx.setLight(1 - this.world.night); // ночью брызги и пена не светятся белым
     setEnvLight(0.22 + 0.78 * (1 - this.world.night));
     this.audio.night = this.world.night;
+    this.audio.hours = this.hours;
     const tw = this.state === 'title' ? now / 1000 : T;
     const cam = this.camera;
     const ui = this.ui;

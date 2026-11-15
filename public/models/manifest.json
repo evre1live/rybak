@@ -2822,7 +2822,7 @@
       "lod": {
         "file": "models/kit/cascade.glb",
         "node": "kit-jtree1-lod",
-        "tris": 726
+        "tris": 430
       }
     },
     "kit-jtree2": {
@@ -2839,7 +2839,7 @@
       "lod": {
         "file": "models/kit/cascade.glb",
         "node": "kit-jtree2-lod",
-        "tris": 1114
+        "tris": 616
       }
     },
     "kit-jtree3": {
@@ -2856,7 +2856,7 @@
       "lod": {
         "file": "models/kit/cascade.glb",
         "node": "kit-jtree3-lod",
-        "tris": 509
+        "tris": 321
       }
     },
     "kit-jtwist1": {
@@ -2873,7 +2873,7 @@
       "lod": {
         "file": "models/kit/cascade.glb",
         "node": "kit-jtwist1-lod",
-        "tris": 1217
+        "tris": 679
       }
     },
     "kit-jtwist2": {
@@ -2890,7 +2890,7 @@
       "lod": {
         "file": "models/kit/cascade.glb",
         "node": "kit-jtwist2-lod",
-        "tris": 1374
+        "tris": 756
       }
     },
     "kit-jplant7": {
@@ -3090,7 +3090,7 @@
       "lod": {
         "file": "models/kit/mangrove.glb",
         "node": "kit-mtwist1-lod",
-        "tris": 1209
+        "tris": 673
       }
     },
     "kit-mtwist2": {
@@ -3107,7 +3107,7 @@
       "lod": {
         "file": "models/kit/mangrove.glb",
         "node": "kit-mtwist2-lod",
-        "tris": 1367
+        "tris": 749
       }
     },
     "kit-mtwist3": {
@@ -3124,7 +3124,7 @@
       "lod": {
         "file": "models/kit/mangrove.glb",
         "node": "kit-mtwist3-lod",
-        "tris": 1518
+        "tris": 824
       }
     },
     "kit-mtree1": {
@@ -3141,7 +3141,7 @@
       "lod": {
         "file": "models/kit/mangrove.glb",
         "node": "kit-mtree1-lod",
-        "tris": 487
+        "tris": 307
       }
     },
     "kit-mtree2": {
@@ -3158,7 +3158,7 @@
       "lod": {
         "file": "models/kit/mangrove.glb",
         "node": "kit-mtree2-lod",
-        "tris": 1818
+        "tris": 962
       }
     },
     "fish-snuk": {
@@ -3296,8 +3296,8 @@
       ],
       "lod": {
         "file": "models/env-mangrove1.lod.glb",
-        "tris": 1550,
-        "kb": 25
+        "tris": 756,
+        "kb": 13
       }
     },
     "env-mangrove2": {
@@ -3312,8 +3312,8 @@
       ],
       "lod": {
         "file": "models/env-mangrove2.lod.glb",
-        "tris": 1582,
-        "kb": 26
+        "tris": 796,
+        "kb": 14
       }
     },
     "env-mangrove3": {
@@ -3328,8 +3328,8 @@
       ],
       "lod": {
         "file": "models/env-mangrove3.lod.glb",
-        "tris": 1512,
-        "kb": 27
+        "tris": 732,
+        "kb": 15
       }
     },
     "fish-pompano": {

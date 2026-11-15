@@ -606,7 +606,7 @@
         "src": "q:CommonTree_5",
         "tris": 1000,
         "lod": 140,
-        "lodLeaves": 0.45,
+        "lodLeaves": 0.22,
         "mats": {
           "Leaves_NormalTree": {
             "color": "#4c9a3c"
@@ -619,7 +619,7 @@
         "texDir": "usnTex:.",
         "tris": 1000,
         "lod": 140,
-        "lodLeaves": 0.45,
+        "lodLeaves": 0.22,
         "mats": {
           "NormalTree_Leaves": {
             "color": "#5aa847"
@@ -632,7 +632,7 @@
         "texDir": "usnTex:.",
         "tris": 1000,
         "lod": 140,
-        "lodLeaves": 0.45,
+        "lodLeaves": 0.22,
         "mats": {
           "NormalTree_Leaves": {
             "color": "#3f8f3a"
@@ -644,7 +644,7 @@
         "src": "q:TwistedTree_1",
         "tris": 1200,
         "lod": 160,
-        "lodLeaves": 0.45,
+        "lodLeaves": 0.22,
         "mats": {
           "Leaves_TwistedTree": {
             "tex": "q:Leaves_TwistedTree.png",
@@ -657,7 +657,7 @@
         "src": "q:TwistedTree_4",
         "tris": 1200,
         "lod": 160,
-        "lodLeaves": 0.45,
+        "lodLeaves": 0.22,
         "mats": {
           "Leaves_TwistedTree": {
             "tex": "q:Leaves_TwistedTree.png",
@@ -708,7 +708,7 @@
         "src": "q:TwistedTree_2",
         "tris": 1200,
         "lod": 160,
-        "lodLeaves": 0.45,
+        "lodLeaves": 0.22,
         "mats": {
           "Leaves_TwistedTree": {
             "tex": "q:Leaves_TwistedTree.png",
@@ -724,7 +724,7 @@
         "src": "q:TwistedTree_3",
         "tris": 1200,
         "lod": 160,
-        "lodLeaves": 0.45,
+        "lodLeaves": 0.22,
         "mats": {
           "Leaves_TwistedTree": {
             "tex": "q:Leaves_TwistedTree.png",
@@ -740,7 +740,7 @@
         "src": "q:TwistedTree_5",
         "tris": 1200,
         "lod": 160,
-        "lodLeaves": 0.45,
+        "lodLeaves": 0.22,
         "mats": {
           "Leaves_TwistedTree": {
             "tex": "q:Leaves_TwistedTree.png",
@@ -756,7 +756,7 @@
         "src": "q:CommonTree_4",
         "tris": 1000,
         "lod": 140,
-        "lodLeaves": 0.45,
+        "lodLeaves": 0.22,
         "mats": {
           "Leaves_NormalTree": {
             "color": "#6cb03e"
@@ -769,7 +769,7 @@
         "texDir": "usnTex:.",
         "tris": 1000,
         "lod": 140,
-        "lodLeaves": 0.45,
+        "lodLeaves": 0.22,
         "mats": {
           "NormalTree_Leaves": {
             "color": "#78b844"

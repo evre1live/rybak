@@ -1,6 +1,6 @@
 // Всё, что стоит в бухте: причалы, лавка-рынок, маяк, водопады, арка, камни, деревья, лодка, буйки, чайки.
 import * as THREE from 'three';
-import { Batch, M, G, BATCH_MAT, BATCH_MAT_2S } from './batch.js';
+import { Batch, M, G, BATCH_MAT, BATCH_MAT_2S, syncThin } from './batch.js';
 import { loadManifest } from './hero.js';
 import { modelInfo, loadModels, spawn, loadModel, modelGeometry } from './models.js';
 import { buildPlaces } from './places.js';
@@ -1821,6 +1821,7 @@ export function buildScenery(scene, nfx = null) {
       sunK = k;
     },
     update(dt, t, camera) {
+      syncThin();
       if (camera) {
         env.update(camera, t);
         cullSmall(camera);

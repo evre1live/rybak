@@ -28,8 +28,13 @@ export class Audio2 {
     this.ctx = null;
     this.night = 0;
     this.tension = null;
-    /** Звук места: surf — громкость волны у берега (1 — морской прибой), gulls — кричат ли чайки, birds — поют ли лесные птицы. Ставит игра по локации. */
+    /**
+     * Звук места (ставит игра по локации): surf — громкость волны у берега (1 — морской прибой), gulls — кричат ли
+     * чайки, birds — птицы днём ('forest' — лесные, 'tropic' — тропические), frogs — лягушки ночью, cicadas — цикады
+     * под вечер (громкость), clinks — фалы звенят о мачты яхт, crickets — громкость сверчков ночью (по умолчанию 1).
+     */
     this.site = { surf: 1, gulls: true, birds: false };
+    this.hours = 12;
   }
   /** Запуск по первому нажатию — раньше браузер не разрешит. */
   start() {
@@ -73,6 +78,7 @@ export class Audio2 {
     this.startAmbient();
     // музыка расписывается на полсекунды вперёд; вкладка скрыта или громкость на нуле — молчит
     this.music = new Music(c, this.mus);
+    if (this.musicStyle) this.music.style(this.musicStyle);
     setInterval(() => {
       if (!document.hidden && c.state === 'running' && settings.music > 0.01) this.music.plan(c.currentTime + 0.6);
     }, 140);
@@ -87,6 +93,11 @@ export class Audio2 {
   /** Настроение музыки: { fight, tension, run, boss, night, rain } — см. music.js. */
   mood(m) {
     if (this.music) this.music.set(m);
+  }
+  /** Манера музыки локации (music.js, STYLES): ставится и до запуска звука. */
+  setMusicStyle(name) {
+    this.musicStyle = name;
+    if (this.music) this.music.style(name);
   }
   /** Запись по адресу url → звук, готовый к игре, или null (нет файла, нет сети, браузер не умеет читать). */
   fetchBuf(url) {
@@ -315,11 +326,18 @@ export class Audio2 {
         setTimeout(() => old.forEach((n) => (n.s.stop(), n.lfo.stop(), n.g.disconnect())), 6000);
       }
       if (this.site.gulls !== false && this.night < 0.5 && Math.random() < 0.5 * (1 - (this.wet || 0))) this.gull(t);
-      // лес у озера: днём поют птицы (в дождь молчат), ночью их сменяют сверчки
-      if (this.site.birds && this.night < 0.35 && Math.random() < 0.8 * (1 - (this.wet || 0))) this.bird(t);
+      // лес у озера: днём поют птицы (в дождь молчат), ночью их сменяют сверчки; в тропиках — свои птицы
+      const wet = this.wet || 0;
+      if (this.site.birds && this.night < 0.35 && Math.random() < 0.8 * (1 - wet)) (this.site.birds === 'tropic' ? this.tropicBird(t) : this.bird(t));
       // сверчки: ночью — запись, а пока её нет — синтез
-      const crickets = this.bed('crickets', this.night > 0.4 ? 0.075 * this.night * (1 - 0.7 * (this.wet || 0)) : 0, { tc: 2.5 });
-      if (this.night > 0.4 && !crickets) this.cricket(t);
+      const ck = this.site.crickets ?? 1;
+      const crickets = this.bed('crickets', this.night > 0.4 ? 0.075 * ck * this.night * (1 - 0.7 * wet) : 0, { tc: 2.5 });
+      if (this.night > 0.4 && !crickets && ck > 0.3) this.cricket(t);
+      // протока и джунгли: ночью квакают лягушки, под вечер звенят цикады
+      if (this.site.frogs && this.night > 0.3 && Math.random() < 0.55 * (1 - 0.5 * wet)) this.frogs(t);
+      if (this.site.cicadas) this.cicadas(this.site.cicadas * this.cicadaK() * (1 - 0.8 * wet));
+      // марина: ветер качает фалы, и они звенят о мачты яхт
+      if (this.site.clinks && Math.random() < (this.night > 0.4 ? 0.2 : 0.6)) this.clink(t);
       setTimeout(loop, this.night > 0.4 ? 700 + Math.random() * 900 : 3500 + Math.random() * 7000);
     };
     setTimeout(loop, 2500);
@@ -421,6 +439,203 @@ export class Audio2 {
       out.disconnect();
       if (pan) pan.disconnect();
     }, (len + 0.6) * 1000);
+  }
+  /** Выход для голоса в стороне: панорама и общая громкость окружения. Возвращает [вход, убрать через секунд]. */
+  side(spread = 0.9) {
+    const c = this.ctx;
+    const out = c.createGain();
+    const pan = c.createStereoPanner ? c.createStereoPanner() : null;
+    if (pan) {
+      pan.pan.value = rnd(-spread, spread);
+      out.connect(pan);
+      pan.connect(this.amb);
+    } else out.connect(this.amb);
+    return [out, (sec) => setTimeout(() => (out.disconnect(), pan && pan.disconnect()), sec * 1000)];
+  }
+  /** Тропическая птица — синтез: свист вверх-вниз, флейтовые три ноты, хриплый вскрик попугая или смех-трель. */
+  tropicBird(t) {
+    const c = this.ctx;
+    const [out, done] = this.side();
+    const far = rnd(0.4, 1);
+    const note = (t0, f0, f1, dur, vol, type = 'sine', bp = 0) => {
+      const o = c.createOscillator();
+      o.type = type;
+      const g = c.createGain();
+      o.frequency.setValueAtTime(f0, t0);
+      o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(vol * far, t0 + Math.min(0.03, dur * 0.3));
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      if (bp) {
+        const f = c.createBiquadFilter();
+        f.type = 'bandpass';
+        f.frequency.value = bp;
+        f.Q.value = 2.5;
+        o.connect(f);
+        f.connect(g);
+      } else o.connect(g);
+      g.connect(out);
+      o.start(t0);
+      o.stop(t0 + dur + 0.02);
+    };
+    const kind = Math.random();
+    let len;
+    if (kind < 0.3) {
+      // «уиу-уиить»: свист вверх и вниз, иногда дважды
+      const n = Math.random() < 0.4 ? 2 : 1;
+      for (let i = 0; i < n; i++) {
+        note(t + i * 0.55, 900, 2300, 0.17, 0.02);
+        note(t + i * 0.55 + 0.17, 2300, 1100, 0.2, 0.018);
+      }
+      len = n * 0.55;
+    } else if (kind < 0.58) {
+      // три флейтовые ноты
+      const f = rnd(1500, 2300);
+      [1, 1.33, 0.9].forEach((k, i) => note(t + i * 0.17, f * k, f * k * 1.03, 0.14, 0.016));
+      len = 0.55;
+    } else if (kind < 0.78) {
+      // попугай: хриплый вскрик
+      note(t, 620, 920, 0.11, 0.035, 'sawtooth', 1500);
+      note(t + 0.11, 920, 600, 0.13, 0.03, 'sawtooth', 1400);
+      len = 0.3;
+    } else {
+      // смех-трель: частые ноты всё ниже
+      const n = 7 + Math.floor(Math.random() * 5);
+      const f = rnd(1300, 1700);
+      for (let i = 0; i < n; i++) note(t + i * 0.085, f * (1 - i * 0.035), f * (1 - i * 0.035) * 1.08, 0.06, 0.013);
+      len = n * 0.085;
+    }
+    done(len + 0.6);
+  }
+  /** Лягушки: «ква» — частые импульсы низкого тона, или басовитый лягушонок-бык; одна-три в стороне. */
+  frogs(t) {
+    const c = this.ctx;
+    const n = 1 + Math.floor(Math.random() * 3);
+    for (let k = 0; k < n; k++) {
+      const [out, done] = this.side(0.95);
+      const far = rnd(0.35, 1) * Math.min(1, this.night * 1.3);
+      const t0 = t + rnd(0, 0.9);
+      const o = c.createOscillator();
+      const f = c.createBiquadFilter();
+      f.type = 'bandpass';
+      const g = c.createGain();
+      g.gain.value = 0;
+      let len;
+      if (Math.random() < 0.75) {
+        // «ква»: 8–14 щелчков подряд, тон чуть падает; иногда повтор
+        const f0 = rnd(260, 520);
+        o.type = 'triangle';
+        o.frequency.setValueAtTime(f0, t0);
+        f.frequency.value = f0 * 2.2;
+        f.Q.value = 3;
+        const pulses = 8 + Math.floor(Math.random() * 7);
+        const step = 1 / rnd(28, 42);
+        const reps = Math.random() < 0.5 ? 2 : 1;
+        for (let r = 0; r < reps; r++)
+          for (let i = 0; i < pulses; i++) {
+            const tp = t0 + r * (pulses * step + 0.18) + i * step;
+            g.gain.setValueAtTime(0, tp);
+            g.gain.linearRampToValueAtTime(0.03 * far, tp + step * 0.3);
+            g.gain.linearRampToValueAtTime(0, tp + step * 0.9);
+          }
+        o.frequency.linearRampToValueAtTime(f0 * 0.9, t0 + reps * (pulses * step + 0.18));
+        len = reps * (pulses * step + 0.18);
+      } else {
+        // лягушка-бык: низкое «ру-ум» с дрожью
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(rnd(95, 130), t0);
+        f.frequency.value = 260;
+        f.Q.value = 1.2;
+        const lfo = c.createOscillator();
+        lfo.frequency.value = 12;
+        const lg = c.createGain();
+        lg.gain.value = 0.02 * far;
+        lfo.connect(lg);
+        lg.connect(g.gain);
+        g.gain.setValueAtTime(0, t0);
+        g.gain.linearRampToValueAtTime(0.04 * far, t0 + 0.08);
+        g.gain.setValueAtTime(0.04 * far, t0 + 0.38);
+        g.gain.linearRampToValueAtTime(0, t0 + 0.52);
+        lfo.start(t0);
+        lfo.stop(t0 + 0.6);
+        len = 0.55;
+      }
+      o.connect(f);
+      f.connect(g);
+      g.connect(out);
+      o.start(t0);
+      o.stop(t0 + len + 0.05);
+      done(len + 1.6);
+    }
+  }
+  /** Сколько поют цикады: громче всего под вечер, ночью тише, днём едва. */
+  cicadaK() {
+    const h = this.hours;
+    const dusk = h > 16 && h < 22 ? Math.sin(((h - 16) / 6) * Math.PI) : 0;
+    return Math.min(1, 0.18 + 0.82 * dusk + 0.35 * this.night);
+  }
+  /** Цикады: шум в узкой полосе, дрожащий с частотой крыльев, волнами то громче, то тише. level 0…1. */
+  cicadas(level) {
+    const c = this.ctx;
+    if (!this.cic && level > 0.01) {
+      const s = this.src(true);
+      const f = c.createBiquadFilter();
+      f.type = 'bandpass';
+      f.frequency.value = 5200;
+      f.Q.value = 6;
+      const am = c.createGain();
+      am.gain.value = 0.55;
+      const lfo = c.createOscillator();
+      lfo.frequency.value = 52;
+      const lg = c.createGain();
+      lg.gain.value = 0.45;
+      lfo.connect(lg);
+      lg.connect(am.gain);
+      const sw = c.createGain();
+      sw.gain.value = 0.7;
+      const slow = c.createOscillator();
+      slow.frequency.value = 0.085;
+      const sg = c.createGain();
+      sg.gain.value = 0.3;
+      slow.connect(sg);
+      sg.connect(sw.gain);
+      const g = c.createGain();
+      g.gain.value = 0;
+      s.connect(f);
+      f.connect(am);
+      am.connect(sw);
+      sw.connect(g);
+      g.connect(this.amb);
+      s.start();
+      lfo.start();
+      slow.start();
+      this.cic = { g };
+    }
+    if (this.cic) this.cic.g.gain.setTargetAtTime(level * 0.05, c.currentTime, 2.5);
+  }
+  /** Фал звенит о мачту: металлический «дзынь» из нескольких негармоничных призвуков, иногда дважды. */
+  clink(t) {
+    const c = this.ctx;
+    const [out, done] = this.side(0.9);
+    const far = rnd(0.3, 1);
+    const base = rnd(1400, 2100);
+    const hit = (t0, v) => {
+      [[1, 1, 0.32], [1.51, 0.5, 0.2], [2.42, 0.35, 0.12], [3.17, 0.2, 0.08]].forEach(([m, k, tau]) => {
+        const o = c.createOscillator();
+        o.frequency.value = base * m;
+        const g = c.createGain();
+        g.gain.setValueAtTime(0, t0);
+        g.gain.linearRampToValueAtTime(v * k * far, t0 + 0.002);
+        g.gain.setTargetAtTime(0, t0 + 0.002, tau);
+        o.connect(g);
+        g.connect(out);
+        o.start(t0);
+        o.stop(t0 + tau * 7);
+      });
+    };
+    hit(t, 0.012);
+    if (Math.random() < 0.5) hit(t + rnd(0.12, 0.3), 0.008);
+    done(3);
   }
   cricket(t) {
     const c = this.ctx;

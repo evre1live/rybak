@@ -15,6 +15,9 @@ const _s = new THREE.Vector3();
 const _sp = new THREE.Sphere();
 const KEEP = 6; // подробная копия остаётся подробной ещё столько метров за границей
 const STEP = 2; // пересчитываем, когда камера ушла на столько метров
+// На «низком» качестве (телефоны) дальние куски леса реже: дальше THIN_AT метров рисуется только доля THIN_KEEP копий
+const THIN_AT = 240;
+const THIN_KEEP = 0.55;
 
 /** Псевдослучайное число 0…1 по месту: у одной и той же точки всегда одно и то же. */
 export function spot01(x, z, k = 0) {
@@ -79,9 +82,11 @@ export class Scatter {
         const col = new Float32Array(n * 3);
         const px = new Float32Array(n);
         const pz = new Float32Array(n);
+        const keep = new Uint8Array(n); // остаётся ли копия, когда дальний кусок прорежен
         list.forEach((it, i) => {
           px[i] = it.x;
           pz[i] = it.z;
+          keep[i] = spot01(it.x, it.z, 9) < THIN_KEEP ? 1 : 0;
           // оттенок: чуть светлее-темнее и теплее-холоднее — одинаковых деревьев в лесу не бывает
           const a = spot01(it.x, it.z, 1) - 0.5;
           const b = spot01(it.x, it.z, 2) - 0.5;
@@ -117,7 +122,7 @@ export class Scatter {
             return im;
           });
         this.chunks.push({
-          x: sphere.center.x, z: sphere.center.z, r: sphere.radius, n, near, px, pz, col, hiM, loM,
+          x: sphere.center.x, z: sphere.center.z, r: sphere.radius, n, near, px, pz, col, hiM, loM, keep, thin: false,
           hi: build(src, mats, shadow), lo: lodSrc ? build(lodSrc, lodMats, false) : null,
           state: new Uint8Array(n), mode: -1, nHi: 0, minor
         });
@@ -141,7 +146,10 @@ export class Scatter {
     const st = ch.state;
     // 1 — весь кусок подробный, 0 — весь дальний, 2 — граница проходит по куску: смотрим каждую копию
     const mode = !ch.lo || d + ch.r < near ? 1 : d - ch.r > far ? 0 : 2;
-    let changed = ch.mode < 0;
+    // телефон: дальний кусок леса прорежен
+    const thin = !!ch.lo && detail.lod < 0.5 && d - ch.r > THIN_AT;
+    let changed = ch.mode < 0 || thin !== ch.thin;
+    ch.thin = thin;
     if (mode !== 2) {
       if (ch.mode !== mode) {
         st.fill(mode);
@@ -169,6 +177,7 @@ export class Scatter {
         c = 0;
         for (let i = 0; i < n; i++) {
           if (st[i] !== want) continue;
+          if (want === 0 && ch.thin && !ch.keep[i]) continue;
           for (let j = 0; j < 16; j++) to[c * 16 + j] = from[i * 16 + j];
           for (let j = 0; j < 3; j++) tc[c * 3 + j] = ch.col[i * 3 + j];
           c++;

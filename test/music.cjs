@@ -16,7 +16,7 @@ const root = path.join(__dirname, '..');
   page.on('pageerror', (e) => console.log('PAGEERROR', e.message.slice(0, 400)));
   await page.goto('about:blank');
   const src = fs.readFileSync(path.join(root, 'client/music.js'), 'utf8').replace(/^export /gm, '');
-  await page.addScriptTag({ content: src + '\nwindow.Music = Music; window.MUSIC_STEP = MUSIC_STEP;' });
+  await page.addScriptTag({ content: src + '\nwindow.Music = Music; window.MUSIC_STEP = MUSIC_STEP; window.STYLES = STYLES;' });
 
   // Минута с четвертью: день → бой → бой с легендой и тугой леской → ночь. Случай — с зерном, чтобы прогон повторялся.
   const SEG = [
@@ -111,6 +111,36 @@ const root = path.join(__dirname, '..');
   console.log(`  нот в секунду: днём ${r.day.toFixed(2)}, ночью ${r.night.toFixed(2)}, в дождь ${r.rain.toFixed(2)}`);
   assert.ok(r.day > 0.45 && r.day < 1.2, 'днём мелодия не редкая и не суетливая: ' + r.day.toFixed(2));
   assert.ok(r.night < r.day * 0.75 && r.rain < r.day * 0.9, `ночью и в дождь нот меньше: ${r.night.toFixed(2)} и ${r.rain.toFixed(2)} против ${r.day.toFixed(2)}`);
+
+  // манеры локаций: у каждой своя музыка, тоже без мусора и перегруза; ноты — из ре мажора, у лаунжа — свои аккорды
+  const st = await page.evaluate(async () => {
+    const out = {};
+    for (const name of Object.keys(window.STYLES)) {
+      let a = 11;
+      const rnd = () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+      const sr = 22050, len = 24;
+      const ctx = new OfflineAudioContext(2, sr * len, sr);
+      const m = new window.Music(ctx, ctx.destination, rnd);
+      m.style(name);
+      m.log = [];
+      m.set({ fight: 0, tension: 0, run: 0, boss: 0, night: 0, rain: 0 });
+      m.plan(len);
+      const buf = await ctx.startRendering();
+      const L = buf.getChannelData(0);
+      let bad = 0, peak = 0, e = 0;
+      for (let i = 0; i < L.length; i++) { const v = Math.abs(L[i]); if (!(v <= 4)) bad++; if (v > peak) peak = v; e += v * v; }
+      const notes = m.log.filter((x) => x.note != null);
+      out[name] = { bad, peak, rms: Math.sqrt(e / L.length), notes: notes.length, nonD: notes.filter((x) => ![2, 4, 6, 7, 9, 11, 1].includes(((x.note % 12) + 12) % 12)).length, chords: [...new Set(m.log.filter((x) => x.chord).map((x) => x.chord))] };
+    }
+    return out;
+  });
+  for (const [name, x] of Object.entries(st)) {
+    console.log(`  манера ${name.padEnd(7)} нот ${x.notes} · громкость ${db(x.rms).toFixed(1)} дБ · пик ${x.peak.toFixed(2)} · аккорды ${x.chords.join(' ')}`);
+    // озеро и океан нарочно редкие: 6–8 нот за 24 с
+    assert.ok(x.bad === 0 && x.peak < 0.6 && x.notes >= 5 && x.nonD === 0 && db(x.rms) > -42, `манера ${name}: ${JSON.stringify(x)}`);
+  }
+  assert.ok(st.lounge.chords.every((c) => /maj9|m9|13|m7/.test(c)), 'у лаунжа — аккорды с септимами и нонами: ' + st.lounge.chords.join(' '));
+  assert.ok(st.reef.notes > st.ocean.notes, 'на рифе нот больше, чем в океане');
 
   // записи звуков: читаются этим браузером, длина и громкость на месте
   const SAMPLES = { splash: [0.7, 0.9], plop: [0.4, 0.6], reel: [0.7, 0.9], snap: [0.25, 0.45] };
