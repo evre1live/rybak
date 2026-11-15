@@ -26,6 +26,18 @@ function gearMat(tpl, m0) {
   tpl.gearMat = m;
   return m;
 }
+/**
+ * Материал приманки: металл Tripo в полную силу отражает то, что вокруг (доски, тень под пирсом), и золотая блесна
+ * выходит оливковой, а не золотой, как на картинке рынка. У маленькой приманки металла меньше — виден её цвет.
+ */
+function lureMat(tpl, m0) {
+  if (tpl.lureMat) return tpl.lureMat;
+  const m = gearMat(tpl, m0).clone();
+  m.metalness = 0.4;
+  addEnvMat(m, 1.1);
+  tpl.lureMat = m;
+  return m;
+}
 /** Строки — новые оси X, Y, Z, записанные в осях картинки. */
 const basis = (rows) => new THREE.Matrix4().set(...rows[0], 0, ...rows[1], 0, ...rows[2], 0, 0, 0, 0, 1);
 /** Сетка из части треугольников (по маске) с теми же вершинами. */
@@ -291,7 +303,7 @@ function bobNow(group, id, float) {
         g.translate(want.x - c.x, want.y - c.y, want.z - c.z);
       }
       g.computeBoundingSphere();
-      const m = new THREE.Mesh(g, gearMat(tpl, p.material));
+      const m = new THREE.Mesh(g, float ? gearMat(tpl, p.material) : lureMat(tpl, p.material));
       m.castShadow = true;
       for (const c of group.children) c.visible = false;
       group.add(m);
