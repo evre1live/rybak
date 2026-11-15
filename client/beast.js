@@ -18,7 +18,8 @@ const SHAPE = {
   'beast-serpent': { head: 1 },
   'beast-chudo': { head: -1 },
   'fauna-kit': { head: -1 },
-  'beast-kraken': { round: true }
+  'beast-kraken': { round: true },
+  'beast-som': { head: 1 }
 };
 const esc = (s) => String(s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]);
 

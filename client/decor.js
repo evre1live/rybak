@@ -21,7 +21,8 @@ const FLORA = {
   lake: { grass: 0.26, fern: 0.4, flowers: 0.04, reeds: 0.55, pebbles: 0.18, shore: 0.4 },
   keys: { grass: 0.16, fern: 0, flowers: 0.07, reeds: 0, pebbles: 0.07, shore: 0 },
   blue: { grass: 0.2, fern: 0.3, flowers: 0.02, reeds: 0, pebbles: 0.14, shore: 0.45 },
-  cascade: { grass: 0.16, fern: 0.6, flowers: 0.06, reeds: 0.25, pebbles: 0.07, shore: 0.3 }
+  cascade: { grass: 0.16, fern: 0.6, flowers: 0.06, reeds: 0.25, pebbles: 0.07, shore: 0.3 },
+  mangrove: { grass: 0.12, fern: 0.55, flowers: 0.05, reeds: 0.3, pebbles: 0.03, shore: 0.2 }
 }[LOC_ID] || { grass: 0.2, fern: 0, flowers: 0.03, reeds: 0, pebbles: 0.1, shore: 0.3 };
 
 const pick = (list, u) => {

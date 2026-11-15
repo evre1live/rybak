@@ -16,7 +16,8 @@ const PLACES = {
   lake: { loc: 'lake', p: [-88, 74, 72], t: [8, 2, -58], fov: 40, hour: 13, pin: [0.6, 1.2, -20] },
   keys: { loc: 'keys', p: [-104, 84, 96], t: [4, 0, -66], fov: 40, hour: 13, pin: [0.6, 1.2, -20] },
   blue: { loc: 'blue', p: [-128, 92, 92], t: [10, 0, -58], fov: 42, hour: 13, pin: [0.6, 1.2, -20] },
-  cascade: { loc: 'cascade', p: [-62, 64, 50], t: [6, 8, -62], fov: 44, hour: 13, pin: [0.6, 1.2, -20] }
+  cascade: { loc: 'cascade', p: [-62, 64, 50], t: [6, 8, -62], fov: 44, hour: 13, pin: [0.6, 1.2, -20] },
+  mangrove: { loc: 'mangrove', p: [-70, 70, 60], t: [10, 6, -70], fov: 46, hour: 19.5, pin: [0.6, 1.2, -20] }
 };
 const W = 1120;
 const H = 600;

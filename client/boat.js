@@ -34,13 +34,16 @@ const HULLS = {
   // Катер Синего простора (Tripo): рубка посередине, открытая кормовая палуба, два мотора на транце. Рыбак за рулём
   // стоит у высокого сиденья на палубе за рубкой (stool) — глаза выше её крыши, впереди видно море; пассажиры —
   // на кормовой банке (passBench). deck — высота палубы над килем; half, beam — до носа и до борта, м (столкновения).
-  'boat-cutter': { len: 5.8, draft: 0.42, deck: 0.75, bench: 1.49, seatX: 0.32, seatZ: 1.5, rot: Math.PI / 2, motor: false, stool: true, passBench: 1.17, passZ: 2.0, passW: 1.66, pass: [[-0.55, 2.0], [0.55, 2.0]], bow: [1.82, -2.55], half: 2.75, beam: 1.05 }
+  'boat-cutter': { len: 5.8, draft: 0.42, deck: 0.75, bench: 1.49, seatX: 0.32, seatZ: 1.5, rot: Math.PI / 2, motor: false, stool: true, passBench: 1.17, passZ: 2.0, passW: 1.66, pass: [[-0.55, 2.0], [0.55, 2.0]], bow: [1.82, -2.55], half: 2.75, beam: 1.05 },
+  // Каноэ Мангровой протоки (Tripo): две банки поперёк корпуса — рыбак на кормовой, друзья на носовой; сидят низко,
+  // у самой воды. Мотора нет — идёт тихо (на ходу его ведёт «лодочный» мотор игры без звука и без винта)
+  'boat-canoe': { len: 5.2, draft: 0.2, bench: 0.6, seatX: 0, seatZ: 1.04, rot: Math.PI / 2, motor: false, pass: [[-0.32, -0.52], [0.32, -0.52]], bow: [0.95, -2.3], half: 2.5, beam: 0.62 }
 };
 /** Какие корпуса пробовать, лучший — первым: в открытом океане Синего простора ходят на катере. */
-const HULL_ORDER = HAS.blue ? ['boat-cutter', 'env-motorboat', 'prop-boat'] : ['env-motorboat', 'prop-boat'];
+const HULL_ORDER = HAS.blue ? ['boat-cutter', 'env-motorboat', 'prop-boat'] : HAS.mangrove ? ['boat-canoe', 'env-motorboat', 'prop-boat'] : ['env-motorboat', 'prop-boat'];
 // bow — где на носу стоит шест с вымпелом у своей (купленной) лодки: [высота над килем, к носу от середины]
 export const BOAT_SEATS = 2; // сколько пассажиров берёт лодка
-export const VMAX = 12.5; // полный ход, м/с
+export const VMAX = HAS.mangrove ? 9 : 12.5; // полный ход, м/с (каноэ — потише)
 const VREV = 3.2; // задний ход
 const BUMP_AT = 2.1; // от середины лодки до места, которым она ударяется о преграду, м
 

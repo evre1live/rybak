@@ -1296,6 +1296,58 @@
     "fish-skalyariya": {
       "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/GkP1LKyeencZZ8IERYdH/eRzfBJFi75tGclcP1kCz/content.png",
       "model": "5526e988-25d1-458b-80d0-71be6d11148a"
+    },
+    "beast-som": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/hYdxnuouL6cZejORkn53/59M3rTCOOVPy72CiH1v1/content.png",
+      "model": "936c35ef-42f7-40a8-b5e1-e0351412230b"
+    },
+    "boat-canoe": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/djQxgdBKSbSDFE9rHJvh/eSwOGWaaIlZjgRm0GEMe/content.png",
+      "model": "be047f17-dfc5-4534-b710-62bfc8351c50"
+    },
+    "fish-tarpon": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/z1i3YfkLbCnZQix9SKz0/oQZ8qTX1znSVBesqfsxa/content.png",
+      "model": "a3c91952-c917-4286-a7df-23b00d765fed"
+    },
+    "fish-pila": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/vUvAdU2H4sUyrYYKHQso/3xkciCQQkTMLRe05Cpsy/content.png",
+      "model": "bb489e4f-ef4a-49f2-b824-12087c5c8fa5"
+    },
+    "fish-gorbyl": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/kRvAzWQwYWxCRApQ6ipK/YnnU0nWqce7QTWGBBoaz/content.png",
+      "model": "a49c1ff9-cb25-4c85-87a3-dca91c78bf15"
+    },
+    "fish-brizgun": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/Bk2STdnOsOXnDunmaxJt/aeNINvqUsHgS3DlVZ8Fw/content.png",
+      "model": "caba58bd-7e47-4efd-890e-bd6dcb1ec047"
+    },
+    "fish-barramundi": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/p4C1fGAejaB16xb7TVQt/rGMPeRxLFIyvOIJ3UdT5/content.png",
+      "model": "21daaaab-12aa-4ed5-b028-a375598a59cd"
+    },
+    "fish-prygun": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/1AeUs1Dhy49H3y0NthFG/izLCOijAigEhCFecdyxs/content.png",
+      "model": "3449aa78-4790-49f3-83e0-39af507b02a7"
+    },
+    "fish-chetyrehglazka": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/18SsSfBZRL6EIR6hng1j/hZhWpmVv9WdcfyJWnwlA/content.png",
+      "model": "3d67c981-89b1-4ef8-b8e3-5ac43e6dc724"
+    },
+    "fish-snuk": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/Wi0N49J6MzHCNTbP8CFS/tsHlVduQ3KO5p0zv6fz4/content.png",
+      "model": "2a8b5ea8-e86b-476e-a31e-c7c74e2b8927"
+    },
+    "env-mangrove3": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/5WII4ymQ9PmIZR94BbS9/amQmmCJetYVdbn5ogS4j/content.png",
+      "model": "55ef3a46-626d-48b5-a440-41ffd737922c"
+    },
+    "env-mangrove1": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/NjUHAdrFN0zwOnXbykGx/9UeJHFerFWpkMgKcD9Ou/content.png",
+      "model": "53a769f7-3ebd-403a-8d92-6b85af40498e"
+    },
+    "env-mangrove2": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/9xyJt8pKdU5OTRua8hpZ/f7vGT5FhvHrRK5V3rzKj/content.png",
+      "model": "d3cf4d22-aa86-4627-8c0b-84c3be6f51be"
     }
   },
   "ledger": [
@@ -3677,6 +3729,97 @@
       "label": "fish-paku модель",
       "type": "image_to_model",
       "task": "9eab1f6a-b957-45ac-9299-9125a0560e4e",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-15T16:01:31.394Z",
+      "label": "fish-snuk модель",
+      "type": "image_to_model",
+      "task": "2a8b5ea8-e86b-476e-a31e-c7c74e2b8927",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-15T16:01:35.036Z",
+      "label": "fish-chetyrehglazka модель",
+      "type": "image_to_model",
+      "task": "3d67c981-89b1-4ef8-b8e3-5ac43e6dc724",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-15T16:01:35.277Z",
+      "label": "fish-prygun модель",
+      "type": "image_to_model",
+      "task": "3449aa78-4790-49f3-83e0-39af507b02a7",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-15T16:01:37.746Z",
+      "label": "fish-barramundi модель",
+      "type": "image_to_model",
+      "task": "21daaaab-12aa-4ed5-b028-a375598a59cd",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-15T16:01:45.740Z",
+      "label": "fish-brizgun модель",
+      "type": "image_to_model",
+      "task": "caba58bd-7e47-4efd-890e-bd6dcb1ec047",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-15T16:02:02.893Z",
+      "label": "fish-gorbyl модель",
+      "type": "image_to_model",
+      "task": "a49c1ff9-cb25-4c85-87a3-dca91c78bf15",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-15T16:02:03.154Z",
+      "label": "fish-pila модель",
+      "type": "image_to_model",
+      "task": "bb489e4f-ef4a-49f2-b824-12087c5c8fa5",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-15T16:02:05.393Z",
+      "label": "fish-tarpon модель",
+      "type": "image_to_model",
+      "task": "a3c91952-c917-4286-a7df-23b00d765fed",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-15T16:02:15.139Z",
+      "label": "boat-canoe модель",
+      "type": "image_to_model",
+      "task": "be047f17-dfc5-4534-b710-62bfc8351c50",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-15T16:02:34.173Z",
+      "label": "beast-som модель",
+      "type": "image_to_model",
+      "task": "936c35ef-42f7-40a8-b5e1-e0351412230b",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-15T16:44:51.782Z",
+      "label": "env-mangrove2 модель",
+      "type": "image_to_model",
+      "task": "d3cf4d22-aa86-4627-8c0b-84c3be6f51be",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-15T16:44:58.176Z",
+      "label": "env-mangrove1 модель",
+      "type": "image_to_model",
+      "task": "53a769f7-3ebd-403a-8d92-6b85af40498e",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-15T16:45:19.106Z",
+      "label": "env-mangrove3 модель",
+      "type": "image_to_model",
+      "task": "55ef3a46-626d-48b5-a440-41ffd737922c",
       "credits": 30
     }
   ]

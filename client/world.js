@@ -7,6 +7,8 @@ import { lakeTint, buildLakeTerrain } from './loc/lake-world.js';
 import { keysTint, buildKeysTerrain } from './loc/keys-world.js';
 import { blueTint, buildBlueTerrain } from './loc/blue-world.js';
 import { cascadeTint, buildCascadeTerrain } from './loc/cascade-world.js';
+import { mangroveTint, buildMangroveTerrain } from './loc/mangrove-world.js';
+import { buildFireflies } from './loc/mangrove-nature.js';
 import { buildReef } from './loc/keys-reef.js';
 import { buildMist } from './loc/lake-nature.js';
 import { createWater, createFoamRings, sea } from './water.js';
@@ -136,7 +138,7 @@ function bayTint(c, x, y, z, ny, w) {
   }
 }
 /** Краски земли — у каждой локации свои. */
-const groundTint = { lake: lakeTint, keys: keysTint, blue: blueTint, cascade: cascadeTint }[LOC_ID] || bayTint;
+const groundTint = { lake: lakeTint, keys: keysTint, blue: blueTint, cascade: cascadeTint, mangrove: mangroveTint }[LOC_ID] || bayTint;
 const _w = [0, 0, 1, 0];
 /** Цвет земли в точке и сколько там травы (0…1) — для пучков травы (grass.js). На склонах, где проступает камень, травы нет. */
 function grassTint(x, z, c) {
@@ -415,7 +417,7 @@ export class World {
   constructor() {
     const scene = (this.scene = new THREE.Scene());
     scene.fog = new THREE.Fog('#a9dcff', 170, 1700);
-    this.terrain = LOC_ID === 'lake' ? buildLakeTerrain(buildGround) : LOC_ID === 'keys' ? buildKeysTerrain(buildGround) : LOC_ID === 'blue' ? buildBlueTerrain(buildGround) : LOC_ID === 'cascade' ? buildCascadeTerrain(buildGround) : buildTerrain();
+    this.terrain = LOC_ID === 'lake' ? buildLakeTerrain(buildGround) : LOC_ID === 'keys' ? buildKeysTerrain(buildGround) : LOC_ID === 'blue' ? buildBlueTerrain(buildGround) : LOC_ID === 'cascade' ? buildCascadeTerrain(buildGround) : LOC_ID === 'mangrove' ? buildMangroveTerrain(buildGround) : buildTerrain();
     scene.add(this.terrain);
     this.water = createWater();
     scene.add(this.water.mesh);
@@ -499,6 +501,7 @@ export class World {
     this.rays = new SunRays(scene);
     // утренний туман над водой — там, где он бывает (озеро)
     this.mist = LOC.wx && LOC.wx.mist ? buildMist(scene, surfaceU.uDet, HAS.cabin ? {} : { smoke: false, area: { x: (MAP_VIEW.x0 + MAP_VIEW.x1) / 2, z: (MAP_VIEW.z0 + MAP_VIEW.z1) / 2, a: (MAP_VIEW.x1 - MAP_VIEW.x0) / 2.4, b: (MAP_VIEW.z1 - MAP_VIEW.z0) / 2.6 } }) : null;
+    this.fireflies = HAS.mangrove ? buildFireflies(scene) : null; // светлячки над протокой: с вечера до рассвета
     this.rings = FOAM_SPOTS.length ? createFoamRings(FOAM_SPOTS, this.water.uniforms) : null;
     if (this.rings) scene.add(this.rings);
     this.sunDir = new THREE.Vector3(0, 1, 0);
@@ -610,6 +613,7 @@ export class World {
     w.uWat.value.set(PW.clear, PW.pathMin, PW.fres, PW.net);
     w.uWat2.value.set(PW.deepAt, PW.netDeep, PW.netTint, PW.seaDeep);
     w.uSurfD.value.set(...(PW.surf || [1.0, 2.3]));
+    w.uEdge.value = PW.edge ?? 1;
     surfaceU.uBed.value.set(PW.bedNet, PW.bedTint, PW.bedFog, PW.bedDeep);
     surfaceU.uSunC.value.copy(k.sun);
     surfaceU.uWaterS.value.copy(k.wS);
@@ -666,6 +670,7 @@ export class World {
     this.water.follow(camera);
     this.nightfx.update();
     if (this.mist) this.mist.update(t);
+    if (this.fireflies) this.fireflies.update(t, this.night, this.hours, camera);
     surfaceU.uTimeS.value = t;
     this.skyU.uTime.value = t;
     this.sky.position.copy(camera.position);

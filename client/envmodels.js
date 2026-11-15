@@ -117,6 +117,12 @@ function glow(scene, x, y, z, size, color = '#ffc37a', day = 0, pull = 0) {
   glows.push(rec);
   return rec;
 }
+/** Свечение фонаря для локаций со своими огнями (хижина на сваях, фонари в ветвях): ночью видно, днём нет. */
+export const addGlow = (scene, x, y, z, size, color = '#ffc37a', day = 0) => glow(scene, x, y, z, size, color, day);
+/** Материал окна или стекла фонаря: ночью загорается (свечение = ночь × k). */
+export function addLit(m, k = 1) {
+  lits.push({ m, k });
+}
 /** Ночь от 0 до 1: зажигает свечение у фонарей, маяка и костра. */
 export function envNight(n) {
   night = n;
@@ -513,7 +519,7 @@ export function upgradeEnv(scene) {
         state.singles++;
       }, fail);
     // ── цапли на мелководье заводи (озеро и Водопадная чаша): стоят в воде по щиколотку и поворачиваются, не взлетают ──
-    if ((LOC_ID === 'lake' || LOC_ID === 'cascade') && has('env-heron'))
+    if ((LOC_ID === 'lake' || LOC_ID === 'cascade' || LOC_ID === 'mangrove') && has('env-heron'))
       loadModel('env-heron').then((tpl) => {
         let n = 0;
         for (let i = 0; i < 48 && n < 3; i++) {
@@ -531,7 +537,7 @@ export function upgradeEnv(scene) {
         state.waders = n;
       }, fail);
     // ── чайки на сваях: сидят и вертят головой. На островках вместо них — пеликаны (не взлетают), на озере чаек нет ──
-    const percher = LOC_ID === 'keys' ? 'env-pelican' : LOC_ID === 'lake' || LOC_ID === 'cascade' ? null : 'env-seagull';
+    const percher = LOC_ID === 'keys' ? 'env-pelican' : LOC_ID === 'lake' || LOC_ID === 'cascade' || LOC_ID === 'mangrove' ? null : 'env-seagull';
     if (percher && has(percher))
       loadModel(percher).then((tpl) => {
         const pel = percher === 'env-pelican';

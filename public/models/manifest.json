@@ -3075,6 +3075,262 @@
         0.531
       ],
       "icon": "models/icons/fish-krasnohvost.webp"
+    },
+    "kit-mtwist1": {
+      "file": "models/kit/mangrove.glb",
+      "node": "kit-mtwist1",
+      "group": "env",
+      "kit": "mangrove",
+      "tris": 3541,
+      "size": [
+        0.557,
+        1,
+        0.486
+      ],
+      "lod": {
+        "file": "models/kit/mangrove.glb",
+        "node": "kit-mtwist1-lod",
+        "tris": 1209
+      }
+    },
+    "kit-mtwist2": {
+      "file": "models/kit/mangrove.glb",
+      "node": "kit-mtwist2",
+      "group": "env",
+      "kit": "mangrove",
+      "tris": 3897,
+      "size": [
+        0.707,
+        1,
+        0.716
+      ],
+      "lod": {
+        "file": "models/kit/mangrove.glb",
+        "node": "kit-mtwist2-lod",
+        "tris": 1367
+      }
+    },
+    "kit-mtwist3": {
+      "file": "models/kit/mangrove.glb",
+      "node": "kit-mtwist3",
+      "group": "env",
+      "kit": "mangrove",
+      "tris": 4216,
+      "size": [
+        0.606,
+        1,
+        0.599
+      ],
+      "lod": {
+        "file": "models/kit/mangrove.glb",
+        "node": "kit-mtwist3-lod",
+        "tris": 1518
+      }
+    },
+    "kit-mtree1": {
+      "file": "models/kit/mangrove.glb",
+      "node": "kit-mtree1",
+      "group": "env",
+      "kit": "mangrove",
+      "tris": 1785,
+      "size": [
+        0.405,
+        1,
+        0.398
+      ],
+      "lod": {
+        "file": "models/kit/mangrove.glb",
+        "node": "kit-mtree1-lod",
+        "tris": 487
+      }
+    },
+    "kit-mtree2": {
+      "file": "models/kit/mangrove.glb",
+      "node": "kit-mtree2",
+      "group": "env",
+      "kit": "mangrove",
+      "tris": 4728,
+      "size": [
+        0.59,
+        1,
+        0.4
+      ],
+      "lod": {
+        "file": "models/kit/mangrove.glb",
+        "node": "kit-mtree2-lod",
+        "tris": 1818
+      }
+    },
+    "fish-snuk": {
+      "file": "models/fish-snuk.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 224,
+      "size": [
+        1,
+        0.431,
+        0.431
+      ],
+      "icon": "models/icons/fish-snuk.webp"
+    },
+    "fish-barramundi": {
+      "file": "models/fish-barramundi.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 217,
+      "size": [
+        1,
+        0.462,
+        0.371
+      ],
+      "icon": "models/icons/fish-barramundi.webp"
+    },
+    "fish-prygun": {
+      "file": "models/fish-prygun.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 268,
+      "size": [
+        1,
+        0.397,
+        0.491
+      ],
+      "icon": "models/icons/fish-prygun.webp"
+    },
+    "fish-brizgun": {
+      "file": "models/fish-brizgun.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 194,
+      "size": [
+        1,
+        0.475,
+        0.376
+      ],
+      "icon": "models/icons/fish-brizgun.webp"
+    },
+    "fish-chetyrehglazka": {
+      "file": "models/fish-chetyrehglazka.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 185,
+      "size": [
+        1,
+        0.287,
+        0.279
+      ],
+      "icon": "models/icons/fish-chetyrehglazka.webp"
+    },
+    "fish-gorbyl": {
+      "file": "models/fish-gorbyl.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 223,
+      "size": [
+        1,
+        0.445,
+        0.428
+      ],
+      "icon": "models/icons/fish-gorbyl.webp"
+    },
+    "fish-tarpon": {
+      "file": "models/fish-tarpon.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 289,
+      "size": [
+        1,
+        0.44,
+        0.254
+      ],
+      "icon": "models/icons/fish-tarpon.webp"
+    },
+    "fish-pila": {
+      "file": "models/fish-pila.glb",
+      "group": "fish",
+      "tris": 8000,
+      "kb": 186,
+      "size": [
+        1,
+        0.282,
+        0.469
+      ],
+      "icon": "models/icons/fish-pila.webp"
+    },
+    "beast-som": {
+      "file": "models/beast-som.glb",
+      "group": "env",
+      "tris": 8996,
+      "kb": 348,
+      "size": [
+        1,
+        0.351,
+        0.349
+      ],
+      "lod": {
+        "file": "models/beast-som.lod.glb",
+        "tris": 886,
+        "kb": 13
+      }
+    },
+    "boat-canoe": {
+      "file": "models/boat-canoe.glb",
+      "group": "prop",
+      "tris": 7000,
+      "kb": 210,
+      "size": [
+        1,
+        0.235,
+        0.283
+      ]
+    },
+    "env-mangrove1": {
+      "file": "models/env-mangrove1.glb",
+      "group": "env",
+      "tris": 13990,
+      "kb": 405,
+      "size": [
+        1,
+        0.706,
+        0.687
+      ],
+      "lod": {
+        "file": "models/env-mangrove1.lod.glb",
+        "tris": 1550,
+        "kb": 25
+      }
+    },
+    "env-mangrove2": {
+      "file": "models/env-mangrove2.glb",
+      "group": "env",
+      "tris": 13994,
+      "kb": 418,
+      "size": [
+        1,
+        0.877,
+        0.713
+      ],
+      "lod": {
+        "file": "models/env-mangrove2.lod.glb",
+        "tris": 1582,
+        "kb": 26
+      }
+    },
+    "env-mangrove3": {
+      "file": "models/env-mangrove3.glb",
+      "group": "env",
+      "tris": 11992,
+      "kb": 337,
+      "size": [
+        1,
+        0.963,
+        0.937
+      ],
+      "lod": {
+        "file": "models/env-mangrove3.lod.glb",
+        "tris": 1512,
+        "kb": 27
+      }
     }
   }
 }

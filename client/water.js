@@ -218,7 +218,8 @@ precision highp float;
 uniform float uTime, uGlitter, uFogNear, uFogFar, uSwell, uWind;
 uniform vec2 uPath; // во сколько раз усилить дорожку от светила: сами блики и широкое мягкое пятно вокруг них (ночью — лунная дорожка)
 uniform vec4 uWat; // из палитры: прозрачность толщи, наименьший «косинус взгляда» для неё, сила отражения неба, сетка света на поверхности
-uniform vec2 uSurfD; // до какой глубины идут пенные валы прибоя: [начинают таять, пропали]. В лагуне с садами у самой поверхности — мельче, иначе пена обводит каждый коралловый бугор
+uniform vec2 uSurfD;
+uniform float uEdge; // насколько бела кромка воды у берега (в манграх берег — корни и ил, пены почти нет) // до какой глубины идут пенные валы прибоя: [начинают таять, пропали]. В лагуне с садами у самой поверхности — мельче, иначе пена обводит каждый коралловый бугор
 uniform vec4 uWat2; // до какой глубины вода бирюзовая; насколько сетка света гаснет над глубиной; насколько она в цвет воды, а не солнца; насколько темнее и синее открытое море
 uniform sampler2D uNormal, uCaustic, uDet;
 uniform float uCloudK;
@@ -327,7 +328,7 @@ void main() {
   // С глубины к берегу идут пенные валы: резкий передний край, за ним тающий след; на мели вал рассыпается в кружево.
   float swash = sin(uTime * 0.9 + p.x * 0.35 + n1.y * 2.0);
   float lap = 0.1 + 0.07 * swash;
-  float edge = 1.0 - ss(0.0, lap + 0.1, depth + n1.x * 0.07);
+  float edge = (1.0 - ss(0.0, lap + 0.1, depth + n1.x * 0.07)) * uEdge;
   float ph = fract(depth * 0.95 + uTime * 0.17 + n2.x * 0.16 + n1.y * 0.1);
   float crest = ss(0.0, 0.035, ph) * pow(1.0 - ph, 6.0);
   float lace = ss(0.45, 0.85, n1.z * 0.45 + c1 * 0.8 + c2 * 0.35);
@@ -382,7 +383,7 @@ export function createWater() {
   geo.setIndex(idx);
   const uniforms = {
     uTime: { value: 0 }, uGlitter: { value: 1 }, uPath: { value: new THREE.Vector2(1, 1) }, uFogNear: { value: 150 }, uFogFar: { value: 1400 },
-    uWat: { value: new THREE.Vector4(0.16, 0.18, 0.8, 0.27) }, uWat2: { value: new THREE.Vector4(14, 0.55, 0, 0.45) }, uSurfD: { value: new THREE.Vector2(1.0, 2.3) }, // прозрачность воды, отражение неба и сетка света — из палитры (palette.js)
+    uWat: { value: new THREE.Vector4(0.16, 0.18, 0.8, 0.27) }, uWat2: { value: new THREE.Vector4(14, 0.55, 0, 0.45) }, uSurfD: { value: new THREE.Vector2(1.0, 2.3) }, uEdge: { value: 1 }, // прозрачность воды, отражение неба и сетка света — из палитры (palette.js)
     uDepth: { value: depthTexture(BOUNDS, 400, 400) }, uDepthFar: { value: depthTexture(FAR, Math.round((FAR.x1 - FAR.x0) / 2.5), Math.round((FAR.z1 - FAR.z0) / 2.5), farFloor) },
     uNormal: { value: normalTexture() }, uCaustic: { value: causticTexture() }, uDet: surfaceU.uDet, uCloudK: surfaceU.uCloudK,
     uBounds: { value: boundsVec(BOUNDS) }, uBoundsFar: { value: boundsVec(FAR) },

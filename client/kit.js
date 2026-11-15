@@ -58,6 +58,14 @@ const SWAP = {
     'env-bush': { use: [['kit-heliconia', 0.6], ['kit-jplant7', 0.8], ['kit-plant1', 1.0], ['kit-fern', 1.0], ['kit-bushl', 0.8]], k: 1.0, opt: { sway: 0.008, near: 26, vary: 0.4 } },
     'env-palm': { use: [['kit-palm1', 1], ['kit-palm2', 1], ['kit-palm3', 1], ['kit-palm5', 0.5]], k: 1.0, opt: { cell: 90, near: 70, sway: 0.02, vary: 0.3 } },
     ...rocks([['env-rock1', 1], ['env-granite', 0.4]], [['env-seastack', 1], ['env-rock1', 0.6]])
+  },
+  // Мангровая протока: у воды — мангры с корнями-арками (модели Tripo), за ними — раскидистые кривые деревья набора
+  mangrove: {
+    'env-oak': { use: [['env-mangrove1', 1], ['env-mangrove2', 0.8], ['env-mangrove3', 0.7, { k: 0.78 }]], k: 1.0, opt: { near: 45, sway: 0.005, vary: 0.25, tint: { r: 1.12, g: 1.3, b: 1.04 }, sat: 1.12 } },
+    'env-birch': { use: [['kit-mtwist1', 1], ['kit-mtwist2', 1], ['kit-mtwist3', 1], ['kit-mtree1', 0.4], ['kit-mtree2', 0.4]], k: 1.15, opt: { near: 46, sway: 0.01, vary: 0.35 } },
+    'env-bush': { use: [['kit-jplant7', 1.0], ['kit-heliconia', 0.35], ['kit-hibiscus', 0.6], ['kit-fern', 0.9]], k: 1.0, opt: { sway: 0.008, near: 26, vary: 0.4 } },
+    'env-palm': { use: [['kit-palm1', 1], ['kit-palm2', 1], ['kit-palm3', 1]], k: 1.0, opt: { cell: 90, near: 70, sway: 0.02, vary: 0.3 } },
+    ...rocks([['env-rock1', 1], ['env-granite', 0.4]], [['env-seastack', 1], ['env-rock1', 0.6]])
   }
 };
 

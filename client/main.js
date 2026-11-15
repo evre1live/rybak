@@ -945,7 +945,7 @@ class Game {
         bk = Math.abs(r.bv) / VMAX;
       }
     }
-    this.audio.motorNear(bk, bd, bk >= 0 && bd > 0.01 ? (bx * Math.cos(pl.yaw) - bz * Math.sin(pl.yaw)) / bd : 0);
+    this.audio.motorNear(HAS.mangrove ? -1 : bk, bd, bk >= 0 && bd > 0.01 ? (bx * Math.cos(pl.yaw) - bz * Math.sin(pl.yaw)) / bd : 0);
   }
   /**
    * Лодка ударилась о преграду: на ходу sp (м/с), местом x, z; edge — у края карты, где преграды нет, а лодку разворачивает волна.
@@ -1884,7 +1884,9 @@ class Game {
       // к лодке можно подойти самой, а дома — ещё и к прилавку будки проката
       else if (Math.hypot(pl.x - boat.x, pl.z - boat.z) < 3.6 || Math.hypot(pl.x - MOORINGS[boat.moor].sx, pl.z - MOORINGS[boat.moor].sz) < 2.6 || (boat.moor === 0 && Math.hypot(pl.x - RENT_DESK.x, pl.z - RENT_DESK.z) < RENT_DESK.r)) {
         const price = this.boatPrice();
-        act = boat.rented ? { text: this.ownBoat() && boat.moor === 0 ? 'СВОЯ ЛОДКА — В ПУТЬ' : 'СЕСТЬ В ЛОДКУ', short: 'В ЛОДКУ', run: () => this.boardBoat() } : { text: `ЛОДКА НАПРОКАТ — ${price ? `${price} МОНЕТ` : 'ПЕРВЫЙ ВЫХОД БЕСПЛАТНО'}`, short: 'ЛОДКА', run: () => this.rentBoat() };
+        // на протоке напрокат дают каноэ
+        const [BOAT, INTO, OWN] = HAS.mangrove ? ['КАНОЭ', 'В КАНОЭ', 'СВОЁ КАНОЭ'] : ['ЛОДКА', 'В ЛОДКУ', 'СВОЯ ЛОДКА'];
+        act = boat.rented ? { text: this.ownBoat() && boat.moor === 0 ? `${OWN} — В ПУТЬ` : `СЕСТЬ ${INTO}`, short: INTO, run: () => this.boardBoat() } : { text: `${BOAT} НАПРОКАТ — ${price ? `${price} МОНЕТ` : 'ПЕРВЫЙ ВЫХОД БЕСПЛАТНО'}`, short: BOAT, run: () => this.rentBoat() };
       } else {
         // лодка друга, оставленная у причала (или стоящая у берега): можно сесть и подождать хозяина
         const any = this.rideTarget();
@@ -2169,7 +2171,8 @@ class Game {
       boat.update(dt, tw);
       if (this.ride) this.rideStep(dt, pnow, tw);
       // мотор слышно и пассажиру — пока хозяин в лодке
-      this.audio.motor(boat.active ? Math.abs(boat.k) : this.ride && this.ride.moored < 0 ? Math.abs(this.ride.k) : -1);
+      // у каноэ мотора нет: на протоке идут тихо
+      this.audio.motor(HAS.mangrove ? -1 : boat.active ? Math.abs(boat.k) : this.ride && this.ride.moored < 0 ? Math.abs(this.ride.k) : -1);
       this.hearBoats();
       // в лодке время от времени поскрипывает дерево
       if (boat.active || this.ride) {

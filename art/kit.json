@@ -701,6 +701,81 @@
           }
         }
       }
+    ],
+    "mangrove": [
+      {
+        "id": "kit-mtwist1",
+        "src": "q:TwistedTree_2",
+        "tris": 1200,
+        "lod": 160,
+        "lodLeaves": 0.45,
+        "mats": {
+          "Leaves_TwistedTree": {
+            "tex": "q:Leaves_TwistedTree.png",
+            "color": "#80c040"
+          },
+          "Bark_TwistedTree": {
+            "color": "#c9906c"
+          }
+        }
+      },
+      {
+        "id": "kit-mtwist2",
+        "src": "q:TwistedTree_3",
+        "tris": 1200,
+        "lod": 160,
+        "lodLeaves": 0.45,
+        "mats": {
+          "Leaves_TwistedTree": {
+            "tex": "q:Leaves_TwistedTree.png",
+            "color": "#70b43c"
+          },
+          "Bark_TwistedTree": {
+            "color": "#c08868"
+          }
+        }
+      },
+      {
+        "id": "kit-mtwist3",
+        "src": "q:TwistedTree_5",
+        "tris": 1200,
+        "lod": 160,
+        "lodLeaves": 0.45,
+        "mats": {
+          "Leaves_TwistedTree": {
+            "tex": "q:Leaves_TwistedTree.png",
+            "color": "#8cc84c"
+          },
+          "Bark_TwistedTree": {
+            "color": "#c9906c"
+          }
+        }
+      },
+      {
+        "id": "kit-mtree1",
+        "src": "q:CommonTree_4",
+        "tris": 1000,
+        "lod": 140,
+        "lodLeaves": 0.45,
+        "mats": {
+          "Leaves_NormalTree": {
+            "color": "#6cb03e"
+          }
+        }
+      },
+      {
+        "id": "kit-mtree2",
+        "src": "usn:NormalTree_1",
+        "texDir": "usnTex:.",
+        "tris": 1000,
+        "lod": 140,
+        "lodLeaves": 0.45,
+        "mats": {
+          "NormalTree_Leaves": {
+            "color": "#78b844"
+          }
+        }
+      }
     ]
   }
 }

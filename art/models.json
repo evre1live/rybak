@@ -1696,6 +1696,102 @@
       "sp": "krasnohvost",
       "name": "Краснохвостый сом",
       "prompt": "(этап 26, образец GPT Image) Redtail catfish: big catfish with a wide flat head and long whiskers (barbels), black-grey back with dark spots, a crisp white band along the lower flank and white belly, bright red-orange tail fin and red-edged dorsal fin"
+    },
+    {
+      "id": "fish-snuk",
+      "group": "fish",
+      "sp": "snuk",
+      "name": "Снук",
+      "prompt": "(этап 27, образец GPT Image) Common snook: long sleek silver body with a bold black lateral stripe running from the gill to the tail, concave sloping forehead, protruding lower jaw, yellowish fins, two separate dorsal fins"
+    },
+    {
+      "id": "fish-barramundi",
+      "group": "fish",
+      "sp": "barramundi",
+      "name": "Баррамунди",
+      "prompt": "(этап 27, образец GPT Image) Barramundi: big heavy silver-bronze perch with large scales, concave forehead, glowing golden-red eye, big mouth, spiny dorsal fin and soft rear dorsal fin, broad rounded tail fin"
+    },
+    {
+      "id": "fish-prygun",
+      "group": "fish",
+      "sp": "prygun",
+      "name": "Илистый прыгун",
+      "prompt": "(этап 27, образец GPT Image) Mudskipper: small goby-like fish with big bulging eyes on top of the head, wide froggy mouth, mottled olive-brown body with bright turquoise-blue dots, strong arm-like pectoral fins, tall spotted dorsal fin edged with blue"
+    },
+    {
+      "id": "fish-brizgun",
+      "group": "fish",
+      "sp": "brizgun",
+      "name": "Рыба-брызгун",
+      "prompt": "(этап 27, образец GPT Image) Archerfish: deep silver-white body with five black wedge-shaped bars across the back, pointed snout with upturned mouth, big eyes, dorsal and anal fins set far back near the tail"
+    },
+    {
+      "id": "fish-chetyrehglazka",
+      "group": "fish",
+      "sp": "chetyrehglazka",
+      "name": "Четырёхглазка",
+      "prompt": "(этап 27, образец GPT Image) Four-eyed fish (Anableps): long slim olive-grey body with thin dark horizontal stripes, flat head with huge bulging eyes on top split in two halves by a dark line, small fins, rounded tail"
+    },
+    {
+      "id": "fish-gorbyl",
+      "group": "fish",
+      "sp": "gorbyl",
+      "name": "Красный горбыль",
+      "prompt": "(этап 27, образец GPT Image) Red drum (redfish): copper-bronze reddish body with one big black eye-spot at the base of the tail, white belly, down-turned mouth, rounded snout, square tail"
+    },
+    {
+      "id": "fish-tarpon",
+      "group": "fish",
+      "sp": "tarpon",
+      "name": "Тарпон",
+      "prompt": "(этап 27, образец GPT Image) Tarpon, the silver king: huge powerful silver fish covered with very large mirror-like scales, upturned bony jaw, big eye, a long thin trailing filament on the last ray of the dorsal fin, deeply forked tail"
+    },
+    {
+      "id": "fish-pila",
+      "group": "fish",
+      "sp": "pila",
+      "name": "Рыба-пила",
+      "prompt": "(этап 27, образец GPT Image) Sawfish: long shark-like body with a very long flat saw-shaped snout lined with white teeth on both sides, flat broad head, olive-brown back, pale belly, two tall dorsal fins, shark tail"
+    },
+    {
+      "id": "beast-som",
+      "group": "env",
+      "name": "Хозяин протоки",
+      "prompt": "(этап 27, образец GPT Image) ancient giant catfish with moss, barnacles and long whiskers",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 9000,
+      "lod": 900
+    },
+    {
+      "id": "boat-canoe",
+      "group": "prop",
+      "name": "Каноэ",
+      "prompt": "(этап 27, образец GPT Image) long narrow wooden canoe, sea-green worn paint, two plank seats"
+    },
+    {
+      "id": "env-mangrove1",
+      "group": "env",
+      "name": "Мангр с корнями-арками",
+      "prompt": "(этап 27, образец GPT Image) A single red mangrove tree standing on a tall tangle of thick arching prop roots: a dozen massive reddish-brown roots curve out of the short trunk in wide arche",
+      "tris": 14000,
+      "lod": 1600
+    },
+    {
+      "id": "env-mangrove2",
+      "group": "env",
+      "name": "Мангр наклонный",
+      "prompt": "(этап 27, образец GPT Image) A single tall mangrove tree leaning slightly to one side over the water, its gnarled twisted reddish-brown trunk rising from a cluster of thick arching stilt ro",
+      "tris": 14000,
+      "lod": 1600
+    },
+    {
+      "id": "env-mangrove3",
+      "group": "env",
+      "name": "Мангр молодой",
+      "prompt": "(этап 27, образец GPT Image) A single young mangrove tree: a low, dense, rounded crown of glossy green leaves sitting on a wide dome of many arching prop roots, thick and thin, that splay o",
+      "tris": 12000,
+      "lod": 1600
     }
   ],
   "leads": {

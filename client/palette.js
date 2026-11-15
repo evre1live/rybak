@@ -153,6 +153,18 @@ export const PALETTES = {
     post: { bloom: 0.14, thr: 1.0, vig: 0.3 },
     fog: { near: 110, far: 1150 }
   },
+  // «Мангровая протока»: золотой час — тёплое солнце, розоватая дымка, изумрудная вода, лиловатые тени
+  mangrove: {
+    name: 'Мангровая протока',
+    tone: { sat: 1.3, vib: 0.12, con: 1.1, toe: 0.66, sh: [0.95, 0.98, 1.06], hi: [1.1, 1.0, 0.9] },
+    keys: vary(DAY, {
+      zen: [0.012, 0.96, 0.96], hor: [-0.02, 0.98, 1.0], sun: [-0.016, 1.16, 1.0], sunI: 1.0, hemiS: [0.004, 0.95, 0.98], hemiG: [0.06, 0.95, 0.92], hemiI: 0.98,
+      fog: [-0.025, 0.95, 1.0], wS: [-0.05, 0.95, 0.88], wD: [-0.11, 0.86, 0.7], cloud: [0, 1.05, 1.0]
+    }),
+    water: { clear: 0.11, pathMin: 0.32, fres: 0.76, net: 0.3, deepAt: 10, netDeep: 0.8, netTint: 0.58, seaDeep: 0.45, bedNet: 0.85, bedTint: 0.62, bedFog: 0.06, bedDeep: 0.66, moonPath: [4, 42], edge: 0.2 },
+    post: { bloom: 0.17, thr: 0.98, vig: 0.32 },
+    fog: { near: 90, far: 1000 }
+  },
 
   // Б. «Пастель»: мягко и светло — молочная дымка, кремовый свет, мятная вода, низкий контраст
   pastel: {
@@ -184,7 +196,7 @@ export const PALETTES = {
 /** Палитра игры. Остальные наборы — для сравнения: ?pal=now (как было до этапа 20), ?pal=pastel, ?pal=cinema. */
 export const DEFAULT_PALETTE = 'tropic';
 /** У локации может быть своя палитра (иначе — палитра игры). */
-export const LOC_PALETTE = { lake: 'pine', keys: 'coral', blue: 'ocean', cascade: 'jungle' };
+export const LOC_PALETTE = { lake: 'pine', keys: 'coral', blue: 'ocean', cascade: 'jungle', mangrove: 'mangrove' };
 const asked = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('pal') : null;
 /** Действующая палитра. Поля меняются на месте (usePalette), поэтому читать их нужно в момент использования. */
 export const PAL = { id: '' };

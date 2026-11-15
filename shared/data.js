@@ -34,7 +34,10 @@ export const ZONES = {
   bank: { name: 'Банка', hint: 'Подводное плато среди океана — далеко на юго-востоке', act: 1.05 },
   current: { name: 'Течение', hint: 'Полоса плавучих водорослей поперёк океана', act: 0.95 },
   // Водопадная чаша
-  snags: { name: 'Коряги', hint: 'Затопленные деревья у восточного берега', act: 1.1 }
+  snags: { name: 'Коряги', hint: 'Затопленные деревья у восточного берега', act: 1.1 },
+  // Мангровая протока
+  roots: { name: 'Корни мангров', hint: 'У берегов и островков, под арками корней', act: 1.1 },
+  mouth: { name: 'Устье', hint: 'Протока выходит в море — далеко на северо-востоке', act: 0.95 }
 };
 /** Зона ловли так, как её зовут на локации: у локации могут быть свои подписи (shared/locations.js). */
 export const zoneInfo = (id, loc = DEFAULT_LOC) => ({ ...(ZONES[id] || { name: '', hint: '', act: 1 }), ...(locOf(loc).zones[id] || {}) });
@@ -297,7 +300,40 @@ export const FISH = [
   fish('zoldorada', 'Золотая дорада', 4, 2, 18, 7500, 1.9, {}, { live: 1.6, worm: 0.6 }, 1.9, { dawn: 1.9, dusk: 1.1 },
     { shape: 'std', back: '#c88a18', side: '#f2b830', belly: '#fde08a', fin: '#e8501c', pat: 'dots', patC: '#3a2a10', lenK: 40 },
     'Её зовут речным тигром: золотая, в чёрных точках, с красными плавниками. На заре выходит под Большой каскад и бьёт блесну так, что гнётся крючок. Раз в сезон, говорят, берёт.',
-    { at: { cascade: { falls: 1.2, pit: 0.4, stones: 0.4 } } })
+    { at: { cascade: { falls: 1.2, pit: 0.4, stones: 0.4 } } }),
+  // ── Мангровая протока ──
+  fish('prygun', 'Илистый прыгун', 0, 0.02, 0.12, 22, 0.6, {}, { worm: 1.5, maggot: 1.3, bloodworm: 1.2, bread: 0.8 }, 0, { day: 1.2, night: 0.6 },
+    { shape: 'goby', back: '#6a5a3a', side: '#8a7a52', belly: '#d8ccb0', fin: '#5a6a4a', pat: 'dots', patC: '#3fc8e8', lenK: 33, bigEye: true },
+    'Рыба, которая ходит по суше: выползает на ил, опираясь на плавники, как на руки, и скачет по кочкам. Хватает червя у самого берега.',
+    { at: { mangrove: { backwater: 7, shallow: 3, roots: 2 } } }),
+  fish('chetyrehglazka', 'Четырёхглазка', 1, 0.04, 0.35, 60, 0.8, {}, { fly: 1.7, maggot: 1.3, bloodworm: 1.2, bread: 1.0 }, 0, { day: 1.1 },
+    { shape: 'slim', back: '#5a6448', side: '#a8ae8c', belly: '#e4e2d0', fin: '#7a8060', pat: 'lines', patC: '#3a4030', lenK: 38, bigEye: true },
+    'Плавает у самой поверхности, и глаза у неё поделены пополам: верхней половиной смотрит над водой, нижней — под водой. Берёт мушку с поверхности.',
+    { at: { mangrove: { backwater: 4, shallow: 4, roots: 2, channel: 1.5 } } }),
+  fish('brizgun', 'Рыба-брызгун', 1, 0.08, 0.7, 85, 0.9, {}, { fly: 1.8, maggot: 1.3, bloodworm: 1.1, shrimp: 0.9 }, 0.6, { day: 1.2 },
+    { shape: 'tall', back: '#5c6a70', side: '#e2e6e4', belly: '#f6f6f2', fin: '#3a3f44', pat: 'bars', patC: '#16181a', lenK: 30 },
+    'Сбивает жуков с листьев метким выстрелом: плюёт струёй воды на два метра. Держится в тени мангров и охотно берёт мушку.',
+    { at: { mangrove: { roots: 5, channel: 3, shallow: 2, pier: 1 } } }),
+  fish('gorbyl', 'Красный горбыль', 1, 0.8, 14, 140, 1.45, {}, { crab: 1.8, shrimp: 1.6, squid: 1.2, worm: 1.0, live: 0.9 }, 1.2, { dawn: 1.2, dusk: 1.2 },
+    { shape: 'std', back: '#9a5a32', side: '#d08a52', belly: '#f4ece0', fin: '#b06a3a', pat: 'scales', lenK: 36 },
+    'Медный, с чёрным «глазом» у хвоста: хищник принимает его за голову и хватает не там. Роется в иле на отмелях и в устье, берёт краба и креветку.',
+    { at: { mangrove: { mouth: 3, shallow: 3, mid: 3, backwater: 1.5, roots: 1.5 } } }),
+  fish('snuk', 'Снук', 1, 0.8, 12, 190, 1.55, {}, { live: 1.8, shrimp: 1.6, squid: 1.0 }, 2.0, { dusk: 1.5, night: 1.3, dawn: 1.3, day: 0.8 },
+    { shape: 'std', back: '#5a6a5a', side: '#d8dcd2', belly: '#f4f4ee', fin: '#d8c860', pat: 'lines', patC: '#1a1a1a', lenK: 44 },
+    'Серебряный, с чёрной линией вдоль бока, будто проведённой тушью. Стоит в тени мангровых корней и выскакивает за блесной — а потом рвётся обратно к корням.',
+    { at: { mangrove: { roots: 5, channel: 3, pier: 2, mouth: 1.5 } } }),
+  fish('barramundi', 'Баррамунди', 2, 1.5, 26, 380, 1.7, {}, { live: 1.8, shrimp: 1.4, squid: 1.1, crab: 1.0 }, 1.8, { dusk: 1.6, night: 1.4, dawn: 1.2, day: 0.6 },
+    { shape: 'std', back: '#6a6448', side: '#c8c0a0', belly: '#f0ece0', fin: '#5a5442', pat: 'scales', lenK: 38 },
+    'Великий окунь мангров: в сумерках его глаза светятся красным. Берёт с разгона и выпрыгивает свечой, тряся головой.',
+    { at: { mangrove: { roots: 3, channel: 3, pit: 2, mid: 1.5 } }, minDepth: 2 }),
+  fish('tarpon', 'Тарпон', 3, 15, 130, 4800, 2.15, {}, { live: 1.8, crab: 1.3, squid: 1.2, shrimp: 1.0 }, 1.2, { dawn: 1.4, dusk: 1.4, night: 1.1, day: 0.7 },
+    { shape: 'jack', back: '#4a6070', side: '#dfe6ea', belly: '#f6f8f8', fin: '#7a8a96', pat: 'scales', lenK: 44 },
+    'Серебряный король: чешуя размером с ладонь блестит, как зеркало. На крючке взлетает из воды выше лодки — раз, другой, третий. Без морской удочки и багра не взять.',
+    { at: { mangrove: { mouth: 1.3, pit: 1.0, deep: 0.5 } }, giant: true, minDepth: 5 }),
+  fish('pila', 'Рыба-пила', 4, 20, 160, 8200, 2.1, {}, { live: 1.6, squid: 1.4, crab: 1.2 }, 0.4, { night: 1.6, dusk: 1.3 },
+    { shape: 'sword', back: '#6a6448', side: '#8a8460', belly: '#ece6d6', fin: '#5a5440', pat: 'none', lenK: 60 },
+    'Живая легенда протоки: длиной с лодку, с пилой во всю морду — зубы по обе стороны. Ходит по дну в устье и в Омуте, ворошит пилой ил. Говорят, берёт раз в жизни.',
+    { at: { mangrove: { mouth: 0.6, pit: 0.6, deep: 0.3 } }, giant: true, minDepth: 5 })
 ];
 // рыба бухты, которая живёт и в озере: свои места там
 const AT_LAKE = {
@@ -343,6 +379,15 @@ const AT_CASCADE = {
   som: { pit: 3, deep: 2.5, snags: 2 }
 };
 for (const f of FISH) if (AT_CASCADE[f.id]) f.at = { ...(f.at || {}), cascade: AT_CASCADE[f.id] };
+// рыба, которая живёт и в Мангровой протоке: кефаль стаями в лагуне, луциан под корнями, хищники моря — в устье
+const AT_MANGROVE = {
+  kefal: { shallow: 5, backwater: 4, mid: 3, pier: 3 },
+  lucian: { roots: 5, channel: 3, pier: 2, mid: 1.5 },
+  barrakuda: { mouth: 4, channel: 2, deep: 2, mid: 1 },
+  karanks: { mouth: 4, deep: 3, mid: 1.5 },
+  skat: { mouth: 3, deep: 2, pit: 1 }
+};
+for (const f of FISH) if (AT_MANGROVE[f.id]) f.at = { ...(f.at || {}), mangrove: AT_MANGROVE[f.id] };
 // Наживки этапа 22: кому они по вкусу (остальная рыба берёт на незнакомую наживку неохотно — 0,3, см. speciesWeights)
 const BAIT_EXTRA = {
   bloodworm: { ersh: 1.7, plotva: 1.5, lesh: 1.5, karas: 1.3, okun: 1.3, bychok: 1.3, sig: 1.1, harius: 1.0, nalim: 0.9 },
@@ -379,7 +424,8 @@ const STYLE_OF = {
   barrakuda: 'jumper', karanks: 'runner', murena: 'snag', napoleon: 'bulldog', imperator: 'snag',
   mako: 'jumper', osetr: 'bulldog', rifakula: 'runner',
   letuchaya: 'jumper', korifena: 'jumper', vahu: 'runner', zheltoper: 'runner', parusnik: 'jumper', marlin: 'jumper', gigantun: 'runner', belakula: 'bulldog',
-  tilapiya: 'plain', piranya: 'thrash', diskus: 'plain', skalyariya: 'plain', paku: 'bulldog', krasnohvost: 'bulldog', pavlin: 'jumper', arovana: 'jumper', elugor: 'snag', arapaima: 'bulldog', zoldorada: 'jumper'
+  tilapiya: 'plain', piranya: 'thrash', diskus: 'plain', skalyariya: 'plain', paku: 'bulldog', krasnohvost: 'bulldog', pavlin: 'jumper', arovana: 'jumper', elugor: 'snag', arapaima: 'bulldog', zoldorada: 'jumper',
+  prygun: 'thrash', chetyrehglazka: 'jumper', brizgun: 'thrash', gorbyl: 'bulldog', snuk: 'jumper', barramundi: 'jumper', tarpon: 'jumper', pila: 'bulldog'
 };
 for (const f of FISH) f.style = STYLE_OF[f.id] || 'plain';
 

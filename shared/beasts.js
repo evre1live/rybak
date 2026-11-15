@@ -38,6 +38,12 @@ export const BEASTS = {
     len: 13, kg: 2100, power: 1.28, hp: 100, coins: 80000, xp: 12000,
     clue: 'Говорят, после дождя под радугой вода в Котле светится всеми цветами — это его чешуя.'
   },
+  hozyain: {
+    id: 'hozyain', name: 'Хозяин протоки', loc: 'mangrove', zone: 'pit', bait: 'hozyainbait', model: 'beast-som',
+    when: { hours: [20, 3], wx: ['fog'] }, whenText: 'ночью, когда над протокой горят светлячки, или в тумане', place: 'Омут',
+    len: 9, kg: 1500, power: 1.22, hp: 95, coins: 65000, xp: 9500,
+    clue: 'Ночью в Омуте кто-то вздыхает так, что качает каноэ, и пускает пузыри размером с таз. Старики говорят — сом старше самих мангров.'
+  },
   chudo: {
     id: 'chudo', name: 'Чудо-юдо рыба-кит', loc: 'bay', zone: 'sea', bait: 'chudobait', model: 'beast-chudo',
     when: { hours: [22, 4], wx: ['rain'] }, whenText: 'ночью или в дождь', place: 'Открытое море',
@@ -59,7 +65,7 @@ export const BEAST_BAITS = BEAST_LIST.map((b) => ({
   desc: `${b.place} (${locName(b.loc)}), ${b.whenText}. Бросать вдвоём: одному не удержать. ${b.clue}`
 }));
 function locName(id) {
-  return { bay: 'Солнечная бухта', lake: 'Сосновое озеро', keys: 'Коралловые островки', blue: 'Синий простор', cascade: 'Водопадная чаша' }[id] || id;
+  return { bay: 'Солнечная бухта', lake: 'Сосновое озеро', keys: 'Коралловые островки', blue: 'Синий простор', cascade: 'Водопадная чаша', mangrove: 'Мангровая протока' }[id] || id;
 }
 export const BEAST_BY_BAIT = Object.fromEntries(BEAST_LIST.map((b) => [b.bait, b]));
 

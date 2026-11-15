@@ -54,7 +54,7 @@ test('каждую рыбу можно поймать хоть где-то и х
 });
 
 test('локации: список, подписи зон, кто может открыть комнату', () => {
-  assert.deepEqual(LOCATIONS.map((l) => l.id), ['bay', 'lake', 'keys', 'blue', 'cascade']);
+  assert.deepEqual(LOCATIONS.map((l) => l.id), ['bay', 'lake', 'keys', 'blue', 'cascade', 'mangrove']);
   for (const l of LOCATIONS) {
     assert.ok(l.name.length > 3 && l.sub && l.about && l.place && /^img\/place-\w+\.webp$/.test(l.img) && l.pin.length === 2 && l.level >= 1, l.id);
     assert.ok(l.say.enter && l.say.back && l.say.top, `${l.id}: слова для сообщений`);
@@ -1161,7 +1161,7 @@ test('гиганты: только на морскую удочку, у борт
   assert.ok(heavy.heavy && !heavy.gaff && heavy.gaffAt === 1);
   assert.ok(L.speciesWeights(sea, 'squid', 12, 'bay', heavy).some((e) => e.f.id === 'mako'));
   const giants = FISH.filter((f) => f.giant);
-  assert.deepEqual(giants.map((f) => f.id).sort(), ['arapaima', 'belakula', 'gigantun', 'mako', 'marlin', 'osetr', 'parusnik', 'rifakula']);
+  assert.deepEqual(giants.map((f) => f.id).sort(), ['arapaima', 'belakula', 'gigantun', 'mako', 'marlin', 'osetr', 'parusnik', 'pila', 'rifakula', 'tarpon']);
   for (const f of giants) assert.ok(f.rar >= 3 && f.w[1] >= 90 && f.minDepth >= 5, f.id);
   // большой подсак гиганту не помогает: без багра — до конца пути; с багром — с 90 %
   const s = L.fightInit({ sp: 'mako', w: 200 }, heavy, half);
