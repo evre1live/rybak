@@ -7,8 +7,10 @@
 общую дорожку: в описи остаются прежние петли);
 --kbps и --frame — сжатие общей дорожки: килобит в секунду и длина кадра Opus в миллисекундах.
 Готовое:
-  sfx.webm          все короткие звуки подряд одной дорожкой;
-  loop-<имя>.webm   петли: море, дождь, ветер, сверчки, мотор, водопад, костёр;
+  sfx.webm          короткие звуки подряд одной дорожкой; sfx-<имя>.webm — дорожки звуков, нужных не везде
+                    (голоса чудищ, крики птиц и зверей): какой звук где — в sounds.json, tapes;
+  loop-<имя>.webm   петли: море, дождь, ветер, сверчки, мотор, водопад, костёр, фон локаций (город, джунгли,
+                    мангры, озеро, океан, лягушки) и дизель катера;
   sounds.json       где в sfx.webm лежит каждый звук и откуда докуда крутить каждую петлю.
 Нужны ffmpeg (с libopus), numpy и scipy. Сами исходники в игру не входят.
 """
@@ -136,6 +138,22 @@ ONE = [
         [('bump4b', 0.0, 0.72, {'hp': 28}), ('bump3a', 0.168, 0.36, {'hp': 500, 'fout': 0.06, 'gain': -5})],
         [('bump4a', 0.015, 0.70, {'hp': 28}), ('bump3a', 0.0, 0.165, {'hp': 350, 'fout': 0.07, 'gain': -4})],
     ]}),
+    # ── этап 30 ── голоса чудищ: по две записи на каждое, обе идут вариантами одного звука
+    # Голоса и крики, которые звучат не везде, лежат в своих дорожках (tape): sfx-v-<чудище>.webm, sfx-fauna.webm —
+    # игра грузит только те, что нужны на её локации.
+    *[(f'v_{b}', f'v_{b}_{k}', 'all', {'tail': 0.9, 'level': -12, 'tape': f'v-{b}'}) for b in ('nessie', 'kraken', 'serpent', 'rainbow', 'hozyain', 'luna', 'chudo') for k in (1, 2)],
+    ('v_whale', 'v_whale_1', 'all', {'tail': 0.9, 'level': -12, 'tape': 'v-whale'}),
+    ('v_whale', 'v_whale_2', [0], {'tail': 0.9, 'level': -12, 'tape': 'v-whale'}),  # в конце второй записи начало новой песни — без него
+    # вёсла и весло каноэ, крики птиц и зверей, звуки марины и боя с гигантом
+    ('oars', 'oars_1', 'all', {'tail': 0.3}), ('oars', 'oars_2', 'all', {'tail': 0.3}),
+    ('paddle', 'paddle_1', 'all', {'tail': 0.3}), ('paddle', 'paddle_2', 'all', {'tail': 0.3}),
+    ('loon', 'loon_1', 'all', {'tail': 1.0, 'tape': 'fauna'}), ('loon', 'loon_2', 'all', {'tail': 1.0, 'tape': 'fauna'}),
+    ('parrot', 'parrot_1', 'all', {'tape': 'fauna'}), ('parrot', 'parrot_2', 'all', {'tape': 'fauna'}), ('toucan', 'toucan', 'all', {'tape': 'fauna'}),
+    ('flamingo', 'flamingo', [1, 2], {'tape': 'fauna'}), ('caiman', 'caiman', 'all', {'tape': 'fauna'}),
+    ('yacht_horn', 'yacht_horn', 'all', {'tail': 1.4, 'tape': 'fauna'}), ('ship_bell', 'ship_bell', 'all', {'tail': 1.2, 'tape': 'fauna'}),
+    ('tail_slap', 'tail_slap', 'all', {}), ('surge', 'surge', 'all', {}), ('big_splash', 'big_splash', 'all', {'tail': 0.8}),
+    # леска звенит от натяга — без треска в конце записи (он звучит как обрыв)
+    ('rod_strain', None, 'mix', {'mix': [[('rod_strain', 0.1, 1.2, {'fout': 0.18})]]}),
 ]
 LEVEL = -14.0  # дБ: громкость самого громкого куска у каждого короткого звука
 PEAK = -1.0  # дБ: выше этого пики не поднимаются
@@ -149,6 +167,11 @@ LOOPS = [
     ('wind', 'wind2', 2, 96, {'mode': 'noise', 'x': 0.8}), ('waterfall', 'waterfall', 1, 48, {'mode': 'noise', 'x': 0.5}),
     ('fire', 'fire2', 1, 48, {'mode': 'noise', 'x': 0.5, 'squash': 14}),
     ('crickets', 'crickets', 1, 40, {'mode': 'match', 'x': 0.05}), ('motor', 'motor', 1, 40, {'mode': 'match', 'x': 0.03}),
+    # этап 30: свой фон у каждой локации и дизель катера
+    ('city', 'city', 2, 40, {'mode': 'noise', 'x': 1.2}), ('jungle', 'jungle', 1, 48, {'mode': 'noise', 'x': 1.0}),
+    ('mangrove', 'mangrove', 2, 48, {'mode': 'noise', 'x': 1.0}), ('lake', 'lake', 2, 40, {'mode': 'noise', 'x': 1.2}),
+    ('ocean', 'ocean', 1, 32, {'mode': 'noise', 'x': 1.5}), ('frogs', 'frogs', 1, 40, {'mode': 'noise', 'x': 0.8}),
+    ('diesel', 'diesel', 1, 40, {'mode': 'match', 'x': 0.03}),
 ]
 LOOP_LEVEL = -20.0  # дБ: средняя громкость петли
 GUARD = 0.25  # запас записи до и после петли: кодек не слышит её краёв
@@ -206,13 +229,18 @@ def make_loop(y, o):
 
 def main(src, out, only=None, kbps=40, loops=True, frame=20):
     os.makedirs(out, exist_ok=True)
-    man = {'sfx': {}, 'loops': {}}
+    man = {'sfx': {}, 'tapes': {}, 'loops': {}}
     rows = []
-    tape = [np.zeros(int(0.05 * SR))]
-    pos = len(tape[0])
+    tapes = {}  # дорожка → [куски, позиция]
     for name, s, pick, o in ONE:
         if only and name not in only:
             continue
+        tp = o.get('tape', 'sfx')
+        if tp != 'sfx':
+            man['tapes'][name] = tp
+        if tp not in tapes:
+            tapes[tp] = [[np.zeros(int(0.05 * SR))], int(0.05 * SR)]
+        tape, pos = tapes[tp]
         if pick == 'mix':
             cuts = [(blend(src, layers), '+'.join(l[0] for l in layers), 0.0, 0.0) for layers in o['mix']]
         else:
@@ -224,19 +252,24 @@ def main(src, out, only=None, kbps=40, loops=True, frame=20):
                 parts = [(segs[i][0], segs[i][1], segs[i + 1][0] - 0.02 if i + 1 < len(segs) else len(y) / SR) for i in pick]
             cuts = [cut(y, a, b, lim, o.get('tail', 0.6)) for a, b, lim in parts]
             cuts = [(z, s, t0, t1) for z, t0, t1 in cuts]
-        man['sfx'][name] = []
+        man['sfx'].setdefault(name, [])  # одно имя в списке несколько раз — варианты из разных записей
         for k, (z, what, t0, t1) in enumerate(cuts):
             pk, l50 = np.max(np.abs(z)), loud50(z)
             g = min(amp(o.get('level', LEVEL)) / l50, amp(PEAK) / pk)
             z = z * g
             man['sfx'][name].append([round(pos / SR, 4), round(len(z) / SR, 4)])
-            rows.append(f"{name}{k + 1 if len(cuts) > 1 else '':<2} {what:<11} {t0:5.2f}-{t1:5.2f} {len(z) / SR:5.2f}с пик{db(np.max(np.abs(z))):6.1f} гр{db(loud50(z)):6.1f} усил{db(g):+6.1f}")
+            rows.append(f"{name}{len(man['sfx'][name]) if len(man['sfx'][name]) > 1 or len(cuts) > 1 else '':<2} {what:<11} {t0:5.2f}-{t1:5.2f} {len(z) / SR:5.2f}с пик{db(np.max(np.abs(z))):6.1f} гр{db(loud50(z)):6.1f} усил{db(g):+6.1f}")
             tape += [z, np.zeros(int(GAP * SR))]
             pos += len(z) + int(GAP * SR)
-    sfx = np.concatenate(tape)
-    enc(os.path.join(out, 'sfx.webm'), sfx, kbps, frame)
-    man['sfxLen'] = round(len(sfx) / SR, 3)
-    rows.append(f"sfx.webm: {len(sfx) / SR:.2f} с, звуков {sum(len(v) for v in man['sfx'].values())}")
+        tapes[tp][1] = pos
+    for tp, (tape, pos) in tapes.items():
+        sfx = np.concatenate(tape)
+        f = 'sfx.webm' if tp == 'sfx' else f'sfx-{tp}.webm'
+        enc(os.path.join(out, f), sfx, kbps, frame)
+        if tp == 'sfx':
+            man['sfxLen'] = round(len(sfx) / SR, 3)
+        n = sum(len(v) for k, v in man['sfx'].items() if man['tapes'].get(k, 'sfx') == tp)
+        rows.append(f"{f}: {len(sfx) / SR:.2f} с, звуков {n}, {os.path.getsize(os.path.join(out, f)) // 1024} КБ")
     for name, s, ch, kbps, o in LOOPS if loops else []:
         y = hp(dec(os.path.join(src, s + '.mp3'), ch), 30)
         if 'squash' in o:

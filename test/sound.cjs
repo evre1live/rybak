@@ -43,23 +43,28 @@ const db = (v) => 20 * Math.log10(v + 1e-9);
     return { peak, rms: Math.sqrt(e / Math.max(1, i1 - i0)) };
   }, { file, a, b });
 
-  if (names.length) {
-    const f = await decode('audio/sfx.webm');
-    assert.ok(f.ok && f.ch === 1 && /audio\/webm/.test(f.type), `общая дорожка читается: ${JSON.stringify(f)}`);
-    assert.ok(Math.abs(f.dur - man.sfxLen) < 0.08, `длина дорожки ${f.dur.toFixed(3)} с, в описи ${man.sfxLen}`);
-    const all = names.flatMap((k) => man.sfx[k].map(([a, d], i) => ({ k, i, a, d }))).sort((x, y) => x.a - y.a);
+  // дорожки: общая (sfx.webm) и свои у звуков, что нужны не везде (sfx-<имя>.webm: голоса чудищ, крики птиц и зверей)
+  const tapes = man.tapes || {};
+  for (const tp of ['sfx', ...new Set(Object.values(tapes))]) {
+    const file = tp === 'sfx' ? 'audio/sfx.webm' : `audio/sfx-${tp}.webm`;
+    const mine = names.filter((k) => (tapes[k] || 'sfx') === tp);
+    if (!mine.length) continue;
+    const f = await decode(file);
+    assert.ok(f.ok && f.ch === 1 && /audio\/webm/.test(f.type), `дорожка ${file} читается: ${JSON.stringify(f)}`);
+    if (tp === 'sfx') assert.ok(Math.abs(f.dur - man.sfxLen) < 0.08, `длина дорожки ${f.dur.toFixed(3)} с, в описи ${man.sfxLen}`);
+    const all = mine.flatMap((k) => man.sfx[k].map(([a, d], i) => ({ k, i, a, d }))).sort((x, y) => x.a - y.a);
     for (let n = 0; n < all.length; n++) {
       const s = all[n];
       assert.ok(s.a >= 0.04 && s.d > 0.05 && s.a + s.d <= f.dur + 0.01, `${s.k}: место в дорожке ${s.a}+${s.d}`);
       if (n) assert.ok(s.a - (all[n - 1].a + all[n - 1].d) >= 0.06, `${s.k}: между звуками есть тишина`);
-      const body = await level('audio/sfx.webm', s.a, s.a + s.d);
-      const before = await level('audio/sfx.webm', s.a - 0.03, s.a - 0.012);
-      const after = await level('audio/sfx.webm', s.a + s.d + 0.004, s.a + s.d + 0.03);
+      const body = await level(file, s.a, s.a + s.d);
+      const before = await level(file, s.a - 0.03, s.a - 0.012);
+      const after = await level(file, s.a + s.d + 0.004, s.a + s.d + 0.03);
       // звук слышен, не перегружен; перед ним и за ним — тишина: при игре с другой скоростью соседа не зацепить
       assert.ok(body.peak > 0.35 && body.peak <= 1.02 && db(body.rms) > -34, `${s.k}${s.i + 1}: громкость ${JSON.stringify(body)}`);
       assert.ok(db(before.peak) < -30 && db(after.peak) < -40, `${s.k}${s.i + 1}: тишина по краям — до ${db(before.peak).toFixed(0)} дБ, после ${db(after.peak).toFixed(0)} дБ`);
     }
-    console.log(`  общая дорожка: ${f.dur.toFixed(2)} с, ${fs.statSync(path.join(root, 'public/audio/sfx.webm')).size} байт — все ${all.length} звуков на своих местах, слышны, с тишиной по краям`);
+    console.log(`  дорожка ${file}: ${f.dur.toFixed(2)} с, ${fs.statSync(path.join(root, 'public', file)).size} байт — все ${all.length} звуков на своих местах, слышны, с тишиной по краям`);
   }
   for (const k of loops) {
     const m = man.loops[k];
@@ -96,7 +101,7 @@ const db = (v) => 20 * Math.log10(v + 1e-9);
   await page.waitForFunction(() => RYBAK.state === 'lobby');
   await page.evaluate(() => RYBAK.enterWorld());
   await page.waitForFunction(() => RYBAK.state === 'world' && RYBAK.audio.ctx);
-  await page.waitForFunction((want) => Object.keys(RYBAK.audio.buf).length >= want, names.length ? 5 : 4, { timeout: 30000 });
+  await page.waitForFunction((want) => want.every((k) => k in RYBAK.audio.buf && RYBAK.audio.buf[k] !== undefined), ['splash', 'plop', 'reel', 'snap', ...(names.length ? ['sfx'] : [])], { timeout: 30000 });
   const got = await page.evaluate(() => Object.fromEntries(Object.entries(RYBAK.audio.buf).map(([k, b]) => [k, b ? +b.duration.toFixed(2) : null])));
   assert.ok(got.splash && got.plop && got.reel && got.snap, `прежние записи загружены: ${JSON.stringify(got)}`);
   if (names.length) assert.ok(got.sfx, `общая дорожка загружена игрой: ${JSON.stringify(got)}`);
@@ -313,6 +318,43 @@ const db = (v) => 20 * Math.log10(v + 1e-9);
     console.log('  мотор чужой лодки: отдельная петля из той же записи, громкость по расстоянию, смолкает при выходе из мира');
   }
   await page.evaluate(() => { const a = RYBAK.audio; a.motor(-1); a.rain(0, 0.2); a.night = 0; });
+
+  // ───── этап 30: свои дорожки звуков локации и записанная музыка ─────
+  if (tapes.v_chudo) {
+    // бухта: голос Чудо-юдо — из своей дорожки, она загружена с запуском звука; чужие дорожки не грузятся сами
+    await page.waitForFunction(() => RYBAK.audio.buf['tape:v-chudo'], null, { timeout: 20000 });
+    const v = await page.evaluate(() => { const a = RYBAK.audio; window.__plays.length = 0; const ok = a.one('v_chudo', { vol: 0.5 }); const p = window.__plays[0]; return { ok, tape: !!p && p.buf === a.buf['tape:v-chudo'], wanted: a.tapeWant, others: Object.keys(a.buf).filter((k) => k.startsWith('tape:')) }; });
+    assert.ok(v.ok && v.tape, `голос чудища играет из своей дорожки: ${JSON.stringify(v)}`);
+    assert.deepEqual(v.others, ['tape:v-chudo'], `в бухте грузится только голос её чудища: ${JSON.stringify(v)}`);
+    console.log('  дорожки звуков: голос чудища бухты — из своей дорожки, чужие не грузятся');
+  }
+  const music = JSON.parse(fs.readFileSync(path.join(root, 'public/audio/music.json'), 'utf8'));
+  if (music.title1) {
+    // сбор команды (лобби) → заставка (одна из двух тем); бой → тема боя; конец боя → снова сочинённая музыка.
+    // Игра сама каждый кадр говорит звуку, где она: в лобби — заставка, в мире — нет; бой задаём сами.
+    await page.evaluate(() => RYBAK.toLobbyState());
+    await page.waitForFunction(() => RYBAK.audio.trk && /^title[12]$/.test(RYBAK.audio.trk.name), null, { timeout: 30000 });
+    const t = await page.evaluate(() => { const s = RYBAK.audio.trk.src; return { name: RYBAK.audio.trk.name, loop: s.loop, ls: s.loopStart, le: s.loopEnd, dur: s.buffer.duration }; });
+    const m = music[t.name];
+    assert.ok(t.loop && Math.abs(t.ls - m.start) < 1e-6 && Math.abs(t.le - m.end) < 1e-6 && t.dur >= m.end, `заставка крутится по точкам из описи: ${JSON.stringify(t)}`);
+    await page.evaluate(() => RYBAK.enterWorld());
+    await page.waitForFunction(() => RYBAK.state === 'world');
+    // бой с чудищем: вместо настоящего (его ведёт сервер) — признак «бой рядом», который игра спрашивает каждый кадр
+    await page.evaluate(() => { RYBAK.beasts.fightNear = () => true; });
+    await page.waitForFunction(() => RYBAK.audio.trk && /^beast[12]$/.test(RYBAK.audio.trk.name), null, { timeout: 30000 });
+    await page.waitForTimeout(1500);
+    const f = await page.evaluate(() => ({ name: RYBAK.audio.trk.name, proc: RYBAK.audio.proc.gain.value }));
+    assert.ok(f.proc < 0.1, `в бою сочинённая музыка затихла: ${JSON.stringify(f)}`);
+    await page.evaluate(() => { RYBAK.beasts.fightNear = () => false; });
+    await page.waitForTimeout(4500);
+    const e = await page.evaluate(() => ({ trk: RYBAK.audio.trk, proc: RYBAK.audio.proc.gain.value }));
+    assert.ok(!e.trk && e.proc > 0.85, `бой кончился — тема боя ушла, сочинённая вернулась: ${JSON.stringify(e)}`);
+    // фанфары и аккорд легенды: держатся наготове и играют сразу
+    await page.waitForFunction(() => RYBAK.audio.trackRaw.trophy && RYBAK.audio.trackRaw.legend, null, { timeout: 30000 });
+    const st = await page.evaluate(() => ({ t: RYBAK.audio.sting('trophy'), l: RYBAK.audio.sting('legend') }));
+    assert.deepEqual(st, { t: true, l: true }, `фанфары трофея и аккорд легенды играют: ${JSON.stringify(st)}`);
+    console.log(`  музыка: заставка «${t.name}» по кругу с ${m.start.toFixed(1)} по ${m.end.toFixed(1)} с, тема боя «${f.name}», фанфары и аккорд легенды — как задумано`);
+  }
   assert.ok(!page.__err, 'ошибок на странице нет');
   console.log(`  петли: записью — ${loops.length ? loops.join(', ') : 'пока ни одной'}; остальное — синтез, как раньше`);
   await browser.close();

@@ -3,7 +3,7 @@
 // Нос лодки смотрит туда же, куда «вперёд» у игрока (при yaw = 0 — на север, −Z). Рыбак сидит на банке у мотора.
 // Лодка у каждого своя: её берут у домашнего пирса, она остаётся за игроком, пока тот не вернёт её обратно.
 import * as THREE from 'three';
-import { canSail, MOORINGS, WORLD, HAS } from './terrain.js';
+import { canSail, MOORINGS, WORLD } from './terrain.js';
 import { waveH } from './water.js';
 import { loadManifest } from './hero.js';
 import { loadModel, spawn, modelInfo } from './models.js';
@@ -12,6 +12,7 @@ import { GLOSS_MAT, METAL_MAT } from './env.js';
 import { patchModel } from './surface.js';
 import { clamp, damp, angDiff } from './util.js';
 import { makePennant, wind } from './flags.js';
+import { LOC_ID } from './loc/id.js';
 
 export const BOAT_PRICE = 30; // монет за выход; первый выход бесплатный
 const LEN = 4.3; // длина корпуса, м
@@ -37,13 +38,28 @@ const HULLS = {
   'boat-cutter': { len: 5.8, draft: 0.42, deck: 0.75, bench: 1.49, seatX: 0.32, seatZ: 1.5, rot: Math.PI / 2, motor: false, stool: true, passBench: 1.17, passZ: 2.0, passW: 1.66, pass: [[-0.55, 2.0], [0.55, 2.0]], bow: [1.82, -2.55], half: 2.75, beam: 1.05 },
   // Каноэ Мангровой протоки (Tripo): две банки поперёк корпуса — рыбак на кормовой, друзья на носовой; сидят низко,
   // у самой воды. Мотора нет — идёт тихо (на ходу его ведёт «лодочный» мотор игры без звука и без винта)
-  'boat-canoe': { len: 5.2, draft: 0.2, bench: 0.6, seatX: 0, seatZ: 1.04, rot: Math.PI / 2, motor: false, pass: [[-0.32, -0.52], [0.32, -0.52]], bow: [0.95, -2.3], half: 2.5, beam: 0.62 }
+  'boat-canoe': { len: 5.2, draft: 0.2, bench: 0.6, seatX: 0, seatZ: 1.04, rot: Math.PI / 2, motor: false, pass: [[-0.32, -0.52], [0.32, -0.52]], bow: [0.95, -2.3], half: 2.5, beam: 0.62 },
+  // Вёсельная лодка Соснового озера (Tripo, этап 30): обшивка внакрой, две банки и кормовое сиденье, вёсла лежат вдоль
+  // бортов. Рыбак — на задней банке, друзья — на передней
+  'boat-row': { len: 4.1, draft: 0.28, bench: 0.64, seatX: 0, seatZ: 0.42, rot: Math.PI / 2, motor: false, pass: [[-0.4, -0.62], [0.4, -0.62]], bow: [1.0, -1.85], half: 1.95, beam: 0.78 },
+  // Двухместный морской каяк Коралловых островков (Tripo): сидят почти у воды; рыбак — на заднем сиденье, друг — на
+  // переднем, третий — на кормовой палубе за рыбаком
+  'boat-kayak': { len: 4.3, draft: 0.12, bench: 0.3, seatX: 0, seatZ: 0.62, rot: Math.PI / 2, motor: false, pass: [[0, -0.66], [0, 1.45]], bow: [0.5, -1.95], half: 2.05, beam: 0.45 },
+  // Пирога Водопадной чаши (Tripo): долблёнка с двумя банками и загнутыми концами
+  'boat-pirogue': { len: 4.8, draft: 0.16, bench: 0.42, seatX: 0, seatZ: 0.85, rot: Math.PI / 2, motor: false, pass: [[-0.22, -0.45], [0.22, -0.45]], bow: [0.85, -2.2], half: 2.3, beam: 0.55 }
 };
-/** Какие корпуса пробовать, лучший — первым: в открытом океане Синего простора ходят на катере. */
-const HULL_ORDER = HAS.blue || HAS.marina ? ['boat-cutter', 'env-motorboat', 'prop-boat'] : HAS.mangrove ? ['boat-canoe', 'env-motorboat', 'prop-boat'] : ['env-motorboat', 'prop-boat'];
+/** Лодка локации — лучшая модель, первой в списке корпусов: в океане ходят на катере, на протоке — на каноэ. */
+export const OWN_HULL = { lake: 'boat-row', keys: 'boat-kayak', blue: 'boat-cutter', cascade: 'boat-pirogue', mangrove: 'boat-canoe', marina: 'boat-cutter' }[LOC_ID] || null;
+/** Чем идёт лодка: motor — подвесной мотор, diesel — катер, oars — вёсла, paddle — весло. Без мотора лодка идёт тихо. */
+export const PROPULSION = { 'boat-row': 'oars', 'boat-kayak': 'paddle', 'boat-pirogue': 'paddle', 'boat-canoe': 'paddle', 'boat-cutter': 'diesel' }[OWN_HULL] || 'motor';
+export const QUIET = PROPULSION === 'oars' || PROPULSION === 'paddle';
+/** Как лодку зовут в подсказках: [что дают напрокат, во что садятся, своя]. */
+export const BOAT_WORDS = { 'boat-canoe': ['КАНОЭ', 'В КАНОЭ', 'СВОЁ КАНОЭ'], 'boat-kayak': ['КАЯК', 'В КАЯК', 'СВОЙ КАЯК'], 'boat-pirogue': ['ПИРОГА', 'В ПИРОГУ', 'СВОЯ ПИРОГА'] }[OWN_HULL] || ['ЛОДКА', 'В ЛОДКУ', 'СВОЯ ЛОДКА'];
+const HULL_ORDER = [...(OWN_HULL ? [OWN_HULL] : []), 'env-motorboat', 'prop-boat'];
 // bow — где на носу стоит шест с вымпелом у своей (купленной) лодки: [высота над килем, к носу от середины]
 export const BOAT_SEATS = 2; // сколько пассажиров берёт лодка
-export const VMAX = HAS.mangrove ? 9 : 12.5; // полный ход, м/с (каноэ — потише)
+/** Полный ход, м/с: на вёслах и с веслом — потише. */
+export const VMAX = { 'boat-canoe': 9, 'boat-row': 7.5, 'boat-kayak': 8.5, 'boat-pirogue': 8.5 }[OWN_HULL] || 12.5;
 const VREV = 3.2; // задний ход
 const BUMP_AT = 2.1; // от середины лодки до места, которым она ударяется о преграду, м
 

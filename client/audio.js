@@ -7,11 +7,16 @@
 // впервые понадобятся. Пока записи нет (не успела, браузер не умеет её читать, её нет в этой сборке) — играет
 // синтез: каждый звук сначала пробует запись и только потом синтезирует. Сигналы игроку — поклёвка, опасность,
 // удача — остаются синтезом: они в тон музыке, которую сочиняет сама игра (music.js).
+// Записанная музыка (tools/music.py, music.json) звучит поверх сочинённой в особые минуты: заставка на главном экране,
+// бой с чудищем, гигантом или легендой, фанфары трофея и аккорд легенды. Сочинённая на это время затихает.
 import { settings } from './profile.js';
 import { Music } from './music.js';
 import SOUNDS from '../public/audio/sounds.json';
+import MUSIC from '../public/audio/music.json';
 
 const SFX = SOUNDS.sfx || {}; // имя → [[начало, длина], …] в общей дорожке; несколько пар — варианты одного звука
+// звуки, что нужны не везде (голоса чудищ, крики птиц и зверей), лежат в своих дорожках: имя → дорожка sfx-<дорожка>.webm
+const TAPES = SOUNDS.tapes || {};
 const LOOPS = SOUNDS.loops || {}; // имя → { file, start, end }
 const SAMPLES = { splash: 'audio/splash.webm', plop: 'audio/plop.webm', reel: 'audio/reel.webm', snap: 'audio/snap.webm' };
 if (Object.keys(SFX).length) SAMPLES.sfx = 'audio/sfx.webm';
@@ -35,6 +40,8 @@ export class Audio2 {
      */
     this.site = { surf: 1, gulls: true, birds: false };
     this.hours = 12;
+    this.want = { menu: false, fight: false }; // какая записанная музыка нужна сейчас (см. musicScene)
+    this.tapeWant = []; // дорожки звуков этой локации: грузятся сразу после запуска звука
   }
   /** Запуск по первому нажатию — раньше браузер не разрешит. */
   start() {
@@ -64,6 +71,18 @@ export class Audio2 {
     this.amb.connect(this.back);
     this.mus = c.createGain();
     this.mus.connect(this.back);
+    // музыка: сочинённая (proc) и записанная (tracks) идут через общий «пригиб» (mduck) — под фанфары оба отступают
+    this.mduck = c.createGain();
+    this.mduck.connect(this.mus);
+    this.proc = c.createGain();
+    this.proc.connect(this.mduck);
+    this.tracks = c.createGain();
+    this.tracks.connect(this.mduck);
+    this.trackBuf = {}; // имя дорожки музыки → обещание записи
+    this.trackRaw = {}; // …и сама запись, когда загрузилась (фанфарам ждать некогда)
+    this.trk = null; // играющая петля музыки: { name, src, g }
+    this.fightN = 0;
+    this.titlePick = Math.random() < 0.5 ? 'title1' : 'title2'; // две темы заставки: в каждый заход — одна из них
     this.buf = {};
     this.beds = {}; // петли: имя → { st, buf, src, g, pan, idle }
     this.loopBuf = {}; // записи петель: файл → обещание записи; две петли из одного файла грузят его один раз
@@ -77,11 +96,16 @@ export class Audio2 {
     this.applyVolume();
     this.startAmbient();
     // музыка расписывается на полсекунды вперёд; вкладка скрыта или громкость на нуле — молчит
-    this.music = new Music(c, this.mus);
+    this.music = new Music(c, this.proc);
     if (this.musicStyle) this.music.style(this.musicStyle);
     setInterval(() => {
       if (!document.hidden && c.state === 'running' && settings.music > 0.01) this.music.plan(c.currentTime + 0.6);
+      // скрытая вкладка: записанная музыка молчит, как и сочинённая
+      this.tracks.gain.setTargetAtTime(document.hidden ? 0 : 1, c.currentTime, 0.3);
     }, 140);
+    this.syncTrack();
+    // фанфары и аккорд легенды — короткие, их держим наготове
+    setTimeout(() => ['trophy', 'legend'].forEach((n) => settings.music > 0.01 && this.loadTrack(n)), 4000);
   }
   applyVolume() {
     if (!this.ctx) return;
@@ -89,6 +113,7 @@ export class Audio2 {
     this.sfx.gain.value = settings.sfx;
     this.amb.gain.value = settings.amb;
     this.mus.gain.value = settings.music;
+    this.syncTrack(); // музыку выключили — петля замолкает; включили — снова звучит, что нужно
   }
   /** Настроение музыки: { fight, tension, run, boss, night, rain } — см. music.js. */
   mood(m) {
@@ -98,6 +123,101 @@ export class Audio2 {
   setMusicStyle(name) {
     this.musicStyle = name;
     if (this.music) this.music.style(name);
+  }
+  /**
+   * Где игрок — какая записанная музыка нужна: menu — главный экран и сбор команды (заставка), fight — бой
+   * с чудищем, гигантом или легендой. Бой важнее заставки; ни то ни другое — звучит сочинённая музыка локации.
+   */
+  musicScene(w) {
+    let ch = false;
+    for (const k of ['menu', 'fight']) {
+      if (w[k] !== undefined && !!w[k] !== this.want[k]) {
+        this.want[k] = !!w[k];
+        ch = true;
+        if (k === 'fight' && w[k]) this.fightN++; // каждый новый бой — другая из двух тем
+      }
+    }
+    if (ch) this.syncTrack();
+  }
+  /** Дорожка музыки name (music-<name>.webm) → обещание записи (null — нет). */
+  loadTrack(name) {
+    const m = MUSIC[name];
+    if (!m || !this.ctx) return Promise.resolve(null);
+    return this.trackBuf[name] || (this.trackBuf[name] = this.fetchBuf('audio/' + m.file).then((b) => (this.trackRaw[name] = b)));
+  }
+  /** Привести играющую петлю к нужной: старая гаснет за пару секунд, новая нарастает; сочинённая — наоборот. */
+  syncTrack() {
+    const c = this.ctx;
+    if (!c) return;
+    const name = settings.music <= 0.01 ? null : this.want.fight ? (this.fightN % 2 ? 'beast2' : 'beast1') : this.want.menu ? this.titlePick : null;
+    if ((this.trk && this.trk.name) === name && this.trkWant === name) return;
+    this.trkWant = name;
+    const t = c.currentTime;
+    if (this.trk && this.trk.name !== name) {
+      const o = this.trk;
+      this.trk = null;
+      o.g.gain.cancelScheduledValues(t);
+      o.g.gain.setTargetAtTime(0, t, name ? 0.6 : 1.1);
+      setTimeout(() => {
+        o.src.stop();
+        o.g.disconnect();
+        // распакованная музыка занимает в памяти десятки мегабайт: не нужна сейчас — отпускаем (файл остаётся в кэше)
+        if (this.trkWant !== o.name) {
+          delete this.trackBuf[o.name];
+          delete this.trackRaw[o.name];
+        }
+      }, 6000);
+    }
+    if (!name || !MUSIC[name]) {
+      this.proc.gain.cancelScheduledValues(t);
+      this.proc.gain.setTargetAtTime(1, t + 0.8, 1.4);
+      return;
+    }
+    if (this.trk) return;
+    this.loadTrack(name).then((b) => {
+      if (!b || this.trkWant !== name || this.trk) return;
+      const m = MUSIC[name];
+      const now = c.currentTime;
+      const s = c.createBufferSource();
+      s.buffer = b;
+      s.loop = true;
+      s.loopStart = m.start;
+      s.loopEnd = m.end;
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.exponentialRampToValueAtTime(1, now + (this.want.fight ? 0.6 : 2.5));
+      s.connect(g);
+      g.connect(this.tracks);
+      s.start(now);
+      this.trk = { name, src: s, g };
+      // прежние планы громкости (возврат сочинённой музыки через миг) отменяем — иначе они перебили бы затихание
+      this.proc.gain.cancelScheduledValues(now);
+      this.proc.gain.setTargetAtTime(0, now, 0.5);
+    });
+  }
+  /**
+   * Короткая запись поверх всего: 'trophy' — фанфары трофея, 'legend' — аккорд легенды. Музыка под ней отступает,
+   * потом возвращается. Нет записи (не загрузилась, музыка выключена) — false.
+   */
+  sting(name) {
+    const c = this.ctx;
+    const m = MUSIC[name];
+    if (!c || !m || settings.music <= 0.01) return false;
+    const buf = this.trackRaw[name];
+    if (!buf) {
+      this.loadTrack(name); // в следующий раз будет
+      return false;
+    }
+    const t = c.currentTime + 0.02;
+    const s = c.createBufferSource();
+    s.buffer = buf;
+    s.connect(this.mus);
+    s.start(t);
+    const d = this.mduck.gain;
+    d.cancelScheduledValues(t);
+    d.setTargetAtTime(0.15, t, 0.08);
+    d.setTargetAtTime(1, t + Math.max(1.5, m.len - 1.8), 1.2);
+    return true;
   }
   /** Запись по адресу url → звук, готовый к игре, или null (нет файла, нет сети, браузер не умеет читать). */
   fetchBuf(url) {
@@ -126,6 +246,21 @@ export class Audio2 {
         this.buf[name] = b; // null — записи нет, останется синтез
       });
     }
+    for (const t of this.tapeWant) this.tape(t);
+  }
+  /** Дорожка звуков t (sfx-<t>.webm): начать грузить. → запись или undefined, пока не загружена. */
+  tape(t) {
+    const k = 'tape:' + t;
+    if (!(k in this.buf) && this.ctx) {
+      this.buf[k] = undefined;
+      this.fetchBuf(`audio/sfx-${t}.webm`).then((b) => (this.buf[k] = b));
+    }
+    return this.buf[k];
+  }
+  /** Дорожки звуков, нужные этой локации (голоса её чудищ, крики её птиц): грузятся, как только запустится звук. */
+  wantTapes(list) {
+    this.tapeWant = list.filter((t) => Object.values(TAPES).includes(t));
+    if (this.ctx) for (const t of this.tapeWant) this.tape(t);
   }
   /**
    * Короткий звук name из общей дорожки. vol — громкость, rate — скорость (и высота), delay — через сколько, pan — левее (−1)
@@ -135,8 +270,9 @@ export class Audio2 {
    */
   one(name, { vol = 1, rate = 1, delay = 0, pan = 0, amb = false, v = -1, lp = 0, dest = null } = {}) {
     const list = SFX[name];
-    const b = this.ctx && this.buf.sfx;
-    if (!list || !b) return false;
+    if (!list || !this.ctx) return false;
+    const b = TAPES[name] ? this.tape(TAPES[name]) : this.buf.sfx;
+    if (!b) return false;
     let i = v;
     if (i < 0 || i >= list.length) {
       i = Math.floor(Math.random() * list.length);
@@ -338,6 +474,22 @@ export class Audio2 {
       if (this.site.cicadas) this.cicadas(this.site.cicadas * this.cicadaK() * (1 - 0.8 * wet));
       // марина: ветер качает фалы, и они звенят о мачты яхт
       if (this.site.clinks && Math.random() < (this.night > 0.4 ? 0.2 : 0.6)) this.clink(t);
+      // фон локации (записи): город за мариной, джунгли, мангры, лес у озера, океанская зыбь, лягушки ночью —
+      // у каждой своя громкость днём и ночью; в дождь лес и джунгли стихают
+      for (const [name, [day, nite, rainK = 0.5]] of Object.entries(this.site.beds || {})) {
+        const v = (day + (nite - day) * this.night) * (1 - rainK * wet);
+        this.bed(name, Math.max(0, v), { tc: 3 });
+      }
+      // гагары на озере: на рассвете, на закате и ночью — далеко над водой, с эхом
+      if (this.site.loons && (this.hours < 8.5 || this.hours > 19) && Math.random() < 0.16 * (1 - wet)) {
+        this.one('loon', { vol: rnd(0.14, 0.3), rate: rnd(0.96, 1.04), pan: rnd(-0.85, 0.85), amb: true, lp: rnd(2600, 5200) });
+      }
+      // гавань: изредка гудит яхта, выходя из марины, или отбивает склянки судовой колокол
+      if (this.site.harbor) {
+        const r = Math.random();
+        if (r < 0.045) this.one('yacht_horn', { vol: rnd(0.16, 0.3), rate: rnd(0.97, 1.03), pan: rnd(-0.7, 0.7), amb: true, lp: rnd(2400, 4200) });
+        else if (r < 0.075) this.one('ship_bell', { vol: rnd(0.12, 0.22), rate: rnd(0.98, 1.02), pan: rnd(-0.6, 0.6), amb: true });
+      }
       setTimeout(loop, this.night > 0.4 ? 700 + Math.random() * 900 : 3500 + Math.random() * 7000);
     };
     setTimeout(loop, 2500);
@@ -942,7 +1094,8 @@ export class Audio2 {
     if (!this.ctx) return;
     const a = k < 0 ? 0 : Math.max(0, 1 - d / MOTOR_FAR);
     const kk = Math.max(0, Math.min(1, k));
-    this.bed('motor', a * a * (0.3 + 0.45 * kk), { key: 'motor2', rate: 0.78 + 0.5 * kk, pan: side * Math.min(1, d / 6) * 0.75, sfx: true, tc: 0.25 });
+    const dz = this.motorLoop === 'diesel';
+    this.bed(this.motorLoop || 'motor', a * a * (0.3 + 0.45 * kk), { key: 'motor2', rate: dz ? 0.86 + 0.32 * kk : 0.78 + 0.5 * kk, pan: side * Math.min(1, d / 6) * 0.75, sfx: true, tc: 0.25 });
   }
   /** Игрок ушёл из мира — в лобби или в меню: звуки мест и чужих лодок смолкают. */
   hush() {
@@ -956,7 +1109,9 @@ export class Audio2 {
     const c = this.ctx;
     const t = c.currentTime;
     // запись мотора: на холостом ходу — ниже и тише, на полном — выше и громче. Пока её нет — синтез
-    const rec = this.bed('motor', k < 0 ? 0 : 0.3 + 0.45 * k, { rate: 0.78 + 0.5 * Math.max(0, k), sfx: true, tc: 0.15 });
+    // у катера — дизель (motorLoop = 'diesel'): ниже и ровнее, высоту с ходом меняет меньше
+    const dz = this.motorLoop === 'diesel';
+    const rec = this.bed(this.motorLoop || 'motor', k < 0 ? 0 : 0.3 + 0.45 * k, { key: 'motor', rate: dz ? 0.86 + 0.32 * Math.max(0, k) : 0.78 + 0.5 * Math.max(0, k), sfx: true, tc: 0.15 });
     if (k < 0 || rec) {
       const e = this.eng;
       if (!e) return;
@@ -1096,6 +1251,10 @@ export class Audio2 {
       this.tension = { o, f, g };
     }
     const k = Math.max(0, (T - 0.55) / 0.45);
+    // в бою с гигантом, легендой или чудищем тугая леска звенит, а удилище стонет — запись, не чаще раза в 3,5 с
+    if (this.bigFight && T > 0.84 && c.currentTime - (this.strainAt || 0) > 3.5) {
+      if (this.one('rod_strain', { vol: 0.25 + 0.5 * Math.min(1, (T - 0.84) / 0.12), rate: rnd(0.95, 1.06) })) this.strainAt = c.currentTime;
+    }
     this.tension.o.frequency.setTargetAtTime(70 + T * 150, c.currentTime, 0.05);
     this.tension.f.frequency.setTargetAtTime(500 + T * 1600, c.currentTime, 0.05);
     this.tension.g.gain.setTargetAtTime(k * k * 0.11, c.currentTime, 0.05);

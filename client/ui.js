@@ -1,6 +1,6 @@
 // Интерфейс: экран игры (HUD) по макетам этапа 19 — стеклянные панели, команда с фигурками, мини-карта с маршрутом;
 // лобби, снасти и магазин, рынок, журнал, выбор героя, настройки.
-import { BEASTS } from '../shared/beasts.js';
+import { BEASTS, BEAST_LIST } from '../shared/beasts.js';
 import { CATS, ITEMS, FISH, FISH_BY_ID, FIGHT_STYLES, JUNK_BY_ID, RARITY, zoneInfo, zonesOf, locsOf, fishOf, DAY_PARTS, RODS, MAX_PLAYERS, fmtW, fmtCoins, fmtClock } from '../shared/data.js';
 import { LOCATIONS, locOf } from '../shared/locations.js';
 import { LOC_ID, LOC } from './loc/id.js';
@@ -80,6 +80,24 @@ const PLACE = { name: LOC.name, img: LOC.img, pin: LOC.pin }; // место на
 const imgUrl = (f) => (window.RYBAK_IMG && window.RYBAK_IMG[f]) || f;
 // цвет редкости для подписи на светлом стекле: тот же тон, но светлее — читается на любом фоне
 const rarTint = (rar) => `color-mix(in srgb, ${RARITY[rar].color} 58%, #fff)`;
+// картинки этапа 30 (GPT Image): в пробной версии одним файлом их нет, если она их не вложила — тогда без картинки
+const art = (f) => (window.RYBAK_OFFLINE && !(window.RYBAK_IMG && window.RYBAK_IMG[f]) ? '' : imgUrl(f));
+// значок звания: у каждого звания — своя медаль (public/img/ranks)
+const RANK_IMG = {
+  Новичок: 'novichok', Любитель: 'lyubitel', Рыбак: 'rybak', Бывалый: 'byvaly', Знаток: 'znatok', Мастер: 'master', Капитан: 'kapitan', 'Морской волк': 'volk',
+  'Легенда бухты': 'legenda', 'Гроза глубин': 'groza', 'Хозяин вод': 'hozyain', 'Повелитель приливов': 'povelitel', 'Морской царь': 'tsar', 'Живая легенда': 'zhivaya'
+};
+const rankImg = (title, cls = 'rk') => {
+  const u = RANK_IMG[title] && art(`img/ranks/rank-${RANK_IMG[title]}.webp`);
+  return u ? `<img class="${cls}" src="${u}" alt="" title="${esc(title)}">` : '';
+};
+// значок вида задания (public/img/quests): поймать, продать, отпустить… и премия за все три
+const questImg = (k) => {
+  const u = art(`img/quests/q-${k}.webp`);
+  return u ? `<img class="qi" src="${u}" alt="">` : '';
+};
+/** Открытка чудища (public/img/beasts) — адрес или пусто. */
+export const beastArt = (id) => art(`img/beasts/${id}.webp`);
 
 export class UI {
   constructor(game) {
@@ -213,7 +231,7 @@ export class UI {
     box.classList.toggle('hidden', !qs);
     if (!qs) return;
     const html = `<div class="qh"><span class="cap">Задания дня</span><kbd class="g">K</kbd>${left ? '' : '<span class="ok">все выполнены</span>'}</div>` +
-      qs.list.filter((q) => !q.done).map((q) => `<div class="q"><span>${esc(questText(q, LOC_ID))}</span><b>${esc(questCount(q))}</b></div>`).join('');
+      qs.list.filter((q) => !q.done).map((q) => `<div class="q">${questImg(q.k)}<span>${esc(questText(q, LOC_ID))}</span><b>${esc(questCount(q))}</b></div>`).join('');
     if (html !== this.questKey) {
       this.questKey = html;
       box.innerHTML = html;
@@ -735,7 +753,7 @@ export class UI {
         <div class="hint">${v.on ? 'Друзья вас слышат. Клавиша M — выключить и включить микрофон.' : 'Нажмите «Включить голос» и разрешите микрофон — будете слышать друг друга прямо в игре.'}</div>`}
       </div>
       <div class="lob-bl">
-        <div class="mechip"><div class="ava"><img src="${faceIcon(p.look)}" alt=""><i class="on"></i></div><div><div class="nm">${esc(p.name || 'Рыбак')}</div><div class="lv">Уровень ${lv.lvl}<div class="pbar"><i style="width:${Math.round((lv.cur / lv.need) * 100)}%"></i></div></div></div></div>
+        <div class="mechip"><div class="ava"><img src="${faceIcon(p.look)}" alt=""><i class="on"></i>${rankImg(lv.title)}</div><div><div class="nm">${esc(p.name || 'Рыбак')}</div><div class="lv">Уровень ${lv.lvl} · ${esc(lv.title)}<div class="pbar"><i style="width:${Math.round((lv.cur / lv.need) * 100)}%"></i></div></div></div></div>
         ${g.solo ? '' : `<div class="crewrow">${crew.filter((r) => !r.me).map(friend).join('')}<button class="plus" data-a="copy" title="Позвать друзей — скопировать ссылку" aria-label="Позвать друзей">+</button><button class="codepill" data-a="copy" title="Скопировать ссылку для друзей">${ic('link')}<span>КОД ${esc(g.code)}</span><i class="sep"></i><span>${n}/${MAX_PLAYERS}</span></button></div>`}
       </div>
       <div class="lob-br">${g.offline ? '' : round('top', 'cup', LOC.say.top)}${round('help', 'help', 'Как играть')}${round('settings', 'gear', 'Настройки')}<button class="btn sm ghost" data-a="leave"><kbd class="b">ESC</kbd><span>${g.solo ? 'В МЕНЮ' : 'ВЫЙТИ ИЗ КОМНАТЫ'}</span></button></div>`;
@@ -851,6 +869,8 @@ export class UI {
         else if (it.id !== 'bread') fx.push('Расходуется при каждой поклёвке');
       }
       if (it.cat === 'bag') fx.push(`Вместимость: ${it.cap} рыб`);
+      // приманка для чудища: вместо рыбок — открытка самого существа
+      if (it.beast && beastArt(it.beast)) chips = `<img class="bart" src="${beastArt(it.beast)}" alt="">`;
       body = `<div class="more">${chips}${fx.length ? `<ul class="fx">${fx.map((s) => `<li>${esc(s)}</li>`).join('')}</ul>` : ''}</div>`;
     }
     const price = (note = '') => `<div class="price">${coin(priceOf(it.id))}${note ? `<small>${note}</small>` : ''}</div>`;
@@ -893,18 +913,60 @@ export class UI {
       <div class="loadout"><span class="hd">ТОРГОВЕЦ</span><div class="it say">«${esc(g.vendorLine())}»</div>${this.footKeys(p.cooler.length ? 'ПРОДАТЬ ВСЁ' : '')}</div></div>`;
   }
 
+  /** Вкладки журнала: локации, вся рыба и чудища. */
+  journalTabs(jl) {
+    const p = this.g.profile;
+    const stars = (n) => `<i class="stars">${'★'.repeat(n)}<s>${'★'.repeat(3 - n)}</s></i>`;
+    const nb = BEAST_LIST.filter((b) => p.beasts && p.beasts[b.id]).length;
+    return [...LOCATIONS.map((l) => [l.id, l.name, fishOf(l.id)]), ['all', 'Вся рыба', FISH]]
+      .map(([id, name, fs]) => `<button class="tab${id === jl ? ' on' : ''}" data-a="jloc" data-id="${id}">${id === 'all' ? '' : ic('pin')}${esc(name)} · ${fs.filter((x) => p.journal[x.id]).length}/${fs.length}${id === 'all' ? '' : stars(mastery(p, id).stars)}</button>`).join('') +
+      `<button class="tab${jl === 'beasts' ? ' on' : ''}" data-a="jloc" data-id="beasts">${ic('star')}Чудища · ${nb}/${BEAST_LIST.length}</button>`;
+  }
+  /** Журнал: чудища — открытки всех восьми, где и когда их искать, сколько раз взяты. */
+  renderBeasts() {
+    const p = this.g.profile;
+    const lv = levelInfo(p.xp);
+    const cards = BEAST_LIST.map((b) => {
+      const n = (p.beasts && p.beasts[b.id]) || 0;
+      const u = beastArt(b.id);
+      return `<div class="bcard ${n ? 'got' : ''}">${u ? `<img src="${u}" alt="" loading="lazy">` : '<i class="noart"></i>'}${n ? `<span class="tg">ВЗЯТ ×${n}</span>` : ''}
+        <div class="bi"><h3>${esc(b.name)}</h3><div class="bw">${ic('pin')}${esc(b.place)} · ${esc(locOf(b.loc).name)}</div><div class="bw">${esc(b.whenText.charAt(0).toUpperCase() + b.whenText.slice(1))}</div><p>${esc(b.clue)}</p></div></div>`;
+    }).join('');
+    this.screen.innerHTML = `<div class="dim"></div><div class="panel jbeasts">
+      ${this.panelHead('ЖУРНАЛ')}
+      <div class="jtop"><div class="jstats"><div class="jrank">${rankImg(lv.title)}<span><b>${lv.lvl}</b>уровень · ${esc(lv.title)}</span></div><div><b>${(p.stats && p.stats.beasts) || 0}</b>чудищ взято вместе</div></div>
+        <div class="tabs2 jtabs">${this.journalTabs('beasts')}<span class="jmast">Чудищ ловят только вдвоём и больше: особую приманку продают на рынке, бросают в логово в его время.</span></div></div>
+      <div class="bgrid">${cards}</div>
+      <div class="loadout"><span class="hd">ДО УРОВНЯ ${lv.lvl + 1}</span><div class="it bar"><div class="pbar"><i style="width:${Math.round((lv.cur / lv.need) * 100)}%"></i></div>${lv.cur} / ${lv.need}</div>${this.footKeys('')}</div></div>`;
+  }
+  /** Чудище взято вместе: открытка на пару секунд поверх игры. mine — трофей и наш (с монетами и опытом). */
+  beastWin(def, names, mine) {
+    let box = $('#bwin');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'bwin';
+      $('#hud').appendChild(box);
+    }
+    const u = beastArt(def.id);
+    box.innerHTML = `${u ? `<img src="${u}" alt="">` : ''}<div class="bw"><div class="rib">ОБЩИЙ ТРОФЕЙ</div><h2>${esc(def.name)}</h2><p>${esc(names)}</p>${mine ? `<div class="rw">${coin(def.coins)}<i class="sep"></i>ОПЫТ +${def.xp.toLocaleString('ru')}</div>` : ''}</div>`;
+    box.classList.toggle('noimg', !u);
+    box.classList.remove('hidden');
+    clearTimeout(this.bwinT);
+    this.bwinT = setTimeout(() => box.classList.add('hidden'), 9000);
+  }
+
   renderJournal() {
     const p = this.g.profile;
     // рыба — по локациям: сначала здешняя (что можно поймать, не уезжая), рядом — другие места и общий список
     const jl = (this.jloc = this.jloc || LOC_ID);
+    if (jl === 'beasts') return this.renderBeasts();
     const list = jl === 'all' ? FISH : fishOf(jl);
     if (!this.js || !list.some((x) => x.id === this.js)) this.js = list[0].id;
     const f = FISH_BY_ID[this.js];
     const j = p.journal[f.id];
     const got = Object.keys(p.journal).length;
     const stars = (n) => `<i class="stars">${'★'.repeat(n)}<s>${'★'.repeat(3 - n)}</s></i>`;
-    const tabs = [...LOCATIONS.map((l) => [l.id, l.name, fishOf(l.id)]), ['all', 'Вся рыба', FISH]]
-      .map(([id, name, fs]) => `<button class="tab${id === jl ? ' on' : ''}" data-a="jloc" data-id="${id}">${id === 'all' ? '' : ic('pin')}${esc(name)} · ${fs.filter((x) => p.journal[x.id]).length}/${fs.length}${id === 'all' ? '' : stars(mastery(p, id).stars)}</button>`).join('');
+    const tabs = this.journalTabs(jl);
     // мастерство на выбранной локации: сколько звёзд и что осталось до следующей
     const ms = jl === 'all' ? null : mastery(p, jl);
     const mline = !ms ? '' : `<span class="jmast">${ms.stars < 3 ? `До ${'★'.repeat(ms.stars + 1)}: ${esc(ms.next)} — награда ${fmtCoins(MASTERY_PRIZE[ms.stars + 1])} монет` : 'Все виды и крупный экземпляр каждого — вы мастер этой локации'}</span>`;
@@ -923,7 +985,7 @@ export class UI {
     const s = p.stats;
     this.screen.innerHTML = `<div class="dim"></div><div class="panel">
       ${this.panelHead('ЖУРНАЛ')}
-      <div class="jtop"><div class="jstats"><div><b>${lv.lvl}</b>уровень · ${esc(lv.title)}</div><div><b>${got}/${FISH.length}</b>видов открыто</div><div><b>${s.caught}</b>поймано</div><div><b>${fmtCoins(s.earned)}</b>заработано</div><div><b>${s.best ? fmtW(s.best.w) : '—'}</b>${s.best ? esc(FISH_BY_ID[s.best.sp].name) + ' — рекорд' : 'самый тяжёлый улов'}</div><div><b>${s.snaps}</b>обрывов лески</div>${s.stalked ? `<div><b>${s.stalked}</b>выслежено</div>` : ''}${s.assists ? `<div><b>${s.assists}</b>подсачено друзьям</div>` : ''}${s.beasts ? `<div><b>${s.beasts}</b>${esc(Object.entries(p.beasts || {}).map(([id, n]) => `${BEASTS[id] ? BEASTS[id].name : id} ×${n}`).join(', '))}</div>` : ''}</div>
+      <div class="jtop"><div class="jstats"><div class="jrank">${rankImg(lv.title)}<span><b>${lv.lvl}</b>уровень · ${esc(lv.title)}</span></div><div><b>${got}/${FISH.length}</b>видов открыто</div><div><b>${s.caught}</b>поймано</div><div><b>${fmtCoins(s.earned)}</b>заработано</div><div><b>${s.best ? fmtW(s.best.w) : '—'}</b>${s.best ? esc(FISH_BY_ID[s.best.sp].name) + ' — рекорд' : 'самый тяжёлый улов'}</div><div><b>${s.snaps}</b>обрывов лески</div>${s.stalked ? `<div><b>${s.stalked}</b>выслежено</div>` : ''}${s.assists ? `<div><b>${s.assists}</b>подсачено друзьям</div>` : ''}${s.beasts ? `<div><b>${s.beasts}</b>${esc(Object.entries(p.beasts || {}).map(([id, n]) => `${BEASTS[id] ? BEASTS[id].name : id} ×${n}`).join(', '))}</div>` : ''}</div>
         <div class="tabs2 jtabs">${tabs}${mline}</div></div>
       <div class="grid g5">${tiles}</div>
       <div class="detail jdetail">
@@ -1122,7 +1184,7 @@ export class UI {
     } else if (t.tab === 'anglers') {
       const rows = d.anglers.map((r, i) => {
         const lv = levelInfo(r.xp);
-        return `<div class="trow ${r.pub === mine ? 'me' : ''}">${place(i)}<span class="nm">${esc(r.name)}${r.pub === mine ? ' <em>вы</em>' : ''}</span><span class="lv">${ic('star')}<b>${lv.lvl}</b> ${esc(lv.title)}</span><span>${r.species}/${FISH.length}</span><span>${r.legends || '—'}</span><span>${r.medals || '—'}</span><span>${r.caught}</span></div>`;
+        return `<div class="trow ${r.pub === mine ? 'me' : ''}">${place(i)}<span class="nm">${esc(r.name)}${r.pub === mine ? ' <em>вы</em>' : ''}</span><span class="lv">${rankImg(lv.title) || ic('star')}<b>${lv.lvl}</b> ${esc(lv.title)}</span><span>${r.species}/${FISH.length}</span><span>${r.legends || '—'}</span><span>${r.medals || '—'}</span><span>${r.caught}</span></div>`;
       }).join('');
       const out = d.me && !d.anglers.some((r) => r.pub === mine);
       body = d.anglers.length
@@ -1235,7 +1297,7 @@ export class UI {
     const cards = (qs ? qs.list : []).map((q) => {
       const r = questReward(q, lv);
       const k = q.done ? 1 : clamp(q.c / q.n, 0, 1);
-      return `<div class="qcard ${q.done ? 'done' : ''}"><div class="qt"><span class="tier t${q.tier}">${TIER[q.tier] || ''}</span><b>${esc(questText(q, LOC_ID))}</b>${q.done ? ic('check') : ''}</div>
+      return `<div class="qcard ${q.done ? 'done' : ''}"><div class="qt">${questImg(q.k)}<span class="tier t${q.tier}">${TIER[q.tier] || ''}</span><b>${esc(questText(q, LOC_ID))}</b>${q.done ? ic('check') : ''}</div>
         <div class="pbar"><i style="width:${Math.round(k * 100)}%"></i></div>
         <div class="qr"><span>${esc(questCount(q)) || (q.done ? 'готово' : 'ещё не сделано')}</span><span class="rw">${coin(r.coins)}<i class="sep"></i>ОПЫТ +${r.xp}</span></div></div>`;
     }).join('');
@@ -1244,7 +1306,7 @@ export class UI {
       <h1>ЗАДАНИЯ ДНЯ</h1>
       <div class="cbody">
       ${cards || '<p>Задания появятся, как только вы выйдете на рыбалку.</p>'}
-      <p>${all ? 'Все три выполнены — премия получена. ' : `За все три — премия: <b class="y">${fmtCoins(Math.round((QUEST_BONUS * Math.min(6, 1 + 0.15 * (lv - 1))) / 5) * 5)} монет</b>. `}Задания у всех рыбаков в этот день одинаковые — их удобно делать вместе. Новые появятся в полночь.</p>
+      <p class="qbonus">${questImg('bonus')}<span>${all ? 'Все три выполнены — премия получена. ' : `За все три — премия: <b class="y">${fmtCoins(Math.round((QUEST_BONUS * Math.min(6, 1 + 0.15 * (lv - 1))) / 5) * 5)} монет</b>. `}Задания у всех рыбаков в этот день одинаковые — их удобно делать вместе. Новые появятся в полночь.</span></p>
       <button class="btn pri" data-a="close"><span>ПОНЯТНО</span>${ic('arrow')}</button></div></div>`;
   }
   renderTour() {

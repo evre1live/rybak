@@ -56,7 +56,9 @@ export const MOORINGS = T.MOORINGS;
 export const RENT_DESK = T.RENT_DESK;
 export const BUOYS = T.BUOYS;
 export const MARKS = T.MARKS;
-export const canSail = T.canSail;
+/** Суда, что стоят на воде (траулер, ялики у причалов — critters.js): круги { x, z, r }, через них лодке не пройти. */
+export const SAIL_EXTRA = [];
+export const canSail = (x, z) => T.canSail(x, z) && (!SAIL_EXTRA.length || !SAIL_EXTRA.some((c) => (x - c.x) ** 2 + (z - c.z) ** 2 < c.r * c.r));
 export const inRocks = T.inRocks;
 export const spotAt = T.spotAt;
 export const SCHOOL_HOMES = T.SCHOOL_HOMES;

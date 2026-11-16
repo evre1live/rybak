@@ -14,9 +14,10 @@ import { ViewModel } from './viewmodel.js';
 import { Input, Player } from './player.js';
 import { Fishing } from './fishing.js';
 import { Fx } from './fx.js';
-import { Boat, BOAT_PRICE, Ride, BOAT_SEATS, VMAX } from './boat.js';
+import { Boat, BOAT_PRICE, Ride, BOAT_SEATS, VMAX, QUIET, PROPULSION, BOAT_WORDS } from './boat.js';
 import { Remote } from './remote.js';
 import { Beasts } from './beast.js';
+import { BEAST_LIST } from '../shared/beasts.js';
 import { Net } from './net.js';
 import { createVoice } from './voice.js';
 import { Audio2, MOTOR_FAR } from './audio.js';
@@ -80,15 +81,19 @@ const VENDOR = LOC.vendor; // что говорит торговец — у ка
 
 
 /** Звук места по локации (audio.js, site). */
+// beds — фон-записи локации: имя петли → [громкость днём, ночью, насколько стихает в дождь]; loons — гагары на озере;
+// harbor — гудки яхт и судовой колокол в гавани
 const SITE_SOUND = {
   bay: { surf: 1, gulls: true },
-  lake: { surf: 0.4, gulls: false, birds: 'forest' },
+  lake: { surf: 0.4, gulls: false, birds: 'forest', beds: { lake: [0.3, 0.16, 0.4] }, loons: true },
   keys: { surf: 0.85, gulls: true, birds: 'tropic' },
-  blue: { surf: 1, gulls: true },
-  cascade: { surf: 0.4, gulls: false, birds: 'tropic', frogs: true, cicadas: 0.6 },
-  mangrove: { surf: 0.25, gulls: false, birds: 'tropic', frogs: true, cicadas: 1 },
-  marina: { surf: 0.35, gulls: true, clinks: true, crickets: 0.5 }
+  blue: { surf: 1, gulls: true, beds: { ocean: [0.42, 0.42, 0] } },
+  cascade: { surf: 0.4, gulls: false, birds: 'tropic', frogs: true, cicadas: 0.6, beds: { jungle: [0.22, 0.05, 0.6], frogs: [0, 0.16, 0.3] } },
+  mangrove: { surf: 0.25, gulls: false, birds: 'tropic', frogs: true, cicadas: 1, beds: { mangrove: [0.3, 0.24, 0.4], frogs: [0, 0.13, 0.3] } },
+  marina: { surf: 0.35, gulls: true, clinks: true, crickets: 0.5, beds: { city: [0.1, 0.22, 0.2] }, harbor: true }
 };
+// у кого из живности есть голос (critters.js зовёт onSound): откуда слышно, м, и громкость вблизи
+const CRITTER_VOICE = { parrot: [95, 0.42], toucan: [60, 0.34], flamingo: [75, 0.32], caiman: [35, 0.55] };
 /** Манера музыки по локации (music.js, STYLES). */
 const MUSIC_STYLE = { bay: 'calm', lake: 'pine', keys: 'reef', blue: 'ocean', cascade: 'jungle', mangrove: 'swamp', marina: 'lounge' };
 
@@ -150,6 +155,17 @@ class Game {
       const d = Math.hypot(x - this.player.x, z - this.player.z);
       if (this.state === 'world' && d < 60) this.audio.splash(0.5 + pw * 0.5, clamp(1 - d / 60, 0, 1) * 0.7);
     };
+    // попугаи, туканы, фламинго кричат, кайман шипит, уходя под воду: слышно с той стороны, где они, вдали — глуше
+    this.world.scenery.critters.onSound = (kind, x, z) => {
+      const v = CRITTER_VOICE[kind];
+      if (!v || this.state !== 'world') return;
+      const pl = this.player;
+      const d = Math.hypot(x - pl.x, z - pl.z) || 1;
+      const k = clamp(1 - d / v[0], 0, 1);
+      if (k < 0.04) return;
+      const side = ((x - pl.x) * Math.cos(pl.yaw) - (z - pl.z) * Math.sin(pl.yaw)) / d;
+      this.audio.one(kind, { vol: v[1] * (0.25 + 0.75 * k * k), pan: side * 0.8, amb: true, lp: 1500 + 12000 * k * k, rate: 0.95 + Math.random() * 0.1 });
+    };
     // мелочь плещется над морским косяком: вблизи слышны короткие лёгкие всплески
     this.fauna.onBoil = (x, z) => {
       const d = Math.hypot(x - this.player.x, z - this.player.z);
@@ -185,6 +201,9 @@ class Game {
     // ночью квакают лягушки и под вечер звенят цикады, в марине фалы звенят о мачты яхт
     this.audio.site = SITE_SOUND[LOC_ID] || (HAS.sea ? { surf: 1, gulls: true, birds: false } : { surf: 0.4, gulls: false, birds: 'forest' });
     this.audio.setMusicStyle(MUSIC_STYLE[LOC_ID] || 'calm');
+    // голоса чудищ этой локации и крики её птиц и зверей лежат в отдельных дорожках — грузим только свои
+    this.audio.wantTapes([...BEAST_LIST.filter((b) => b.loc === LOC_ID).map((b) => 'v-' + b.id), ...(['lake', 'cascade', 'mangrove', 'marina'].includes(LOC_ID) ? ['fauna'] : [])]);
+    this.audio.motorLoop = PROPULSION === 'diesel' ? 'diesel' : 'motor'; // катер Синего простора и марины — дизель
     // шаги: доски причала, земля, вода по колено
     this.player.onStep = (land) => {
       const p = this.player;
@@ -962,7 +981,20 @@ class Game {
         bk = Math.abs(r.bv) / VMAX;
       }
     }
-    this.audio.motorNear(HAS.mangrove ? -1 : bk, bd, bk >= 0 && bd > 0.01 ? (bx * Math.cos(pl.yaw) - bz * Math.sin(pl.yaw)) / bd : 0);
+    this.audio.motorNear(QUIET ? -1 : bk, bd, bk >= 0 && bd > 0.01 ? (bx * Math.cos(pl.yaw) - bz * Math.sin(pl.yaw)) / bd : 0);
+  }
+  /** Гребки без мотора: на вёслах — пара лопастей с уключинами, с веслом — по очереди с каждого борта. k — ход от 0 до 1. */
+  strokes(dt, k) {
+    if (!(k > 0.08)) {
+      this.strokePh = 0.7; // тронулись — первый гребок почти сразу
+      return;
+    }
+    this.strokePh = (this.strokePh || 0) + dt * (0.5 + 0.55 * k);
+    if (this.strokePh < 1) return;
+    this.strokePh -= 1;
+    this.strokeSide = -(this.strokeSide || 1);
+    const oars = PROPULSION === 'oars';
+    this.audio.one(oars ? 'oars' : 'paddle', { vol: 0.32 + 0.4 * k, rate: 0.94 + Math.random() * 0.12, pan: oars ? 0 : this.strokeSide * 0.45 });
   }
   /**
    * Лодка ударилась о преграду: на ходу sp (м/с), местом x, z; edge — у края карты, где преграды нет, а лодку разворачивает волна.
@@ -1415,6 +1447,10 @@ class Game {
         ui.banner(this.hookText);
         // гиганта в подсак не взять: без багра его вываживают до самого конца
         if (d.giant) ui.toast(this.fishing.kit.gaff ? 'Гигант! У борта он соберётся с силами — с 90 % пути берите багром.' : 'Гигант! В подсак он не влезет, а багра нет — вываживайте до конца.', '', 4200);
+        // гигант и легенда: свой бой — с записанной музыкой боя, тяжёлыми всплесками и стоном удилища
+        this.bigFight = !!(d.giant || d.legend);
+        a.bigFight = this.bigFight;
+        if (this.bigFight) a.one('big_splash', { vol: 0.55, rate: 0.96 + Math.random() * 0.08 });
         a.hook();
         this.rumble(120, 0.6);
         this.stopTime(0.07, 0.04);
@@ -1426,11 +1462,14 @@ class Game {
       case 'run':
         this.fauna.scare(this.fishing.bx, this.fishing.bz, 3);
         a.thrash(0.6);
+        // гигант уходит в рывок: вода расходится у самой поверхности
+        if (this.bigFight && Math.random() < 0.6) a.one('surge', { vol: 0.45, rate: 0.94 + Math.random() * 0.1, delay: 0.1 });
         return this.rumble(180, 0.8);
       case 'jump':
         this.fauna.scare(d.x, d.z, 3.5);
         a.splash(1);
         a.leap();
+        if (this.bigFight) a.one('tail_slap', { vol: 0.6, rate: 0.93 + Math.random() * 0.1, delay: 0.35 });
         return this.ev('jump', { x: +d.x.toFixed(1), z: +d.z.toFixed(1) });
       case 'rage':
         // легенда собралась с силами: это видно, слышно и чувствуется в руке
@@ -1438,6 +1477,8 @@ class Game {
         this.fightBanner(d.left ? 'ВТОРОЕ ДЫХАНИЕ!' : 'ПОСЛЕДНИЙ РЫВОК!', 1500);
         ui.flash('#f04438');
         a.rage();
+        a.one('big_splash', { vol: 0.6, rate: 0.9 });
+        a.one('tail_slap', { vol: 0.55, rate: 0.92, delay: 0.5 });
         this.rumble(420, 1);
         this.stopTime(0.12, 0.2);
         this.player.shake = Math.max(this.player.shake, 1);
@@ -1464,6 +1505,7 @@ class Game {
       case 'lost': {
         ui.banner(d.why === 'snap' ? 'ОБРЫВ!' : 'СОШЛА!', 'red', 1600);
         a.strain(-1);
+        this.bigFight = a.bigFight = false;
         if (d.why === 'snap') a.snap();
         else a.fail();
         this.player.shake = 1;
@@ -1481,7 +1523,10 @@ class Game {
         const f = FISH_BY_ID[c.sp];
         ui.banner(null);
         a.strain(-1);
-        a.catch(f ? f.rar : 0);
+        // легенда или гигант — аккорд легенды; трофей редкой рыбы — фанфары; иначе — короткий сигнал в тон музыке
+        const big = this.bigFight;
+        this.bigFight = a.bigFight = false;
+        if (!((f && (f.rar >= 4 || big) && a.sting('legend')) || (f && c.trophy && f.rar >= 2 && a.sting('trophy')))) a.catch(f ? f.rar : 0);
         if (f) a.landed(this.fishing.kit.net && !f.giant);
         ui.catchCard(d);
         this.rumble(300, 0.5);
@@ -1901,8 +1946,8 @@ class Game {
       // к лодке можно подойти самой, а дома — ещё и к прилавку будки проката
       else if (Math.hypot(pl.x - boat.x, pl.z - boat.z) < 3.6 || Math.hypot(pl.x - MOORINGS[boat.moor].sx, pl.z - MOORINGS[boat.moor].sz) < 2.6 || (boat.moor === 0 && Math.hypot(pl.x - RENT_DESK.x, pl.z - RENT_DESK.z) < RENT_DESK.r)) {
         const price = this.boatPrice();
-        // на протоке напрокат дают каноэ
-        const [BOAT, INTO, OWN] = HAS.mangrove ? ['КАНОЭ', 'В КАНОЭ', 'СВОЁ КАНОЭ'] : ['ЛОДКА', 'В ЛОДКУ', 'СВОЯ ЛОДКА'];
+        // на протоке напрокат дают каноэ, на островках — каяк, у водопадов — пирогу
+        const [BOAT, INTO, OWN] = BOAT_WORDS;
         act = boat.rented ? { text: this.ownBoat() && boat.moor === 0 ? `${OWN} — В ПУТЬ` : `СЕСТЬ ${INTO}`, short: INTO, run: () => this.boardBoat() } : { text: `${BOAT} НАПРОКАТ — ${price ? `${price} МОНЕТ` : 'ПЕРВЫЙ ВЫХОД БЕСПЛАТНО'}`, short: BOAT, run: () => this.rentBoat() };
       } else {
         // лодка друга, оставленная у причала (или стоящая у берега): можно сесть и подождать хозяина
@@ -2172,6 +2217,9 @@ class Game {
     setEnvLight(0.22 + 0.78 * (1 - this.world.night));
     this.audio.night = this.world.night;
     this.audio.hours = this.hours;
+    // заставка играет на главном экране и пока команда собирается; в мире — музыка локации (и боя, см. ниже)
+    if (this.state !== 'world') this.audio.musicScene({ menu: true, fight: false });
+    else this.audio.musicScene({ menu: false });
     const tw = this.state === 'title' ? now / 1000 : T;
     const cam = this.camera;
     const ui = this.ui;
@@ -2189,8 +2237,10 @@ class Game {
       boat.update(dt, tw);
       if (this.ride) this.rideStep(dt, pnow, tw);
       // мотор слышно и пассажиру — пока хозяин в лодке
-      // у каноэ мотора нет: на протоке идут тихо
-      this.audio.motor(HAS.mangrove ? -1 : boat.active ? Math.abs(boat.k) : this.ride && this.ride.moored < 0 ? Math.abs(this.ride.k) : -1);
+      // у вёсельной лодки, каяка, пироги и каноэ мотора нет: слышны только гребки
+      const goK = boat.active ? Math.abs(boat.k) : this.ride && this.ride.moored < 0 ? Math.abs(this.ride.k) : -1;
+      this.audio.motor(QUIET ? -1 : goK);
+      if (QUIET) this.strokes(dt, goK);
       this.hearBoats();
       // в лодке время от времени поскрипывает дерево
       if (boat.active || this.ride) {
@@ -2314,6 +2364,10 @@ class Game {
       ui.fight(f.state === 'fight' ? f.fight : f.state === 'beast' ? Object.assign(this.beastFight || (this.beastFight = {}), f.fight, { p: this.beasts.b ? this.beasts.b.P : 0 }) : null, i.steer);
       // музыка слушает игру: вываживание — пульс, тугая леска — тревога, легенда — минор, ночь и дождь — тише и реже
       this.audio.mood({ fight: f.state === 'fight' ? 1 : 0, tension: f.fight ? f.fight.T : 0, run: f.fight && f.fight.phase === 'run' ? 1 : 0, boss: f.fight ? f.fight.bossMax : 0, night: this.world.night, rain: wx.rain });
+      // записанная музыка боя: свой бой с гигантом или легендой, общий бой с чудищем — и у тех, кто рядом смотрит
+      if (f.state === 'beast') this.audio.bigFight = true;
+      else if (f.state !== 'fight') this.audio.bigFight = false;
+      this.audio.musicScene({ fight: f.state === 'beast' || (f.state === 'fight' && !!this.bigFight) || this.beasts.fightNear(this.player.x, this.player.z) });
       // фрикцион трещит, когда рыба в рывке стягивает леску
       this.audio.drag(f.state === 'fight' && f.fight.phase === 'run' ? (i.hold ? 0.45 : 1) : 0);
       if (f.state === 'fight') {

@@ -21,6 +21,7 @@ import { waveH, swellMax } from './water.js';
 import { FAR_ISLES, farTrees, farCliffs } from './farisles.js';
 import { Fauna } from './fauna.js';
 import { small, cullSmall, smallState } from './smalls.js';
+import { buildCritters } from './critters.js';
 
 const WOODS = ['#c58a4e', '#b97c42', '#d39a5d', '#a86f3a', '#c9945a'];
 const PILE_H = 2.1; // высота готовой сваи (env-pile), м: низ с водорослями приходится на кромку воды
@@ -1772,7 +1773,10 @@ export function buildScenery(scene, nfx = null) {
   upgradeProps(scene, fallback, floaters);
   if (nfx) buildNightLife(nfx, shack, lh);
   const env = upgradeEnv(scene);
+  const critters = buildCritters(scene);
   return {
+    /** Живность и суда этапа 30 (critters.js): сколько чего стоит; onSound — звуки от них. */
+    critters,
     /** Для проверок: город марины (сколько домов, неона, яхт). */
     cityState: () => (city ? city.stats() : null),
     /** Для проверок: какие готовые модели локации уже стоят и сколько в них треугольников. */
@@ -1813,6 +1817,7 @@ export function buildScenery(scene, nfx = null) {
       }
       falls.uLight.value = 0.14 + 0.86 * light;
       envNight(night);
+      critters.setNight(night);
       if (city) city.setNight(night);
     },
     /** Где солнце и видно ли его (0 — ночь, дождь или туман): для радуги в пыли водопадов. */
@@ -1850,6 +1855,7 @@ export function buildScenery(scene, nfx = null) {
         l.s.position.y = l.f.o.position.y + (l.f.y < -0.5 ? 2.95 : 2.3);
       }
       if (gulls) gulls.update(t, schools.sea, camera);
+      critters.update(dt, t, camera);
     }
   };
 }

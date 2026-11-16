@@ -31,13 +31,21 @@ swap('<link rel="icon" href="favicon.svg">', `<link rel="icon" href="${icon}">`)
 swap('<link rel="stylesheet" href="style.css">', `<style>${css}</style>`);
 // пробная версия живёт одним файлом: ни значков приложения, ни кэша на устройстве у неё нет
 swap('<link rel="manifest" href="manifest.webmanifest">\n<link rel="apple-touch-icon" href="icon-192.png">\n', '');
+// арт на экране загрузки (картинки локаций по ?loc=) — не для пробной версии: экран загрузки у неё прежний
+{
+  const re = /<script id="bootArt">[\s\S]*?<\/script>\n?/;
+  if (!re.test(html)) throw new Error('В index.html не нашлось: <script id="bootArt">');
+  html = html.replace(re, '');
+}
 // записи звуков (отдельные файлы, общая дорожка коротких звуков и петли) — тоже внутрь: из сети пробная версия ничего не берёт
 const audio = {};
-for (const f of readdirSync(join(pub, 'audio')).filter((f) => f.endsWith('.webm')).sort()) audio[f.replace(/\.webm$/, '')] = readFileSync(join(pub, 'audio', f)).toString('base64');
+// записанной музыки (music-*.webm, мегабайты) в пробной версии нет: играет музыка, которую сочиняет сама игра
+for (const f of readdirSync(join(pub, 'audio')).filter((f) => f.endsWith('.webm') && !f.startsWith('music-')).sort()) audio[f.replace(/\.webm$/, '')] = readFileSync(join(pub, 'audio', f)).toString('base64');
 // картинки мест (вид сверху на карточке в лобби) — туда же
 const img = {};
 // значки рынка (img/items) не кладём: пробная версия рисует их кодом, как и рыбу без моделей
-for (const f of readdirSync(join(pub, 'img'), { withFileTypes: true }).filter((d) => d.isFile()).map((d) => d.name).sort()) img[`img/${f}`] = `data:image/${f.split('.').pop()};base64,${readFileSync(join(pub, 'img', f)).toString('base64')}`;
+// экраны загрузки и картинка для ссылок (load-*.webp, og.jpg) пробной версии не нужны
+for (const f of readdirSync(join(pub, 'img'), { withFileTypes: true }).filter((d) => d.isFile() && !/^load-|^og\./.test(d.name)).map((d) => d.name).sort()) img[`img/${f}`] = `data:image/${f.split('.').pop()};base64,${readFileSync(join(pub, 'img', f)).toString('base64')}`;
 swap('<script src="app.js"></script>', `<script>window.RYBAK_OFFLINE = true; window.RYBAK_AUDIO = ${JSON.stringify(audio)}; window.RYBAK_IMG = ${JSON.stringify(img)};</script>\n<script>${js}</script>`);
 
 mkdirSync(dirname(out), { recursive: true });

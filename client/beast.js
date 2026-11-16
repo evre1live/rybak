@@ -9,6 +9,7 @@ import { LOC_ID } from './loc/id.js';
 import { spotAt, groundH } from './terrain.js';
 import { BEAST_LIST } from '../shared/beasts.js';
 import { damp } from './util.js';
+import { beastArt } from './ui.js';
 
 const X = 0;
 const Z = 2;
@@ -16,6 +17,7 @@ const Z = 2;
 const SHAPE = {
   'beast-nessie': { head: 1, neck: true },
   'beast-serpent': { head: 1 },
+  'beast-rainbow': { head: 1 },
   'beast-chudo': { head: -1 },
   'fauna-kit': { head: -1 },
   'beast-kraken': { round: true },
@@ -77,6 +79,11 @@ function beastMesh(tpl, def) {
         diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.3 + rbw * 0.8, 0.78);`
         )
         .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += (0.5 + 0.5 * cos(6.2832 * (vBU * 1.7 - uBT * 0.07 + vec3(0.0, 0.33, 0.67)))) * 0.16;');
+    } else if (def.tint === 'shimmer') {
+      // своя модель Радужного змея (этап 30) уже раскрашена радугой — по чешуе только бежит лёгкий переливчатый отсвет
+      s.fragmentShader = s.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform float uBT;\nvarying float vBU;')
+        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += (0.5 + 0.5 * cos(6.2832 * (vBU * 1.7 - uBT * 0.07 + vec3(0.0, 0.33, 0.67)))) * 0.1;');
     } else if (def.tint === 'ghost') {
       // Лунный призрак: бледный, как луна, светится изнутри голубоватым светом — ночью его видно издалека
       s.fragmentShader = s.fragmentShader
@@ -187,6 +194,26 @@ background:rgba(10,28,52,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter
   }
 
   // ── состояние с сервера ──
+  /**
+   * Звук существа с того места, где оно (x, z — или его логово): голос (name не задан — 'v_<id>') или всплеск. Слышно
+   * издалека — за far метров, вдали глуше; со стороны, где оно. Нет записи — молча.
+   */
+  hear(def, { name = '', vol = 0.6, far = 260, x = this.pos.x, z = this.pos.z, delay = 0 } = {}) {
+    const g = this.g;
+    const pl = g.player;
+    if (!pl || g.state !== 'world') return;
+    const dx = x - pl.x;
+    const dz = z - pl.z;
+    const d = Math.hypot(dx, dz) || 1;
+    const k = Math.max(0, 1 - d / far);
+    if (k < 0.03) return;
+    g.audio.one(name || 'v_' + def.id, { vol: vol * (0.3 + 0.7 * k), pan: ((dx * Math.cos(pl.yaw) - dz * Math.sin(pl.yaw)) / d) * 0.7, lp: 900 + 14000 * k * k, rate: 0.96 + Math.random() * 0.07, delay });
+  }
+  /** Идёт общий бой с существом (взяло приманку — и до конца), а мы не дальше far метров: у нас тоже музыка боя. */
+  fightNear(x, z, far = 160) {
+    const b = this.b;
+    return !!b && (b.phase === 'bite' || b.phase === 'fight' || b.phase === 'gaff') && Math.hypot(this.pos.x - x, this.pos.z - z) < far;
+  }
   set(b) {
     const g = this.g;
     if (!b || b.phase === 'none') {
@@ -204,6 +231,9 @@ background:rgba(10,28,52,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter
       this.lungeSeen = 0;
       this.phaseSeen = '';
       this.mount(def);
+      // открытка для победы — загрузить заранее, пока идёт бой
+      const u = beastArt(def.id);
+      if (u && typeof Image !== 'undefined') new Image().src = u;
     }
     if (b.phase !== this.phaseSeen) {
       const was = this.phaseSeen;
@@ -221,18 +251,23 @@ background:rgba(10,28,52,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter
         }
         g.ui.feed(`Вода у места «${def.place}» закипела: <b>${def.name}</b> идёт на приманку ${b.by === me ? 'вашу' : esc(who)}!`);
         g.audio.tone(46, 2.4, 'sine', 0.32, 38);
+        this.hear(def, { vol: 0.55, x: b.x, z: b.z, delay: 0.6 }); // из глубины доносится его голос
       } else if (b.phase === 'bite') {
         g.ui.toast(b.by === me ? `${def.name} взял(а)! Нужен второй: пусть забросит рядом и подсечёт — ${BEAST_K.biteWindow} с` : `${def.name} взял(а) у ${who}! Забросьте рядом — подсечёте вместе`, 'good');
         g.fx.splash(b.x, b.z, 2.4);
         g.audio.tone(70, 1.2, 'sawtooth', 0.12, 40);
+        this.hear(def, { name: 'big_splash', vol: 0.7, far: 200, x: b.x, z: b.z });
+        this.hear(def, { vol: 0.85, x: b.x, z: b.z, delay: 0.4 });
       } else if (b.phase === 'fight' && was === 'bite') {
         g.ui.toast(`Держите вдвоём! Существо бросается то на одного, то на другого — на кого рывок, тот отпускает`, 'good');
       } else if (b.phase === 'gaff') {
         g.ui.toast(`${def.name} у борта! Багор — клавиша E, нужны двое разом`, 'good');
+        this.hear(def, { vol: 0.9 });
       } else if (b.phase === 'won') {
         this.win(def, b);
       } else if (b.phase === 'gone') {
         if (b.why) g.ui.toast(b.why);
+        if (was === 'fight' || was === 'bite' || was === 'gaff') this.hear(def, { vol: 0.4, delay: 0.8 }); // уходит в глубину
         if (g.fishing.state === 'beast') g.fishing.beastEnd();
       }
     }
@@ -252,6 +287,9 @@ background:rgba(10,28,52,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter
       const at = this.spotOf(lu.to);
       if (at) this.lungeDir = Math.atan2(this.pos.x - at[0], this.pos.z - at[1]);
       g.fx.splash(this.pos.x, this.pos.z, 2);
+      // рывок слышен всем: удар хвоста или вал воды, а то и рёв
+      this.hear(def, { name: Math.random() < 0.5 ? 'tail_slap' : 'surge', vol: 0.65, far: 180 });
+      if (Math.random() < 0.4) this.hear(def, { vol: 0.75, delay: 0.5 });
     }
     this.renderHud();
   }
@@ -271,9 +309,14 @@ background:rgba(10,28,52,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter
       g.afterBeast && g.afterBeast(def);
     }
     g.ui.feed(`<b>${esc(def.name)}</b> взят(а) вместе: ${esc(names)}. Существо отпустили`);
-    g.audio.tone(523, 0.3, 'triangle', 0.14);
-    g.audio.tone(659, 0.3, 'triangle', 0.14, null, 0.18);
-    g.audio.tone(784, 0.5, 'triangle', 0.14, null, 0.36);
+    g.ui.beastWin(def, names, !!(me && b.win.includes(me))); // открытка поверх игры
+    // аккорд легенды; нет записи (музыка выключена или не загрузилась) — три ноты синтезом
+    if (!g.audio.sting('legend')) {
+      g.audio.tone(523, 0.3, 'triangle', 0.14);
+      g.audio.tone(659, 0.3, 'triangle', 0.14, null, 0.18);
+      g.audio.tone(784, 0.5, 'triangle', 0.14, null, 0.36);
+    }
+    this.hear(def, { vol: 0.6, delay: 1.2 });
     if (g.fishing.state === 'beast') g.fishing.beastEnd(true);
   }
   mount(def) {
@@ -335,6 +378,8 @@ background:rgba(10,28,52,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter
       if (!d) continue;
       this.trail = { x, z, a: Math.random() * Math.PI * 2, t: 0, len: d.len };
       g.fx.ripple(x, z, 3.5, 3.2, 0.2);
+      // иногда из глубины доносится его голос — глухо, будто издалека
+      if (Math.random() < 0.3) this.hear(d, { vol: 0.32, x: x + Math.cos(a) * 60, z: z + Math.sin(a) * 60 });
       for (let k = 0; k < 14; k++) g.fx.drop(x + (Math.random() - 0.5) * 4, waveH(x, z, t), z + (Math.random() - 0.5) * 4, 0, 0.6 + Math.random(), 0, 0.035, 0.4);
       return;
     }

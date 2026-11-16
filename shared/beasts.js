@@ -33,7 +33,7 @@ export const BEASTS = {
     clue: 'На закате у Арки вода закручивается кольцами — это он.'
   },
   rainbow: {
-    id: 'rainbow', name: 'Радужный змей', loc: 'cascade', zone: 'pit', bait: 'rainbowbait', model: 'beast-serpent', tint: 'rainbow',
+    id: 'rainbow', name: 'Радужный змей', loc: 'cascade', zone: 'pit', bait: 'rainbowbait', model: 'beast-rainbow', tint: 'shimmer',
     when: { hours: [15, 18.5], wx: ['rain'] }, whenText: 'в дождь или под вечер, когда над Котлом стоит радуга', place: 'Котёл',
     len: 13, kg: 2100, power: 1.28, hp: 100, coins: 80000, xp: 12000,
     clue: 'Говорят, после дождя под радугой вода в Котле светится всеми цветами — это его чешуя.'

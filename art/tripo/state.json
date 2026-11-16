@@ -1388,6 +1388,62 @@
     "beast-luna": {
       "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/v5xrHLhOZX978R87XDu3/wzNLWBTKfNgsryE81AJh/content.png",
       "model": "224de192-8d2f-472c-b1a2-0bdc8c40f1a5"
+    },
+    "beast-rainbow": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/JGwqfaXRpnhz1J71025x/vHs5GNmsobXcYV2Hvbx6/content.png",
+      "model": "31c4e431-3ee6-4c73-84fb-2b1b1660b43c"
+    },
+    "boat-kayak": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/SbFcohZHRf404fgm8p0n/ZkT5g5WmkFIqLYhXn0vD/content.png",
+      "model": "c823f846-03be-423d-ac16-09c63305f316"
+    },
+    "fauna-crab": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/AVT7orRknNdM7PzAHGsl/ETHQYoTAM7nJqFqv2Gua/content.png",
+      "model": "9450a2c1-12de-40b4-b9c6-7c5d1135caf5"
+    },
+    "fauna-turtle": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/asyWkmHGmLvYkRZnSk1y/paXnlxj7SMyndsqXclOy/content.png",
+      "model": "d004bb86-9399-45db-b2cf-36005c0e4357"
+    },
+    "boat-row": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/66IKmVhnclvX7KKHoMjP/axZiCTuH1dT2yIbuf5jW/content.png",
+      "model": "87e899d7-4b9e-4c21-8483-38cda79f19da"
+    },
+    "fauna-tukan": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/4wRaUuAhx70wUM0F1f56/1XdNSgL3a6G4v3BTCn2W/content.png",
+      "model": "6e1176f3-9d33-4398-92f2-8035dd044d0e"
+    },
+    "fauna-ara": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/JJ4keRsTqmYaeeTfn4GI/96WCcSLrjuSweqWkqsE0/content.png",
+      "model": "a604392f-904b-4db2-8eeb-7a95af5aec13"
+    },
+    "boat-trawler": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/6o9KeG0KoQxYH2g5G2xW/Zv7SJZUqyq22eBwEWLhJ/content.png",
+      "model": "9f653b24-ef0c-44ae-9744-f3341b745e63"
+    },
+    "fauna-caiman": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/TYbASw5taIjVi3nDuO8j/lJpKtg3xXSvz1RLNjXVf/content.png",
+      "model": "50fd8aac-097c-4496-8aeb-16b9514623ba"
+    },
+    "boat-pirogue": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/YJlDKKz9pQAtoiUuBbWa/Z2v16ejAdJifwyrpWTbm/content.png",
+      "model": "1ebcde8b-e978-4625-8e09-242187af5232"
+    },
+    "boat-tour": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/raLXmxDAsk9saA8EYL6I/svoLTwJ3vnLdgkdHxsCv/content.png",
+      "model": "cc639d38-7e0d-4999-9b1a-6961acbac68b"
+    },
+    "fauna-frog": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/p56WXBHOnnHvFJiBr2ZR/jCVydxfW2Cby1NLYYoNi/content.png",
+      "model": "f719154e-8196-48db-af79-e305c2e8d50e"
+    },
+    "boat-skiff": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/U8cQXVzLNuDZ3p4fIcAy/UX35OdbvSpJPY5WDHzYw/content.png",
+      "model": "7a69ffc7-77b6-44f2-aa5b-79b112a70346"
+    },
+    "fauna-flamingo": {
+      "conceptUrl": "https://elevenlabsusercontent.com/database/workspace/b76c394568644d828730956cb95fe739/content_generation/GSIZp64nN4uy0cO2H8sv/lzTcTtdH2BMaGeEXKi7J/content.png",
+      "model": "926ebebc-4e50-47e7-b042-0632f82644eb"
     }
   },
   "ledger": [
@@ -3931,6 +3987,104 @@
       "type": "image_to_model",
       "task": "45134a80-7c0b-4846-bf9e-bc1bdd2727f2",
       "credits": 30
+    },
+    {
+      "at": "2026-11-16T02:55:42.833Z",
+      "label": "boat-kayak модель",
+      "type": "image_to_model",
+      "task": "c823f846-03be-423d-ac16-09c63305f316",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-16T02:55:46.626Z",
+      "label": "beast-rainbow модель",
+      "type": "image_to_model",
+      "task": "31c4e431-3ee6-4c73-84fb-2b1b1660b43c",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-16T02:55:50.835Z",
+      "label": "fauna-ara модель",
+      "type": "image_to_model",
+      "task": "a604392f-904b-4db2-8eeb-7a95af5aec13",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-16T02:55:59.136Z",
+      "label": "fauna-tukan модель",
+      "type": "image_to_model",
+      "task": "6e1176f3-9d33-4398-92f2-8035dd044d0e",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-16T02:56:03.180Z",
+      "label": "boat-row модель",
+      "type": "image_to_model",
+      "task": "87e899d7-4b9e-4c21-8483-38cda79f19da",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-16T02:56:19.970Z",
+      "label": "fauna-turtle модель",
+      "type": "image_to_model",
+      "task": "d004bb86-9399-45db-b2cf-36005c0e4357",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-16T02:57:15.591Z",
+      "label": "fauna-crab модель",
+      "type": "image_to_model",
+      "task": "9450a2c1-12de-40b4-b9c6-7c5d1135caf5",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-16T02:57:44.037Z",
+      "label": "fauna-caiman модель",
+      "type": "image_to_model",
+      "task": "50fd8aac-097c-4496-8aeb-16b9514623ba",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-16T02:57:57.583Z",
+      "label": "fauna-flamingo модель",
+      "type": "image_to_model",
+      "task": "926ebebc-4e50-47e7-b042-0632f82644eb",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-16T02:58:04.646Z",
+      "label": "boat-skiff модель",
+      "type": "image_to_model",
+      "task": "7a69ffc7-77b6-44f2-aa5b-79b112a70346",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-16T02:58:21.567Z",
+      "label": "fauna-frog модель",
+      "type": "image_to_model",
+      "task": "f719154e-8196-48db-af79-e305c2e8d50e",
+      "credits": 30
+    },
+    {
+      "at": "2026-11-16T02:58:46.387Z",
+      "label": "boat-tour модель",
+      "type": "image_to_model",
+      "task": "cc639d38-7e0d-4999-9b1a-6961acbac68b",
+      "credits": 60
+    },
+    {
+      "at": "2026-11-16T02:59:16.651Z",
+      "label": "boat-pirogue модель",
+      "type": "image_to_model",
+      "task": "1ebcde8b-e978-4625-8e09-242187af5232",
+      "credits": 40
+    },
+    {
+      "at": "2026-11-16T02:59:25.559Z",
+      "label": "boat-trawler модель",
+      "type": "image_to_model",
+      "task": "9f653b24-ef0c-44ae-9744-f3341b745e63",
+      "credits": 60
     }
   ]
 }

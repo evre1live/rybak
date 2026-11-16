@@ -40,6 +40,22 @@ def key(im):
     out = np.dstack([C, alpha])
     return Image.fromarray((out * 255 + 0.5).astype(np.uint8), 'RGBA'), ('green' if green else 'magenta'), K
 
+def clean(im):
+    """Убрать обрезки соседних значков: мелкие куски, что касаются края картинки (лист режется по сетке, и острие
+    соседней медали может зайти в клетку). Искры и капли рядом с предметом края не касаются — они остаются."""
+    from scipy import ndimage
+    x = np.asarray(im).copy()
+    lab, n = ndimage.label(x[..., 3] > 24)
+    if n < 2:
+        return im
+    area = ndimage.sum(np.ones_like(lab), lab, range(1, n + 1))
+    big = area.max()
+    edge = set(np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]]))) - {0}
+    for i in edge:
+        if area[i - 1] < 0.15 * big:
+            x[lab == i, 3] = 0
+    return Image.fromarray(x, 'RGBA')
+
 def fit(im, size, pad):
     al = np.asarray(im)[..., 3]
     ys, xs = np.where(al > 24)
@@ -60,6 +76,7 @@ def main():
     ap.add_argument('--pad', type=float, default=0.04)
     ap.add_argument('--sheet', default=None)
     ap.add_argument('--only', default=None)
+    ap.add_argument('--nojs', action='store_true', help='не переписывать client/itemimg.js (значки не для рынка: звания, задания)')
     a = ap.parse_args()
     os.makedirs(a.dst, exist_ok=True)
     files = sorted(glob.glob(os.path.join(a.src, '*.png')))
@@ -68,13 +85,13 @@ def main():
     for f in files:
         name = os.path.basename(f)[:-4]
         cut, kind, K = key(Image.open(f))
-        ic = fit(cut, a.size, a.pad)
+        ic = fit(clean(cut), a.size, a.pad)
         p = os.path.join(a.dst, name + '.webp')
         ic.save(p, 'WEBP', quality=86, method=6, alpha_quality=90)
         cells.append((name, ic))
         print(f'{name}: фон {kind} {np.round(K * 255).astype(int).tolist()}, {os.path.getsize(p) // 1024} КБ')
-    # список значков для клиента: какие предметы рисуются картинкой (client/itemimg.js)
-    if not a.only:
+    # список значков для клиента: какие предметы рисуются картинкой (client/itemimg.js) — по тому, что лежит в папке
+    if not a.nojs:
         ids = sorted(os.path.basename(f)[:-5] for f in glob.glob(os.path.join(a.dst, '*.webp')))
         js = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'client', 'itemimg.js')
         with open(js, 'w') as fh:

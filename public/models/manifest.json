@@ -3453,6 +3453,165 @@
         0.961,
         0.343
       ]
+    },
+    "boat-row": {
+      "file": "models/boat-row.glb",
+      "group": "prop",
+      "tris": 8999,
+      "kb": 499,
+      "size": [
+        1,
+        0.281,
+        0.409
+      ]
+    },
+    "boat-kayak": {
+      "file": "models/boat-kayak.glb",
+      "group": "prop",
+      "tris": 6996,
+      "kb": 321,
+      "size": [
+        1,
+        0.168,
+        0.418
+      ]
+    },
+    "boat-pirogue": {
+      "file": "models/boat-pirogue.glb",
+      "group": "prop",
+      "tris": 7000,
+      "kb": 433,
+      "size": [
+        1,
+        0.211,
+        0.264
+      ]
+    },
+    "boat-skiff": {
+      "file": "models/boat-skiff.glb",
+      "group": "prop",
+      "tris": 8993,
+      "kb": 543,
+      "size": [
+        1,
+        0.325,
+        0.38
+      ]
+    },
+    "boat-tour": {
+      "file": "models/boat-tour.glb",
+      "group": "prop",
+      "tris": 9999,
+      "kb": 508,
+      "size": [
+        1,
+        0.421,
+        0.36
+      ]
+    },
+    "boat-trawler": {
+      "file": "models/boat-trawler.glb",
+      "group": "prop",
+      "tris": 12000,
+      "kb": 615,
+      "size": [
+        1,
+        0.489,
+        0.419
+      ]
+    },
+    "beast-rainbow": {
+      "file": "models/beast-rainbow.glb",
+      "group": "env",
+      "tris": 8998,
+      "kb": 360,
+      "size": [
+        1,
+        0.468,
+        0.282
+      ],
+      "lod": {
+        "file": "models/beast-rainbow.lod.glb",
+        "tris": 898,
+        "kb": 15
+      }
+    },
+    "fauna-ara": {
+      "file": "models/fauna-ara.glb",
+      "group": "env",
+      "tris": 2400,
+      "kb": 219,
+      "size": [
+        1,
+        0.596,
+        0.336
+      ]
+    },
+    "fauna-tukan": {
+      "file": "models/fauna-tukan.glb",
+      "group": "env",
+      "tris": 3000,
+      "kb": 114,
+      "size": [
+        1,
+        0.718,
+        0.386
+      ]
+    },
+    "fauna-turtle": {
+      "file": "models/fauna-turtle.glb",
+      "group": "env",
+      "tris": 3500,
+      "kb": 197,
+      "size": [
+        1,
+        0.523,
+        0.998
+      ]
+    },
+    "fauna-flamingo": {
+      "file": "models/fauna-flamingo.glb",
+      "group": "env",
+      "tris": 3499,
+      "kb": 169,
+      "size": [
+        0.787,
+        1,
+        0.369
+      ]
+    },
+    "fauna-crab": {
+      "file": "models/fauna-crab.glb",
+      "group": "env",
+      "tris": 2000,
+      "kb": 92,
+      "size": [
+        1,
+        0.334,
+        0.602
+      ]
+    },
+    "fauna-frog": {
+      "file": "models/fauna-frog.glb",
+      "group": "env",
+      "tris": 1999,
+      "kb": 63,
+      "size": [
+        1,
+        0.832,
+        0.829
+      ]
+    },
+    "fauna-caiman": {
+      "file": "models/fauna-caiman.glb",
+      "group": "env",
+      "tris": 3998,
+      "kb": 298,
+      "size": [
+        1,
+        0.14,
+        0.327
+      ]
     }
   }
 }

@@ -64,7 +64,8 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     const coral = /rgb\(255, 46, 147\)/; // закатный градиент главных кнопок начинается с розового
     assert.ok(/Fira Sans Condensed/.test(st.font) && st.style === 'italic' && st.weight >= 800 && coral.test(st.bg) && coral.test(st.tab) && st.h2 === 'italic' && st.loaded && st.old === 0, `меню в новом стиле: ${JSON.stringify(st)}`);
     assert.ok(st.shot[0] >= 900 && st.shot[1] >= 480 && st.pin && /svg/.test(st.palm), `карточка места: вид сверху, булавка, логотип с пальмой: ${JSON.stringify(st)}`);
-    assert.ok(st.me === 'Жамшид' && /^Уровень 1$/.test(st.lvl) && st.plates === 0, `плашка игрока и строй без таблички: ${JSON.stringify(st)}`);
+    // с этапа 30 под именем — уровень и звание (медаль звания — на аватаре)
+    assert.ok(st.me === 'Жамшид' && /^Уровень 1 · Новичок$/.test(st.lvl) && st.plates === 0, `плашка игрока и строй без таблички: ${JSON.stringify(st)}`);
     // стекло панелей — дымчатый графит (а не голубоватое): заливка серая, рамка прозрачная — кромку рисует слой стекла;
     // при смене экрана панели всплывают (класс enter), при перерисовке того же экрана — нет
     assert.ok(/rgba\(84, ?88, ?98/.test(st.glass) && /rgba\(84, 88, 98/.test(st.card) && /rgba\(255, 255, 255, 0\.92\)/.test(st.card) && /rgba\(0, 0, 0, 0\)|transparent/.test(st.edge) && st.shown === 'lobby',

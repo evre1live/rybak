@@ -1865,6 +1865,141 @@
       "name": "Парусная яхта",
       "prompt": "(этап 28, образец GPT Image) white cruising sailboat with sails down: tall mast and rigging, mainsail under a navy cover on the boom, low cabin with portholes, teak deck",
       "tris": 9000
+    },
+    {
+      "id": "boat-row",
+      "group": "prop",
+      "name": "Вёсельная лодка",
+      "prompt": "(этап 30, образец GPT Image) clinker-built wooden rowing boat: deep forest green outside with a cream stripe, varnished pine interior, two thwarts, brass oarlocks, oars inside",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 9000,
+      "tex": [2048, 1024]
+    },
+    {
+      "id": "boat-kayak",
+      "group": "prop",
+      "name": "Каяк",
+      "prompt": "(этап 30, образец GPT Image) sit-on-top tandem sea kayak: turquoise hull with a coral-pink stripe, two moulded seats with black backrests, bungee cords, paddle across the deck",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 7000,
+      "tex": [2048, 1024]
+    },
+    {
+      "id": "boat-pirogue",
+      "group": "prop",
+      "name": "Пирога",
+      "prompt": "(этап 30, образец GPT Image) dugout canoe carved from one trunk: reddish-brown wood with adze marks, upturned ends, plank seats, leaf-blade paddle inside, zigzag carving at the bow",
+      "textureQuality": "detailed",
+      "tris": 7000,
+      "tex": [2048, 1024]
+    },
+    {
+      "id": "boat-skiff",
+      "group": "prop",
+      "name": "Ялик",
+      "prompt": "(этап 30, образец GPT Image) small wooden fishing skiff: white hull with a cobalt stripe and red bottom, varnished seats, small outboard motor, rope, wicker basket and orange buoy inside",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 9000,
+      "tex": [2048, 1024]
+    },
+    {
+      "id": "boat-tour",
+      "group": "prop",
+      "name": "Прогулочный катер",
+      "prompt": "(этап 30, образец GPT Image) small harbour tour boat: white hull with a teal stripe, benches under a striped canopy, glazed wheelhouse, life rings, string of light bulbs",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 10000,
+      "tex": [2048, 1024]
+    },
+    {
+      "id": "boat-trawler",
+      "group": "prop",
+      "name": "Траулер",
+      "prompt": "(этап 30, образец GPT Image) small coastal fishing trawler: navy steel hull with red bottom, white wheelhouse, mast with rigging, A-frame gantry and net drum, buoys and crates on deck",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 12000,
+      "tex": [2048, 1024]
+    },
+    {
+      "id": "beast-rainbow",
+      "group": "env",
+      "name": "Радужный змей",
+      "prompt": "(этап 30, образец GPT Image) giant rainbow water serpent: long S-curved body with iridescent rainbow scale bands, glowing fin crest, dragon head with short horns",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 9000,
+      "lod": 900
+    },
+    {
+      "id": "fauna-ara",
+      "group": "env",
+      "name": "Ара в полёте",
+      "prompt": "(этап 30, образец GPT Image) scarlet macaw gliding with wings spread flat: red body, yellow and blue wing feathers, long red-blue tail",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 2400,
+      "tex": [1024, 512]
+    },
+    {
+      "id": "fauna-tukan",
+      "group": "env",
+      "name": "Тукан",
+      "prompt": "(этап 30, образец GPT Image) toco toucan standing: black body, white throat, huge orange beak with black tip, blue eye ring",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 3000,
+      "tex": [1024, 512]
+    },
+    {
+      "id": "fauna-turtle",
+      "group": "env",
+      "name": "Морская черепаха",
+      "prompt": "(этап 30, образец GPT Image) green sea turtle swimming: front flippers spread, olive-brown shell with hexagonal scutes, pale belly",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 3500,
+      "tex": [1024, 512]
+    },
+    {
+      "id": "fauna-flamingo",
+      "group": "env",
+      "name": "Фламинго",
+      "prompt": "(этап 30, образец GPT Image) American flamingo standing on one leg: coral-pink plumage, S-curved neck, black-tipped beak",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 3500,
+      "tex": [1024, 512]
+    },
+    {
+      "id": "fauna-crab",
+      "group": "env",
+      "name": "Краб",
+      "prompt": "(этап 30, образец GPT Image) red-orange shore crab: flat shell, two big claws raised, eight legs, eyes on stalks",
+      "tris": 2000,
+      "tex": [512, 512]
+    },
+    {
+      "id": "fauna-frog",
+      "group": "env",
+      "name": "Лягушка",
+      "prompt": "(этап 30, образец GPT Image) red-eyed tree frog sitting: lime-green body, red eyes, blue-yellow flank stripes, orange toes",
+      "tris": 2000,
+      "tex": [512, 512]
+    },
+    {
+      "id": "fauna-caiman",
+      "group": "env",
+      "name": "Кайман",
+      "prompt": "(этап 30, образец GPT Image) spectacled caiman lying flat: olive-brown scutes, long tail, folded legs, long snout, raised yellow eyes",
+      "textureQuality": "detailed",
+      "geometry": "detailed",
+      "tris": 4000,
+      "tex": [1024, 512]
     }
   ],
   "leads": {
