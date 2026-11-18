@@ -262,9 +262,38 @@ function mountNow(rod, rodId, reelId) {
 
 // ── поплавки и приманки ──
 /**
- * Модель поплавка или приманки встаёт в рамку заготовки из кода: поплавок — от низа корпуса до верха антенны
- * (киль под водой не нужен), приманка — по наибольшему размеру; середины совпадают.
+ * Модель поплавка или приманки встаёт в рамку заготовки из кода. Поплавок — стоймя (длинной осью вверх: перо у Tripo
+ * вышло наискось), во всю высоту заготовки (FLOAT_TEMPLATE_H), и под водой у него доля fit.wl снизу; приманка — по
+ * наибольшему размеру, середины совпадают.
  */
+const UP = new THREE.Vector3(0, 1, 0);
+/** Главная ось точек геометрии (куда она вытянута) — степенным методом по матрице разброса. */
+function mainAxis(g) {
+  const P = g.attributes.position;
+  const n = P.count;
+  let mx = 0, my = 0, mz = 0;
+  for (let i = 0; i < n; i++) {
+    mx += P.getX(i);
+    my += P.getY(i);
+    mz += P.getZ(i);
+  }
+  mx /= n;
+  my /= n;
+  mz /= n;
+  let xx = 0, xy = 0, xz = 0, yy = 0, yz = 0, zz = 0;
+  for (let i = 0; i < n; i++) {
+    const x = P.getX(i) - mx, y = P.getY(i) - my, z = P.getZ(i) - mz;
+    xx += x * x;
+    xy += x * y;
+    xz += x * z;
+    yy += y * y;
+    yz += y * z;
+    zz += z * z;
+  }
+  const v = new THREE.Vector3(0, 1, 0);
+  for (let k = 0; k < 40; k++) v.set(xx * v.x + xy * v.y + xz * v.z, xy * v.x + yy * v.y + yz * v.z, xz * v.x + yz * v.y + zz * v.z).normalize();
+  return v.y < 0 ? v.negate() : v; // верх модели остаётся верхом
+}
 export function mountBobModel(group, id, float) {
   if (window.RYBAK_OFFLINE) return;
   group.userData.pending = 1;
@@ -285,14 +314,19 @@ function bobNow(group, id, float) {
       const box = new THREE.Box3();
       for (const c of group.children) box.expandByObject(c);
       if (float) {
-        // от −0,18 (под водой) до верха антенны
-        const top = box.max.y;
-        const bot = -0.18;
-        const k = (top - bot) / (b.max.y - b.min.y);
+        const fit = group.userData.fit || { len: 0.6, wl: 0.45 };
+        const H = fit.len / (group.userData.real || 1); // высота заготовки (FLOAT_TEMPLATE_H в gear3d.js)
+        // стоймя: главная ось модели — вверх (если отклонилась больше чем на 5°)
+        const ax = mainAxis(g);
+        if (ax.angleTo(UP) > 0.09) g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(ax, UP));
+        g.computeBoundingBox();
+        const b2 = g.boundingBox;
+        const k = H / (b2.max.y - b2.min.y);
         g.scale(k, k, k);
         g.computeBoundingBox();
         const c = g.boundingBox;
-        g.translate(-(c.min.x + c.max.x) / 2, bot - c.min.y, -(c.min.z + c.max.z) / 2);
+        g.translate(-(c.min.x + c.max.x) / 2, -fit.wl * H - c.min.y, -(c.min.z + c.max.z) / 2);
+        group.userData.top = (1 - fit.wl) * H; // верх над водой, к нему идёт леска
       } else {
         const s = box.getSize(new THREE.Vector3());
         const k = Math.max(s.x, s.y, s.z) / Math.max(b.max.x - b.min.x, b.max.y - b.min.y, b.max.z - b.min.z);

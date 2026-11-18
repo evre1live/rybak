@@ -420,6 +420,37 @@ export function buildNet() {
   return net;
 }
 
+/**
+ * Поплавки — настоящего размера, как приманки (этап 26): len — длина вместе с ушком и килем, м; wl — какая доля длины
+ * под водой, от низа (по профилю модели: над водой антенна и верх тела, у шара — красная половина с колпачком).
+ * Заготовка из кода — FLOAT_TEMPLATE_H от низа киля до шарика антенны, ватерлиния — в нуле; модель встаёт в ту же
+ * высоту (gearmodels.js: mountBobModel), а настоящий размер даёт масштаб группы userData.real.
+ */
+export const FLOAT_TEMPLATE_H = 0.6;
+export const FLOAT_FIT = {
+  float1: { len: 0.065, wl: 0.47 }, // «Классика»: шар ~4,5 см — над водой красная половина и колпачок
+  float2: { len: 0.18, wl: 0.76 }, // «Гусиное перо»: тонкое, над водой оранжевый кончик
+  float3: { len: 0.14, wl: 0.6 }, // «Светлячок»: светящаяся антенна и верх тела
+  float4: { len: 0.14, wl: 0.6 }, // «Чемпион»
+  float5: { len: 0.15, wl: 0.56 }, // «Северное сияние»
+  float6: { len: 0.11, wl: 0.6 } // «Золотой»: верхняя половина «яйца» и ушко
+};
+/**
+ * Издалека настоящий поплавок — меньше точки. Поэтому над водой он не бывает на экране меньше FLOAT_MIN_ANG радиан
+ * (около 11 точек на экране 1080p, 7 — на 720p): до 3–6 м — настоящий, дальше растёт с расстоянием, но не больше
+ * чем в FLOAT_BOOST_MAX раза. FLOAT_VIEW — откуда смотрит игрок (main.js ставит каждый кадр).
+ */
+export const FLOAT_MIN_ANG = 0.011;
+export const FLOAT_BOOST_MAX = 3;
+export const FLOAT_VIEW = new THREE.Vector3();
+/** Масштаб поплавка (группы buildFloat) на воде в точке (x, z). */
+export function floatScale(g, x, z) {
+  const real = g.userData.real || 1;
+  const above = (g.userData.top || 0.33) * real; // высота над водой, м
+  const d = Math.hypot(x - FLOAT_VIEW.x, z - FLOAT_VIEW.z);
+  return real * Math.min(FLOAT_BOOST_MAX, Math.max(1, (FLOAT_MIN_ANG * d) / above));
+}
+
 export function buildFloat(floatId = 'float1') {
   const f = ITEMS[floatId] || FLOATS[0];
   const [cTop, cBot, cKeel] = f.col;
@@ -438,6 +469,10 @@ export function buildFloat(floatId = 'float1') {
     glow.position.y = 0.3;
     g.add(glow);
   }
+  const fit = FLOAT_FIT[f.id] || FLOAT_FIT.float1;
+  g.userData.fit = fit;
+  g.userData.real = fit.len / FLOAT_TEMPLATE_H; // заготовка 0,60 м → настоящая длина
+  g.userData.top = 0.334; // верх над ватерлинией, в долях заготовки: к нему идёт леска; у модели — свой
   mountBobModel(g, f.id, true);
   return g;
 }

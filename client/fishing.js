@@ -5,7 +5,7 @@ import { kitStats, biteDelay, rollFish, speciesWeights, fightInit, fightStep, fi
 import { spotAt } from './terrain.js';
 import { LOC_ID } from './loc/id.js';
 import { waveH } from './water.js';
-import { buildFloat, buildLure, LURE_SIDEWAYS, LURE_FLOATS, poseLure } from './gear3d.js';
+import { buildFloat, buildLure, LURE_SIDEWAYS, LURE_FLOATS, poseLure, floatScale } from './gear3d.js';
 import { buildFish, wiggleFish } from './fish3d.js';
 import { FishLine, Dangle } from './line.js';
 import { HANG_K } from './viewmodel.js';
@@ -53,7 +53,7 @@ export class Fishing {
     if (id !== this.bobId) {
       if (this.bob) this.scene.remove(this.bob);
       this.bob = lure ? buildLure(id) : buildFloat(id);
-      this.bobScale = lure ? this.bob.userData.real : 1; // приманка — настоящего размера, 7–10 см
+      this.bobScale = this.bob.userData.real; // настоящий размер: приманка 7–10 см, поплавок 6–18 см (gear3d.js)
       this.bob.scale.setScalar(this.bobScale);
       this.bob.visible = false;
       this.scene.add(this.bob);
@@ -252,6 +252,7 @@ export class Fishing {
         this.bz = lerp(this.from.z, this.target.z, u);
         this.by = lerp(this.from.y, 0, u) + Math.sin(Math.PI * u) * h;
         this.bob.position.set(this.bx, this.by, this.bz);
+        if (!this.lure) this.bob.scale.setScalar(floatScale(this.bob, this.bx, this.bz)); // вдали поплавок не мельче точки
         this.bob.rotation.set(u * 9, 0, u * 5);
         this.line.set(tip, this.bob.position, 0.35 + Math.sin(Math.PI * u) * 1.2, -5);
       }
@@ -345,8 +346,11 @@ export class Fishing {
       }
       this.reeling = reel;
       this.dip = damp(this.dip, st === 'bite' ? -0.4 + Math.sin(this.t * 30) * 0.05 : 0, st === 'bite' ? 20 : 5, dt);
+      // поплавок настоящего размера (вдали — не мельче точки); его кивки и уход под воду — в долях заготовки
+      const fs = this.lure ? 1 : floatScale(this.bob, this.bx, this.bz);
+      if (!this.lure) this.bob.scale.setScalar(fs);
       // поппер и воблер держатся на поверхности, остальные приманки чуть притоплены; поплавок — на воде
-      this.by = waveH(this.bx, this.bz, t) + this.dip + (this.lure ? (LURE_FLOATS.has(this.bobId) ? -0.005 : -0.05) : 0);
+      this.by = waveH(this.bx, this.bz, t) + this.dip * fs + (this.lure ? (LURE_FLOATS.has(this.bobId) ? -0.005 : -0.05) : 0);
       // приманку издалека не видно: где она, подсказывают круги от лески на воде
       if (this.lure && st === 'wait' && !reel && Math.random() < dt * 0.7) this.fx.ripple(this.bx, this.bz, 0.22, 0.5);
       this.bob.position.set(this.bx, this.by, this.bz);
@@ -354,7 +358,7 @@ export class Fishing {
       else this.bob.rotation.set(Math.sin(t * 1.7 + this.bx) * 0.12, 0, Math.cos(t * 1.3) * 0.12 + (st === 'bite' ? 0.5 : 0));
       this.vm.tipWorld(tip);
       end.copy(this.bob.position);
-      if (!this.lure) end.y += 0.28;
+      if (!this.lure) end.y += this.bob.userData.top * fs * 0.95; // леска — к верху поплавка
       this.line.set(tip, end, reel || st === 'bite' ? 0.08 : Math.min(1.2, 0.25 + dist * 0.03));
     } else if (st === 'fight') {
       const f = this.fight;
@@ -589,11 +593,11 @@ export class Fishing {
       return;
     }
     this.vm.tipWorld(tip);
-    const k = this.lure ? 1 : 0.36; // поплавок у кончика мельче: на воде он крупный, чтобы его было видно издалека
+    // под кончиком — настоящего размера, как и на воде вблизи
     const h = this.hanger.step(tip, this.lure ? 0.22 : 0.3, Math.min(dt, 0.05));
-    bob.scale.setScalar(this.bobScale * k);
+    bob.scale.setScalar(this.bobScale);
     bob.visible = true;
-    this.hanger.place(bob, tip, 0.29 * this.bobScale * k, this.lure && LURE_SIDEWAYS.has(this.bobId));
+    this.hanger.place(bob, tip, (this.lure ? 0.29 : bob.userData.top) * this.bobScale, this.lure && LURE_SIDEWAYS.has(this.bobId));
     this.line.set(tip, h, 0, -99);
   }
 

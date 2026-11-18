@@ -9,7 +9,7 @@ import { adopt, buildFish, warmFish } from './fish3d.js';
 import { modelShot, faceShot, fishIcon } from './icons.js';
 import { World, drawMinimap, SEA_VIEW } from './world.js';
 import { Character, VENDOR_PUPPET } from './character.js';
-import { buildRod, itemModel } from './gear3d.js';
+import { buildRod, itemModel, FLOAT_VIEW } from './gear3d.js';
 import { ViewModel } from './viewmodel.js';
 import { Input, Player } from './player.js';
 import { Fishing } from './fishing.js';
@@ -2338,6 +2338,7 @@ class Game {
           }
         }
         this.player.update(dt, i, free);
+        FLOAT_VIEW.set(this.player.x, 0, this.player.z); // поплавки вдали — не мельче точки (gear3d.js: floatScale)
         f.update(dt, tw, i, this.player);
         this.beasts.update(dt, tw);
         const v = f.view();
