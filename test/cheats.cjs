@@ -90,7 +90,9 @@ async function code(page, c) {
   assert.match(r.on, /Богатейший/);
   let s = await state(page);
   assert.equal(s.coins, base + 9999999, 'на счету +9 999 999');
-  assert.match(await page.textContent('.ptitle .coinbox'), new RegExp((base + 9999999).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')), 'в шапке рынка новые монеты');
+  const fmt = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  assert.match(await page.textContent('.ptitle .coinbox'), new RegExp(fmt(base + 9999999)), 'в шапке рынка новые монеты');
+  assert.equal(await page.textContent('#coins'), fmt(base + 9999999), 'и на экране игры');
   await page.waitForTimeout(700); // сохранение в браузере — через 300 мс после изменения
   assert.equal((await saved(page)).coins, base, 'в сохранении браузера монеты прежние');
   const cloudCoins = await G(page, () => RYBAK.cloud.profile().coins);
@@ -109,6 +111,7 @@ async function code(page, c) {
   assert.match(r.msg, /«Богатейший» выключен/);
   s = await state(page);
   assert.deepEqual([s.coins, s.bonus, s.on], [base, 0, []], `монеты как до кода: ${JSON.stringify(s)}`);
+  assert.equal(await page.textContent('#coins'), fmt(base), 'на экране игры — тоже прежние');
   assert.equal(r.on, '', 'список включённых пуст');
 
   // ───── все три сразу ─────

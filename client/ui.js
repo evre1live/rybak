@@ -835,6 +835,7 @@ export class UI {
           g.audio.ui();
           g.fishing.whoKey = null; // эхолот-профи пересчитает, кто клюёт
           this.rerender(); // монеты в шапке рынка
+          this.refreshHud(); // и на экране игры
         }
         this.cheatList();
       };
