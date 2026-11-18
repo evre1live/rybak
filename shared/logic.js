@@ -85,9 +85,24 @@ export function tackleInfo(id) {
 }
 
 // ───── кто клюнет ─────
+/**
+ * Код «Моби Дик» (client/cheats.js, kit.moby): клюёт только крупное — гиганты, эпические и легендарные рыбы
+ * этой локации. Снасть, наживка, время и глубина не важны; чья зона — та, где стоит поплавок, — берёт чаще.
+ */
+export function bigWeights(spot, loc) {
+  const out = [];
+  for (const f of FISH) {
+    if (!(f.giant || f.rar >= 3)) continue;
+    const zones = zonesOf(f, loc);
+    if (!Object.values(zones).some((v) => v > 0)) continue;
+    out.push({ f, w: 1 + 2 * (zones[spot.zone] > 0 || (spot.pier && zones.pier > 0) ? 1 : 0) });
+  }
+  return out;
+}
 // spot: { zone, depth, pier, hot }; loc — локация: у рыбы на каждой свои места (data.js: zones и at);
 // kit — набор снастей (kitStats): у дорогих удочек редкая рыба берёт охотнее (kit.rare)
 export function speciesWeights(spot, tackleId, hour, loc, kit) {
+  if (kit && kit.moby) return bigWeights(spot, loc);
   const tk = tackleInfo(tackleId);
   const part = dayPart(hour);
   const out = [];
@@ -109,9 +124,10 @@ export function speciesWeights(spot, tackleId, hour, loc, kit) {
 }
 export function rollFish(spot, tackleId, hour, rng, loc, kit) {
   const tk = tackleInfo(tackleId);
+  const moby = !!(kit && kit.moby);
   // spot.big (0…1) — рыбу выследили: наживка легла рядом с крупной тенью в воде. Тогда это точно рыба, а не хлам,
   // и не мелочь: чем крупнее тень, тем выше нижняя граница веса.
-  const junkChance = spot.big ? 0 : tk.lure ? 0.015 : { shallow: 0.07, pier: 0.07, backwater: 0.06, mid: 0.025 }[spot.zone] || 0.008;
+  const junkChance = spot.big || moby ? 0 : tk.lure ? 0.015 : { shallow: 0.07, pier: 0.07, backwater: 0.06, mid: 0.025 }[spot.zone] || 0.008;
   const list = speciesWeights(spot, tackleId, hour, loc, kit);
   if (!list.length || rng() < junkChance) {
     let j = JUNK[Math.floor(rng() * 4)];
@@ -133,6 +149,7 @@ export function rollFish(spot, tackleId, hour, rng, loc, kit) {
   const k = clamp(2.6 - (sizeBoost - 1) * 1.6, 1.1, 2.6); // нижний предел достижим только с лучшими приманками и «трофейной» удочкой
   let u = Math.pow(rng(), k);
   if (spot.big) u = Math.min(1, Math.max(u, 0.35 + 0.4 * clamp(spot.big, 0, 1) + rng() * 0.1));
+  if (moby) u = 0.82 + 0.18 * rng(); // «Моби Дик»: всякий раз трофей
   const w = round3(f.w[0] + (f.w[1] - f.w[0]) * u);
   const c = { sp: f.id, w, len: Math.round(f.look.lenK * Math.cbrt(w)), trophy: u > 0.8, junk: false };
   if (spot.big) c.stalked = true; // «выслежена»: за такую дают больше опыта
@@ -259,12 +276,26 @@ export function fightInit(c, kit, rng) {
     rage: false, jumpT: 0, stuck: 0, stuckT: 0, lift: 0, stickCd: 0, wrapT: 0, wrapped: false
   };
 }
-// input: { reel: boolean, steer: -1|0|1 } → список событий:
+/** Код «Бог Улова»: сколько пути рыбы даёт один клик (kit.god, input.click) — около десяти кликов на любую рыбу. */
+export const GOD_CLICK = 0.11;
+// input: { reel: boolean, steer: -1|0|1, click?: boolean } → список событий:
 // 'warn', 'run', 'calm', 'jump', 'landed', 'snap', 'escape' — у всех; 'rage' — легенда собралась с силами;
 // 'stuck' / 'unstuck' — присоска залегла и оторвана; 'wrap' — хитрец завёл леску за камни.
+// kit.god — код «Бог Улова» (client/cheats.js): леска не рвётся, рыба не сходит, не залегает и не заводит леску
+// за камни, у легенды нет «второго дыхания»; каждый клик подтягивает рыбу на GOD_CLICK пути.
 export function fightStep(s, input, dt, kit, rng) {
   const ev = [];
   if (s.result) return ev;
+  const god = !!kit.god;
+  if (god) {
+    s.strain = 0;
+    s.slack = 0;
+    s.stuck = 0;
+    s.wrapT = 0;
+    s.wrapped = false;
+    s.boss = 0;
+    s.rage = false;
+  }
   s.t += dt;
   s.fat += dt; // усталость рыбы: растёт со временем, у легенды частично сбрасывается
   s.phaseT -= dt;
@@ -314,7 +345,7 @@ export function fightStep(s, input, dt, kit, rng) {
       s.dir = 0;
       ev.push('calm');
       // присоска залегает на дно: пока не оторвёшь — ни с места
-      if (s.style === 'flat' && !s.stuck && s.stickCd <= 0 && s.p > 0.12 && s.p < 0.92 && rng() < F.stick) {
+      if (!god && s.style === 'flat' && !s.stuck && s.stickCd <= 0 && s.p > 0.12 && s.p < 0.92 && rng() < F.stick) {
         s.stuck = 1;
         s.stuckT = 0;
         s.lift = 0;
@@ -352,11 +383,14 @@ export function fightStep(s, input, dt, kit, rng) {
   // трясун мотает головой: стрелка дрожит (размах 1–3 % шкалы, в рывке в полтора раза шире)
   if (s.style === 'thrash') dT += Math.cos(s.t * 21) * 21 * (0.012 + 0.022 * k01) * (run ? 1.4 : 1) * F.shake;
   s.T = clamp(s.T + dT * dt, 0, 1);
+  if (god) s.T = clamp(s.T, 0.32, 0.66); // стрелка всегда в бирюзовой зоне
 
   // пока рыба в прыжке, тугая леска — почти верный обрыв: опасная зона начинается раньше
   const danger = dangerAt(s);
   if (leap) s.jumpT -= dt;
-  if (s.T > danger) {
+  if (god) {
+    /* ни обрыва, ни схода */
+  } else if (s.T > danger) {
     s.strain += dt * clamp(s.rho * 1.1 + 0.3, 0.4, 1.6) * (1 + (2.5 * (s.T - danger)) / (1 - danger)) * (kit.tough || 1);
     if (s.strain >= 1) {
       s.result = 'snap';
@@ -365,7 +399,9 @@ export function fightStep(s, input, dt, kit, rng) {
     }
   } else s.strain = Math.max(0, s.strain - dt * 1.0);
 
-  if (s.T < T_LOW && !leap) {
+  if (god) {
+    /* леска не слабнет до схода */
+  } else if (s.T < T_LOW && !leap) {
     s.slack += dt * (0.4 + 0.6 * s.pull) * kit.hold * (run ? 1.6 : 1);
     if (s.slack >= 1.6 && !s.junk) {
       s.result = 'escape';
@@ -391,7 +427,8 @@ export function fightStep(s, input, dt, kit, rng) {
       ev.push('unstuck');
     }
   } else if (input.reel) s.p += (kit.reel * eff * (run ? (input.steer === -s.dir ? 0.75 : 0.35) : 1) * dt) / s.stamina;
-  else s.p -= ((run ? 0.1 * (s.giant ? GIANT_K.peel : 1) : 0.03) * (0.5 + Math.min(1.2, s.rho)) * tired(s) * dt) / Math.sqrt(s.stamina);
+  else if (!god) s.p -= ((run ? 0.1 * (s.giant ? GIANT_K.peel : 1) : 0.03) * (0.5 + Math.min(1.2, s.rho)) * tired(s) * dt) / Math.sqrt(s.stamina);
+  if (god && input.click) s.p += GOD_CLICK;
   s.p = clamp(s.p, 0, 1);
   if (s.p >= landAtOf(s, kit)) {
     s.result = 'landed';

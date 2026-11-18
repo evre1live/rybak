@@ -29,22 +29,23 @@ export function loadProfile() {
 }
 let timer = null;
 let locked = false;
-// saved — вызывается при каждом сохранении профиля: по нему прогресс уходит ещё и на сервер (client/cloud.js)
-export const hooks = { saved: null };
+// saved — вызывается при каждом сохранении профиля: по нему прогресс уходит ещё и на сервер (client/cloud.js);
+// view — что записывать вместо профиля (client/cheats.js: без монет кода «Богатейший»)
+export const hooks = { saved: null, view: null };
+const viewOf = (p) => {
+  const { fresh, ...rest } = hooks.view ? hooks.view(p) : p;
+  return rest;
+};
 export function saveProfile(p) {
   if (locked) return;
   clearTimeout(timer);
-  timer = setTimeout(() => {
-    const { fresh, ...rest } = p;
-    store.set(KEY, rest);
-  }, 300);
+  timer = setTimeout(() => store.set(KEY, viewOf(p)), 300);
   if (hooks.saved) hooks.saved();
 }
 /** Записать профиль сразу, не дожидаясь паузы: перед перезагрузкой страницы (загрузка сохранения из файла или с сервера). */
 export function saveProfileNow(p) {
   clearTimeout(timer);
-  const { fresh, ...rest } = p;
-  store.set(KEY, rest);
+  store.set(KEY, viewOf(p));
 }
 /**
  * Прогресс заменён другим сохранением, страница сейчас откроется заново. До тех пор профиль из памяти больше

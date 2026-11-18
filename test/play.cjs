@@ -1650,12 +1650,20 @@ const G = (page, fn, arg) => page.evaluate(fn, arg);
     await G(pp, () => { const g = RYBAK; g.boat.away = true; g.dock(0); });
     const b1 = await G(pp, () => { const g = RYBAK; g.ui.openPanel('pause'); const home = !!document.querySelector('[data-a="home"]'); g.ui.closePanel(); g.input.locked = true; g.input.enabled = true; return { rented: g.boat.rented, away: g.boat.away, active: g.boat.active, toast: document.querySelector('#toasts').textContent, home }; });
     assert.ok(b1.rented && !b1.away && !b1.active && /на своём месте/.test(b1.toast) && !b1.home, `своя лодка дома: ${JSON.stringify(b1)}`);
+    // Пауза выше открыта и закрыта за один шаг — у игрока так не бывает. Если проверочный браузер успел дать странице
+    // захват мыши, он отпускается не сразу, и тогда пауза открывается снова сама; закрываем её
+    await pp.waitForTimeout(500);
+    await G(pp, () => { const g = RYBAK; if (g.ui.panel) g.ui.closePanel(); g.input.locked = true; g.input.enabled = true; });
 
     // открытка: с уловом в руках — кадр игры с подписью; скачивается файлом, улов при этом ждёт
     await G(pp, () => { const g = RYBAK, f = g.fishing; g.player.place(0, -24.5, 0); g.player.pitch = -0.1; f.kit.net = false; f.showCatch('shuka', 0.9); });
     await pp.waitForFunction(() => RYBAK.fishing.state === 'landed' && !RYBAK.fishing.fly, null, { timeout: 60000 });
     await G(pp, () => RYBAK.input.pressed.add('KeyP'));
-    await pp.waitForSelector('.cardview .cardimg', { timeout: 60000 });
+    await pp.waitForSelector('.cardview .cardimg', { timeout: 60000 }).catch(async (e) => {
+      console.log('  открытка не открылась:', JSON.stringify(await G(pp, () => { const g = RYBAK, f = g.fishing, im = document.querySelector('.cardimg'); return { state: g.state, panel: g.ui.panel, f: f.state, fly: !!f.fly, card: !!g.card, img: im ? [im.naturalWidth, im.getBoundingClientRect().width, im.complete] : null, toast: document.querySelector('#toasts').textContent, frames: window.__frames, en: g.input.enabled, pressed: [...g.input.pressed], hidden: document.hidden, screen: document.querySelector('#screen').className + ':' + document.querySelector('#screen').children.length }; })));
+      await pp.screenshot({ path: `${out}/fail-card.png` });
+      throw e;
+    });
     await pp.waitForFunction(() => document.querySelector('.cardimg').naturalWidth > 0, null, { timeout: 20000 });
     const card = await G(pp, () => {
       const k = RYBAK.card, im = document.querySelector('.cardimg');

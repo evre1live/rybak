@@ -17,6 +17,7 @@ import { Fx } from './fx.js';
 import { Boat, BOAT_PRICE, Ride, BOAT_SEATS, VMAX, QUIET, PROPULSION, BOAT_WORDS } from './boat.js';
 import { Remote } from './remote.js';
 import { Beasts } from './beast.js';
+import { Cheats } from './cheats.js';
 import { BEAST_LIST } from '../shared/beasts.js';
 import { Net } from './net.js';
 import { createVoice } from './voice.js';
@@ -105,11 +106,15 @@ class Game {
     // пробная версия без сервера (например, страница-витрина): только одиночная рыбалка
     this.offline = !!window.RYBAK_OFFLINE;
     this.profile = loadProfile();
+    // коды (рынок → 10 раз «ТОРГОВЕЦ»): только на эту сессию; монеты «Богатейшего» в сохранения не попадают
+    this.cheats = new Cheats(() => this.profile);
+    this.cheats.resume(); // переехали на другую локацию — коды с прошлой страницы с нами
+    profileHooks.view = (p) => this.cheats.saveView(p);
     // сохранение на сервере: прогресс уходит туда вслед за каждым сохранением в браузере (client/cloud.js)
     this.cloud = new Cloud({
       enabled: !this.offline,
       profile: () => {
-        const { fresh, ...rest } = this.profile;
+        const { fresh, ...rest } = this.cheats.saveView(this.profile);
         return rest;
       },
       apply: (save, sum, asked) => this.cloudApply(save, sum, asked),
@@ -235,7 +240,7 @@ class Game {
     // для автопроверок: ускорение времени и игра без отрисовки
     this.timeScale = Number(q.get('ts')) || 1;
     this.noRender = q.has('norender');
-    this.fishing = new Fishing({ scene: this.scene, camera: this.camera, vm: this.vm, fx: this.fx, schools: this.world.scenery.schools, profile: this.profile, hour: () => this.hours, wx: () => this.weather.bite, emit: (t, d) => this.onFish(t, d) });
+    this.fishing = new Fishing({ scene: this.scene, camera: this.camera, vm: this.vm, fx: this.fx, schools: this.world.scenery.schools, profile: this.profile, hour: () => this.hours, wx: () => this.weather.bite, emit: (t, d) => this.onFish(t, d), cheats: this.cheats });
     // крупная рыба в воде замечает наживку, которая легла рядом (fauna.notice)
     this.fishing.stalk = (x, z, R, soft) => this.fauna.notice(x, z, R, soft);
     // чудища и киты: общий бой вдвоём и больше (beast.js, server/beast.js)
@@ -406,6 +411,7 @@ class Game {
       /* без хранилища просто откроется заставка новой локации */
     }
     saveProfileNow(this.profile);
+    this.cheats.handoff(); // коды переезжают вместе с игроком
     this.net.closed = true; // связь оборвётся вместе со страницей — не пытаться её вернуть
     const q = new URLSearchParams(location.search);
     q.delete('loc');
@@ -1177,7 +1183,7 @@ class Game {
   /** Сохранение — файлом: перенести на другое устройство или оставить про запас. → { name, text } */
   saveToFile() {
     const p = this.profile;
-    const text = exportSave(p, Date.now());
+    const text = exportSave(this.cheats.saveView(p), Date.now());
     const d = new Date();
     const who = String(p.name || '').replace(/[^\p{L}\p{N}_-]+/gu, '') || 'save';
     const name = `rybak-${who}-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}.json`;
@@ -1245,6 +1251,7 @@ class Game {
     const look = r.profile.look && r.profile.look.hero ? r.profile.look : p.look;
     for (const k of Object.keys(p)) delete p[k];
     Object.assign(p, r.profile, { look });
+    this.cheats.forgetCoins(); // монеты пришли с сервера — настоящие
     saveProfileNow(p);
     // всё, что в игре выведено из профиля: герой, снасть в руках, лодка, задания, цифры на экране
     this.vm.setLook(fpLook(look));
@@ -2027,7 +2034,9 @@ class Game {
       case 'cast': return row('Летит…');
       case 'wait': return f.lure ? row(`${k('primary')} Держи — веди приманку`, `${k('back')} Смотать`) : row('Ждём поклёвку', `${k('back')} Смотать`);
       case 'bite': return row(`${k('primary')} Подсекай!`);
-      case 'fight': return row(`${k('primary')} Мотать`, 'Отпусти — ослабить', `${k('left')}${pad ? '' : k('right')} Вести`);
+      case 'fight':
+        if (this.cheats.has('god')) return row(`${k('primary')} Кликай — тянуть`, 'Рыба не сойдёт');
+        return row(`${k('primary')} Мотать`, 'Отпусти — ослабить', `${k('left')}${pad ? '' : k('right')} Вести`);
       case 'landed': return ''; // что делать с уловом и какими клавишами — написано на самой карточке улова
       default: return '';
     }
@@ -2217,6 +2226,7 @@ class Game {
     setEnvLight(0.22 + 0.78 * (1 - this.world.night));
     this.audio.night = this.world.night;
     this.audio.hours = this.hours;
+    this.cheats.sync(); // покупки платятся сперва монетами «Богатейшего»
     // заставка играет на главном экране и пока команда собирается; в мире — музыка локации (и боя, см. ниже)
     if (this.state !== 'world') this.audio.musicScene({ menu: true, fight: false });
     else this.audio.musicScene({ menu: false });

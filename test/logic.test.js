@@ -1198,3 +1198,54 @@ test('гиганты: только на морскую удочку, у борт
   const mako = L.fightInit({ sp: 'mako', w: 60 }, heavy, half);
   assert.ok(mako.stamina > tuna.stamina);
 });
+
+test('код «Моби Дик»: клюёт только крупное — гиганты, эпические и легендарные, всегда трофей и без хлама', () => {
+  const r = rng();
+  for (const loc of LOCATIONS) {
+    const kit = { ...L.kitStats(L.newProfile()), moby: true }; // со стартовой снастью: снасть не важна
+    const seen = new Set();
+    for (let i = 0; i < 400; i++) {
+      const zone = ['shallow', 'mid', 'deep', 'pier'][i % 4];
+      const c = L.rollFish({ zone, depth: 1, pier: zone === 'pier', hot: false }, 'bread', (i * 7) % 24, r, loc.id, kit);
+      assert.ok(!c.junk, `${loc.id}: хлама нет`);
+      const f = FISH_BY_ID[c.sp];
+      assert.ok(f.giant || f.rar >= 3, `${loc.id}: ${c.sp} — гигант, эпическая или легенда`);
+      assert.ok(fishOf(loc.id).includes(f), `${loc.id}: ${c.sp} водится здесь`);
+      assert.ok(c.trophy && c.w >= f.w[0] + (f.w[1] - f.w[0]) * 0.8, `${loc.id}: ${c.sp} трофейного веса (${c.w})`);
+      seen.add(c.sp);
+    }
+    assert.ok(seen.size >= 3 && [...seen].some((id) => FISH_BY_ID[id].rar >= 4), `${loc.id}: попадаются разные, и легенды тоже: ${[...seen]}`);
+    // эхолот-профи показывает то же, что клюёт
+    assert.ok(L.speciesWeights({ zone: 'mid', depth: 3 }, 'bread', 12, loc.id, kit).every((e) => e.f.giant || e.f.rar >= 3));
+  }
+});
+
+test('код «Бог Улова»: рыба не сходит и не рвёт леску при любом обращении, клики её вытаскивают', () => {
+  const r = rng();
+  const base = L.kitStats(L.newProfile());
+  const kit = { ...base, god: true };
+  let landed = 0;
+  for (const sp of ['mako', 'starik', 'pila', 'molot', 'elugor', 'skat', 'karas']) {
+    const f = FISH_BY_ID[sp];
+    const s = L.fightInit({ sp, w: f.w[1], junk: false }, kit, r);
+    const seen = new Set();
+    // десять секунд худшего обращения: то держим кнопку весь рывок, то бросаем; без кликов
+    for (let i = 0; i < 300; i++) for (const e of L.fightStep(s, { reel: i % 40 < 25, steer: 0 }, 1 / 30, kit, r)) seen.add(e);
+    assert.ok(!seen.has('snap') && !seen.has('escape') && (!s.result || s.result === 'landed'), `${sp}: ни обрыва, ни схода (${[...seen]})`);
+    assert.ok(!seen.has('rage') && !seen.has('stuck') && !seen.has('wrap'), `${sp}: ни «второго дыхания», ни залегания, ни камней`);
+    // а теперь клики: около десяти — и рыба в руках
+    let clicks = 0;
+    while (!s.result && clicks < 12) {
+      clicks++;
+      L.fightStep(s, { reel: false, steer: 0, click: true }, 1 / 30, kit, r);
+      for (let i = 0; i < 8 && !s.result; i++) L.fightStep(s, { reel: false, steer: 0 }, 1 / 30, kit, r);
+    }
+    assert.equal(s.result, 'landed', `${sp}: вытащена кликами (${clicks})`);
+    landed++;
+  }
+  assert.equal(landed, 7);
+  // без кода всё как было: гигант на стартовой снасти рвёт леску
+  const s = L.fightInit({ sp: 'mako', w: FISH_BY_ID.mako.w[1], junk: false }, base, r);
+  for (let i = 0; i < 3000 && !s.result; i++) L.fightStep(s, { reel: true, steer: 0 }, 1 / 30, base, r);
+  assert.equal(s.result, 'snap');
+});

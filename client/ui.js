@@ -308,12 +308,15 @@ export class UI {
       this.fNow = null;
       return;
     }
+    // «Бог Улова» (client/cheats.js): рыба не сходит, тащим кликами; бой с чудищем ведёт сервер — там как обычно
+    const god = this.g.cheats.has('god') && f !== this.g.beastFight;
     // что за бой не меняется — манера рыбы и отметки легенды — пишем один раз, в его начале
-    if (this.fNow !== f) {
+    if (this.fNow !== f || this.fGod !== god) {
       this.fNow = f;
+      this.fGod = god;
       this.fMode = this.fBoss = this.fHelp = null;
       const S = FIGHT_STYLES[f.style] || FIGHT_STYLES.plain;
-      $('#ftip').innerHTML = f.junk ? '' : `<b>${esc(S.name.toUpperCase())}</b>${esc(S.tip)}`;
+      $('#ftip').innerHTML = god ? '<b>БОГ УЛОВА</b>Кликайте: каждый клик подтягивает рыбу, сойти она не может' : f.junk ? '' : `<b>${esc(S.name.toUpperCase())}</b>${esc(S.tip)}`;
       $('#tok').textContent = f.style === 'bulldog' ? 'ВНАТЯГ' : 'НОРМА';
       $('#pbar').classList.toggle('boss', f.bossMax > 0);
       $('#fboss').classList.toggle('on', f.bossMax > 0);
@@ -374,6 +377,10 @@ export class UI {
       cls = 'warn';
     } else if (f.style === 'bulldog' && f.T < T_TIGHT) {
       txt = 'ТЯНИ ВНАТЯГ';
+    }
+    if (god) {
+      txt = 'КЛИКАЙ!';
+      cls = '';
     }
     if (this.fTxt !== txt) st.textContent = this.fTxt = txt;
     if (st.className !== cls) st.className = cls;
@@ -761,6 +768,7 @@ export class UI {
 
   openPanel(name, opts = {}) {
     const prev = this.panel;
+    if (name !== 'sell') this.closeCheat();
     this.panel = name;
     this.popts = opts;
     this.enter('p:' + name);
@@ -782,8 +790,87 @@ export class UI {
     else if (name === 'save') this.renderSave();
     this.g.onPanel(name, prev);
   }
+  /**
+   * Коды (client/cheats.js): десять нажатий подряд на «ТОРГОВЕЦ» на рынке (не дольше полутора секунд между
+   * нажатиями) открывают окошко ввода. Шесть цифр — и код срабатывает: включает свою хитрость или, если уже
+   * включена, выключает.
+   */
+  vendorTap() {
+    const now = performance.now();
+    this.taps = now - (this.tapAt || 0) < 1500 ? (this.taps || 0) + 1 : 1;
+    this.tapAt = now;
+    if (this.taps >= 10) {
+      this.taps = 0;
+      this.cheatBox();
+    }
+  }
+  cheatBox() {
+    const g = this.g;
+    let box = $('#cheat');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'cheat';
+      box.setAttribute('role', 'dialog');
+      box.setAttribute('aria-label', 'Ввод кода');
+      box.innerHTML = `<div class="ch-h"><b>КОД</b><span class="sp"></span><button class="xbtn" data-c="x" aria-label="Закрыть">×</button></div>
+        <input id="cheatIn" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" spellcheck="false" placeholder="······" aria-label="Шесть цифр">
+        <div class="ch-msg" aria-live="polite"></div><div class="ch-on"></div>`;
+      $('#ui').appendChild(box);
+      const inp = box.querySelector('#cheatIn');
+      const msg = box.querySelector('.ch-msg');
+      const submit = () => {
+        const code = inp.value;
+        inp.value = '';
+        if (code.length !== 6) return;
+        const r = g.cheats.enter(code);
+        box.classList.remove('bad', 'ok');
+        void box.offsetWidth; // перезапуск встряски
+        if (!r.ok) {
+          box.classList.add('bad');
+          msg.textContent = 'Такого кода нет';
+          g.audio.error();
+        } else {
+          box.classList.add('ok');
+          msg.innerHTML = r.on ? `<b>«${esc(r.name)}»</b> включён: ${esc(r.about)}` : `<b>«${esc(r.name)}»</b> выключен`;
+          g.audio.ui();
+          g.fishing.whoKey = null; // эхолот-профи пересчитает, кто клюёт
+          this.rerender(); // монеты в шапке рынка
+        }
+        this.cheatList();
+      };
+      inp.addEventListener('input', () => {
+        inp.value = inp.value.replace(/\D/g, '').slice(0, 6);
+        if (inp.value.length === 6) submit();
+      });
+      inp.addEventListener('keydown', (e) => {
+        if (e.code === 'Escape') {
+          e.stopPropagation(); // Esc закрывает только окошко, рынок остаётся
+          this.closeCheat();
+        } else if (e.code === 'Enter' || e.code === 'NumpadEnter') {
+          e.stopPropagation();
+          submit();
+        }
+      });
+      box.querySelector('[data-c="x"]').addEventListener('click', () => this.closeCheat());
+    }
+    box.classList.remove('bad', 'ok');
+    box.querySelector('.ch-msg').textContent = 'Шесть цифр. Коды действуют, пока не выйдете из игры';
+    this.cheatList();
+    box.querySelector('#cheatIn').focus();
+  }
+  cheatList() {
+    const box = $('#cheat');
+    if (!box) return;
+    const on = this.g.cheats.list();
+    box.querySelector('.ch-on').innerHTML = on.length ? `Включены: ${on.map((n) => `<em>${esc(n)}</em>`).join('')}` : '';
+  }
+  closeCheat() {
+    const box = $('#cheat');
+    if (box) box.remove();
+  }
   closePanel() {
     if (!this.panel) return;
+    this.closeCheat();
     const was = this.panel;
     this.panel = null;
     this.g.onPanel(null, was);
@@ -910,7 +997,7 @@ export class UI {
         <div class="total"><span>За весь улов</span><b>${coin(total)}</b></div>
         <button class="btn pri big" data-a="sellall" ${p.cooler.length ? '' : 'disabled'}><span>ПРОДАТЬ ВСЁ</span>${ic('arrow')}</button>
       </div>
-      <div class="loadout"><span class="hd">ТОРГОВЕЦ</span><div class="it say">«${esc(g.vendorLine())}»</div>${this.footKeys(p.cooler.length ? 'ПРОДАТЬ ВСЁ' : '')}</div></div>`;
+      <div class="loadout"><span class="hd" data-a="vendor">ТОРГОВЕЦ</span><div class="it say">«${esc(g.vendorLine())}»</div>${this.footKeys(p.cooler.length ? 'ПРОДАТЬ ВСЁ' : '')}</div></div>`;
   }
 
   /** Вкладки журнала: локации, вся рыба и чудища. */
@@ -1418,6 +1505,7 @@ export class UI {
     const a = t.dataset.a;
     const id = t.dataset.id;
     const g = this.g;
+    if (a === 'vendor') return this.vendorTap(); // тайная дверь — без щелчка интерфейса
     g.audio.ui();
     switch (a) {
       case 'create': case 'join': case 'joincode': case 'solo': {

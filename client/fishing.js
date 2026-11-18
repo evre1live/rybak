@@ -18,8 +18,8 @@ const dir = new THREE.Vector3();
 const CHARGE_TIME = 0.85;
 
 export class Fishing {
-  constructor({ scene, camera, vm, fx, schools, profile, hour, emit, wx = () => 1 }) {
-    Object.assign(this, { scene, camera, vm, fx, schools, profile, hour, emit, wx });
+  constructor({ scene, camera, vm, fx, schools, profile, hour, emit, wx = () => 1, cheats = null }) {
+    Object.assign(this, { scene, camera, vm, fx, schools, profile, hour, emit, wx, cheats });
     this.state = 'idle';
     this.kit = kitStats(profile);
     this.line = new FishLine(scene, '#e8f4ff', () => this.vm.rod && this.vm.rod.path()); // леска идёт от катушки через кольца
@@ -115,14 +115,22 @@ export class Fishing {
    */
   whoBites(spot) {
     const tk = this.profile.equip.tackle;
-    const key = `${spot.zone}|${spot.pier ? 1 : 0}|${Math.round(spot.depth)}|${tk}|${dayPart(this.hour())}|${spot.hot ? 1 : 0}`;
+    const kit = this.cheatKit();
+    const key = `${spot.zone}|${spot.pier ? 1 : 0}|${Math.round(spot.depth)}|${tk}|${dayPart(this.hour())}|${spot.hot ? 1 : 0}|${kit.moby ? 1 : 0}`;
     if (key !== this.whoKey) {
       this.whoKey = key;
-      this.who = speciesWeights(spot, tk, this.hour(), LOC_ID, this.kit).sort((x, y) => y.w - x.w).slice(0, 3).map((e) => e.f.name.toLowerCase()).join(', ');
+      this.who = speciesWeights(spot, tk, this.hour(), LOC_ID, kit).sort((x, y) => y.w - x.w).slice(0, 3).map((e) => e.f.name.toLowerCase()).join(', ');
     }
     return this.who;
   }
 
+  /** Набор снастей с кодами (client/cheats.js): moby — клюёт только крупное, god — рыба не сходит. */
+  cheatKit() {
+    const c = this.cheats;
+    this.kit.moby = !!(c && c.has('moby'));
+    this.kit.god = !!(c && c.has('god'));
+    return this.kit;
+  }
   startBite() {
     this.spot.wx = this.wx(); // погода: в дождь и туман ждать поклёвку меньше
     const d = biteDelay(this.spot, this.profile.equip.tackle, this.hour(), this.kit, Math.random);
@@ -314,7 +322,7 @@ export class Fishing {
           this.emit('bite', { win: this.biteT });
         }
       } else {
-        this.biteT -= dt;
+        if (!this.cheatKit().god) this.biteT -= dt; // «Бог Улова»: клюнувшая рыба ждёт подсечки сколько угодно
         if (input.hit('Primary')) {
           this.hook(dist);
           return;
@@ -344,7 +352,9 @@ export class Fishing {
       this.line.set(tip, end, reel || st === 'bite' ? 0.08 : Math.min(1.2, 0.25 + dist * 0.03));
     } else if (st === 'fight') {
       const f = this.fight;
-      const evs = fightStep(f, { reel: input.hold, steer: input.steer }, dt, this.kit, Math.random);
+      const kit = this.cheatKit();
+      // «Бог Улова»: каждый клик подтягивает рыбу (shared/logic.js, GOD_CLICK); держать кнопку тоже можно
+      const evs = fightStep(f, { reel: input.hold, steer: input.steer, click: kit.god && input.hit('Primary') }, dt, kit, Math.random);
       this.reeling = input.hold;
       const sty = f.style;
       const run = f.phase === 'run';
@@ -463,7 +473,8 @@ export class Fishing {
       // Подмотка без опасного натяжения копится и уходит серверу; вытащить существо одному нельзя.
       const f = this.fight;
       const p0 = f.p;
-      const evs = fightStep(f, { reel: input.hold, steer: input.steer }, dt, this.kit, Math.random);
+      // «Бог Улова» бережёт свою леску (не рвётся), но общий ход боя с чудищем ведёт сервер — кликами его не ускорить
+      const evs = fightStep(f, { reel: input.hold, steer: input.steer }, dt, this.cheatKit(), Math.random);
       this.reeling = input.hold;
       if (f.p > p0 && f.T < dangerAt(f)) this.beastGain += f.p - p0;
       f.p = 0.4; // путь здесь не копится: держим середину, чтобы рыба не «вышла» сама
@@ -605,7 +616,7 @@ export class Fishing {
 
   hook(dist) {
     const p = this.profile;
-    const c = this.rollOnce || rollFish(this.spot, p.equip.tackle, this.hour(), Math.random, LOC_ID, this.kit);
+    const c = this.rollOnce || rollFish(this.spot, p.equip.tackle, this.hour(), Math.random, LOC_ID, this.cheatKit());
     const forced = !!this.rollOnce; // проверки и снимки: рыба задана заранее, наживка не тратится
     this.rollOnce = null;
     if (!this.lure && !forced) {
@@ -698,7 +709,7 @@ export class Fishing {
   /** Для проверок: что за место в точке (x, z) и кто там клюнет — по тем же правилам, что и при настоящем забросе. */
   probe(x, z, hour = this.hour()) {
     const spot = spotAt(x, z);
-    return spot ? { spot, c: rollFish(spot, this.profile.equip.tackle, hour, Math.random, LOC_ID, this.kit) } : null;
+    return spot ? { spot, c: rollFish(spot, this.profile.equip.tackle, hour, Math.random, LOC_ID, this.cheatKit()) } : null;
   }
   /** Для проверок и снимков: сразу начать вываживание рыбы sp (u — размер от 0 до 1) в dist метрах перед собой. */
   startFight(sp, u = 0.5, dist = 9) {

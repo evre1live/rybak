@@ -865,3 +865,22 @@ body.blur :is(.lob-br .btn.ghost,.edfoot .btn.ghost){-webkit-backdrop-filter:var
 #bwin .rw{display:flex;align-items:center;gap:.5em;font:italic 800 1.35em/1 var(--disp);color:var(--am);text-shadow:var(--tsh)}
 #bwin .rw .ic{width:1em;height:1em}
 #bwin .rw .sep{width:1px;height:1em;background:rgba(255,255,255,.4)}
+
+/* ── коды (client/cheats.js): окошко ввода на рынке ── */
+#cheat{position:absolute;left:50%;top:50%;translate:-50% -50%;z-index:30;width:min(19em,86vw);padding:1em 1.15em 1.1em;border-radius:1.3em;border:.09em solid transparent;background:var(--g2);box-shadow:var(--drop),var(--rim);pointer-events:auto;font-size:1.16em;color:#fff;animation:pop .22s cubic-bezier(.2,1.4,.4,1);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+body.touch #cheat{font-size:1.3em}
+#cheat .ch-h{display:flex;align-items:center;margin-bottom:.7em}
+#cheat .ch-h b{font:italic 800 1.7em/1 var(--disp);letter-spacing:.06em;color:var(--cream);text-shadow:var(--tsh)}
+#cheat .ch-h .sp{flex:1}
+#cheat .xbtn{position:static;width:2em;height:2em;font-size:1em}
+#cheat input{display:block;width:100%;box-sizing:border-box;height:2.4em;padding:0 0 0 .55em;border-radius:.7em;border:.1em solid rgba(255,255,255,.35);background:rgba(8,10,16,.55);color:var(--cream);font:italic 800 1.65em/1 var(--disp);letter-spacing:.55em;text-align:center;outline:none;caret-color:var(--tl);user-select:text;-webkit-user-select:text}
+#cheat input:focus{border-color:var(--tl);box-shadow:0 0 0 .14em rgba(46,242,222,.25)}
+#cheat input::placeholder{color:rgba(255,255,255,.28)}
+#cheat .ch-msg{min-height:2.6em;margin-top:.65em;font-size:.86em;line-height:1.35;color:var(--mut)}
+#cheat .ch-msg b{color:var(--cream)}
+#cheat.ok .ch-msg{color:var(--tl2)}
+#cheat.bad .ch-msg{color:#ff8a96}
+#cheat.bad{animation:shake .12s 3}
+#cheat .ch-on{display:flex;flex-wrap:wrap;align-items:center;gap:.35em;font-size:.8em;color:var(--mut)}
+#cheat .ch-on:empty{display:none}
+#cheat .ch-on em{font:italic 800 1em/1 var(--disp);padding:.35em .7em;border-radius:1em;background:linear-gradient(180deg,#ffe596,#ffc44e);color:#4a2a00;font-style:italic}
