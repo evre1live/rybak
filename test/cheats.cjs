@@ -147,6 +147,9 @@ async function code(page, c) {
   console.log('  «Моби Дик»:', [...new Set(rolls.map((c) => c.sp))].join(', '));
 
   // ───── «Бог Улова»: настоящий заброс — рыба ждёт подсечки, леска не рвётся, клики её вытаскивают ─────
+  const prog = () => G(page, () => { const p = RYBAK.profile; return JSON.stringify({ xp: p.xp, caught: p.stats.caught, legends: p.stats.legends, journal: p.journal, quests: p.quests && p.quests.list.map((q) => q.c) }); });
+  const progBefore = await prog();
+  assert.equal(await G(page, () => document.querySelector('.purse').classList.contains('cheat')), true, 'рядом с монетами — отметка «КОДЫ»');
   await G(page, () => { const g = RYBAK; g.player.place(0, -24.5, 0); g.player.pitch = -0.22; });
   await frames(page, 3);
   await G(page, () => { const i = RYBAK.input; i.primary = true; i.pressed.add('Primary'); });
@@ -190,8 +193,20 @@ async function code(page, c) {
     assert.ok(clicks <= 12, `хватило дюжины кликов: ${clicks}`);
   }
   await page.waitForTimeout(1200);
+  // улов под кодами — вне зачёта: на карточке отметка, в садок кладётся, но опыта, журнала и заданий нет
+  assert.match(await page.textContent('#catch .badges'), /ПОД КОДОМ · ВНЕ ЗАЧЁТА/);
+  assert.doesNotMatch(await page.textContent('#catch .badges'), /НОВЫЙ ВИД|ЛИЧНЫЙ РЕКОРД/);
+  await shot(page, 'cheat-card');
   await G(page, () => RYBAK.input.pressed.add('Primary')); // в садок
   await page.waitForFunction(() => RYBAK.fishing.state === 'idle', null, { timeout: 30000 });
+  assert.match(await page.textContent('#toasts'), /вне зачёта/);
+  assert.equal(await prog(), progBefore, 'опыт, счёт, журнал и задания не изменились');
+  const last = await G(page, () => RYBAK.profile.cooler[RYBAK.profile.cooler.length - 1]);
+  assert.ok(last && last.sp === hooked.sp && last.cheat === true, `в садке — с отметкой: ${JSON.stringify(last)}`);
+  await G(page, () => RYBAK.ui.openPanel('sell'));
+  assert.equal(await page.textContent('.tile:last-child .tg'), 'КОД', 'на рынке — отметка «КОД»');
+  await shot(page, 'cheat-market');
+  await G(page, () => { RYBAK.ui.closePanel(); RYBAK.input.locked = true; RYBAK.input.enabled = true; });
 
   // ───── переезд на другую локацию: коды едут вместе с игроком; монеты «Богатейшего» — тоже, но не в сохранение ─────
   s = await state(page);
@@ -215,6 +230,19 @@ async function code(page, c) {
   s2 = await state(page);
   assert.deepEqual([s2.on, s2.bonus, s2.coins], [[], 0, s.coins - 9999999], `после перезагрузки кодов нет: ${JSON.stringify(s2)}`);
   assert.equal(await G(page, () => RYBAK.fishing.cheatKit().god || RYBAK.fishing.cheatKit().moby), false);
+  // без кодов улов снова в зачёте
+  await enter(page, 'Кодер');
+  assert.equal(await G(page, () => document.querySelector('.purse').classList.contains('cheat')), false, 'отметки «КОДЫ» нет');
+  const xp0 = await G(page, () => RYBAK.profile.xp);
+  await G(page, () => RYBAK.fishing.startFight('taimen', 0.3));
+  await G(page, () => { RYBAK.fishing.fight.p = 0.99; RYBAK.input.primary = true; }); // у самых рук — подматываем
+  await page.waitForFunction(() => RYBAK.fishing.state === 'landed', null, { timeout: 20000 });
+  await G(page, () => { RYBAK.input.primary = false; });
+  await page.waitForTimeout(800);
+  await G(page, () => RYBAK.input.pressed.add('Primary'));
+  await page.waitForFunction(() => RYBAK.fishing.state === 'idle', null, { timeout: 30000 });
+  const fairEnd = await G(page, () => ({ xp: RYBAK.profile.xp, j: RYBAK.profile.journal.taimen, last: RYBAK.profile.cooler[RYBAK.profile.cooler.length - 1] }));
+  assert.ok(fairEnd.xp > xp0 && fairEnd.j && fairEnd.j.n >= 1 && !fairEnd.last.cheat, `обычный улов — в зачёт: ${JSON.stringify(fairEnd)}`);
 
   assert.equal(errors, 0, 'ошибок на странице нет');
   await browser.close();

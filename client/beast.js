@@ -300,12 +300,18 @@ background:rgba(10,28,52,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter
     const names = b.win.map((id) => (id === me ? g.profile.name || 'вы' : this.nameOf(id))).join(', ');
     if (me && b.win.includes(me)) {
       const p = g.profile;
+      // держали под кодами (client/cheats.js) — вне зачёта: монеты да, а опыта и записи в журнал «Чудища» нет
+      const cheat = !!(g.fishing.cheated || (g.cheats && g.cheats.on.size));
       p.coins += def.coins;
-      p.xp += def.xp;
-      p.beasts = p.beasts && typeof p.beasts === 'object' ? p.beasts : {};
-      p.beasts[def.id] = (p.beasts[def.id] || 0) + 1;
-      p.stats.beasts = (p.stats.beasts || 0) + 1;
-      g.ui.toast(`${def.name} — ваш общий трофей! +${def.coins.toLocaleString('ru')} монет, +${def.xp.toLocaleString('ru')} опыта. Существо отпускаете — нажмите P, чтобы сделать снимок`, 'good');
+      if (!cheat) {
+        p.xp += def.xp;
+        p.beasts = p.beasts && typeof p.beasts === 'object' ? p.beasts : {};
+        p.beasts[def.id] = (p.beasts[def.id] || 0) + 1;
+        p.stats.beasts = (p.stats.beasts || 0) + 1;
+      }
+      g.ui.toast(cheat
+        ? `${def.name} — общий трофей! +${def.coins.toLocaleString('ru')} монет. Вы держали существо под кодом — вне зачёта: без опыта и записи в журнал`
+        : `${def.name} — ваш общий трофей! +${def.coins.toLocaleString('ru')} монет, +${def.xp.toLocaleString('ru')} опыта. Существо отпускаете — нажмите P, чтобы сделать снимок`, cheat ? '' : 'good', cheat ? 6000 : undefined);
       g.afterBeast && g.afterBeast(def);
     }
     g.ui.feed(`<b>${esc(def.name)}</b> взят(а) вместе: ${esc(names)}. Существо отпустили`);

@@ -357,3 +357,29 @@ test('комната, созданная без базы, записываетс
   await a.close();
   one.srv.close();
 });
+
+test('турнир: улов под кодами (d.cheat) в зачёт не идёт, но друзья его видят', async (t) => {
+  await ready;
+  let clock = 30_000_000;
+  const now = () => clock;
+  const one = await start(t, { store, now });
+  const a = await one.join({ t: 'create', card: { name: 'Финн' } });
+  const ja = await a.wait('joined');
+  const b = await one.join({ t: 'join', code: ja.code, card: { name: 'Нори' } });
+  const jb = await b.wait('joined');
+  a.send({ t: 'tour', kind: 'big', len: TOUR_LENS[0] });
+  await b.wait('tour');
+  clock += TOUR_COUNTDOWN * 1000 + 1000;
+  // гостья ловит акулу-мако под кодами: событие доходит до хозяина с отметкой, а в таблицу турнира не попадает
+  b.send({ t: 'ev', k: 'catch', d: { sp: 'mako', w: 459, cheat: 1 } });
+  const ev = await a.wait('ev', (m) => m.k === 'catch' && m.id === jb.id);
+  assert.equal(ev.d.cheat, 1);
+  await sleep(200);
+  assert.ok(!a.got.some((m) => m.t === 'tscore') && !b.got.some((m) => m.t === 'tscore'), 'улов под кодами — не в зачёт');
+  // обычный улов — как всегда в зачёт
+  b.send({ t: 'ev', k: 'catch', d: { sp: 'okun', w: 0.42 } });
+  const sc = await a.wait('tscore');
+  assert.deepEqual([sc.row.id, sc.row.s.n, sc.row.s.best, sc.row.s.sp], [jb.id, 1, 0.42, 'okun'], `в зачёте только окунь: ${JSON.stringify(sc.row.s)}`);
+  await Promise.all([a.close(), b.close()]);
+  one.srv.close();
+});

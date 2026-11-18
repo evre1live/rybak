@@ -1249,3 +1249,40 @@ test('код «Бог Улова»: рыба не сходит и не рвёт 
   for (let i = 0; i < 3000 && !s.result; i++) L.fightStep(s, { reel: true, steer: 0 }, 1 / 30, base, r);
   assert.equal(s.result, 'snap');
 });
+
+test('улов под кодами — вне зачёта: ни опыта, ни журнала с рекордами, ни счёта; продаётся, но выручка не идёт в задания', async () => {
+  const p = L.newProfile();
+  const kit = L.kitStats(p);
+  // обычный улов для сравнения
+  const fair = { sp: 'okun', w: 0.3, len: 25, trophy: false, junk: false };
+  assert.ok(L.addCatch(p, fair, kit).ok);
+  const r0 = L.recordCatch(p, fair, false);
+  assert.ok(r0.xp > 0 && p.journal.okun.n === 1 && p.stats.caught === 1);
+  const before = JSON.stringify({ xp: p.xp, stats: p.stats, journal: p.journal });
+  // легенда-гигант под кодами: в садок кладётся с отметкой, а прогресс не меняется
+  const big = { sp: 'mako', w: 459, len: 386, trophy: true, junk: false, cheat: true };
+  assert.ok(L.addCatch(p, big, kit).ok);
+  assert.equal(p.cooler[1].cheat, true, 'в садке видно, что улов под кодом');
+  assert.equal(p.cooler[0].cheat, undefined, 'у честного улова отметки нет');
+  const r = L.recordCatch(p, big, false);
+  assert.deepEqual(r, { xp: 0, isNew: false, record: false, levelUp: 0, cheat: true });
+  assert.equal(JSON.stringify({ xp: p.xp, stats: p.stats, journal: p.journal }), before, 'опыт, счёт и журнал не тронуты');
+  // то же при «отпустить»
+  L.recordCatch(p, { ...big, w: 470 }, true);
+  assert.equal(JSON.stringify({ xp: p.xp, stats: p.stats, journal: p.journal }), before);
+  // продажа: монеты за всё, в задания — только честная выручка
+  const market = { mult: {}, hot: [] };
+  const v0 = L.fishValue(p.cooler[0], market);
+  const v1 = L.fishValue(p.cooler[1], market);
+  const coins = p.coins;
+  const s = L.sell(p, null, market);
+  assert.deepEqual([s.ok, s.total, s.fair, s.n], [true, v0 + v1, v0, 2]);
+  assert.equal(p.coins, coins + v0 + v1);
+  // таблица рекордов строится из сохранения — улова под кодом в ней нет
+  const { saveSummary } = await import('../shared/cloud.js');
+  const sum = saveSummary(p);
+  assert.ok(!sum.records.some((x) => x.sp === 'mako') && sum.legends === 0 && sum.caught === 1, JSON.stringify(sum));
+  // открытка: «под кодом» вместо «нового вида» и «рекорда»
+  const { cardText } = await import('../client/postcard.js');
+  assert.deepEqual(cardText({ c: big, isNew: true, record: true }).tags, ['ПОД КОДОМ', 'ТРОФЕЙ']);
+});

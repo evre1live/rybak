@@ -660,11 +660,13 @@ export function spendTackle(p) {
 }
 export function addCatch(p, c, kit) {
   if (p.cooler.length >= kit.bagCap) return { ok: false, full: true };
-  p.cooler.push({ sp: c.sp, w: c.w, len: c.len, trophy: !!c.trophy, junk: !!c.junk });
+  p.cooler.push({ sp: c.sp, w: c.w, len: c.len, trophy: !!c.trophy, junk: !!c.junk, ...(c.cheat ? { cheat: true } : {}) });
   return { ok: true };
 }
-// учёт пойманного в журнале и опыте — и для отпущенной рыбы тоже
+// учёт пойманного в журнале и опыте — и для отпущенной рыбы тоже. Улов под кодами (c.cheat, client/cheats.js) — вне
+// зачёта: ни опыта, ни журнала с рекордами, ни счёта пойманного — в таблицу рекордов он не попадает.
 export function recordCatch(p, c, released) {
+  if (c.cheat) return { xp: 0, isNew: false, record: false, levelUp: 0, cheat: true };
   const xp = Math.round(xpFor(c) * (released ? 1.3 : 1));
   const before = levelInfo(p.xp).lvl;
   p.xp += xp;
@@ -689,13 +691,18 @@ export function sell(p, index, market) {
   const list = index == null ? p.cooler.slice() : [p.cooler[index]].filter(Boolean);
   if (!list.length) return { ok: false, error: 'Садок пуст' };
   let total = 0;
-  for (const c of list) total += fishValue(c, market);
+  let fair = 0; // выручка без улова под кодами: только она идёт в задания
+  for (const c of list) {
+    const v = fishValue(c, market);
+    total += v;
+    if (!c.cheat) fair += v;
+  }
   if (index == null) p.cooler = [];
   else p.cooler.splice(index, 1);
   p.coins += total;
   p.stats.sold += list.length;
   p.stats.earned += total;
-  return { ok: true, total, n: list.length };
+  return { ok: true, total, fair, n: list.length };
 }
 export function coolerValue(p, market) {
   let t = 0;

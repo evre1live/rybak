@@ -78,6 +78,7 @@ body.blur :is(.gl,.place,.tally,.rodchip,#quests .q,#feed div,.toast,#catch,#cas
 #feed{display:flex;flex-direction:column;gap:.3em;max-width:26em}
 #feed div{background:var(--g);border:.08em solid var(--gb);border-radius:.7em;padding:.4em .8em;font-size:1em;line-height:1.3;animation:fin .25s ease-out}
 #feed div b{font-weight:700}
+#feed .cheat{color:#ff8ac4;font-weight:600}
 #feed div.out{opacity:0;transition:opacity .6s}
 #feed div.chat{border-color:rgba(46,242,222,.6)}
 @keyframes fin{from{opacity:0;transform:translateX(-1em)}}
@@ -128,6 +129,7 @@ body.blur :is(.gl,.place,.tally,.rodchip,#quests .q,#feed div,.toast,#catch,#cas
 .purse .ic{color:var(--am);width:1.2em;height:1.2em}
 .purse .sep{width:1px;height:1.1em;background:var(--ln)}
 .purse .lv{font-size:.85em;text-shadow:var(--tsh)}
+.purse.cheat::after{content:'КОДЫ';padding:.28em .6em;border-radius:1em;background:linear-gradient(180deg,#ff7ab8,#ff2e93);color:#fff;font:italic 800 .72em/1 var(--disp);letter-spacing:.04em;box-shadow:0 .15em .5em rgba(255,46,147,.35)}
 
 /* слева внизу: где мы, мини-карта с маршрутом и расстоянием, плашка «улов | наживка» */
 .hud-bl{left:2.2em;bottom:1.9em;display:flex;flex-direction:column;align-items:flex-start;gap:.75em}
@@ -265,6 +267,7 @@ body:not(.touch) #hud:has(#catch:not(.hidden)) :is(.crewbox,.purse){visibility:h
 #catch .bd.cy{background:var(--teal);color:var(--tld)}
 #catch .bd.gr{background:linear-gradient(180deg,#b4f7ca,#62df8f);color:#06351c}
 #catch .bd.red{background:linear-gradient(180deg,#ff8a8f,#f0465a);color:#fff}
+#catch .bd.pk{background:linear-gradient(180deg,#ff7ab8,#ff2e93);color:#fff}
 #catch p{margin:.4em 0 .6em;font-size:.98em;line-height:1.4;text-shadow:var(--tsh)}
 #catch .val{display:flex;align-items:center;gap:.4em;font:italic 800 1.9em/1 var(--disp);color:var(--cream);text-shadow:var(--tsh)}
 #catch .val .ic{width:.95em;height:.95em}
@@ -467,6 +470,7 @@ input.code{text-transform:uppercase;letter-spacing:.3em;text-align:center;font:i
 .tile .nm{position:relative;font:italic 800 1.68em/1.05 var(--disp);color:var(--cream);text-align:center;padding:0 .4em;text-shadow:0 .04em 0 rgba(0,0,0,.4),0 .1em .25em rgba(0,0,0,.55)}
 .tile .tg{position:absolute;left:.65em;top:.65em;display:flex;align-items:center;gap:.3em;height:1.9em;padding:0 .7em;border-radius:1em;background:var(--teal);color:var(--tld);font:italic 800 .98em/1 var(--disp);letter-spacing:.03em;z-index:1;box-shadow:0 .2em .6em rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.6)}
 .tile .tg .ic{width:1em;height:1em}
+.tile .tg.cheat{background:linear-gradient(180deg,#ff7ab8,#ff2e93);color:#fff}
 .tile .tg.price,.tile .pr{position:absolute;left:auto;right:.65em;top:.65em;display:flex;align-items:center;gap:.3em;height:1.7em;padding:0 .65em;border-radius:1em;background:rgba(0,0,0,.42);color:#fff;font:italic 800 1.15em/1 var(--disp);z-index:1;box-shadow:inset 0 0 0 .06em rgba(255,255,255,.18);font-variant-numeric:tabular-nums}
 .tile .pr .ic{width:1em;height:1em}
 .tile .pr.up::after{content:"▲";color:var(--ok);font-size:.7em;font-style:normal}
@@ -883,4 +887,5 @@ body.touch #cheat{font-size:1.3em}
 #cheat.bad{animation:shake .12s 3}
 #cheat .ch-on{display:flex;flex-wrap:wrap;align-items:center;gap:.35em;font-size:.8em;color:var(--mut)}
 #cheat .ch-on:empty{display:none}
+#cheat .ch-note{flex-basis:100%;margin-top:.25em;color:#ff9ccc;font-size:.95em;line-height:1.3}
 #cheat .ch-on em{font:italic 800 1em/1 var(--disp);padding:.35em .7em;border-radius:1em;background:linear-gradient(180deg,#ffe596,#ffc44e);color:#4a2a00;font-style:italic}

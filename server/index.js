@@ -496,9 +496,9 @@ export function createServer({ now = () => Date.now(), store = null, storeSoon =
           d = null;
         }
         broadcast(room, { t: 'ev', id: p.id, k: msg.k, d }, ws);
-        // улов во время турнира идёт в зачёт
+        // улов во время турнира идёт в зачёт — кроме пойманного под кодами (d.cheat, client/cheats.js)
         const tr = room.tour;
-        if (msg.k === 'catch' && d && tr && now() >= tr.start && now() < tr.end) {
+        if (msg.k === 'catch' && d && !d.cheat && tr && now() >= tr.start && now() < tr.end) {
           let row = tr.scores.get(p.id);
           if (!row) row = { id: p.id, name: p.card.name, slot: p.slot, s: tourBlank() };
           if (tourAdd(row.s, { sp: String(d.sp || ''), w: Number(d.w) }, now() - tr.start, room.loc)) { // рыба — только с локации комнаты

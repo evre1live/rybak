@@ -1,6 +1,7 @@
 // Общий бой с чудищем вдвоём в настоящем браузере: Несси на Сосновом озере.
 // Одному не позвать; приманка в Яме на рассвете — вода бурлит, Несси берёт; второй подсекает рядом;
-// оба тянут, на одного из них — рывок; у борта двое бьют багром — трофей обоим, приманка потрачена.
+// оба тянут, на одного из них — рывок; у борта двое бьют багром — трофей обоим (у державшей под кодом — вне зачёта),
+// приманка потрачена.
 // Запуск: PORT=3111 node test/beast.cjs [папка для снимков]
 const { chromium } = require(process.env.PLAYWRIGHT || '/opt/npm-tools/node_modules/playwright');
 const assert = require('node:assert/strict');
@@ -93,14 +94,17 @@ async function shot(page, file) {
   console.log('  Несси у борта', lunged ? '(рывки были)' : '');
   await G(a, () => { const g = RYBAK; g.player.yaw = Math.atan2(-(g.beasts.pos.x - g.player.x), -(g.beasts.pos.z - g.player.z)); g.player.pitch = -0.2; });
   await shot(a, 'b1-nessie-gaff');
-  // багор: двое разом
+  // багор: двое разом. Нори под конец включила код «Бог Улова»: её трофей — вне зачёта (монеты есть, опыта и записи нет)
   const c0 = await G(a, () => RYBAK.profile.coins);
+  const nb0 = await G(b, () => { RYBAK.cheats.enter('636363'); return { coins: RYBAK.profile.coins, xp: RYBAK.profile.xp }; });
   for (const pg of [a, b]) await G(pg, () => { const g = RYBAK; g.input.locked = true; g.input.enabled = true; g.input.pressed.add('KeyE'); });
   await a.waitForFunction(() => !RYBAK.beasts.b || RYBAK.beasts.b.phase === 'won', null, { timeout: 15000 });
   const won = await G(a, () => ({ coins: RYBAK.profile.coins, n: RYBAK.profile.beasts.nessie, st: RYBAK.fishing.state, beasts: RYBAK.profile.stats.beasts }));
   assert.ok(won.coins === c0 + 60000 && won.n === 1 && won.beasts === 1 && won.st === 'idle', `трофей Жамшиду: ${JSON.stringify(won)}`);
-  await b.waitForFunction(() => RYBAK.profile.beasts.nessie === 1, null, { timeout: 15000 });
-  console.log('  Несси взята вдвоём — трофей обоим');
+  await b.waitForFunction((c) => RYBAK.profile.coins >= c + 60000, nb0.coins, { timeout: 15000 });
+  const nb = await G(b, () => ({ xp: RYBAK.profile.xp, n: RYBAK.profile.beasts && RYBAK.profile.beasts.nessie, toast: document.querySelector('#toasts').textContent }));
+  assert.ok(nb.xp === nb0.xp && !nb.n && /вне зачёта/.test(nb.toast), `Нори держала под кодом — монеты без опыта и записи в журнал: ${JSON.stringify(nb)}`);
+  console.log('  Несси взята вдвоём — трофей Жамшиду; Нори держала под кодом — ей монеты, но вне зачёта');
   // запись о бое пропадает
   await a.waitForFunction(() => !RYBAK.beasts.b, null, { timeout: 30000 });
   assert.ok(!a.__err && !b.__err, 'ошибки на странице');

@@ -1103,7 +1103,7 @@ class Game {
     this.audio.coin(index == null ? 4 : 1);
     this.ui.toast(`+${fmtCoins(r.total)} монет`, 'gold');
     if (!this.solo && r.total >= 50) this.net.send({ t: 'ev', k: 'sold', d: { n: r.n, total: r.total } });
-    this.questEv({ t: 'sell', total: r.total });
+    this.questEv({ t: 'sell', total: r.fair }); // улов под кодами продаётся, но в задания не идёт
     saveProfile(this.profile);
     this.ui.refreshHud();
     this.ui.rerender();
@@ -1547,17 +1547,24 @@ class Game {
         }
         this.tourCatch(c);
         if (c.help) ui.toast(`${c.help} подсачил вашу рыбу — спасибо другу!`, 'good', 3200);
-        return this.ev('catch', { sp: c.sp, w: c.w, len: c.len, trophy: c.trophy, by: c.help ? this.helperId : undefined });
+        // улов под кодами друзья видят с отметкой, а сервер не берёт его в турнир
+        return this.ev('catch', { sp: c.sp, w: c.w, len: c.len, trophy: c.trophy, by: c.help ? this.helperId : undefined, cheat: c.cheat ? 1 : undefined });
       }
       case 'kept': {
         ui.catchCard(null);
         const c = d.c;
         const f = FISH_BY_ID[c.sp];
         if (d.forced) ui.toast('Садок полон — рыбу пришлось отпустить. Продайте улов на рынке', 'bad', 3600);
+        else if (d.cheat) ui.toast(`${d.released ? 'Отпущена' : 'В садок'}. Улов под кодом — вне зачёта: без опыта и рекордов`, '', 2600);
         else if (d.released) ui.toast(`Отпущена. Опыт +${d.xp}`, 'good', 1800);
         else ui.toast(`В садок. Опыт +${d.xp}`, 'good', 1600);
         if (d.released) a.splash(0.45);
         else a.keep();
+        if (d.cheat) {
+          // вне зачёта: ни журнала, ни заданий, ни мастерства (shared/logic.js: recordCatch)
+          ui.refreshHud();
+          return saveProfile(p);
+        }
         if (d.isNew && f) ui.toast(`Новый вид в журнале: ${f.name}`, 'gold', 3200);
         if (d.levelUp) {
           a.level();
@@ -1632,11 +1639,12 @@ class Game {
       const col = f ? RARITY[f.rar].color : '#cbd5e1';
       const by = Number(d.by) || 0;
       const helper = by === this.me.id ? 'вы' : by && this.players.get(by) ? esc(this.players.get(by).card.name) : '';
-      this.ui.feed(`${name} — <b style="color:${col}">${esc(nm)}</b>, ${fmtW(Number(d.w) || 0)}${d.trophy ? ' · трофей!' : ''}${helper ? ` · подсачил${helper === 'вы' ? 'и' : ''} ${helper}` : ''}`);
-      if (by === this.me.id && this.assistAsk === p.id) this.assistDone(p, { sp: String(d.sp || ''), w: Number(d.w) || 0, trophy: !!d.trophy, junk: !f });
+      const cheat = !!d.cheat; // поймано под кодами — вне зачёта, и это видно всем
+      this.ui.feed(`${name} — <b style="color:${col}">${esc(nm)}</b>, ${fmtW(Number(d.w) || 0)}${d.trophy && !cheat ? ' · трофей!' : ''}${helper ? ` · подсачил${helper === 'вы' ? 'и' : ''} ${helper}` : ''}${cheat ? ' · <span class="cheat">под кодом, вне зачёта</span>' : ''}`);
+      if (by === this.me.id && this.assistAsk === p.id) this.assistDone(p, { sp: String(d.sp || ''), w: Number(d.w) || 0, trophy: !!d.trophy, junk: !f, cheat });
       p.remote.bubble(`${esc(nm)} · ${fmtW(Number(d.w) || 0)}`, 6);
       if (f && f.rar >= 3) {
-        this.ui.toast(`${esc(p.card.name)} вытащил: ${f.name}, ${fmtW(d.w)}!`, 'gold', 5000);
+        this.ui.toast(`${esc(p.card.name)} вытащил: ${f.name}, ${fmtW(d.w)}${cheat ? ' — под кодом, вне зачёта' : '!'}`, cheat ? '' : 'gold', 5000);
         this.audio.catch(f.rar);
       }
     } else if (m.k === 'assist') {
@@ -1716,8 +1724,13 @@ class Game {
   /** Рыба друга взята нашим подсаком: нам — четверть её опыта и отметка в журнале. */
   assistDone(p, c) {
     this.assistAsk = 0;
-    const r = recordAssist(this.profile, c);
     const f = FISH_BY_ID[c.sp];
+    if (c.cheat) {
+      // друг ловил под кодом: помощь видна, но опыта за неё нет — улов вне зачёта
+      this.audio.catch(f ? Math.min(2, f.rar) : 0);
+      return this.ui.toast(`Вы подсачили рыбу для ${p.card.name}${f ? `: ${f.name}, ${fmtW(c.w)}` : ''}. Она поймана под кодом — вне зачёта`, '', 3600);
+    }
+    const r = recordAssist(this.profile, c);
     this.audio.catch(f ? Math.min(2, f.rar) : 0);
     this.ui.toast(`Вы подсачили рыбу для ${p.card.name}${f ? `: ${f.name}, ${fmtW(c.w)}` : ''}. Опыт +${r.xp}`, 'good', 3600);
     if (r.levelUp) {
@@ -1798,7 +1811,7 @@ class Game {
   /** Свой улов во время заплыва в одиночку (в комнате очки считает сервер). */
   tourCatch(c) {
     const t = this.tour;
-    if (!t || !t.solo) return;
+    if (!t || !t.solo || c.cheat) return; // улов под кодами — вне зачёта
     const now = this.tourNow();
     if (now < t.start || now >= t.end) return;
     const row = t.scores.get(this.me.id) || { id: this.me.id, name: this.profile.name || 'Рыбак', slot: this.me.slot, s: tourBlank() };

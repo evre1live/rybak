@@ -31,7 +31,8 @@ export function cardText({ c = null, name = '', lvl = 1, title = '', zone = '', 
   out.head = (f || j).name;
   out.sub = fmtW(c.w) + (c.len ? ` · ${c.len} см` : '');
   out.rar = f ? { name: RARITY[f.rar].name, color: RARITY[f.rar].color } : { name: 'Находка', color: '#cbd5e1' };
-  if (isNew && f) out.tags.push('НОВЫЙ ВИД');
+  if (c.cheat) out.tags.push('ПОД КОДОМ'); // улов под кодами: ни нового вида, ни рекорда (client/cheats.js)
+  else if (isNew && f) out.tags.push('НОВЫЙ ВИД');
   else if (record && f) out.tags.push('ЛИЧНЫЙ РЕКОРД');
   if (c.trophy) out.tags.push('ТРОФЕЙ');
   if (c.stalked) out.tags.push('ВЫСЛЕЖЕНА');

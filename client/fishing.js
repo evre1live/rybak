@@ -124,6 +124,10 @@ export class Fishing {
     return this.who;
   }
 
+  /** Включён ли сейчас хоть один код: улов, при котором он был включён, — вне зачёта (c.cheat). */
+  cheatNow() {
+    return !!(this.cheats && this.cheats.on.size);
+  }
   /** Набор снастей с кодами (client/cheats.js): moby — клюёт только крупное, god — рыба не сходит. */
   cheatKit() {
     const c = this.cheats;
@@ -144,6 +148,7 @@ export class Fishing {
   }
   toIdle() {
     this.state = 'idle';
+    this.cheated = false;
     this.flying = false;
     this.bob.visible = false;
     this.line.hide();
@@ -187,6 +192,7 @@ export class Fishing {
     this.inBoat = !!player.boat;
     const st = this.state;
     if (st === 'idle' || st === 'charge') this.updateAim(player);
+    if ((st === 'fight' || st === 'beast') && this.cheatNow()) this.cheated = true; // код включили посреди боя
 
     if (st === 'idle') {
       if (input.hit('Primary') && input.enabled) {
@@ -625,6 +631,7 @@ export class Fishing {
       this.emit('bait', r);
     }
     this.catch = c;
+    this.cheated = this.cheatNow(); // код включён при подсечке (или включится до конца боя) — улов вне зачёта
     this.catchAt = { zone: this.spot.zone, boat: !!this.inBoat }; // где поймано — для заданий
     this.fight = fightInit(c, this.kit, Math.random);
     this.state = 'fight';
@@ -679,6 +686,7 @@ export class Fishing {
     this.fish.rotation.x = 0;
     this.fx.splash(this.bx, this.bz, 1.2 + Math.max(0, rar) * 0.15);
     const full = this.profile.cooler.length >= this.kit.bagCap;
+    if (this.cheated || this.cheatNow()) c.cheat = true;
     this.emit('caught', { c, full });
   }
   /** Друг рядом подсачил рыбу (правила — assistBlock в logic.js). name — кто помог. → взята ли рыба */
@@ -779,6 +787,7 @@ export class Fishing {
     };
     this.bob.visible = false;
     this.state = 'beast';
+    this.cheated = this.cheatNow();
     this.kick = 1;
     this.emit('beastHooked', { id: def.id });
   }

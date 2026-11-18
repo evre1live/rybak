@@ -145,6 +145,13 @@ export class UI {
     const lv = levelInfo(p.xp);
     $('#coins').textContent = fmtCoins(p.coins);
     $('#lvl').textContent = lv.lvl;
+    // включены коды — рядом с монетами розовая отметка: улов сейчас вне зачёта (client/cheats.js)
+    const cheat = this.g.cheats && this.g.cheats.on.size > 0;
+    const purse = $('.purse');
+    if (purse.classList.contains('cheat') !== cheat) {
+      purse.classList.toggle('cheat', cheat);
+      purse.title = cheat ? 'Включены коды: улов вне зачёта — без опыта, рекордов и турниров' : '';
+    }
     $('#bagN').textContent = `${p.cooler.length} / ${kit.bagCap}`;
     $('.tally .bag').classList.toggle('full', p.cooler.length >= kit.bagCap);
     const rod = ITEMS[p.equip.rod] || RODS[0];
@@ -276,7 +283,8 @@ export class UI {
     const val = fishValue(c, this.g.market());
     const bd = [];
     const jn = this.g.profile.journal[c.sp];
-    if (f && (!jn || jn.n === 0)) bd.push('<span class="bd cy">НОВЫЙ ВИД</span>');
+    if (c.cheat) bd.push('<span class="bd pk">ПОД КОДОМ · ВНЕ ЗАЧЁТА</span>'); // ни журнала, ни рекордов (client/cheats.js)
+    else if (f && (!jn || jn.n === 0)) bd.push('<span class="bd cy">НОВЫЙ ВИД</span>');
     else if (f && jn && c.w > jn.best) bd.push('<span class="bd gr">ЛИЧНЫЙ РЕКОРД</span>');
     if (c.trophy) bd.push('<span class="bd">ТРОФЕЙ</span>');
     if (c.stalked) bd.push('<span class="bd gr">ВЫСЛЕЖЕНА</span>');
@@ -863,7 +871,7 @@ export class UI {
     const box = $('#cheat');
     if (!box) return;
     const on = this.g.cheats.list();
-    box.querySelector('.ch-on').innerHTML = on.length ? `Включены: ${on.map((n) => `<em>${esc(n)}</em>`).join('')}` : '';
+    box.querySelector('.ch-on').innerHTML = on.length ? `Включены: ${on.map((n) => `<em>${esc(n)}</em>`).join('')}<span class="ch-note">Пока включён хоть один код, улов вне зачёта: без опыта, рекордов, заданий и турниров</span>` : '';
   }
   closeCheat() {
     const box = $('#cheat');
@@ -983,7 +991,7 @@ export class UI {
       const f = FISH_BY_ID[c.sp];
       const v = fishValue(c, m);
       const k = f ? m.mult[c.sp] : 1;
-      return `<div class="tile" data-a="sell1" data-id="${i}" title="Продать"><span class="pr ${k >= 1.15 ? 'up' : k <= 0.92 ? 'dn' : ''}">${coin(v)}</span>${c.trophy ? '<span class="tg">ТРОФЕЙ</span>' : ''}<img src="${f ? fishIcon(c.sp) : itemIcon(c.sp)}" alt=""><div class="nm" style="color:${f ? rarTint(f.rar) : '#fff'}">${esc((f || JUNK_BY_ID[c.sp]).name)}</div><div class="wt">${fmtW(c.w)}</div></div>`;
+      return `<div class="tile" data-a="sell1" data-id="${i}" title="Продать"><span class="pr ${k >= 1.15 ? 'up' : k <= 0.92 ? 'dn' : ''}">${coin(v)}</span>${c.cheat ? '<span class="tg cheat" title="Поймано под кодом: продаётся, но в задания не идёт">КОД</span>' : c.trophy ? '<span class="tg">ТРОФЕЙ</span>' : ''}<img src="${f ? fishIcon(c.sp) : itemIcon(c.sp)}" alt=""><div class="nm" style="color:${f ? rarTint(f.rar) : '#fff'}">${esc((f || JUNK_BY_ID[c.sp]).name)}</div><div class="wt">${fmtW(c.w)}</div></div>`;
     }).join('');
     const total = coolerValue(p, m);
     const mins = Math.max(1, Math.ceil(m.nextIn / 60));
